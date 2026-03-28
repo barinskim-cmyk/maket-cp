@@ -1,0 +1,3 @@
+# Netlify redirects
+# Share links should load the main app
+/share/*  /index.html  200

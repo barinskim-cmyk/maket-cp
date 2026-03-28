@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Maket CP -- Полный бэклог</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #333; padding: 24px; max-width: 1600px; margin: 0 auto; }
+h1 { font-size: 22px; margin-bottom: 4px; }
+.subtitle { font-size: 13px; color: #888; margin-bottom: 20px; }
+
+.toolbar { display: flex; gap: 10px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; }
+.toolbar button { padding: 6px 16px; border: none; border-radius: 4px; font-size: 13px; cursor: pointer; font-weight: 500; }
+.btn-save { background: #4caf50; color: #fff; }
+.btn-load { background: #2196f3; color: #fff; }
+.btn-reset { background: #f44336; color: #fff; }
+.save-status { font-size: 12px; color: #888; margin-left: 8px; }
+
+.test-summary { display: flex; gap: 16px; padding: 10px 16px; background: #fff; border-radius: 8px; margin-bottom: 16px; font-size: 13px; align-items: center; border: 1px solid #e0e0e0; }
+.test-summary .ts-label { font-weight: 600; color: #333; }
+.test-summary .ts-pass { color: #2e7d32; font-weight: 600; }
+.test-summary .ts-fail { color: #c62828; font-weight: 600; }
+.test-summary .ts-issues { color: #e65100; font-weight: 600; }
+.test-summary .ts-untested { color: #9e9e9e; }
+.test-summary .ts-bar { flex: 1; height: 8px; background: #eceff1; border-radius: 4px; overflow: hidden; display: flex; min-width: 200px; }
+.test-summary .ts-bar-pass { background: #4caf50; height: 100%; }
+.test-summary .ts-bar-fail { background: #f44336; height: 100%; }
+.test-summary .ts-bar-issues { background: #ff9800; height: 100%; }
+
+table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; font-size: 11.5px; line-height: 1.45; margin-bottom: 24px; }
+thead { background: #333; color: #fff; }
+th { padding: 8px 6px; text-align: left; font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: 0.3px; }
+td { padding: 6px; border-bottom: 1px solid #eee; vertical-align: top; }
+td[contenteditable="true"] { cursor: text; }
+td[contenteditable="true"]:focus { outline: 2px solid #2196f3; outline-offset: -2px; background: #fff; }
+tr:hover td { background: #fafafa; }
+
+.sprint-row td { background: #1a237e; color: #fff; font-weight: 700; font-size: 14px; padding: 10px 8px; letter-spacing: 0.5px; }
+.section-row td { background: #e8eaf6; font-weight: 600; font-size: 12px; padding: 6px 8px; color: #283593; }
+.checkpoint-row td { background: #fff3e0; font-weight: 600; font-size: 11px; border-left: 4px solid #ff9800; }
+
+.who-claude { background: #e3f2fd; color: #1565c0; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+.who-masha { background: #fce4ec; color: #c62828; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+.who-both { background: #f3e5f5; color: #6a1b9a; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+
+.p-high { color: #c62828; font-weight: 600; }
+.p-med { color: #e65100; font-weight: 600; }
+.p-low { color: #2e7d32; font-weight: 600; }
+
+.s-todo { background: #eceff1; color: #546e7f; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+.s-progress { background: #fff3e0; color: #e65100; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+.s-done { background: #e8f5e9; color: #2e7d32; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+.s-check { background: #fff8e1; color: #f57f17; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+
+.files { font-size: 10px; color: #999; font-family: monospace; }
+.my-comment { min-height: 28px; padding: 4px 6px; background: #fffde7; border-left: 3px solid #ffc107; font-size: 11px; }
+.my-comment:empty::before { content: '...'; color: #ccc; font-style: italic; }
+
+.t-cell { text-align: center; cursor: pointer; user-select: none; min-width: 56px; }
+.t-none { color: #bbb; font-size: 10px; }
+.t-pass { background: #e8f5e9; color: #2e7d32; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+.t-fail { background: #ffebee; color: #c62828; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+.t-issues { background: #fff3e0; color: #e65100; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+
+.auto-saved { color: #4caf50; font-weight: 500; }
+
+/* ── Tabs ── */
+.tabs { display: flex; gap: 0; margin-bottom: 0; border-bottom: 2px solid #333; }
+.tab { padding: 10px 24px; font-size: 14px; font-weight: 600; cursor: pointer; background: #e0e0e0; color: #666; border: none; border-radius: 6px 6px 0 0; margin-right: 2px; transition: background 0.15s; }
+.tab:hover { background: #ccc; }
+.tab.active { background: #333; color: #fff; }
+.tab .tab-badge { display: inline-block; background: #f44336; color: #fff; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 10px; margin-left: 6px; min-width: 18px; text-align: center; }
+.tab .tab-badge.zero { background: #9e9e9e; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; padding-top: 16px; }
+
+/* ── Bug tracker ── */
+.bug-form { display: flex; gap: 8px; margin-bottom: 16px; align-items: flex-end; flex-wrap: wrap; }
+.bug-form label { font-size: 12px; font-weight: 600; color: #555; display: flex; flex-direction: column; gap: 3px; }
+.bug-form input, .bug-form select, .bug-form textarea { padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px; font-family: inherit; }
+.bug-form input:focus, .bug-form select:focus, .bug-form textarea:focus { outline: 2px solid #2196f3; border-color: #2196f3; }
+.bug-form textarea { resize: vertical; min-height: 32px; }
+.bug-form .bf-screen { width: 140px; }
+.bug-form .bf-desc { width: 360px; }
+.bug-form .bf-pri { width: 100px; }
+.btn-add-bug { padding: 6px 20px; border: none; border-radius: 4px; font-size: 13px; cursor: pointer; font-weight: 600; background: #f44336; color: #fff; align-self: flex-end; }
+
+.bug-summary { display: flex; gap: 16px; padding: 10px 16px; background: #fff; border-radius: 8px; margin-bottom: 16px; font-size: 13px; align-items: center; border: 1px solid #e0e0e0; }
+.bug-summary .bs-label { font-weight: 600; }
+.bug-summary .bs-open { color: #c62828; font-weight: 600; }
+.bug-summary .bs-fixed { color: #2e7d32; font-weight: 600; }
+.bug-summary .bs-bar { flex: 1; height: 8px; background: #ffebee; border-radius: 4px; overflow: hidden; min-width: 200px; }
+.bug-summary .bs-bar-fixed { background: #4caf50; height: 100%; transition: width 0.3s; }
+
+.bug-row td { font-size: 12px; }
+.bug-row.fixed td { opacity: 0.5; text-decoration: line-through; }
+.bug-check { width: 18px; height: 18px; cursor: pointer; accent-color: #4caf50; }
+.bug-pri-high { color: #c62828; font-weight: 600; }
+.bug-pri-med { color: #e65100; font-weight: 600; }
+.bug-pri-low { color: #2e7d32; }
+.bug-date { color: #999; font-size: 10px; }
+.bug-id { color: #999; font-family: monospace; font-size: 10px; }
+.btn-del-bug { background: none; border: none; color: #bbb; cursor: pointer; font-size: 14px; padding: 2px 6px; }
+.btn-del-bug:hover { color: #f44336; }
+</style>
+</head>
+<body>
+
+<h1>Maket CP -- Полный бэклог</h1>
+<p class="subtitle">Спринты 1-3 | Обновлено 26.03.2026</p>
+
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('backlog')">Задачи <span class="tab-badge zero" id="tb-tasks">0</span></button>
+  <button class="tab" onclick="switchTab('bugs')">Баги <span class="tab-badge zero" id="tb-bugs">0</span></button>
+</div>
+
+<div class="tab-panel active" id="panel-backlog">
+
+<div class="test-summary" id="tsum">
+  <span class="ts-label">Тестирование:</span>
+  <span class="ts-pass" id="ts-pass">0 OK</span>
+  <span class="ts-fail" id="ts-fail">0 FAIL</span>
+  <span class="ts-issues" id="ts-issues">0 ?</span>
+  <span class="ts-untested" id="ts-untested">0 --</span>
+  <span class="ts-bar"><span class="ts-bar-pass" id="tsb-pass"></span><span class="ts-bar-fail" id="tsb-fail"></span><span class="ts-bar-issues" id="tsb-issues"></span></span>
+</div>
+
+<div class="toolbar">
+  <button class="btn-save" onclick="exportEdits()">Экспорт JSON</button>
+  <button class="btn-load" onclick="document.getElementById('li').click()">Импорт JSON</button>
+  <input type="file" id="li" accept=".json" style="display:none" onchange="importEdits(this)">
+  <button class="btn-reset" onclick="if(confirm('Сбросить все тесты и комментарии?')){localStorage.removeItem('maketcp_backlog');location.reload()}">Сброс</button>
+  <span class="save-status" id="ss"></span>
+</div>
+
+<table id="bt">
+<thead>
+<tr>
+  <th style="width:2.5%">#</th>
+  <th style="width:12%">Задача</th>
+  <th style="width:4.5%">Кто</th>
+  <th style="width:4.5%">Статус</th>
+  <th style="width:5.5%">Экран</th>
+  <th style="width:22%">Что сделать</th>
+  <th style="width:9%">Файлы</th>
+  <th style="width:4.5%">Зависит от</th>
+  <th style="width:5%">Тест</th>
+  <th style="width:14%">Мои комментарии</th>
+</tr>
+</thead>
+<tbody>
+
+<!-- ═══════════ СПРИНТ 1: ФУНДАМЕНТ ═══════════ -->
+<tr class="sprint-row"><td colspan="10">СПРИНТ 1 -- Фундамент и доработка существующих экранов</td></tr>
+
+<tr class="section-row"><td colspan="10">Инфраструктура</td></tr>
+
+<tr data-row="s1-01">
+  <td>1.1</td>
+  <td contenteditable="true"><strong>Git: initial commit</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Инфра</td>
+  <td>Инициализация репозитория, .gitignore, первый коммит всех файлов.</td>
+  <td class="files">.gitignore, все</td>
+  <td>--</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="s1-02">
+  <td>1.2</td>
+  <td contenteditable="true"><strong>CLAUDE.md -- правила проекта</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Инфра</td>
+  <td>Правила для Claude: коммиты, архитектура, стиль кода, чек-лист.</td>
+  <td class="files">CLAUDE.md</td>
+  <td>--</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="s1-03">
+  <td>1.3</td>
+  <td contenteditable="true"><strong>Обновить domain-модели</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Архитектура</td>
+  <td>Photo: rating, rotation, tags, source. CardTemplate: grid(), flexible(), id. Project: categories, channels, stage_history, advance_stage(), collect_photo_stems().</td>
+  <td class="files">photo.py, card.py, project.py</td>
+  <td>--</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr class="section-row"><td colspan="10">Редактор карточек</td></tr>
+
+<tr data-row="s1-04">
+  <td>1.4</td>
+  <td contenteditable="true"><strong>CARD_TEMPLATES в state.js</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Карточки</td>
+  <td>Пользовательские шаблоны (UserTemplates) в state.js. Шаблон = {id, name, slots: [{orient:'h'|'v', main:bool}]}. localStorage-хранилище, CRUD-функции, стартовые пресеты (h+3v, 4v, 6v). Пользователь создаёт шаблоны из карточек.</td>
+  <td class="files">state.js</td>
+  <td>--</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="s1-05">
+  <td>1.5</td>
+  <td contenteditable="true"><strong>Связать шаблон с проектом</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Съёмки + Карточки</td>
+  <td>createProject() сохраняет templateId в проект. cpAddCard(): копирует слоты предыдущей карточки → шаблон проекта → фолбэк 4v. Слот = {orient, main, file, dataUrl, path}. "Сохранить как шаблон" из карточки.</td>
+  <td class="files">shootings.js, cards.js</td>
+  <td>1.4</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="s1-06">
+  <td>1.6</td>
+  <td contenteditable="true"><strong>Универсальный layout карточки</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Карточки</td>
+  <td>Авто-layout: main+h = полная ширина сверху + ряд снизу; main+v = span 2 колонки в grid; без main = равные колонки. Кнопки +/- слотов, переключатель ориентации (H/V), флаг заглавного (M). CSS Grid.</td>
+  <td class="files">cards.js, style.css</td>
+  <td>1.5</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="s1-07">
+  <td>1.7</td>
+  <td contenteditable="true"><strong>Обновить модалку создания съёмки</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Съёмки</td>
+  <td>Модалка: выбрать шаблон из UserTemplates или "Без шаблона". Мини-превью повторяет layout-логику (main-h сверху, main-v = 2x). Проект хранит templateId.</td>
+  <td class="files">index.html, shootings.js, style.css</td>
+  <td>1.4</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr class="checkpoint-row" data-row="cp1">
+  <td></td>
+  <td colspan="7"><strong>ПРОВЕРКА 1 (Masha):</strong> Создать съёмку (с шаблоном и без). Добавить карточки, +/- слоты, переключить H/V, назначить заглавный. Перетащить фото. Сохранить как шаблон. Проверить layout: main-h сверху, main-v = 2x.</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr class="section-row"><td colspan="10">Шаблоны (v3 layout engine)</td></tr>
+
+<tr data-row="s1-06a">
+  <td>1.6a</td>
+  <td contenteditable="true"><strong>Layout engine v3: JS-sizing</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Карточки</td>
+  <td>Три режима: landscape (hero V слева, grid 2fr+3fr), portrait (hero H сверху), equal (без hero). JS-sizing для равных высот рядов. Overflow (3-й ряд на полную ширину).</td>
+  <td class="files">layout.js, cards.js, style.css</td>
+  <td>1.6</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="s1-06b">
+  <td>1.6b</td>
+  <td contenteditable="true"><strong>Редактор шаблона: drag-and-drop между рядами</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Карточки</td>
+  <td>Drag слотов между рядами, клик для переключения H/V, кнопка "+" в каждом ряду. Ручная расстановка приоритетнее авто. Пустые ряды схлопываются. lockRows=true при применении.</td>
+  <td class="files">cards.js, layout.js, style.css</td>
+  <td>1.6a</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="s1-06c">
+  <td>1.6c</td>
+  <td contenteditable="true"><strong>Сохранение шаблона в проект (persistence)</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Карточки / Persistence</td>
+  <td>Шаблон сохраняется в JSON проекта (не только localStorage). При открытии проекта -- восстановить шаблон. Шаблон привязан к проекту (proj.template), но можно сохранить отдельно в библиотеку.</td>
+  <td class="files">state.js, project_service.py, cards.js</td>
+  <td>1.6b, 1.18</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="s1-06d">
+  <td>1.6d</td>
+  <td contenteditable="true"><strong>Библиотека шаблонов (CRUD)</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Карточки</td>
+  <td>Список сохранённых шаблонов (localStorage + JSON). Переименование, удаление, дупликат. Превью шаблона в списке. Применить шаблон к текущему проекту.</td>
+  <td class="files">state.js, cards.js, index.html, style.css</td>
+  <td>1.6c</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="s1-06e">
+  <td>1.6e</td>
+  <td contenteditable="true"><strong>Применение шаблона ко всем карточкам проекта</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Карточки</td>
+  <td>Кнопка "Применить шаблон ко всем карточкам" в проекте. Пересоздать слоты, сохранить фото по позициям (по возможности). Подтверждение перед применением.</td>
+  <td class="files">cards.js, shootings.js</td>
+  <td>1.6d</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr class="section-row"><td colspan="10">Редактор карточек (продолжение)</td></tr>
+
+<tr data-row="s1-09">
+  <td>1.9</td>
+  <td contenteditable="true"><strong>Поворот изображения в слоте</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Карточки</td>
+  <td>Кнопка поворота (90 CW) на заполненном слоте. slot.rotation = 0|90|180|270. CSS transform:rotate() на img. Сохраняется в истории (undo).</td>
+  <td class="files">cards.js, style.css</td>
+  <td>--</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr class="section-row"><td colspan="10">Превью-панель</td></tr>
+
+<tr data-row="s1-09b">
+  <td>1.9b</td>
+  <td contenteditable="true"><strong>Горизонты в превью = 2 вертикали</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Превью</td>
+  <td>Горизонтальное фото в галерее превью занимает ширину ~2 вертикалей. Два горизонта не влезают в ряд -- каждый на своей строке. Ориентация определяется при загрузке (browser + desktop).</td>
+  <td class="files">previews.js, style.css</td>
+  <td>--</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="s1-10">
+  <td>1.10</td>
+  <td contenteditable="true"><strong>Ресайз панели (drag)</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Превью</td>
+  <td>Drag-handle на левой границе .cp-previews. mousedown/mousemove меняет ширину. Min 200px, max 50%. Flexbox перестроит миниатюры автоматически.</td>
+  <td class="files">previews.js, style.css, index.html</td>
+  <td>--</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="s1-11">
+  <td>1.11</td>
+  <td contenteditable="true"><strong>Ползунок размера миниатюр</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Превью</td>
+  <td>Range input в тулбаре. Значение = кол-во колонок (2-6). При изменении пересчёт .pv-thumb width. Как в Capture One.</td>
+  <td class="files">previews.js, style.css</td>
+  <td>--</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="s1-11b">
+  <td>1.11b</td>
+  <td contenteditable="true"><strong>Горизонты = 2x ширина в превью</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Превью</td>
+  <td>Горизонтальные фото (aspect > 1) занимают 2 колонки в превью-сетке. Определять ориентацию по naturalWidth/naturalHeight загруженного img. CSS: grid-column: span 2 для горизонтов.</td>
+  <td class="files">previews.js, style.css</td>
+  <td>--</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr class="section-row"><td colspan="10">Пайплайн</td></tr>
+
+<tr data-row="s1-12">
+  <td>1.12</td>
+  <td contenteditable="true"><strong>Реестр триггеров</strong></td>
+  <td><span class="who-both">Вместе</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Пайплайн</td>
+  <td>PIPELINE_STAGES: добавить trigger {description, check(proj)} для каждого этапа. Кнопка "Завершить" проверяет check(), показывает что не выполнено. Если всё ок -- переход.</td>
+  <td class="files">state.js, shootings.js</td>
+  <td>1.5</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="s1-13">
+  <td>1.13</td>
+  <td contenteditable="true"><strong>Журнал переходов (timestamps)</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Пайплайн</td>
+  <td>advanceStage() записывает {stage, timestamp, trigger} в proj._stageHistory[]. UI показывает время на каждом завершённом этапе.</td>
+  <td class="files">shootings.js</td>
+  <td>1.12</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="s1-14">
+  <td>1.14</td>
+  <td contenteditable="true"><strong>Подсказки по этапам</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Пайплайн</td>
+  <td>Описание текущего этапа: что нужно сделать, какие инструменты доступны. Раскрывающийся блок под активным шагом.</td>
+  <td class="files">state.js, shootings.js, style.css</td>
+  <td>1.12</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr class="section-row"><td colspan="10">Rate Setter</td></tr>
+
+<tr data-row="s1-15">
+  <td>1.15</td>
+  <td contenteditable="true"><strong>Авто-сбор имён из карточек</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Синхронизация</td>
+  <td>Третий режим в Rate Setter UI: "Из карточек". Собирает имена файлов из заполненных слотов + otherContent. Кнопка "Обновить". Показывает кол-во имён.</td>
+  <td class="files">sync.js, cards.js</td>
+  <td>--</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="s1-16">
+  <td>1.16</td>
+  <td contenteditable="true"><strong>Запись ключевых слов в COS</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Синхронизация</td>
+  <td>Метод update_keywords() в CosRepository. Теги: "MaketCP", "card" или "extra", площадки из proj.channels. Исследовать формат ключевых слов в COS (IPTC_Keywords или аналог).</td>
+  <td class="files">cos_repository.py, rate_setter.py, sync.js</td>
+  <td>1.15</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr class="section-row"><td colspan="10">Доп. контент</td></tr>
+
+<tr data-row="s1-17">
+  <td>1.17</td>
+  <td contenteditable="true"><strong>Теги площадок публикации</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Доп. контент</td>
+  <td>На каждом фото в доп. отборе -- кликабельные теги: WB, Ozon, Lamoda, сайт, соцсети, баннер. Множественный выбор. Фильтрация по тегам. Список из proj.channels.</td>
+  <td class="files">previews.js, style.css</td>
+  <td>1.7</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr class="section-row"><td colspan="10">Persistence</td></tr>
+
+<tr data-row="s1-18">
+  <td>1.18</td>
+  <td contenteditable="true"><strong>Автосохранение проекта</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Все</td>
+  <td>Авто-save при значимых действиях (drop фото, удаление, переход этапа). Индикатор "сохранено / не сохранено". Desktop: через ProjectService. Дебаунс 2 сек.</td>
+  <td class="files">cards.js, shootings.js, app_api.py, project_service.py</td>
+  <td>1.6</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr class="checkpoint-row" data-row="cp2">
+  <td></td>
+  <td colspan="7"><strong>ПРОВЕРКА 2 (Masha):</strong> Полный прогон на Mac (python3 main.py). Создать съёмку, настроить шаблон, добавить карточки, загрузить превью из реальной папки, заполнить карточки, запустить Rate Setter. Проверить пайплайн. Сохранить/загрузить проект.</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<!-- ═══════════ СПРИНТ 2: ОПЦИИ И PERSISTENCE ═══════════ -->
+<tr class="sprint-row"><td colspan="10">СПРИНТ 2 -- Опции в слотах, persistence, подготовка к вебу</td></tr>
+
+<tr class="section-row"><td colspan="10">Опции (варианты) в слоте</td></tr>
+
+<tr data-row="s2-01">
+  <td>2.1</td>
+  <td contenteditable="true"><strong>Рефакторинг Slot: options[]</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Карточки</td>
+  <td>Текущий slot = {file, dataUrl}. Рефакторить: slot = {options: [{file, dataUrl, path}], selected: idx}. Drop нескольких фото в один слот. Обратная совместимость с текущими проектами.</td>
+  <td class="files">cards.js, state.js</td>
+  <td>1.6</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="s2-02">
+  <td>2.2</td>
+  <td contenteditable="true"><strong>Карусель в слоте</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Карточки</td>
+  <td>UI: стрелки или свайп внутри слота для просмотра вариантов. Индикатор "3 варианта". Текущее фото выделено.</td>
+  <td class="files">cards.js, style.css</td>
+  <td>2.1</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="s2-03">
+  <td>2.3</td>
+  <td contenteditable="true"><strong>Полноэкранный просмотр фото</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Превью / Карточки</td>
+  <td>Клик на миниатюру / слот -> полноэкранный просмотр с навигацией. Загрузка полного изображения (через get_full_image на desktop).</td>
+  <td class="files">previews.js, cards.js, style.css</td>
+  <td>--</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr class="section-row"><td colspan="10">Persistence и данные</td></tr>
+
+<tr data-row="s2-04">
+  <td>2.4</td>
+  <td contenteditable="true"><strong>Оптимизация сохранения (пути вместо base64)</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Инфра</td>
+  <td>Хранить path + thumbnail отдельно (не base64 в JSON). Отдельная папка .maketcp/thumbs/ рядом с проектом. Reduce JSON размер на порядок.</td>
+  <td class="files">project_service.py, cards.js</td>
+  <td>1.18</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="s2-05">
+  <td>2.5</td>
+  <td contenteditable="true"><strong>Единый event system (_emit)</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Инфра</td>
+  <td>Стандартизировать push-события из Python: onProgress, onDone, onError. Общий _emit() в AppAPI. Frontend: единый обработчик.</td>
+  <td class="files">app_api.py, state.js</td>
+  <td>--</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr class="checkpoint-row" data-row="cp3">
+  <td></td>
+  <td colspan="7"><strong>ПРОВЕРКА 3 (Masha):</strong> Перетащить несколько фото в один слот -- видна карусель. Переключение вариантов. Полноэкранный просмотр. Сохранить проект, закрыть, открыть -- всё восстановилось. Размер JSON файла адекватный.</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr class="section-row"><td colspan="10">Пользователи и доступ</td></tr>
+
+<tr data-row="s2-06">
+  <td>2.6</td>
+  <td contenteditable="true"><strong>Модель пользователей и ролей</strong></td>
+  <td><span class="who-both">Вместе</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Архитектура</td>
+  <td>Три роли: фотограф (owner), клиент (viewer/approver), ретушёр (editor). User = {id, name, email, role}. Фотограф создаёт проект и приглашает по ссылке. Без регистрации для клиента (magic link / token).</td>
+  <td class="files">domain, state.js</td>
+  <td>--</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="s2-06a">
+  <td>2.6a</td>
+  <td contenteditable="true"><strong>Доступ к съёмке по ссылке (share link)</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Web-клиент</td>
+  <td>Фотограф генерирует ссылку на съёмку (уникальный token). Клиент/ретушёр открывает ссылку в браузере, видит проект. Опционально: имя при первом входе. Ссылка = read-only или с правами (по роли).</td>
+  <td class="files">новый модуль, index.html</td>
+  <td>2.6</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="s2-06b">
+  <td>2.6b</td>
+  <td contenteditable="true"><strong>Идентификация: кто смотрит / комментирует</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Web-клиент</td>
+  <td>При открытии ссылки -- ввести имя (сохраняется в cookie/localStorage). Комментарии и действия привязаны к имени. Фотограф видит кто что сделал.</td>
+  <td class="files">state.js, cards.js</td>
+  <td>2.6a</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr class="section-row"><td colspan="10">Подготовка к веб-версии</td></tr>
+
+<tr data-row="s2-07">
+  <td>2.7</td>
+  <td contenteditable="true"><strong>Выбор бэкенда (Supabase vs Firebase vs self-hosted)</strong></td>
+  <td><span class="who-both">Вместе</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Архитектура</td>
+  <td>Исследовать: стоимость хранения больших файлов, real-time sync, auth. Рассмотреть Google Drive / Яндекс.Диск как storage. Принять решение.</td>
+  <td class="files">документация</td>
+  <td>--</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="s2-08">
+  <td>2.8</td>
+  <td contenteditable="true"><strong>Модель данных для синхронизации</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Архитектура</td>
+  <td>Определить схему БД: projects, cards, slots, photos, comments. Sync protocol: desktop push -> server -> web pull. Конфликт-резолюция.</td>
+  <td class="files">документация, domain</td>
+  <td>2.7</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="s2-08">
+  <td>2.8</td>
+  <td contenteditable="true"><strong>PyInstaller сборка .app</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Инфра</td>
+  <td>Обновить .spec файл для v2. Собрать .app. Проверить на чистом Mac.</td>
+  <td class="files">spec, main.py</td>
+  <td>--</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr class="checkpoint-row" data-row="cp4">
+  <td></td>
+  <td colspan="7"><strong>ПРОВЕРКА 4 (Masha):</strong> Запустить .app на Mac без Python. Полный рабочий цикл. Принять решение по бэкенду.</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<!-- ═══════════ СПРИНТ 3: ВЕБ-ВЕРСИЯ ДЛЯ КЛИЕНТА ═══════════ -->
+<tr class="sprint-row"><td colspan="10">СПРИНТ 3 -- Веб-версия для клиента + комментарии на ретушь</td></tr>
+
+<tr class="section-row"><td colspan="10">Согласование клиента (web)</td></tr>
+
+<tr data-row="s3-01">
+  <td>3.1</td>
+  <td contenteditable="true"><strong>Web-версия: просмотр карточек</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Web-клиент</td>
+  <td>Клиент открывает ссылку, видит карточки проекта. Три режима: карточки, лента фото, галерея. Read-only для начала. Zero install.</td>
+  <td class="files">новый модуль</td>
+  <td>2.7</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="s3-02">
+  <td>3.2</td>
+  <td contenteditable="true"><strong>Клиентский режим: отбор</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Web-клиент</td>
+  <td>Галочка/крестик на фото. Комментарий к слоту. Запрос доп. варианта. Утверждение карточки. Всё сохраняется в БД, фотограф видит в desktop.</td>
+  <td class="files">новый модуль</td>
+  <td>3.1, 2.1</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="s3-03">
+  <td>3.3</td>
+  <td contenteditable="true"><strong>Desktop-web sync</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Инфра</td>
+  <td>Фотограф загружает превью на desktop -> автоматическая загрузка в storage -> клиент видит в near-real-time. Sync по имени файла.</td>
+  <td class="files">app_api.py, новый sync модуль</td>
+  <td>2.7, 3.1</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr class="checkpoint-row" data-row="cp5">
+  <td></td>
+  <td colspan="7"><strong>ПРОВЕРКА 5 (Masha + клиент):</strong> Фотограф создаёт проект на desktop, загружает превью. Клиент открывает ссылку, видит карточки. Ставит галочки/крестики. Фотограф видит изменения.</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr class="section-row"><td colspan="10">Комментарии на ретушь</td></tr>
+
+<tr data-row="s3-04">
+  <td>3.4</td>
+  <td contenteditable="true"><strong>Текстовые комментарии к карточке и фото</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Ретушь</td>
+  <td>MVP: текстовые комментарии на двух уровнях -- к карточке целиком и к отдельному фото. Автор + timestamp. Видны всем ролям.</td>
+  <td class="files">cards.js, style.css, domain</td>
+  <td>2.1</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="s3-05">
+  <td>3.5</td>
+  <td contenteditable="true"><strong>Аннотации (рисование на фото)</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Ретушь</td>
+  <td>Canvas overlay для рисования (обводка дефектов, стрелки). Хранить аннотации как SVG/JSON. Видно при просмотре и в экспорте.</td>
+  <td class="files">новый модуль, style.css</td>
+  <td>3.4</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="s3-06">
+  <td>3.6</td>
+  <td contenteditable="true"><strong>Экспорт ТЗ на ретушь (PDF)</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Ретушь</td>
+  <td>Экспорт комментариев + аннотаций в PDF или отдельные файлы. Фото + обводки + текст на одной странице. Или отдельный файл на каждое фото.</td>
+  <td class="files">jsPDF или серверный рендер</td>
+  <td>3.5</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="s3-07">
+  <td>3.7</td>
+  <td contenteditable="true"><strong>Цветные метки по имени файла</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Ретушь / Синхр.</td>
+  <td>По аналогии с Rate Setter: по имени файла присваивать цветную метку в Capture One (через COS). Ретушёр видит только файлы с комментариями. Авто-продвижение без комментариев.</td>
+  <td class="files">cos_repository.py, rate_setter.py</td>
+  <td>1.16, 3.4</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr class="checkpoint-row" data-row="cp6">
+  <td></td>
+  <td colspan="7"><strong>ПРОВЕРКА 6 (Masha):</strong> Оставить комментарии к карточкам и фото. Нарисовать аннотации. Экспортировать PDF. Запустить Rate Setter с цветными метками. Проверить в Capture One.</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr class="section-row"><td colspan="10">Адаптация и AI</td></tr>
+
+<tr data-row="s3-08">
+  <td>3.8</td>
+  <td contenteditable="true"><strong>Адаптация к каналам (MVP)</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Адаптация</td>
+  <td>MVP: ресайз под WB/Ozon. Выбор каналов из proj.channels. Batch export в папку с подпапками по каналам. Переименование по шаблону.</td>
+  <td class="files">новый модуль, Pillow</td>
+  <td>1.17</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="s3-09">
+  <td>3.9</td>
+  <td contenteditable="true"><strong>AI-переименование (MVP)</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Адаптация</td>
+  <td>Semi-auto: загрузить чек-лист (фото + названия), показать фото + предложить имя, человек подтверждает. Vision API (Claude).</td>
+  <td class="files">новый модуль</td>
+  <td>--</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr class="section-row"><td colspan="10">Дальний план</td></tr>
+
+<tr data-row="s4-01">
+  <td>4.1</td>
+  <td contenteditable="true"><strong>Категории из проекта</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Карточки</td>
+  <td>Категория -- необязательное поле (по умолчанию пусто). Кнопка-тоггл вместо обязательного select. Список категорий из proj.categories. Возможность добавить на лету.</td>
+  <td class="files">cards.js, state.js</td>
+  <td>--</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr class="checkpoint-row" data-row="cp7">
+  <td></td>
+  <td colspan="7"><strong>ПРОВЕРКА 7 (Masha):</strong> Полный цикл на реальной съёмке от преотбора до адаптации. Все 8 этапов пайплайна. Все три роли.</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+</tbody>
+</table>
+
+</div><!-- /panel-backlog -->
+
+<div class="tab-panel" id="panel-bugs">
+
+<div class="bug-summary" id="bsum">
+  <span class="bs-label">Баги:</span>
+  <span class="bs-open" id="bs-open">0 открытых</span>
+  <span class="bs-fixed" id="bs-fixed">0 исправлено</span>
+  <span class="bs-bar"><span class="bs-bar-fixed" id="bsb-fixed"></span></span>
+</div>
+
+<div class="bug-form">
+  <label>Экран<input class="bf-screen" id="bf-screen" type="text" placeholder="Превью, Карточки..."></label>
+  <label>Описание<input class="bf-desc" id="bf-desc" type="text" placeholder="Что сломалось / что не так"></label>
+  <label>Приоритет
+    <select class="bf-pri" id="bf-pri">
+      <option value="high">Высокий</option>
+      <option value="med" selected>Средний</option>
+      <option value="low">Низкий</option>
+    </select>
+  </label>
+  <label>Задача (связь)<input id="bf-task" type="text" placeholder="1.4, 1.10..." style="width:80px"></label>
+  <button class="btn-add-bug" onclick="addBug()">+ Добавить баг</button>
+</div>
+
+<div class="toolbar">
+  <button class="btn-save" onclick="exportAll()">Экспорт JSON</button>
+  <button class="btn-load" onclick="document.getElementById('li2').click()">Импорт JSON</button>
+  <input type="file" id="li2" accept=".json" style="display:none" onchange="importAll(this)">
+  <span class="save-status" id="ss2"></span>
+</div>
+
+<table id="bug-table">
+<thead>
+<tr>
+  <th style="width:3%"></th>
+  <th style="width:5%">#</th>
+  <th style="width:8%">Дата</th>
+  <th style="width:10%">Экран</th>
+  <th style="width:38%">Описание</th>
+  <th style="width:8%">Приоритет</th>
+  <th style="width:7%">Задача</th>
+  <th style="width:8%">Статус</th>
+  <th style="width:10%">Коммит</th>
+  <th style="width:3%"></th>
+</tr>
+</thead>
+<tbody id="bug-body">
+</tbody>
+</table>
+
+</div><!-- /panel-bugs -->
+
+<script>
+/* ════════════════════════════════════════════════
+   BACKLOG: task table persistence
+   ════════════════════════════════════════════════ */
+var CN=['num','task','who','status','screen','desc','files','depends','test','my'];
+var LS_KEY='maketcp_backlog';
+var BUGS_KEY='maketcp_bugs';
+var TEST_STATES=['none','pass','fail','issues'];
+var TEST_LABELS={'none':'--','pass':'OK','fail':'FAIL','issues':'?'};
+var TEST_CLASSES={'none':'t-none','pass':'t-pass','fail':'t-fail','issues':'t-issues'};
+var PRI_LABELS={'high':'Высокий','med':'Средний','low':'Низкий'};
+var PRI_CLASSES={'high':'bug-pri-high','med':'bug-pri-med','low':'bug-pri-low'};
+
+var bugs=[];
+var bugCounter=0;
+
+/* ── Tabs ── */
+function switchTab(name){
+  document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('active')});
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active')});
+  document.getElementById('panel-'+name).classList.add('active');
+  var btns=document.querySelectorAll('.tab');
+  if(name==='backlog') btns[0].classList.add('active');
+  else btns[1].classList.add('active');
+}
+
+/* ── Collect backlog data ── */
+function collectData(){
+  var d={_saved:new Date().toISOString(),rows:{}};
+  document.querySelectorAll('#bt tr[data-row]').forEach(function(r){
+    var k=r.getAttribute('data-row'),c=r.querySelectorAll('td'),o={};
+    for(var i=0;i<c.length&&i<CN.length;i++) o[CN[i]]=c[i].innerHTML.trim();
+    d.rows[k]=o;
+  });
+  return d;
+}
+
+/* ── Auto-save everything to localStorage ── */
+function autoSave(){
+  try{
+    localStorage.setItem(LS_KEY,JSON.stringify(collectData()));
+    localStorage.setItem(BUGS_KEY,JSON.stringify({_saved:new Date().toISOString(),counter:bugCounter,bugs:bugs}));
+    var ss=document.getElementById('ss');
+    ss.textContent='Авто-сохранено: '+new Date().toLocaleTimeString();
+    ss.className='save-status auto-saved';
+    updateTestSummary();
+    updateBugSummary();
+    updateTabBadges();
+  }catch(e){console.error('autoSave:',e)}
+}
+
+/* ── Auto-load from localStorage ── */
+function autoLoad(){
+  try{
+    var raw=localStorage.getItem(LS_KEY);
+    if(raw){var d=JSON.parse(raw);if(d&&d.rows)applyData(d)}
+    var braw=localStorage.getItem(BUGS_KEY);
+    if(braw){
+      var bd=JSON.parse(braw);
+      if(bd&&bd.bugs){bugs=bd.bugs;bugCounter=bd.counter||bugs.length}
+    }
+    document.getElementById('ss').textContent='Загружено из авто-сохранения';
+  }catch(e){console.error('autoLoad:',e)}
+}
+
+/* ── Apply saved backlog data ── */
+function applyData(d){
+  document.querySelectorAll('#bt tr[data-row]').forEach(function(tr){
+    var k=tr.getAttribute('data-row');
+    if(!d.rows||!d.rows[k])return;
+    var c=tr.querySelectorAll('td');
+    for(var i=0;i<c.length&&i<CN.length;i++){
+      var col=CN[i];
+      if(d.rows[k][col]!==undefined) c[i].innerHTML=d.rows[k][col];
+    }
+  });
+}
+
+/* ── Export all (backlog + bugs) ── */
+function exportAll(){
+  var all={backlog:collectData(),bugs:{counter:bugCounter,bugs:bugs},_saved:new Date().toISOString()};
+  var b=new Blob([JSON.stringify(all,null,2)],{type:'application/json'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(b);a.download='backlog_edits.json';a.click();
+}
+function exportEdits(){exportAll()}
+
+/* ── Import all ── */
+function importAll(inp){
+  if(!inp.files[0])return;
+  var r=new FileReader();
+  r.onload=function(e){
+    try{
+      var d=JSON.parse(e.target.result);
+      if(d.backlog&&d.backlog.rows){applyData(d.backlog)}
+      if(d.bugs&&d.bugs.bugs){bugs=d.bugs.bugs;bugCounter=d.bugs.counter||bugs.length;renderBugs()}
+      /* backwards compat: old format without .backlog wrapper */
+      if(d.rows&&!d.backlog){applyData(d)}
+      autoSave();
+    }catch(e){alert(e)}
+  };
+  r.readAsText(inp.files[0]);inp.value='';
+}
+function importEdits(inp){importAll(inp)}
+
+/* ── Test cell click ── */
+function cycleTest(td){
+  var span=td.querySelector('span');if(!span)return;
+  var cur='none';
+  for(var s in TEST_CLASSES){if(span.className===TEST_CLASSES[s]){cur=s;break}}
+  var idx=TEST_STATES.indexOf(cur);
+  var next=TEST_STATES[(idx+1)%TEST_STATES.length];
+  span.className=TEST_CLASSES[next];
+  span.textContent=TEST_LABELS[next];
+  autoSave();
+}
+
+/* ── Test summary ── */
+function updateTestSummary(){
+  var cells=document.querySelectorAll('#bt .t-cell');
+  var counts={none:0,pass:0,fail:0,issues:0},total=0;
+  cells.forEach(function(td){
+    var span=td.querySelector('span');if(!span)return;total++;
+    for(var s in TEST_CLASSES){if(span.className===TEST_CLASSES[s]){counts[s]++;break}}
+  });
+  document.getElementById('ts-pass').textContent=counts.pass+' OK';
+  document.getElementById('ts-fail').textContent=counts.fail+' FAIL';
+  document.getElementById('ts-issues').textContent=counts.issues+' ?';
+  document.getElementById('ts-untested').textContent=counts.none+' --';
+  if(total>0){
+    document.getElementById('tsb-pass').style.width=(counts.pass/total*100)+'%';
+    document.getElementById('tsb-fail').style.width=(counts.fail/total*100)+'%';
+    document.getElementById('tsb-issues').style.width=(counts.issues/total*100)+'%';
+  }
+}
+
+/* ════════════════════════════════════════════════
+   BUG TRACKER
+   ════════════════════════════════════════════════ */
+
+function addBug(){
+  var scr=document.getElementById('bf-screen').value.trim();
+  var desc=document.getElementById('bf-desc').value.trim();
+  var pri=document.getElementById('bf-pri').value;
+  var task=document.getElementById('bf-task').value.trim();
+  if(!desc){document.getElementById('bf-desc').focus();return}
+  bugCounter++;
+  var bug={
+    id:'BUG-'+bugCounter,
+    date:new Date().toISOString().slice(0,10),
+    screen:scr||'--',
+    desc:desc,
+    priority:pri,
+    task:task||'--',
+    fixed:false,
+    commit:''
+  };
+  bugs.unshift(bug);
+  renderBugs();
+  autoSave();
+  /* clear form */
+  document.getElementById('bf-desc').value='';
+  document.getElementById('bf-screen').value='';
+  document.getElementById('bf-task').value='';
+}
+
+function toggleBug(id){
+  for(var i=0;i<bugs.length;i++){
+    if(bugs[i].id===id){
+      bugs[i].fixed=!bugs[i].fixed;
+      if(bugs[i].fixed) bugs[i].fixDate=new Date().toISOString().slice(0,10);
+      else delete bugs[i].fixDate;
+      break;
+    }
+  }
+  renderBugs();
+  autoSave();
+}
+
+function deleteBug(id){
+  if(!confirm('Удалить '+id+'?'))return;
+  bugs=bugs.filter(function(b){return b.id!==id});
+  renderBugs();
+  autoSave();
+}
+
+function editBugCommit(id,val){
+  for(var i=0;i<bugs.length;i++){
+    if(bugs[i].id===id){bugs[i].commit=val;break}
+  }
+  autoSave();
+}
+
+function renderBugs(){
+  var body=document.getElementById('bug-body');
+  body.innerHTML='';
+  bugs.forEach(function(b){
+    var tr=document.createElement('tr');
+    tr.className='bug-row'+(b.fixed?' fixed':'');
+    var statusHtml=b.fixed
+      ? '<span class="t-pass">FIXED</span>'+(b.fixDate?' <span class="bug-date">'+b.fixDate+'</span>':'')
+      : '<span class="t-fail">OPEN</span>';
+    tr.innerHTML=
+      '<td><input type="checkbox" class="bug-check"'+(b.fixed?' checked':'')+' onchange="toggleBug(\''+b.id+'\')"></td>'+
+      '<td class="bug-id">'+b.id+'</td>'+
+      '<td class="bug-date">'+b.date+'</td>'+
+      '<td>'+b.screen+'</td>'+
+      '<td>'+b.desc+'</td>'+
+      '<td><span class="'+PRI_CLASSES[b.priority]+'">'+PRI_LABELS[b.priority]+'</span></td>'+
+      '<td>'+b.task+'</td>'+
+      '<td>'+statusHtml+'</td>'+
+      '<td><input type="text" value="'+(b.commit||'')+'" placeholder="хэш" style="width:80px;font-size:10px;font-family:monospace;padding:2px 4px;border:1px solid #ddd;border-radius:3px" onblur="editBugCommit(\''+b.id+'\',this.value)"></td>'+
+      '<td><button class="btn-del-bug" onclick="deleteBug(\''+b.id+'\')" title="Удалить">x</button></td>';
+    body.appendChild(tr);
+  });
+  updateBugSummary();
+}
+
+function updateBugSummary(){
+  var open=0,fixed=0;
+  bugs.forEach(function(b){if(b.fixed)fixed++;else open++});
+  document.getElementById('bs-open').textContent=open+' открытых';
+  document.getElementById('bs-fixed').textContent=fixed+' исправлено';
+  var total=open+fixed;
+  document.getElementById('bsb-fixed').style.width=total>0?(fixed/total*100)+'%':'0%';
+}
+
+function updateTabBadges(){
+  /* Tasks badge: count TODO tasks */
+  var todo=0;
+  document.querySelectorAll('#bt .s-todo').forEach(function(){todo++});
+  var tbTasks=document.getElementById('tb-tasks');
+  tbTasks.textContent=todo;
+  tbTasks.className='tab-badge'+(todo===0?' zero':'');
+
+  /* Bugs badge: count open bugs */
+  var open=0;
+  bugs.forEach(function(b){if(!b.fixed)open++});
+  var tbBugs=document.getElementById('tb-bugs');
+  tbBugs.textContent=open;
+  tbBugs.className='tab-badge'+(open===0?' zero':'');
+}
+
+/* ════════════════════════════════════════════════
+   INIT
+   ════════════════════════════════════════════════ */
+(function(){
+  autoLoad();
+  renderBugs();
+  document.querySelectorAll('#bt .t-cell').forEach(function(td){
+    td.addEventListener('click',function(){cycleTest(td)});
+  });
+  document.querySelectorAll('td[contenteditable="true"]').forEach(function(td){
+    td.addEventListener('blur',function(){autoSave()});
+  });
+  updateTestSummary();
+  updateBugSummary();
+  updateTabBadges();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Maket CP — Аудит и бэклог</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #333; padding: 24px; }
+h1 { font-size: 22px; margin-bottom: 6px; }
+.subtitle { font-size: 13px; color: #888; margin-bottom: 20px; }
+.legend { display: flex; gap: 16px; margin-bottom: 16px; font-size: 12px; }
+.legend span { display: inline-flex; align-items: center; gap: 4px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.dot-done { background: #4caf50; }
+.dot-partial { background: #ff9800; }
+.dot-plan { background: #90a4ae; }
+
+.toolbar { display: flex; gap: 10px; margin-bottom: 16px; align-items: center; }
+.toolbar button { padding: 6px 16px; border: none; border-radius: 4px; font-size: 13px; cursor: pointer; font-weight: 500; }
+.btn-save { background: #4caf50; color: #fff; }
+.btn-save:hover { background: #43a047; }
+.btn-load { background: #2196f3; color: #fff; }
+.btn-load:hover { background: #1e88e5; }
+.save-status { font-size: 12px; color: #888; margin-left: 8px; }
+
+table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; font-size: 12px; line-height: 1.5; }
+thead { background: #333; color: #fff; }
+th { padding: 10px 8px; text-align: left; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px; }
+td { padding: 10px 8px; border-bottom: 1px solid #eee; vertical-align: top; }
+td[contenteditable="true"] { cursor: text; }
+td[contenteditable="true"]:focus { outline: 2px solid #2196f3; outline-offset: -2px; background: #fff; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #fafafa; }
+
+.my-comment {
+  min-height: 40px; padding: 8px;
+  background: #fffde7; border-left: 3px solid #ffc107;
+  font-style: normal; color: #333; font-size: 12px;
+}
+.my-comment:empty::before {
+  content: 'Кликни, чтобы написать...';
+  color: #ccc; font-style: italic;
+}
+
+.status-done { color: #4caf50; font-weight: 600; }
+.status-partial { color: #ff9800; font-weight: 600; }
+.status-plan { color: #90a4ae; font-weight: 600; }
+
+.stage-tag { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; margin: 1px 0; }
+.s1 { background: #e8f5e9; color: #2e7d32; }
+.s2 { background: #e3f2fd; color: #1565c0; }
+.s3 { background: #fff3e0; color: #e65100; }
+.s4 { background: #fce4ec; color: #c62828; }
+.s5 { background: #f3e5f5; color: #6a1b9a; }
+.s6 { background: #e0f2f1; color: #00695c; }
+.s7 { background: #fff8e1; color: #f57f17; }
+.s8 { background: #eceff1; color: #37474f; }
+
+ul { margin: 0; padding-left: 14px; }
+li { margin-bottom: 2px; }
+.section-row td { background: #f0f0f0; font-weight: 600; font-size: 13px; padding: 8px; }
+.comment-cell { color: #999; font-style: italic; }
+.trigger-cell { font-size: 11px; }
+</style>
+</head>
+<body>
+
+<h1>Maket CP — Аудит экранов и бэклог</h1>
+<p class="subtitle">По состоянию на 26.03.2026 | Пайплайн: 8 этапов от преотбора до адаптации</p>
+
+<div class="legend">
+  <span><span class="dot dot-done"></span> Готово</span>
+  <span><span class="dot dot-partial"></span> Частично</span>
+  <span><span class="dot dot-plan"></span> Запланировано</span>
+</div>
+
+<div class="toolbar">
+  <button class="btn-save" onclick="saveEdits()">Сохранить изменения</button>
+  <button class="btn-load" onclick="document.getElementById('load-input').click()">Загрузить сохранённое</button>
+  <input type="file" id="load-input" accept=".json" style="display:none" onchange="loadEdits(this)">
+  <span class="save-status" id="save-status"></span>
+</div>
+
+<table id="audit-table">
+<thead>
+<tr>
+  <th style="width:10%">Экран</th>
+  <th style="width:6%">Статус</th>
+  <th style="width:8%">Этап пайплайна</th>
+  <th style="width:9%">Триггер перехода</th>
+  <th style="width:13%">Функции</th>
+  <th style="width:12%">Бизнес-требования</th>
+  <th style="width:12%">Технические требования</th>
+  <th style="width:12%">Комментарии</th>
+  <th style="width:18%">Мои комментарии</th>
+</tr>
+</thead>
+<tbody>
+
+<!-- СЪЁМКИ -->
+<tr class="section-row"><td colspan="9">Съёмки</td></tr>
+
+<tr data-row="shootings-list">
+  <td contenteditable="true"><strong>Список съёмок</strong></td>
+  <td contenteditable="true"><span class="status-done">Готово</span></td>
+  <td contenteditable="true"><span class="stage-tag s1">Все этапы</span></td>
+  <td contenteditable="true" class="trigger-cell">—</td>
+  <td contenteditable="true">
+    <ul>
+      <li>Создание новой съёмки (модалка: бренд, дата, шаблон)</li>
+      <li>Открытие проекта из JSON</li>
+      <li>Список проектов с выбором</li>
+      <li>Отображение бренда, даты, кол-ва карточек</li>
+    </ul>
+  </td>
+  <td contenteditable="true">
+    <ul>
+      <li>Фотограф быстро создаёт проект и переключается между съёмками</li>
+      <li>Видит сводку по каждой: бренд, дата, сколько карточек</li>
+    </ul>
+  </td>
+  <td contenteditable="true">
+    <ul>
+      <li>state.js: App.projects[], App.selectedProject</li>
+      <li>shootings.js: createProject(), loadProject()</li>
+      <li>Python: ProjectService save/load JSON</li>
+      <li>Браузерный фолбэк (без Python) работает</li>
+    </ul>
+  </td>
+  <td contenteditable="true" class="comment-cell">Нет сохранения проекта в браузерном режиме (только через Python). Нет автосохранения. Нет удаления проекта из списка.</td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="pipeline">
+  <td contenteditable="true"><strong>Пайплайн (панель справа)</strong></td>
+  <td contenteditable="true"><span class="status-partial">Частично</span></td>
+  <td contenteditable="true"><span class="stage-tag s1">1</span>–<span class="stage-tag s8">8</span></td>
+  <td contenteditable="true" class="trigger-cell">Кнопка «Завершить этап» на текущем активном шаге</td>
+  <td contenteditable="true">
+    <ul>
+      <li>8 этапов с визуальным прогрессом (done/active/pending)</li>
+      <li>Кнопка «Завершить этап» на активном шаге</li>
+      <li>Визуал: точки, линии, галочки</li>
+    </ul>
+  </td>
+  <td contenteditable="true">
+    <ul>
+      <li>Фотограф видит на каком этапе каждая съёмка</li>
+      <li>Переход на следующий этап — осознанное действие</li>
+      <li>Пайплайн отражает реальный рабочий процесс</li>
+    </ul>
+  </td>
+  <td contenteditable="true">
+    <ul>
+      <li>shootings.js: PIPELINE_STAGES[], advanceStage()</li>
+      <li>proj._stage — индекс текущего этапа</li>
+      <li>Только forward-движение (нет отката)</li>
+    </ul>
+  </td>
+  <td contenteditable="true" class="comment-cell">Этапы — заглушка: нажатие «Завершить» просто инкрементирует _stage. Нет привязки к реальным действиям (напр. «все карточки заполнены» для перехода). Нет возврата назад. Нет описания/подсказки что делать на этапе.</td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<!-- КОНТЕНТ — КАРТОЧКИ -->
+<tr class="section-row"><td colspan="9">Контент — Карточки товара</td></tr>
+
+<tr data-row="cards-sidebar">
+  <td contenteditable="true"><strong>Сайдбар карточек</strong></td>
+  <td contenteditable="true"><span class="status-done">Готово</span></td>
+  <td contenteditable="true"><span class="stage-tag s2">2. Отбор фотографа</span></td>
+  <td contenteditable="true" class="trigger-cell">—</td>
+  <td contenteditable="true">
+    <ul>
+      <li>Список карточек (номер, категория, кол-во фото)</li>
+      <li>Добавление новой карточки</li>
+      <li>Экспорт списка (.txt)</li>
+      <li>Выделение активной карточки</li>
+    </ul>
+  </td>
+  <td contenteditable="true">
+    <ul>
+      <li>Быстрый доступ к любой карточке</li>
+      <li>Видно заполненность каждой карточки</li>
+    </ul>
+  </td>
+  <td contenteditable="true">
+    <ul>
+      <li>cards.js: cpRenderList(), cpAddCard()</li>
+      <li>Слоты: null = пустой, {file, dataUrl} = заполнен</li>
+    </ul>
+  </td>
+  <td contenteditable="true" class="comment-cell">Нет drag-and-drop для сортировки карточек. Нет группировки/поиска. Экспорт только в .txt (нет PDF-экспорта карточек из v2).</td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="card-editor">
+  <td contenteditable="true"><strong>Редактор карточки (EKONIKA-стиль)</strong></td>
+  <td contenteditable="true"><span class="status-done">Готово</span></td>
+  <td contenteditable="true"><span class="stage-tag s2">2. Отбор фотографа</span></td>
+  <td contenteditable="true" class="trigger-cell">Все карточки заполнены &rarr; можно перейти к «Отбор клиента»</td>
+  <td contenteditable="true">
+    <ul>
+      <li>Раскладка: 1 горизонтальная + 2–3 вертикальных</li>
+      <li>Drag-and-drop: из ОС, из превью, между слотами (swap)</li>
+      <li>Удаление фото из слота</li>
+      <li>Переключатель 2/3 вертикали</li>
+      <li>Выбор категории товара</li>
+      <li>Undo (до 10 шагов, Cmd+Z)</li>
+      <li>Навигация стрелками между карточками</li>
+    </ul>
+  </td>
+  <td contenteditable="true">
+    <ul>
+      <li>Карточка — центральная сущность: фотограф видит как кадры работают вместе</li>
+      <li>Drag-and-drop из превью — основной способ работы</li>
+      <li>Undo — страховка от ошибок</li>
+    </ul>
+  </td>
+  <td contenteditable="true">
+    <ul>
+      <li>cards.js: cpRenderCard(), cpSlotHTML(), cpBindSlotEvents()</li>
+      <li>Drop priority: 1) application/x-preview, 2) OS files, 3) slot swap</li>
+      <li>History: JSON-снэпшоты slots</li>
+      <li>Desktop: хранит path, thumb для display; full image через get_full_image</li>
+    </ul>
+  </td>
+  <td contenteditable="true" class="comment-cell">Нет опций (вариантов) в слоте — по документации запланировано (карусель, выбор клиента). Нет комментариев к карточке. Шаблон фиксирован (горизонт + вертикали), нет кастомных шаблонов. Нет PDF-экспорта из v2.</td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="preview-panel">
+  <td contenteditable="true"><strong>Панель превью (справа)</strong></td>
+  <td contenteditable="true"><span class="status-done">Готово</span></td>
+  <td contenteditable="true"><span class="stage-tag s1">1. Преотбор</span> <span class="stage-tag s2">2. Отбор</span></td>
+  <td contenteditable="true" class="trigger-cell">—</td>
+  <td contenteditable="true">
+    <ul>
+      <li>Загрузка: drag-and-drop папки/файлов + кнопка «Выбрать папку»</li>
+      <li>Прогресс загрузки (X / Y, %)</li>
+      <li>Миниатюры: canvas (браузер) или Pillow (desktop)</li>
+      <li>Фильтр по рейтингу (XMP из Capture One)</li>
+      <li>Фильтр по папке (при загрузке нескольких папок)</li>
+      <li>Дедупликация по имени файла</li>
+      <li>Зелёная галочка на фото, уже используемых в карточках</li>
+      <li>Drag из превью в слоты карточек</li>
+      <li>Lazy rendering (60 шт + скролл)</li>
+      <li>Сортировка по имени (слева-направо, сверху-вниз)</li>
+    </ul>
+  </td>
+  <td contenteditable="true">
+    <ul>
+      <li>Быстрый просмотр всех превью</li>
+      <li>Рейтинг из Capture One сохраняется</li>
+      <li>Видно что уже отобрано, что нет</li>
+      <li>Несколько папок без дубликатов</li>
+    </ul>
+  </td>
+  <td contenteditable="true">
+    <ul>
+      <li>previews.js: pvRenderPanel(), pvBuildHTML(), pvReadXmpRating()</li>
+      <li>preview_service.py: scan_folder(), _read_xmp_rating()</li>
+      <li>XMP: sidecar .xmp, embedded (256KB), Pillow getxmp()</li>
+      <li>Модель: {name, path, thumb, rating, folders}</li>
+      <li>Concurrent loading: 4 потока</li>
+    </ul>
+  </td>
+  <td contenteditable="true" class="comment-cell">Рейтинг read-only (не пишется обратно в XMP). Нет полноэкранного просмотра фото. Нет color label из Capture One. При очистке превью не спрашивает про карточки.</td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<!-- КОНТЕНТ — ДОП. КОНТЕНТ -->
+<tr class="section-row"><td colspan="9">Контент — Доп. контент</td></tr>
+
+<tr data-row="other-content">
+  <td contenteditable="true"><strong>Свободное поле + превью</strong></td>
+  <td contenteditable="true"><span class="status-done">Готово</span></td>
+  <td contenteditable="true"><span class="stage-tag s2">2. Отбор фотографа</span></td>
+  <td contenteditable="true" class="trigger-cell">—</td>
+  <td contenteditable="true">
+    <ul>
+      <li>Свободное поле (drop target): перетаскиваем из превью</li>
+      <li>Галерея с масонри-раскладкой</li>
+      <li>Удаление из поля</li>
+      <li>Своя панель превью справа (общий пул)</li>
+      <li>Все фильтры превью (рейтинг, папка)</li>
+    </ul>
+  </td>
+  <td contenteditable="true">
+    <ul>
+      <li>Фотограф выносит дополнительные кадры, не вошедшие в карточки</li>
+      <li>Часть отбора — «ещё понравилось»</li>
+    </ul>
+  </td>
+  <td contenteditable="true">
+    <ul>
+      <li>previews.js: ocInitField(), ocRenderField()</li>
+      <li>proj.otherContent[] — отдельный массив</li>
+      <li>Drop только из превью (application/x-preview)</li>
+    </ul>
+  </td>
+  <td contenteditable="true" class="comment-cell">Нет возможности добавить комментарий к фото. Нет экспорта списка доп. контента. Не привязан к пайплайну (нет чёткого действия завершения).</td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<!-- СИНХРОНИЗАЦИЯ -->
+<tr class="section-row"><td colspan="9">Синхронизация</td></tr>
+
+<tr data-row="rate-setter">
+  <td contenteditable="true"><strong>Rate Setter</strong></td>
+  <td contenteditable="true"><span class="status-done">Готово</span></td>
+  <td contenteditable="true"><span class="stage-tag s4">4. Цветокоррекция</span></td>
+  <td contenteditable="true" class="trigger-cell">Успешный запуск Rate Setter &rarr; переход к ЦК в Capture One</td>
+  <td contenteditable="true">
+    <ul>
+      <li>Два режима: список имён (textarea) или папка-источник</li>
+      <li>Выбор папки сессии Capture One</li>
+      <li>Удаление суффиксов (_preview, _web...)</li>
+      <li>Пробный запуск (dry-run)</li>
+      <li>Лог в реальном времени (push из Python)</li>
+      <li>Цветовая разметка: ok/miss/err/skip/dry</li>
+      <li>Результат: обновлено / не найдено</li>
+    </ul>
+  </td>
+  <td contenteditable="true">
+    <ul>
+      <li>Автоматическое выставление рейтинга 5 звёзд на утверждённые фото в Capture One</li>
+      <li>Экономит часы ручного поиска</li>
+    </ul>
+  </td>
+  <td contenteditable="true">
+    <ul>
+      <li>sync.js: runRateSetter(), push-лог</li>
+      <li>rate_setter.py: run(), clean_name(), collect_source_stems()</li>
+      <li>cos_repository.py: build_index(), update_rating()</li>
+      <li>Атомарная запись, .cos.bak бэкапы</li>
+    </ul>
+  </td>
+  <td contenteditable="true" class="comment-cell">Не привязан к карточкам: можно было бы автоматически собирать список имён из заполненных карточек. Нет кнопки «Синхронизировать из карточек».</td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<!-- ЗАПЛАНИРОВАНО -->
+<tr class="section-row"><td colspan="9">Запланированные экраны (ещё не реализованы)</td></tr>
+
+<tr data-row="client-approval">
+  <td contenteditable="true"><strong>Согласование клиента (web)</strong></td>
+  <td contenteditable="true"><span class="status-plan">Запланировано</span></td>
+  <td contenteditable="true"><span class="stage-tag s3">3. Отбор клиента</span></td>
+  <td contenteditable="true" class="trigger-cell">Клиент утвердил все карточки &rarr; переход к ЦК</td>
+  <td contenteditable="true">
+    <ul>
+      <li>Клиент открывает ссылку (zero install)</li>
+      <li>Просмотр карточек (read + edit)</li>
+      <li>Галочка / крестик на фото</li>
+      <li>Комментарии к слоту</li>
+      <li>Запрос доп. варианта</li>
+      <li>Утверждение карточки</li>
+    </ul>
+  </td>
+  <td contenteditable="true">
+    <ul>
+      <li>Zero learning curve: галочка = выбрать, крестик = убрать</li>
+      <li>Клиент не устанавливает софт</li>
+      <li>Прозрачность: фотограф видит решения клиента</li>
+    </ul>
+  </td>
+  <td contenteditable="true">
+    <ul>
+      <li>Веб-версия Card Maker</li>
+      <li>Supabase/Firebase для синхронизации</li>
+      <li>Auth: magic link или share-ссылка</li>
+      <li>Real-time sync desktop &harr; web</li>
+    </ul>
+  </td>
+  <td contenteditable="true" class="comment-cell">Ключевая фича для монетизации. Требует бэкенд (Supabase). Требует опции/варианты в слотах.</td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="slot-options">
+  <td contenteditable="true"><strong>Опции (варианты) в слоте</strong></td>
+  <td contenteditable="true"><span class="status-plan">Запланировано</span></td>
+  <td contenteditable="true"><span class="stage-tag s2">2. Отбор</span> <span class="stage-tag s3">3. Клиент</span></td>
+  <td contenteditable="true" class="trigger-cell">—</td>
+  <td contenteditable="true">
+    <ul>
+      <li>Несколько фото в одном слоте</li>
+      <li>Карусель / свайп для просмотра</li>
+      <li>Индикатор «3 варианта»</li>
+      <li>Клиент: выбор, удаление, запрос ещё</li>
+    </ul>
+  </td>
+  <td contenteditable="true">
+    <ul>
+      <li>Фотограф предлагает варианты — клиент выбирает</li>
+      <li>Основа процесса согласования</li>
+    </ul>
+  </td>
+  <td contenteditable="true">
+    <ul>
+      <li>domain/card.py: Slot.options[], Slot.selected</li>
+      <li>UI: карусель в слоте, счётчик вариантов</li>
+      <li>Drop нескольких фото в один слот</li>
+    </ul>
+  </td>
+  <td contenteditable="true" class="comment-cell">Блокирует веб-версию для клиента. Текущий Slot — плоский {file, dataUrl}. Нужно рефакторить в options[].</td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="cc-approval">
+  <td contenteditable="true"><strong>Согласование ЦК</strong></td>
+  <td contenteditable="true"><span class="status-plan">Запланировано</span></td>
+  <td contenteditable="true"><span class="stage-tag s4">4. Цветокоррекция</span> / <span class="stage-tag s5">5. Комментарии</span></td>
+  <td contenteditable="true" class="trigger-cell">Клиент подтверждает ЦК &rarr; переход к ретуши</td>
+  <td contenteditable="true">
+    <ul>
+      <li>Просмотр фото после ЦК</li>
+      <li>Сравнение до/после</li>
+      <li>Комментарии клиента</li>
+    </ul>
+  </td>
+  <td contenteditable="true">
+    <ul>
+      <li>Клиент утверждает цветокоррекцию (иногда пропускается)</li>
+    </ul>
+  </td>
+  <td contenteditable="true">
+    <ul>
+      <li>Веб-версия с просмотром</li>
+      <li>Загрузка обновлённых фото (после ЦК)</li>
+    </ul>
+  </td>
+  <td contenteditable="true" class="comment-cell">Зависит от веб-версии. Часто этап пропускается — нужен UX «пропустить».</td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="retouch-comments">
+  <td contenteditable="true"><strong>Комментарии на ретушь</strong></td>
+  <td contenteditable="true"><span class="status-plan">Запланировано</span></td>
+  <td contenteditable="true"><span class="stage-tag s5">5. Комментарии на ретушь</span></td>
+  <td contenteditable="true" class="trigger-cell">Все комментарии расставлены &rarr; отправка ретушёру</td>
+  <td contenteditable="true">
+    <ul>
+      <li>Просмотр карточек/фото</li>
+      <li>Добавление комментариев/ТЗ к каждому фото</li>
+      <li>Маркеры на фото (pin-комментарии)</li>
+      <li>Экспорт ТЗ для ретушёра</li>
+    </ul>
+  </td>
+  <td contenteditable="true">
+    <ul>
+      <li>Фотограф формирует чёткое ТЗ на ретушь</li>
+      <li>Ретушёр видит что и где править</li>
+    </ul>
+  </td>
+  <td contenteditable="true">
+    <ul>
+      <li>domain/card.py: Slot.comment, Card.comments[]</li>
+      <li>Canvas overlay для pin-комментариев</li>
+      <li>Экспорт в PDF/DOCX</li>
+    </ul>
+  </td>
+  <td contenteditable="true" class="comment-cell">Можно начать с простых текстовых комментариев без пинов. MVP: текстовое поле на карточку.</td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="retouch-approval">
+  <td contenteditable="true"><strong>Ретушь + согласование</strong></td>
+  <td contenteditable="true"><span class="status-plan">Запланировано</span></td>
+  <td contenteditable="true"><span class="stage-tag s6">6. Ретушь</span> <span class="stage-tag s7">7. Согласование</span></td>
+  <td contenteditable="true" class="trigger-cell">Ретушёр загружает результат &rarr; клиент/фотограф утверждает</td>
+  <td contenteditable="true">
+    <ul>
+      <li>Ретушёр получает ссылку</li>
+      <li>Загрузка отретушированных фото</li>
+      <li>Сравнение до/после</li>
+      <li>Комментарии на доработку</li>
+      <li>Финальное утверждение</li>
+    </ul>
+  </td>
+  <td contenteditable="true">
+    <ul>
+      <li>Три роли: фотограф, ретушёр, клиент</li>
+      <li>Прозрачный процесс</li>
+    </ul>
+  </td>
+  <td contenteditable="true">
+    <ul>
+      <li>Веб-версия + роли + права</li>
+      <li>Upload новых версий фото</li>
+      <li>Version tracking</li>
+    </ul>
+  </td>
+  <td contenteditable="true" class="comment-cell">Самый сложный модуль. Зависит от бэкенда, ролей, веб-версии. Можно отложить на фазу 4.</td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="channel-adaptation">
+  <td contenteditable="true"><strong>Адаптация к каналам</strong></td>
+  <td contenteditable="true"><span class="status-plan">Запланировано</span></td>
+  <td contenteditable="true"><span class="stage-tag s8">8. Адаптация</span></td>
+  <td contenteditable="true" class="trigger-cell">Все фото адаптированы &rarr; проект завершён</td>
+  <td contenteditable="true">
+    <ul>
+      <li>Выбор каналов: WB, Ozon, Lamoda, сайт, соцсети</li>
+      <li>Автоматический ресайз/кроп под каждый канал</li>
+      <li>Переименование по шаблону канала</li>
+      <li>Экспорт готовых пакетов</li>
+    </ul>
+  </td>
+  <td contenteditable="true">
+    <ul>
+      <li>Одно действие — готовые файлы для всех площадок</li>
+      <li>Убирает ручную рутину сдачи</li>
+    </ul>
+  </td>
+  <td contenteditable="true">
+    <ul>
+      <li>Pillow/sharp для ресайза</li>
+      <li>Шаблоны каналов (размеры, форматы, именование)</li>
+      <li>Batch export</li>
+    </ul>
+  </td>
+  <td contenteditable="true" class="comment-cell">Низкий приоритет, но высокая ценность. Можно MVP: только ресайз под WB/Ozon.</td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="ai-rename">
+  <td contenteditable="true"><strong>AI-переименование</strong></td>
+  <td contenteditable="true"><span class="status-plan">Запланировано</span></td>
+  <td contenteditable="true"><span class="stage-tag s8">8. Адаптация</span></td>
+  <td contenteditable="true" class="trigger-cell">—</td>
+  <td contenteditable="true">
+    <ul>
+      <li>Загрузка чек-листа товаров (изображения + названия)</li>
+      <li>Vision API распознаёт что на фото</li>
+      <li>Автоматическое переименование файлов</li>
+    </ul>
+  </td>
+  <td contenteditable="true">
+    <ul>
+      <li>Боль клиента: ручное переименование сотен файлов</li>
+    </ul>
+  </td>
+  <td contenteditable="true">
+    <ul>
+      <li>Vision API (Claude / GPT-4V)</li>
+      <li>Matching алгоритм: фото &harr; товар</li>
+    </ul>
+  </td>
+  <td contenteditable="true" class="comment-cell">Средний приоритет. Можно начать с semi-auto: показать фото + предложить имя, человек подтверждает.</td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<!-- ИНФРАСТРУКТУРА -->
+<tr class="section-row"><td colspan="9">Инфраструктура / cross-cutting</td></tr>
+
+<tr data-row="persistence">
+  <td contenteditable="true"><strong>Persistence (save/load)</strong></td>
+  <td contenteditable="true"><span class="status-partial">Частично</span></td>
+  <td contenteditable="true"><span class="stage-tag s1">Все</span></td>
+  <td contenteditable="true" class="trigger-cell">—</td>
+  <td contenteditable="true">
+    <ul>
+      <li>Save/load проекта через файловый диалог (JSON)</li>
+      <li>Сериализация карточек, слотов</li>
+    </ul>
+  </td>
+  <td contenteditable="true">
+    <ul>
+      <li>Не терять работу</li>
+      <li>Возобновлять сессию</li>
+    </ul>
+  </td>
+  <td contenteditable="true">
+    <ul>
+      <li>project_service.py: save(), load()</li>
+      <li>JSON с base64 thumbnails (тяжёлый)</li>
+    </ul>
+  </td>
+  <td contenteditable="true" class="comment-cell">Нет автосохранения. Нет сохранения превью-пула (только карточки). base64 в JSON — тяжёлые файлы. Нет браузерного persistence (IndexedDB убрали).</td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="pyinstaller">
+  <td contenteditable="true"><strong>PyInstaller (.app)</strong></td>
+  <td contenteditable="true"><span class="status-plan">Запланировано</span></td>
+  <td contenteditable="true"><span class="stage-tag s1">Все</span></td>
+  <td contenteditable="true" class="trigger-cell">—</td>
+  <td contenteditable="true">
+    <ul>
+      <li>Сборка в macOS .app</li>
+      <li>Иконка, подпись</li>
+    </ul>
+  </td>
+  <td contenteditable="true">
+    <ul>
+      <li>Запуск без установки Python</li>
+    </ul>
+  </td>
+  <td contenteditable="true">
+    <ul>
+      <li>PyInstaller spec</li>
+      <li>js_api= вместо expose() (уже сделано)</li>
+    </ul>
+  </td>
+  <td contenteditable="true" class="comment-cell">Нужно протестировать на чистом Mac. Pillow может потребовать особой сборки.</td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="supabase">
+  <td contenteditable="true"><strong>Supabase backend</strong></td>
+  <td contenteditable="true"><span class="status-plan">Запланировано</span></td>
+  <td contenteditable="true"><span class="stage-tag s3">3</span>–<span class="stage-tag s7">7</span></td>
+  <td contenteditable="true" class="trigger-cell">—</td>
+  <td contenteditable="true">
+    <ul>
+      <li>Хранение проектов и карточек</li>
+      <li>Auth (magic link)</li>
+      <li>Storage для фото</li>
+      <li>Real-time sync</li>
+    </ul>
+  </td>
+  <td contenteditable="true">
+    <ul>
+      <li>Клиент и ретушёр работают через веб</li>
+      <li>Синхронизация desktop &harr; web</li>
+    </ul>
+  </td>
+  <td contenteditable="true">
+    <ul>
+      <li>Supabase project</li>
+      <li>Dual-mode архитектура (pvHasBackend)</li>
+    </ul>
+  </td>
+  <td contenteditable="true" class="comment-cell">Архитектурное разветвление desktop/web уже заложено (pvHasBackend). Нужно определиться: Supabase vs Firebase.</td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+</tbody>
+</table>
+
+<script>
+// Колонки таблицы (для сериализации)
+var COL_NAMES = ['screen', 'status', 'stage', 'trigger', 'functions', 'business', 'technical', 'comments', 'my_comments'];
+
+// Собрать все данные из таблицы в объект
+function collectEdits() {
+  var data = { _saved: new Date().toISOString(), rows: {} };
+  var rows = document.querySelectorAll('#audit-table tr[data-row]');
+  rows.forEach(function(tr) {
+    var key = tr.getAttribute('data-row');
+    var cells = tr.querySelectorAll('td');
+    var rowData = {};
+    for (var i = 0; i < cells.length && i < COL_NAMES.length; i++) {
+      rowData[COL_NAMES[i]] = cells[i].innerHTML.trim();
+    }
+    data.rows[key] = rowData;
+  });
+  return data;
+}
+
+// Сохранить в JSON-файл (скачивание)
+function saveEdits() {
+  var data = collectEdits();
+  var json = JSON.stringify(data, null, 2);
+  var blob = new Blob([json], { type: 'application/json; charset=utf-8' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'audit_edits.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  document.getElementById('save-status').textContent = 'Сохранено: ' + new Date().toLocaleTimeString();
+}
+
+// Загрузить из JSON-файла
+function loadEdits(input) {
+  if (!input.files || !input.files[0]) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var data = JSON.parse(e.target.result);
+      applyEdits(data);
+      document.getElementById('save-status').textContent = 'Загружено из файла (' + (data._saved || '?') + ')';
+    } catch(err) {
+      alert('Ошибка чтения файла: ' + err.message);
+    }
+  };
+  reader.readAsText(input.files[0]);
+  input.value = '';
+}
+
+// Применить данные из JSON к таблице
+function applyEdits(data) {
+  if (!data || !data.rows) return;
+  var rows = document.querySelectorAll('#audit-table tr[data-row]');
+  rows.forEach(function(tr) {
+    var key = tr.getAttribute('data-row');
+    if (!data.rows[key]) return;
+    var cells = tr.querySelectorAll('td');
+    for (var i = 0; i < cells.length && i < COL_NAMES.length; i++) {
+      var col = COL_NAMES[i];
+      if (data.rows[key][col] !== undefined) {
+        cells[i].innerHTML = data.rows[key][col];
+      }
+    }
+  });
+}
+</script>
+
+</body>
+</html>
