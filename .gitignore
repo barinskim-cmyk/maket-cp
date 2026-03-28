@@ -1,0 +1,56 @@
+# Images and large binary files
+[anchor client]_cards/images/
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.tiff
+*.tif
+*.heic
+*.heif
+*.cr2
+*.cr3
+*.nef
+*.arw
+*.dng
+*.psd
+*.psb
+
+# Keep specific assets
+!v2/assets/icon.png
+!v2/assets/icon.icns
+
+# Build artifacts
+script/dist/
+script/build/
+v2/dist/
+__pycache__/
+*.pyc
+*.pyo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Python
+*.egg-info/
+*.egg
+venv/
+.venv/
+
+# Node (if ever used)
+node_modules/
+
+# Backlog edits (user's local state)
+*_edits.json
+
+# Large archives and videos
+*.zip
+*.mov
+*.mp4
+*.pdf
+.git_old
+
+# Large legacy HTML files with embedded images
+[anchor client]_карточки товара.html
+[anchor client]_карточки_товара_v2.html

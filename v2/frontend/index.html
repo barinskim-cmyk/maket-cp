@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maket CP</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ══════════════ Auth Gate: экран входа ══════════════ -->
+<div id="auth-gate" class="auth-gate">
+  <div class="auth-card">
+    <div class="auth-logo">Maket CP</div>
+    <div class="auth-subtitle">Управление съёмкой</div>
+
+    <div id="auth-login-form">
+      <div class="auth-field">
+        <label>Email</label>
+        <input type="email" id="auth-email" placeholder="you@example.com">
+      </div>
+      <div class="auth-field">
+        <label>Пароль</label>
+        <input type="password" id="auth-pass" placeholder="Пароль">
+      </div>
+      <div id="auth-error" class="auth-error"></div>
+      <button class="auth-btn auth-btn-primary" onclick="authDoLogin()">Войти</button>
+      <button class="auth-btn" onclick="authDoMagicLink()">Отправить ссылку на email</button>
+      <div class="auth-link">
+        <a href="#" onclick="authShowSignup();return false">Нет аккаунта? Регистрация</a>
+      </div>
+    </div>
+
+    <div id="auth-signup-form" style="display:none">
+      <div class="auth-field">
+        <label>Имя</label>
+        <input type="text" id="auth-signup-name" placeholder="Ваше имя">
+      </div>
+      <div class="auth-field">
+        <label>Email</label>
+        <input type="email" id="auth-signup-email" placeholder="you@example.com">
+      </div>
+      <div class="auth-field">
+        <label>Пароль</label>
+        <input type="password" id="auth-signup-pass" placeholder="Не менее 6 символов">
+      </div>
+      <div id="auth-signup-error" class="auth-error"></div>
+      <button class="auth-btn auth-btn-primary" onclick="authDoSignup()">Создать аккаунт</button>
+      <div class="auth-link">
+        <a href="#" onclick="authShowLogin();return false">Уже есть аккаунт? Войти</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ Основное приложение (скрыто до авторизации) ══════════════ -->
+<div id="app-main" style="display:none">
+
+<div class="nav">
+  <button class="nav-btn active" id="nav-shootings" onclick="showPage('shootings')">Съёмки</button>
+  <button class="nav-btn" id="nav-content" onclick="showPage('content')">Контент</button>
+  <button class="nav-btn" id="nav-sync" onclick="showPage('sync')">Синхронизация</button>
+</div>
+
+<!-- ══════════════ Съёмки ══════════════ -->
+<div id="page-shootings" class="page active">
+  <div class="container">
+    <div class="projects-header">
+      <div class="section-title">Съёмки</div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn" onclick="loadProject()">Открыть</button>
+        <button class="btn btn-primary" onclick="openNewProjectModal()">Новая съёмка</button>
+        <button class="btn" onclick="sbUploadCurrentProject()" title="Загрузить в облако">В облако</button>
+        <button class="btn" onclick="sbShowCloudProjects()" title="Скачать из облака">Из облака</button>
+        <button class="btn" onclick="sbOpenShareModal()" title="Поделиться ссылкой">Поделиться</button>
+      </div>
+    </div>
+
+    <div class="shootings-layout">
+      <div class="shootings-left">
+        <div class="project-list" id="project-list">
+          <div class="empty-state">Нет открытых проектов</div>
+        </div>
+      </div>
+
+      <div class="shootings-right">
+        <div class="pipeline-panel">
+          <div class="section-title">Пайплайн</div>
+          <div id="pipeline-container">
+            <div class="empty-state">Выберите съёмку</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ Контент ══════════════ -->
+<div id="page-content" class="page">
+  <div class="subtabs">
+    <button class="subtab active" id="subtab-cp" onclick="showSubpage('cp')">Карточки товара</button>
+    <button class="subtab" id="subtab-other" onclick="showSubpage('other')">Доп. контент</button>
+  </div>
+
+  <div id="subpage-cp" class="subpage active">
+    <div class="cp-container">
+      <div class="cp-sidebar">
+        <h3>Карточки</h3>
+        <div id="cp-cards-list"></div>
+        <button class="cp-add-card-btn" onclick="cpAddCard()">+ Новая карточка</button>
+        <button class="btn btn-sm" style="width:100%;margin-top:6px" onclick="cpExportList()">Экспорт списка</button>
+      </div>
+      <div class="cp-view" id="cp-view">
+        <div class="cp-empty">Создайте или откройте съёмку, затем добавьте карточки</div>
+      </div>
+      <div class="cp-previews" id="cp-previews">
+        <h3>Превью</h3>
+        <div class="pv-dropzone" id="pv-dropzone">
+          <span class="pv-dropzone-text">Перетащите файлы или</span>
+          <button class="btn btn-sm" onclick="pvPickFolder()">Выбрать папку</button>
+        </div>
+        <div class="pv-toolbar" id="pv-toolbar" style="display:none">
+          <span id="pv-count">0 фото</span>
+          <input type="range" id="pv-thumb-slider" min="2" max="6" value="3" class="pv-slider" title="Размер миниатюр" oninput="pvSetColumns(this.value)">
+          <button class="btn btn-sm" onclick="pvClearAll()">Очистить</button>
+        </div>
+        <div class="pv-filter" id="pv-filter" style="display:none">
+          <span class="pv-filter-stars" id="pv-filter-stars" data-panel="pv"></span>
+          <button class="pv-filter-reset" id="pv-filter-reset" onclick="pvSetFilter('pv', 0)">Все</button>
+        </div>
+        <div class="pv-folder-filter" id="pv-folder-filter" style="display:none">
+          <select class="pv-folder-select" id="pv-folder-select" onchange="pvSetFolderFilter('pv', this.value)">
+            <option value="">Все папки</option>
+          </select>
+        </div>
+        <div class="pv-gallery" id="pv-gallery"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="subpage-other" class="subpage">
+    <div class="oc-layout">
+      <div class="oc-main">
+        <div class="oc-header">
+          <div class="section-title">Доп. контент</div>
+          <div class="oc-toolbar" id="oc-toolbar" style="display:none">
+            <span id="oc-count">0 фото</span>
+            <button class="btn btn-sm" onclick="ocClearAll()">Очистить</button>
+          </div>
+        </div>
+        <div class="oc-field" id="oc-field">
+          <div class="oc-field-empty" id="oc-field-empty">Перетащите сюда фото из превью</div>
+          <div class="oc-gallery" id="oc-gallery"></div>
+        </div>
+      </div>
+      <div class="cp-previews" id="oc-previews">
+        <h3>Превью</h3>
+        <div class="pv-dropzone" id="oc-pv-dropzone">
+          <span class="pv-dropzone-text">Перетащите файлы или</span>
+          <button class="btn btn-sm" onclick="pvPickFolder()">Выбрать папку</button>
+        </div>
+        <div class="pv-toolbar" id="oc-pv-toolbar" style="display:none">
+          <span id="oc-pv-count">0 фото</span>
+        </div>
+        <div class="pv-filter" id="oc-pv-filter" style="display:none">
+          <span class="pv-filter-stars" id="oc-pv-filter-stars" data-panel="oc-pv"></span>
+          <button class="pv-filter-reset" id="oc-pv-filter-reset" onclick="pvSetFilter('oc-pv', 0)">Все</button>
+        </div>
+        <div class="pv-folder-filter" id="oc-pv-folder-filter" style="display:none">
+          <select class="pv-folder-select" id="oc-pv-folder-select" onchange="pvSetFolderFilter('oc-pv', this.value)">
+            <option value="">Все папки</option>
+          </select>
+        </div>
+        <div class="pv-gallery" id="oc-pv-gallery"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ Синхронизация ══════════════ -->
+<div id="page-sync" class="page">
+  <div class="container">
+    <div class="section-title">Синхронизация с Capture One</div>
+
+    <div class="sync-layout">
+      <div class="sync-left">
+        <div class="sync-panel">
+          <div class="section-title">Rate Setter</div>
+
+          <div class="radio-group">
+            <label><input type="radio" name="rs-mode" value="text" checked onchange="toggleRsMode()"> Список имён</label>
+            <label><input type="radio" name="rs-mode" value="folder" onchange="toggleRsMode()"> Папка с файлами</label>
+          </div>
+
+          <div id="rs-text-mode">
+            <div class="sync-field">
+              <label>Вставьте список имён файлов (по одному на строку)</label>
+              <textarea id="rs-text" placeholder="IMG_0001&#10;IMG_0002&#10;IMG_0003"></textarea>
+            </div>
+          </div>
+
+          <div id="rs-folder-mode" style="display:none">
+            <div class="sync-field">
+              <label>Папка-источник (с превью/выборкой)</label>
+              <div class="path-row">
+                <input type="text" id="rs-source-dir" placeholder="Выберите папку..." readonly>
+                <button class="btn btn-sm" onclick="pickFolder('rs-source-dir')">Обзор</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="sync-field">
+            <label>Папка сессии Capture One</label>
+            <div class="path-row">
+              <input type="text" id="rs-session-dir" placeholder="Выберите папку сессии..." readonly>
+              <button class="btn btn-sm" onclick="pickFolder('rs-session-dir')">Обзор</button>
+            </div>
+          </div>
+
+          <div class="checkbox-row">
+            <input type="checkbox" id="rs-strip-tails">
+            <label for="rs-strip-tails">Убирать суффиксы (_preview, _web, _copy...)</label>
+          </div>
+
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-primary" id="rs-run-btn" onclick="runRateSetter(false)">Запустить</button>
+            <button class="btn" onclick="runRateSetter(true)">Пробный запуск</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="sync-right">
+        <div class="sync-panel">
+          <div class="section-title">Лог</div>
+          <div class="sync-log" id="rs-log">Готов к работе</div>
+          <div class="sync-result" id="rs-result" style="display:none"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ Модалка: новая съёмка ══════════════ -->
+<div class="modal-overlay" id="modal-new-project">
+  <div class="modal">
+    <h3>Новая съёмка</h3>
+    <div class="modal-field">
+      <label>Бренд</label>
+      <input type="text" id="inp-brand" placeholder="[anchor client], Rendez-Vous...">
+    </div>
+    <div class="modal-field">
+      <label>Дата съёмки</label>
+      <input type="date" id="inp-date">
+    </div>
+    <div class="modal-field">
+      <label>Шаблон карточки (из сохранённых)</label>
+      <select id="inp-template"></select>
+      <div id="tmpl-preview" class="tmpl-preview"></div>
+    </div>
+    <div class="modal-buttons">
+      <button class="btn" onclick="closeModal('modal-new-project')">Отмена</button>
+      <button class="btn btn-primary" onclick="createProject()">Создать</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ Модалка: редактор шаблона ══════════════ -->
+<div class="modal-overlay" id="modal-tmpl-editor">
+  <div class="modal" style="width:480px">
+    <h3>Редактор шаблона</h3>
+
+    <div class="te-row">
+      <div class="te-group">
+        <label>Вертикали</label>
+        <div class="te-counter">
+          <button class="btn btn-sm" onclick="teAdjust('v',-1)">-</button>
+          <span id="te-v-count">0</span>
+          <button class="btn btn-sm" onclick="teAdjust('v',+1)">+</button>
+        </div>
+      </div>
+      <div class="te-group">
+        <label>Пропорции V</label>
+        <select id="te-v-aspect" onchange="teRefreshPreview()"></select>
+      </div>
+    </div>
+
+    <div class="te-row">
+      <div class="te-group">
+        <label>Горизонтали</label>
+        <div class="te-counter">
+          <button class="btn btn-sm" onclick="teAdjust('h',-1)">-</button>
+          <span id="te-h-count">0</span>
+          <button class="btn btn-sm" onclick="teAdjust('h',+1)">+</button>
+        </div>
+      </div>
+      <div class="te-group">
+        <label>Пропорции H</label>
+        <select id="te-h-aspect" onchange="teRefreshPreview()"></select>
+      </div>
+    </div>
+
+    <div class="te-row">
+      <div class="te-group">
+        <label>Ряды</label>
+        <div class="te-counter">
+          <button class="btn btn-sm" onclick="teAdjustRows(-1)">-</button>
+          <span id="te-row-count">1</span>
+          <button class="btn btn-sm" onclick="teAdjustRows(+1)">+</button>
+        </div>
+      </div>
+      <div class="te-group">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="checkbox" id="te-has-hero" onchange="teToggleHasHero()">
+          Заглавное фото
+        </label>
+        <div class="te-hint">Первое фото = заглавное. Ориентация определяет раскладку.</div>
+      </div>
+      <div class="te-group">
+        <label>Имя шаблона</label>
+        <input type="text" id="te-name" placeholder="Название...">
+      </div>
+    </div>
+
+    <!-- lockRows убран: авторяды в редакторе, lockRows=true при применении -->
+
+    <div id="te-preview" class="te-preview"></div>
+
+    <div class="modal-buttons" style="flex-wrap:wrap;gap:8px">
+      <button class="btn" onclick="closeModal('modal-tmpl-editor')">Отмена</button>
+      <button class="btn" onclick="teSaveAsNew()">Сохранить новый шаблон</button>
+      <button class="btn btn-primary" onclick="teApplyToCard()">Применить к карточке</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ Модалка: облачная настройка ══════════════ -->
+<div class="modal-overlay" id="modal-cloud-setup">
+  <div class="modal" style="width:420px">
+    <h3>Настройка облака</h3>
+    <div class="modal-field">
+      <label>Supabase Project URL</label>
+      <input type="text" id="inp-sb-url" placeholder="https://xxxxx.supabase.co">
+    </div>
+    <div class="modal-field">
+      <label>Supabase anon key</label>
+      <input type="text" id="inp-sb-anon" placeholder="eyJhbGciOiJIUzI1NiIs...">
+    </div>
+    <div class="modal-buttons">
+      <button class="btn" onclick="closeModal('modal-cloud-setup')">Отмена</button>
+      <button class="btn btn-primary" onclick="sbApplySetup()">Подключить</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ Модалка: вход ══════════════ -->
+<div class="modal-overlay" id="modal-login">
+  <div class="modal" style="width:380px">
+    <h3>Вход</h3>
+    <div class="modal-field">
+      <label>Email</label>
+      <input type="email" id="inp-login-email" placeholder="you@example.com">
+    </div>
+    <div class="modal-field">
+      <label>Пароль</label>
+      <input type="password" id="inp-login-pass" placeholder="Пароль">
+    </div>
+    <div id="login-error" style="color:#c62828;font-size:12px;margin-bottom:8px;display:none"></div>
+    <div class="modal-buttons">
+      <button class="btn" onclick="closeModal('modal-login')">Отмена</button>
+      <button class="btn" onclick="sbDoMagicLink()">Magic Link</button>
+      <button class="btn btn-primary" onclick="sbDoLogin()">Войти</button>
+    </div>
+    <div style="font-size:11px;color:#888;margin-top:8px">
+      <a href="#" onclick="openModal('modal-signup');return false">Нет аккаунта? Регистрация</a>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ Модалка: регистрация ══════════════ -->
+<div class="modal-overlay" id="modal-signup">
+  <div class="modal" style="width:380px">
+    <h3>Регистрация</h3>
+    <div class="modal-field">
+      <label>Имя</label>
+      <input type="text" id="inp-signup-name" placeholder="Masha">
+    </div>
+    <div class="modal-field">
+      <label>Email</label>
+      <input type="email" id="inp-signup-email" placeholder="you@example.com">
+    </div>
+    <div class="modal-field">
+      <label>Пароль</label>
+      <input type="password" id="inp-signup-pass" placeholder="Не менее 6 символов">
+    </div>
+    <div id="signup-error" style="color:#c62828;font-size:12px;margin-bottom:8px;display:none"></div>
+    <div class="modal-buttons">
+      <button class="btn" onclick="closeModal('modal-signup')">Отмена</button>
+      <button class="btn btn-primary" onclick="sbDoSignup()">Создать аккаунт</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ Модалка: share link ══════════════ -->
+<div class="modal-overlay" id="modal-share">
+  <div class="modal" style="width:420px">
+    <h3>Поделиться съёмкой</h3>
+    <div class="modal-field">
+      <label>Роль</label>
+      <select id="inp-share-role">
+        <option value="client">Клиент (просмотр + комментарии)</option>
+        <option value="retoucher">Ретушёр (редактирование)</option>
+      </select>
+    </div>
+    <div class="modal-field">
+      <label>Метка (необязательно)</label>
+      <input type="text" id="inp-share-label" placeholder="Для Лены...">
+    </div>
+    <div id="share-result" style="display:none;margin-top:12px">
+      <label style="font-size:11px;color:#888">Ссылка для отправки:</label>
+      <input type="text" id="share-url" readonly style="width:100%;padding:8px;font-size:12px;background:#f5f5f5;border:1px solid #ddd;border-radius:5px;margin-top:4px">
+      <button class="btn btn-sm" onclick="sbCopyShareUrl()" style="margin-top:6px">Скопировать</button>
+    </div>
+    <div class="modal-buttons">
+      <button class="btn" onclick="closeModal('modal-share')">Закрыть</button>
+      <button class="btn btn-primary" id="btn-create-share" onclick="sbDoCreateShare()">Создать ссылку</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ Статус ══════════════ -->
+<div class="status-bar" id="status-bar">
+  <span id="save-status" style="color:#999">--</span>
+  Бэкенд: <span id="backend-status" class="disconnected">проверяю...</span>
+  <span id="cloud-status" style="margin-left:12px"></span>
+  <span id="user-status" style="margin-left:12px"></span>
+</div>
+
+</div><!-- /app-main -->
+
+<!-- ══════════════ Скрипты ══════════════ -->
+<!-- Supabase SDK v2 (jsdelivr CDN) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
+<script src="js/state.js"></script>
+<script src="js/nav.js"></script>
+<script src="js/shootings.js"></script>
+<script src="js/layout.js"></script>
+<script src="js/cards.js"></script>
+<script src="js/previews.js"></script>
+<script src="js/sync.js"></script>
+<script src="js/supabase.js"></script>
+<script src="js/cloud-ui.js"></script>
+</body>
+</html>

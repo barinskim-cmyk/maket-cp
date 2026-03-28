@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Maket CP -- Настройка Supabase</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #333; padding: 24px; max-width: 800px; margin: 0 auto; }
+h1 { font-size: 20px; margin-bottom: 4px; }
+.subtitle { font-size: 13px; color: #888; margin-bottom: 20px; }
+.progress-bar { height: 8px; background: #e0e0e0; border-radius: 4px; margin-bottom: 24px; overflow: hidden; }
+.progress-fill { height: 100%; background: #4caf50; transition: width 0.3s; border-radius: 4px; }
+.progress-text { font-size: 12px; color: #888; margin-bottom: 8px; }
+
+.section { background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 16px; border: 1px solid #e8e8e8; }
+.section-title { font-size: 15px; font-weight: 600; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #eee; }
+.section-hint { font-size: 12px; color: #888; margin-bottom: 12px; }
+
+.step { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f5f5f5; }
+.step:last-child { border-bottom: none; }
+.step input[type="checkbox"] { margin-top: 3px; width: 18px; height: 18px; cursor: pointer; accent-color: #333; flex-shrink: 0; }
+.step-content { flex: 1; }
+.step-label { font-size: 14px; cursor: pointer; }
+.step.done .step-label { text-decoration: line-through; color: #aaa; }
+.step-detail { font-size: 12px; color: #888; margin-top: 4px; }
+.step.done .step-detail { color: #ccc; }
+
+/* Поля для вставки данных */
+.data-field { margin-top: 8px; }
+.data-field label { font-size: 11px; color: #666; display: block; margin-bottom: 2px; }
+.data-field input { width: 100%; padding: 6px 10px; border: 1.5px solid #ddd; border-radius: 5px; font-size: 13px; font-family: monospace; }
+.data-field input:focus { outline: none; border-color: #333; }
+
+.note { background: #fffde7; border: 1px solid #fff9c4; border-radius: 6px; padding: 12px; font-size: 12px; color: #795548; margin-top: 12px; }
+
+.toolbar { display: flex; gap: 8px; margin-bottom: 16px; }
+.toolbar button { padding: 6px 14px; border: none; border-radius: 5px; font-size: 12px; cursor: pointer; font-weight: 500; }
+.btn-export { background: #333; color: #fff; }
+.btn-export:hover { background: #555; }
+.btn-reset { background: #f5f5f5; color: #666; border: 1px solid #ddd !important; }
+.btn-reset:hover { background: #eee; }
+</style>
+</head>
+<body>
+
+<h1>Maket CP -- Настройка инфраструктуры</h1>
+<p class="subtitle">Чеклист для Masha. Прогресс сохраняется в браузере.</p>
+
+<div class="progress-text" id="progress-text">0 / 0</div>
+<div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+
+<div class="toolbar">
+  <button class="btn-export" onclick="exportData()">Экспорт JSON</button>
+  <button class="btn-reset" onclick="resetAll()">Сбросить</button>
+</div>
+
+<!-- ═══════════ Supabase: регистрация ═══════════ -->
+<div class="section" id="sec-supabase">
+  <div class="section-title">1. Supabase -- создание проекта</div>
+  <div class="section-hint">supabase.com -- бесплатный план хватит для старта</div>
+
+  <div class="step" data-key="sb-register">
+    <input type="checkbox" id="ch-sb-register" onchange="toggle('sb-register')">
+    <div class="step-content">
+      <label class="step-label" for="ch-sb-register">Зарегистрироваться на supabase.com</label>
+      <div class="step-detail">Можно через GitHub или email</div>
+    </div>
+  </div>
+
+  <div class="step" data-key="sb-project">
+    <input type="checkbox" id="ch-sb-project" onchange="toggle('sb-project')">
+    <div class="step-content">
+      <label class="step-label" for="ch-sb-project">Создать новый проект</label>
+      <div class="step-detail">Название: maketcp, Регион: Frankfurt (eu-central-1) -- ближе к РФ, Пароль БД: любой надежный</div>
+    </div>
+  </div>
+
+  <div class="step" data-key="sb-url">
+    <input type="checkbox" id="ch-sb-url" onchange="toggle('sb-url')">
+    <div class="step-content">
+      <label class="step-label" for="ch-sb-url">Скопировать Project URL</label>
+      <div class="step-detail">Settings > API > Project URL</div>
+      <div class="data-field">
+        <label>Project URL</label>
+        <input type="text" id="data-sb-url" placeholder="https://xxxxx.supabase.co" oninput="saveData()">
+      </div>
+    </div>
+  </div>
+
+  <div class="step" data-key="sb-anon">
+    <input type="checkbox" id="ch-sb-anon" onchange="toggle('sb-anon')">
+    <div class="step-content">
+      <label class="step-label" for="ch-sb-anon">Скопировать anon public key</label>
+      <div class="step-detail">Settings > API > Project API Keys > anon / public</div>
+      <div class="data-field">
+        <label>anon public key</label>
+        <input type="text" id="data-sb-anon" placeholder="eyJhbGciOiJIUzI1NiIs..." oninput="saveData()">
+      </div>
+    </div>
+  </div>
+
+  <div class="step" data-key="sb-id">
+    <input type="checkbox" id="ch-sb-id" onchange="toggle('sb-id')">
+    <div class="step-content">
+      <label class="step-label" for="ch-sb-id">Скопировать Project ID</label>
+      <div class="step-detail">Видно в URL или в Settings > General</div>
+      <div class="data-field">
+        <label>Project ID</label>
+        <input type="text" id="data-sb-id" placeholder="abcdefghijk" oninput="saveData()">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ Supabase: SQL schema ═══════════ -->
+<div class="section" id="sec-schema">
+  <div class="section-title">2. Запустить SQL-схему базы данных</div>
+  <div class="section-hint">Создает все таблицы, политики безопасности и функции</div>
+
+  <div class="step" data-key="sql-open">
+    <input type="checkbox" id="ch-sql-open" onchange="toggle('sql-open')">
+    <div class="step-content">
+      <label class="step-label" for="ch-sql-open">Открыть SQL Editor в Supabase Dashboard</label>
+      <div class="step-detail">Левое меню > SQL Editor > New query</div>
+    </div>
+  </div>
+
+  <div class="step" data-key="sql-paste">
+    <input type="checkbox" id="ch-sql-paste" onchange="toggle('sql-paste')">
+    <div class="step-content">
+      <label class="step-label" for="ch-sql-paste">Вставить содержимое v2/supabase/schema.sql и нажать Run</label>
+      <div class="step-detail">Файл лежит в проекте. Скопировать весь текст, вставить в редактор, запустить.</div>
+    </div>
+  </div>
+
+  <div class="step" data-key="sql-check">
+    <input type="checkbox" id="ch-sql-check" onchange="toggle('sql-check')">
+    <div class="step-content">
+      <label class="step-label" for="ch-sql-check">Проверить что таблицы создались</label>
+      <div class="step-detail">Table Editor (левое меню) -- должны быть: profiles, projects, cards, slots, comments, share_links, project_members, stage_events</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ Storage ═══════════ -->
+<div class="section" id="sec-storage">
+  <div class="section-title">3. Supabase Storage -- бакеты для файлов</div>
+  <div class="section-hint">Хранение миниатюр и оригиналов фото</div>
+
+  <div class="step" data-key="st-thumbs">
+    <input type="checkbox" id="ch-st-thumbs" onchange="toggle('st-thumbs')">
+    <div class="step-content">
+      <label class="step-label" for="ch-st-thumbs">Создать bucket "thumbnails" (Public: ON)</label>
+      <div class="step-detail">Storage > New bucket > Name: thumbnails, Public bucket: включить</div>
+    </div>
+  </div>
+
+  <div class="step" data-key="st-orig">
+    <input type="checkbox" id="ch-st-orig" onchange="toggle('st-orig')">
+    <div class="step-content">
+      <label class="step-label" for="ch-st-orig">Создать bucket "originals" (Public: OFF)</label>
+      <div class="step-detail">Storage > New bucket > Name: originals, Public bucket: выключить</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ Auth ═══════════ -->
+<div class="section" id="sec-auth">
+  <div class="section-title">4. Аутентификация</div>
+  <div class="section-hint">Magic link -- клиенты заходят по ссылке из email без пароля</div>
+
+  <div class="step" data-key="auth-email">
+    <input type="checkbox" id="ch-auth-email" onchange="toggle('auth-email')">
+    <div class="step-content">
+      <label class="step-label" for="ch-auth-email">Включить Email provider</label>
+      <div class="step-detail">Authentication > Providers > Email > Enable. Убедись что "Confirm email" включен.</div>
+    </div>
+  </div>
+
+  <div class="step" data-key="auth-magic">
+    <input type="checkbox" id="ch-auth-magic" onchange="toggle('auth-magic')">
+    <div class="step-content">
+      <label class="step-label" for="ch-auth-magic">Включить Magic Link</label>
+      <div class="step-detail">В том же разделе Email provider: Enable Magic Link = ON</div>
+    </div>
+  </div>
+
+  <div class="step" data-key="auth-redirect">
+    <input type="checkbox" id="ch-auth-redirect" onchange="toggle('auth-redirect')">
+    <div class="step-content">
+      <label class="step-label" for="ch-auth-redirect">Добавить Redirect URLs</label>
+      <div class="step-detail">Authentication > URL Configuration > Redirect URLs. Добавить: http://localhost:8080, http://127.0.0.1:8080</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ Домен ═══════════ -->
+<div class="section" id="sec-domain">
+  <div class="section-title">5. Домен (подготовка)</div>
+  <div class="section-hint">Настроим DNS когда будет готов деплой на Vercel/Netlify</div>
+
+  <div class="step" data-key="dom-name">
+    <input type="checkbox" id="ch-dom-name" onchange="toggle('dom-name')">
+    <div class="step-content">
+      <label class="step-label" for="ch-dom-name">Записать свой домен</label>
+      <div class="step-detail">Какой домен будем использовать для веб-версии?</div>
+      <div class="data-field">
+        <label>Домен</label>
+        <input type="text" id="data-domain" placeholder="maketcp.ru или app.mysite.ru" oninput="saveData()">
+      </div>
+    </div>
+  </div>
+
+  <div class="step" data-key="dom-access">
+    <input type="checkbox" id="ch-dom-access" onchange="toggle('dom-access')">
+    <div class="step-content">
+      <label class="step-label" for="ch-dom-access">Проверить доступ к DNS-панели домена</label>
+      <div class="step-detail">Убедись что можешь добавлять CNAME/A записи. Регистратор домена?</div>
+      <div class="data-field">
+        <label>DNS провайдер</label>
+        <input type="text" id="data-dns" placeholder="Cloudflare / REG.RU / Timeweb / ..." oninput="saveData()">
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="note">
+  Когда всё готово -- экспортируй JSON (кнопка выше) и скинь мне. Я подключу ключи к коду и мы поедем.
+</div>
+
+<script>
+var LS_KEY = 'maketcp_setup';
+
+function getState() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY)) || {}; }
+  catch(e) { return {}; }
+}
+
+function saveState(state) {
+  localStorage.setItem(LS_KEY, JSON.stringify(state));
+}
+
+function toggle(key) {
+  var state = getState();
+  if (!state.checks) state.checks = {};
+  var el = document.getElementById('ch-' + key);
+  state.checks[key] = el.checked;
+  saveState(state);
+  render();
+}
+
+function saveData() {
+  var state = getState();
+  if (!state.data) state.data = {};
+  var fields = document.querySelectorAll('.data-field input');
+  for (var i = 0; i < fields.length; i++) {
+    state.data[fields[i].id] = fields[i].value;
+  }
+  saveState(state);
+}
+
+function render() {
+  var state = getState();
+  var checks = state.checks || {};
+  var data = state.data || {};
+
+  // Чекбоксы
+  var steps = document.querySelectorAll('.step');
+  var total = steps.length;
+  var done = 0;
+  for (var i = 0; i < steps.length; i++) {
+    var key = steps[i].getAttribute('data-key');
+    var checked = !!checks[key];
+    var ch = steps[i].querySelector('input[type="checkbox"]');
+    if (ch) ch.checked = checked;
+    if (checked) {
+      steps[i].classList.add('done');
+      done++;
+    } else {
+      steps[i].classList.remove('done');
+    }
+  }
+
+  // Прогресс
+  var pct = total > 0 ? Math.round(done / total * 100) : 0;
+  document.getElementById('progress-text').textContent = done + ' / ' + total + ' (' + pct + '%)';
+  document.getElementById('progress-fill').style.width = pct + '%';
+
+  // Данные
+  var fields = document.querySelectorAll('.data-field input');
+  for (var j = 0; j < fields.length; j++) {
+    if (data[fields[j].id]) fields[j].value = data[fields[j].id];
+  }
+}
+
+function exportData() {
+  var state = getState();
+  var json = JSON.stringify(state, null, 2);
+  var blob = new Blob([json], {type: 'application/json'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'maketcp-setup.json';
+  a.click();
+}
+
+function resetAll() {
+  if (!confirm('Сбросить весь прогресс?')) return;
+  localStorage.removeItem(LS_KEY);
+  render();
+}
+
+// Init
+render();
+</script>
+</body>
+</html>

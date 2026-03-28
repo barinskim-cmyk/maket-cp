@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Maket CP -- Деплой и домен</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #333; padding: 24px; max-width: 800px; margin: 0 auto; }
+h1 { font-size: 20px; margin-bottom: 4px; }
+.subtitle { font-size: 13px; color: #888; margin-bottom: 20px; }
+.progress-bar { height: 8px; background: #e0e0e0; border-radius: 4px; margin-bottom: 24px; overflow: hidden; }
+.progress-fill { height: 100%; background: #4caf50; transition: width 0.3s; border-radius: 4px; }
+.progress-text { font-size: 12px; color: #888; margin-bottom: 8px; }
+
+.section { background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 16px; border: 1px solid #e8e8e8; }
+.section-title { font-size: 15px; font-weight: 600; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #eee; }
+.section-hint { font-size: 12px; color: #888; margin-bottom: 12px; }
+
+.step { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f5f5f5; }
+.step:last-child { border-bottom: none; }
+.step input[type="checkbox"] { margin-top: 3px; width: 18px; height: 18px; cursor: pointer; accent-color: #333; flex-shrink: 0; }
+.step-content { flex: 1; }
+.step-label { font-size: 14px; cursor: pointer; }
+.step.done .step-label { text-decoration: line-through; color: #aaa; }
+.step-detail { font-size: 12px; color: #888; margin-top: 4px; line-height: 1.5; }
+.step.done .step-detail { color: #ccc; }
+
+.data-field { margin-top: 8px; }
+.data-field label { font-size: 11px; color: #666; display: block; margin-bottom: 2px; }
+.data-field input { width: 100%; padding: 6px 10px; border: 1.5px solid #ddd; border-radius: 5px; font-size: 13px; font-family: monospace; }
+.data-field input:focus { outline: none; border-color: #333; }
+
+.note { background: #fffde7; border: 1px solid #fff9c4; border-radius: 6px; padding: 12px; font-size: 12px; color: #795548; margin-top: 12px; }
+.note-blue { background: #e3f2fd; border: 1px solid #bbdefb; color: #1565c0; }
+.code { background: #f5f5f5; border: 1px solid #e0e0e0; border-radius: 4px; padding: 8px 12px; font-family: monospace; font-size: 12px; margin-top: 8px; white-space: pre-wrap; word-break: break-all; }
+.copy-btn { background: #333; color: #fff; border: none; border-radius: 4px; padding: 3px 10px; font-size: 11px; cursor: pointer; margin-left: 8px; }
+.copy-btn:hover { background: #555; }
+
+.option-box { background: #fafafa; border: 1px solid #e8e8e8; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+.option-title { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+.option-pros { font-size: 12px; color: #2e7d32; }
+.option-cons { font-size: 12px; color: #c62828; margin-top: 2px; }
+</style>
+</head>
+<body>
+
+<h1>Maket CP -- Деплой на хостинг</h1>
+<p class="subtitle">Чеклист для Masha. Домен на REG.RU + бесплатный хостинг Netlify.</p>
+
+<div class="progress-text" id="progress-text">0 / 0</div>
+<div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+
+<!-- ═══════════ Вариант хостинга ═══════════ -->
+<div class="section">
+  <div class="section-title">Почему Netlify, а не хостинг REG.RU?</div>
+  <div class="section-hint">Наш фронтенд -- это статические файлы (HTML, JS, CSS). Для них не нужен PHP или сервер.</div>
+
+  <div class="option-box">
+    <div class="option-title">Netlify (рекомендую)</div>
+    <div class="option-pros">+ Бесплатно навсегда (100 ГБ трафика/мес)</div>
+    <div class="option-pros">+ Деплой за 2 минуты -- просто перетащить папку</div>
+    <div class="option-pros">+ Автоматический HTTPS (SSL сертификат)</div>
+    <div class="option-pros">+ CDN по всему миру -- сайт грузится быстро</div>
+    <div class="option-cons">- Нужно зарегистрироваться на netlify.com</div>
+  </div>
+
+  <div class="option-box">
+    <div class="option-title">Хостинг REG.RU</div>
+    <div class="option-pros">+ Уже есть аккаунт</div>
+    <div class="option-cons">- Платный (от ~150 руб/мес)</div>
+    <div class="option-cons">- Сложнее настроить (FTP, панель управления)</div>
+    <div class="option-cons">- SSL надо настраивать отдельно</div>
+  </div>
+
+  <div class="note note-blue">
+    Рекомендую Netlify. Ниже инструкция для него. Если хочешь использовать хостинг REG.RU -- напиши, сделаю инструкцию для него тоже.
+  </div>
+</div>
+
+<!-- ═══════════ Netlify: регистрация ═══════════ -->
+<div class="section">
+  <div class="section-title">1. Netlify -- регистрация и деплой</div>
+  <div class="section-hint">Весь процесс занимает ~5 минут</div>
+
+  <div class="step" data-key="nl-register">
+    <input type="checkbox" id="ch-nl-register" onchange="toggle('nl-register')">
+    <div class="step-content">
+      <label class="step-label" for="ch-nl-register">Зарегистрироваться на netlify.com</label>
+      <div class="step-detail">Открой app.netlify.com -- можно войти через GitHub, Google или email.</div>
+    </div>
+  </div>
+
+  <div class="step" data-key="nl-deploy">
+    <input type="checkbox" id="ch-nl-deploy" onchange="toggle('nl-deploy')">
+    <div class="step-content">
+      <label class="step-label" for="ch-nl-deploy">Загрузить сайт (drag & drop)</label>
+      <div class="step-detail">
+        1. На главной странице Netlify найди блок "Want to deploy a new site without connecting to Git? Drag and drop your site output folder here"<br>
+        2. Открой папку проекта: Maket CP / v2 / frontend<br>
+        3. Перетащи ВСЮ папку "frontend" в поле на сайте Netlify<br>
+        4. Подожди 10-30 секунд -- сайт опубликуется
+      </div>
+    </div>
+  </div>
+
+  <div class="step" data-key="nl-check">
+    <input type="checkbox" id="ch-nl-check" onchange="toggle('nl-check')">
+    <div class="step-content">
+      <label class="step-label" for="ch-nl-check">Проверить что сайт открывается</label>
+      <div class="step-detail">
+        Netlify даст временный адрес вида random-name-12345.netlify.app<br>
+        Открой его -- должен появиться Maket CP.
+      </div>
+      <div class="data-field">
+        <label>Временный URL от Netlify</label>
+        <input type="text" id="data-nl-url" placeholder="https://xxxxx.netlify.app" oninput="saveData()">
+      </div>
+    </div>
+  </div>
+
+  <div class="step" data-key="nl-rename">
+    <input type="checkbox" id="ch-nl-rename" onchange="toggle('nl-rename')">
+    <div class="step-content">
+      <label class="step-label" for="ch-nl-rename">Переименовать сайт (опционально)</label>
+      <div class="step-detail">
+        Site configuration > Site details > Change site name<br>
+        Например: maketcp -- тогда адрес будет maketcp.netlify.app
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ Домен ═══════════ -->
+<div class="section">
+  <div class="section-title">2. Подключить домен с REG.RU</div>
+  <div class="section-hint">Направляем твой домен на Netlify через DNS</div>
+
+  <div class="step" data-key="dom-write">
+    <input type="checkbox" id="ch-dom-write" onchange="toggle('dom-write')">
+    <div class="step-content">
+      <label class="step-label" for="ch-dom-write">Записать свой домен</label>
+      <div class="step-detail">Какой домен будем использовать? Можно основной (maketcp.ru) или поддомен (app.maketcp.ru)</div>
+      <div class="data-field">
+        <label>Домен для Maket CP</label>
+        <input type="text" id="data-domain" placeholder="maketcp.ru или app.mysite.ru" oninput="saveData()">
+      </div>
+    </div>
+  </div>
+
+  <div class="step" data-key="nl-domain-add">
+    <input type="checkbox" id="ch-nl-domain-add" onchange="toggle('nl-domain-add')">
+    <div class="step-content">
+      <label class="step-label" for="ch-nl-domain-add">Добавить домен в Netlify</label>
+      <div class="step-detail">
+        1. В Netlify: Site configuration > Domain management > Add custom domain<br>
+        2. Введи свой домен (например maketcp.ru)<br>
+        3. Netlify скажет "Check DNS configuration" -- это нормально, настроим дальше
+      </div>
+    </div>
+  </div>
+
+  <div class="step" data-key="dns-regru">
+    <input type="checkbox" id="ch-dns-regru" onchange="toggle('dns-regru')">
+    <div class="step-content">
+      <label class="step-label" for="ch-dns-regru">Настроить DNS в REG.RU</label>
+      <div class="step-detail">
+        1. Зайди в REG.RU > Мои домены > выбери домен > DNS-серверы и управление зоной<br>
+        2. Добавь записи:<br><br>
+
+        Для ОСНОВНОГО домена (maketcp.ru):<br>
+        -- Удали старые A-записи для @ (если есть)<br>
+        -- Добавь A-запись: @ -> 75.2.60.5<br>
+        -- Добавь CNAME-запись: www -> [твой-сайт].netlify.app<br><br>
+
+        Для ПОДДОМЕНА (app.maketcp.ru):<br>
+        -- Добавь CNAME-запись: app -> [твой-сайт].netlify.app
+      </div>
+      <div class="note">
+        75.2.60.5 -- это IP-адрес Netlify для A-записей основного домена.
+        DNS обновляется от 5 минут до 48 часов (обычно 15-30 минут).
+      </div>
+    </div>
+  </div>
+
+  <div class="step" data-key="ssl-check">
+    <input type="checkbox" id="ch-ssl-check" onchange="toggle('ssl-check')">
+    <div class="step-content">
+      <label class="step-label" for="ch-ssl-check">Проверить SSL (HTTPS)</label>
+      <div class="step-detail">
+        Netlify автоматически выпустит SSL-сертификат после того как DNS обновится.<br>
+        Site configuration > Domain management > HTTPS -- должно быть "Your site has HTTPS enabled"<br>
+        Если не обновилось -- подожди 30 минут и нажми "Verify DNS configuration"
+      </div>
+    </div>
+  </div>
+
+  <div class="step" data-key="dom-test">
+    <input type="checkbox" id="ch-dom-test" onchange="toggle('dom-test')">
+    <div class="step-content">
+      <label class="step-label" for="ch-dom-test">Проверить что сайт открывается по домену</label>
+      <div class="step-detail">
+        Открой https://твой-домен -- должен появиться Maket CP.<br>
+        Проверь что HTTPS работает (замочек в адресной строке).
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ Supabase redirect ═══════════ -->
+<div class="section">
+  <div class="section-title">3. Обновить Supabase -- разрешить новый домен</div>
+  <div class="section-hint">Чтобы авторизация работала с нового домена</div>
+
+  <div class="step" data-key="sb-redirect">
+    <input type="checkbox" id="ch-sb-redirect" onchange="toggle('sb-redirect')">
+    <div class="step-content">
+      <label class="step-label" for="ch-sb-redirect">Добавить домен в Redirect URLs в Supabase</label>
+      <div class="step-detail">
+        1. Supabase Dashboard > Authentication > URL Configuration<br>
+        2. В "Redirect URLs" добавить:<br>
+        -- https://твой-домен.ru<br>
+        -- https://твой-домен.ru/**<br>
+        -- https://www.твой-домен.ru (если используешь www)<br>
+        3. В "Site URL" поставить: https://твой-домен.ru
+      </div>
+    </div>
+  </div>
+
+  <div class="step" data-key="sb-test">
+    <input type="checkbox" id="ch-sb-test" onchange="toggle('sb-test')">
+    <div class="step-content">
+      <label class="step-label" for="ch-sb-test">Проверить вход на сайте</label>
+      <div class="step-detail">
+        Открой сайт по домену, попробуй войти через email+пароль или magic link.<br>
+        Должно работать без ошибок.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ Обновления ═══════════ -->
+<div class="section">
+  <div class="section-title">4. Как обновлять сайт потом</div>
+  <div class="section-hint">Когда мы вносим изменения в код</div>
+
+  <div class="step" data-key="upd-know">
+    <input type="checkbox" id="ch-upd-know" onchange="toggle('upd-know')">
+    <div class="step-content">
+      <label class="step-label" for="ch-upd-know">Запомнить процесс обновления</label>
+      <div class="step-detail">
+        Каждый раз когда мы обновляем код:<br>
+        1. В Netlify: Deploys > внизу "Need to update your site? Drag and drop your site output folder here"<br>
+        2. Перетащи папку frontend заново<br>
+        3. Через 10 секунд сайт обновится<br><br>
+        Потом можно подключить Git (GitHub) для автодеплоя -- тогда обновления будут автоматические.
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="note" style="margin-top: 16px;">
+  Когда сайт заработает по домену -- скинь мне URL, я проверю что всё ок и обновлю настройки в коде.
+</div>
+
+<script>
+var LS_KEY = 'maketcp_deploy';
+
+function getState() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY)) || {}; }
+  catch(e) { return {}; }
+}
+
+function saveState(state) {
+  localStorage.setItem(LS_KEY, JSON.stringify(state));
+}
+
+function toggle(key) {
+  var state = getState();
+  if (!state.checks) state.checks = {};
+  var el = document.getElementById('ch-' + key);
+  state.checks[key] = el.checked;
+  saveState(state);
+  render();
+}
+
+function saveData() {
+  var state = getState();
+  if (!state.data) state.data = {};
+  var fields = document.querySelectorAll('.data-field input');
+  for (var i = 0; i < fields.length; i++) {
+    state.data[fields[i].id] = fields[i].value;
+  }
+  saveState(state);
+}
+
+function render() {
+  var state = getState();
+  var checks = state.checks || {};
+  var data = state.data || {};
+
+  var steps = document.querySelectorAll('.step');
+  var total = steps.length;
+  var done = 0;
+  for (var i = 0; i < steps.length; i++) {
+    var key = steps[i].getAttribute('data-key');
+    var checked = !!checks[key];
+    var ch = steps[i].querySelector('input[type="checkbox"]');
+    if (ch) ch.checked = checked;
+    if (checked) {
+      steps[i].classList.add('done');
+      done++;
+    } else {
+      steps[i].classList.remove('done');
+    }
+  }
+
+  var pct = total > 0 ? Math.round(done / total * 100) : 0;
+  document.getElementById('progress-text').textContent = done + ' / ' + total + ' (' + pct + '%)';
+  document.getElementById('progress-fill').style.width = pct + '%';
+
+  var fields = document.querySelectorAll('.data-field input');
+  for (var j = 0; j < fields.length; j++) {
+    if (data[fields[j].id]) fields[j].value = data[fields[j].id];
+  }
+}
+
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Карточки товара</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #333; }
+
+  /* Setup screen */
+  #setup-screen { max-width: 500px; margin: 80px auto; background: #fff; border-radius: 12px; padding: 40px; box-shadow: 0 2px 20px rgba(0,0,0,0.08); }
+  #setup-screen h1 { font-size: 22px; margin-bottom: 28px; font-weight: 600; }
+  .form-group { margin-bottom: 20px; }
+  .form-group label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
+  .form-group input, .form-group select { width: 100%; padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 15px; outline: none; transition: border-color 0.2s; }
+  .form-group input:focus, .form-group select:focus { border-color: #333; }
+  .btn { display: inline-block; padding: 12px 28px; background: #333; color: #fff; border: none; border-radius: 8px; font-size: 15px; cursor: pointer; transition: background 0.2s; }
+  .btn:hover { background: #555; }
+  .btn-outline { background: transparent; color: #333; border: 2px solid #333; }
+  .btn-outline:hover { background: #333; color: #fff; }
+
+  /* Editor screen */
+  #editor-screen { display: none; padding: 20px; }
+  .editor-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 16px 20px; background: #fff; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
+  .editor-header .info { font-size: 14px; color: #666; }
+  .editor-header .info strong { color: #333; }
+  .editor-actions { display: flex; gap: 10px; }
+
+  .editor-body { display: flex; gap: 24px; max-width: 1000px; margin: 0 auto; }
+
+  /* Card preview */
+  .card-preview { flex: 1; background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
+
+  .card-layout { width: 100%; max-width: 650px; margin: 0 auto; background: #fff; border: 1px solid #e0e0e0; border-radius: 4px; overflow: hidden; display: flex; flex-direction: column; gap: 4px; padding: 4px; }
+
+  .card-top-row { display: flex; }
+  .card-top-row .photo-slot { aspect-ratio: 3/2; margin: 0; }
+  .card-bottom-row { display: flex; gap: 4px; }
+  .card-bottom-row .photo-slot { aspect-ratio: 2/3; margin: 0; }
+
+  .photo-slot {
+    flex: 1;
+    border: 2px dashed #ccc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    cursor: default;
+    transition: border-color 0.2s, background 0.2s;
+    background: #fafafa;
+    border-radius: 2px;
+    min-height: 0;
+  }
+  .photo-slot.drag-over { border-color: #333; background: #eee; border-style: solid; }
+  .photo-slot.has-image { border: 3px solid #e8e8e8; cursor: grab; }
+  .photo-slot.has-image:active { cursor: grabbing; }
+  .photo-slot .placeholder { font-size: 13px; color: #bbb; text-align: center; pointer-events: none; }
+  .photo-slot img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+  .photo-slot .remove-btn {
+    position: absolute; top: 6px; right: 6px;
+    width: 26px; height: 26px;
+    background: rgba(0,0,0,0.6); color: #fff;
+    border: none; border-radius: 50%;
+    font-size: 16px; line-height: 26px; text-align: center;
+    cursor: pointer; display: none; z-index: 2;
+  }
+  .photo-slot:hover .remove-btn { display: block; }
+  .photo-slot.dragging-source { opacity: 0.3; }
+
+  /* Controls */
+  .card-controls { display: flex; gap: 20px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+  .control-group { display: flex; gap: 8px; align-items: center; }
+  .control-group label { font-size: 13px; color: #666; }
+  .control-group select { padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; outline: none; }
+  .toggle-btn { padding: 6px 14px; border: 1px solid #ddd; background: #fff; border-radius: 6px; cursor: pointer; font-size: 13px; transition: all 0.2s; }
+  .toggle-btn.active { background: #333; color: #fff; border-color: #333; }
+
+  /* Cards list panel */
+  .cards-list-panel { width: 200px; background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); flex-shrink: 0; max-height: calc(100vh - 120px); display: flex; flex-direction: column; }
+  .cards-list-panel h3 { font-size: 14px; color: #999; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .cards-list { flex: 1; overflow-y: auto; }
+  .card-item { padding: 10px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; margin-bottom: 4px; transition: all 0.2s; display: flex; justify-content: space-between; align-items: center; }
+  .card-item:hover { background: #f0f0f0; }
+  .card-item.active { background: #333; color: #fff; }
+  .card-item .delete-card { opacity: 0; cursor: pointer; background: none; border: none; font-size: 14px; color: inherit; }
+  .card-item:hover .delete-card { opacity: 0.6; }
+  .card-item .delete-card:hover { opacity: 1; }
+  .add-card-btn { width: 100%; margin-top: 8px; padding: 8px; background: #f5f5f5; border: 1px dashed #ccc; border-radius: 6px; cursor: pointer; font-size: 13px; color: #999; text-align: center; }
+  .add-card-btn:hover { background: #eee; color: #666; }
+
+  /* Export overlay */
+  .overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 100; align-items: center; justify-content: center; }
+  .overlay.show { display: flex; }
+  .overlay-content { background: #fff; border-radius: 12px; padding: 40px; text-align: center; }
+  .overlay-content p { margin-bottom: 16px; font-size: 15px; }
+  .spinner { width: 40px; height: 40px; border: 3px solid #eee; border-top-color: #333; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<!-- SETUP SCREEN -->
+<div id="setup-screen">
+  <h1>Создание карточек товара</h1>
+  <div class="form-group">
+    <label>Дата съёмки</label>
+    <input type="date" id="shoot-date" value="">
+  </div>
+  <div class="form-group">
+    <label>Бренд</label>
+    <input type="text" id="brand" placeholder="Название бренда">
+  </div>
+  <button class="btn" onclick="startEditor()">Создать карточки</button>
+  <div id="resume-block" style="display:none; margin-top:20px; padding-top:20px; border-top:1px solid #eee;">
+    <p style="font-size:13px; color:#888; margin-bottom:10px;">Есть незавершённая сессия:</p>
+    <div id="resume-info" style="font-size:14px; margin-bottom:12px; color:#333;"></div>
+    <div style="display:flex; gap:10px;">
+      <button class="btn" onclick="resumeSession()">Продолжить</button>
+      <button class="btn btn-outline" style="font-size:13px; padding:8px 16px;" onclick="clearCache()">Сбросить</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDITOR SCREEN -->
+<div id="editor-screen">
+  <div class="editor-header">
+    <div class="info">
+      <strong id="header-brand"></strong> &middot;
+      <span id="header-date"></span> &middot;
+      <span id="header-category" class="category-badge"></span> &middot;
+      Карточка <strong><span id="current-card-num">1</span></strong>
+    </div>
+    <div class="editor-actions">
+      <button class="btn btn-outline" onclick="goBack()">Назад к настройкам</button>
+      <button class="btn btn-outline" onclick="resetAll()" style="color:#c00; border-color:#c00;">Сбросить всё</button>
+      <button class="btn btn-outline" onclick="exportProject()">Сохранить проект</button>
+      <button class="btn btn-outline" onclick="exportPhotoList()">Список фото</button>
+      <button class="btn" onclick="exportPDF()">Выгрузить PDF</button>
+    </div>
+  </div>
+
+  <div class="editor-body">
+    <!-- Cards list -->
+    <div class="cards-list-panel">
+      <h3>Карточки</h3>
+      <div class="cards-list" id="cards-list"></div>
+      <div class="add-card-btn" onclick="addCard()">+ Новая карточка</div>
+    </div>
+
+    <!-- Card preview -->
+    <div class="card-preview">
+      <div class="card-controls">
+        <div class="control-group">
+          <label>Категория:</label>
+          <select id="card-category" onchange="setCardCategory(this.value)">
+            <option value="glasses">Очки</option>
+            <option value="bag">Сумка</option>
+            <option value="accessory">Аксессуар</option>
+            <option value="shoes">Обувь</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label>Нижний ряд:</label>
+          <button class="toggle-btn active" id="btn-bottom-2" onclick="setBottomCount(2)">2 фото</button>
+          <button class="toggle-btn" id="btn-bottom-3" onclick="setBottomCount(3)">3 фото</button>
+        </div>
+      </div>
+      <div class="card-layout" id="card-layout">
+        <div class="card-top-row" id="top-row"></div>
+        <div class="card-bottom-row" id="bottom-row"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Export overlay -->
+<div class="overlay" id="export-overlay">
+  <div class="overlay-content">
+    <div class="spinner"></div>
+    <p id="export-status">Генерация PDF...</p>
+  </div>
+</div>
+
+<script>
+// ==================== STATE ====================
+let state = {
+  shootDate: '',
+  brand: '',
+  cards: [],
+  currentCardIndex: 0
+};
+
+// ==================== SETUP ====================
+function startEditor() {
+  state.shootDate = document.getElementById('shoot-date').value;
+  state.brand = document.getElementById('brand').value || 'Без названия';
+  state.cards = [];
+  state.currentCardIndex = 0;
+  addCard();
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('editor-screen').style.display = 'block';
+  updateHeader();
+}
+
+function goBack() {
+  if (!confirm('Вернуться к настройкам? Все карточки будут потеряны.')) return;
+  document.getElementById('setup-screen').style.display = 'block';
+  document.getElementById('editor-screen').style.display = 'none';
+  state.cards = [];
+}
+
+// ==================== HEADER ====================
+function updateHeader() {
+  document.getElementById('header-brand').textContent = state.brand;
+  document.getElementById('header-date').textContent = state.shootDate || 'дата не указана';
+  const card = currentCard();
+  const catEl = document.getElementById('header-category');
+  const catNames = { glasses: 'Очки', bag: 'Сумка', accessory: 'Аксессуар', shoes: 'Обувь' };
+  catEl.textContent = catNames[card.category];
+  catEl.className = 'category-badge cat-' + card.category;
+  document.getElementById('current-card-num').textContent = state.currentCardIndex + 1;
+}
+
+// ==================== CARDS LIST ====================
+function addCard() {
+  state.cards.push({ category: 'glasses', bottomCount: 2, slots: [null, null, null, null] });
+  state.currentCardIndex = state.cards.length - 1;
+  renderAll();
+}
+
+function selectCard(idx) {
+  state.currentCardIndex = idx;
+  renderAll();
+}
+
+function deleteCard(idx, e) {
+  e.stopPropagation();
+  if (state.cards.length <= 1) return;
+  state.cards.splice(idx, 1);
+  if (state.currentCardIndex >= state.cards.length) state.currentCardIndex = state.cards.length - 1;
+  renderAll();
+}
+
+function renderAll() {
+  renderCardsList();
+  renderCard();
+  updateHeader();
+}
+
+function renderCardsList() {
+  const list = document.getElementById('cards-list');
+  list.innerHTML = '';
+  const catShort = { glasses: 'Очки', bag: 'Сумка', accessory: 'Аксес.', shoes: 'Обувь' };
+  state.cards.forEach((card, i) => {
+    const filled = card.slots.filter(s => s !== null).length;
+    const total = 1 + card.bottomCount;
+    const div = document.createElement('div');
+    div.className = 'card-item' + (i === state.currentCardIndex ? ' active' : '');
+    div.onclick = () => selectCard(i);
+    div.innerHTML = `<span>Карточка ${i + 1} <small style="opacity:0.7">${catShort[card.category] || ''}</small> <small>(${filled}/${total})</small></span>` +
+      (state.cards.length > 1 ? `<button class="delete-card" onclick="deleteCard(${i}, event)">&times;</button>` : '');
+    list.appendChild(div);
+  });
+}
+
+// ==================== CARD LAYOUT ====================
+function currentCard() { return state.cards[state.currentCardIndex]; }
+
+function setCardCategory(val) {
+  currentCard().category = val;
+  updateHeader();
+  renderCardsList();
+}
+
+function setBottomCount(n) {
+  currentCard().bottomCount = n;
+  renderAll();
+}
+
+function renderCard() {
+  const card = currentCard();
+
+  // Sync controls
+  document.getElementById('card-category').value = card.category;
+  document.getElementById('btn-bottom-2').classList.toggle('active', card.bottomCount === 2);
+  document.getElementById('btn-bottom-3').classList.toggle('active', card.bottomCount === 3);
+
+  // Top row — 1 slot
+  const topRow = document.getElementById('top-row');
+  topRow.innerHTML = '';
+  topRow.appendChild(createSlotEl(0));
+
+  // Bottom row
+  const bottomRow = document.getElementById('bottom-row');
+  bottomRow.innerHTML = '';
+  for (let i = 1; i <= card.bottomCount; i++) {
+    bottomRow.appendChild(createSlotEl(i));
+  }
+}
+
+function createSlotEl(index) {
+  const card = currentCard();
+  const data = card.slots[index];
+  const slot = document.createElement('div');
+  slot.className = 'photo-slot' + (data ? ' has-image' : '');
+  slot.setAttribute('data-slot', String(index));
+  slot.setAttribute('draggable', data ? 'true' : 'false');
+
+  if (data) {
+    const img = document.createElement('img');
+    img.src = data.dataUrl;
+    slot.appendChild(img);
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'remove-btn';
+    removeBtn.textContent = '×';
+    removeBtn.onclick = (e) => { e.stopPropagation(); card.slots[index] = null; renderAll(); };
+    slot.appendChild(removeBtn);
+  } else {
+    const ph = document.createElement('div');
+    ph.className = 'placeholder';
+    ph.textContent = index === 0 ? 'Перетащите фото из папки' : 'Перетащите фото из папки';
+    slot.appendChild(ph);
+  }
+
+  // Drag events
+  slot.addEventListener('dragstart', onSlotDragStart);
+  slot.addEventListener('dragend', onSlotDragEnd);
+  slot.addEventListener('dragover', onSlotDragOver);
+  slot.addEventListener('dragleave', onSlotDragLeave);
+  slot.addEventListener('drop', onSlotDrop);
+
+  return slot;
+}
+
+// ==================== DRAG & DROP ====================
+let dragSourceSlotIdx = null;
+
+function onSlotDragStart(e) {
+  const idx = parseInt(this.getAttribute('data-slot'));
+  if (!currentCard().slots[idx]) { e.preventDefault(); return; }
+  dragSourceSlotIdx = idx;
+  this.classList.add('dragging-source');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('application/x-slot', String(idx));
+}
+
+function onSlotDragEnd(e) {
+  dragSourceSlotIdx = null;
+  this.classList.remove('dragging-source');
+}
+
+function onSlotDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'copy';
+  this.classList.add('drag-over');
+}
+
+function onSlotDragLeave(e) {
+  this.classList.remove('drag-over');
+}
+
+function onSlotDrop(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  this.classList.remove('drag-over');
+
+  const targetIdx = parseInt(this.getAttribute('data-slot'));
+  const card = currentCard();
+
+  // Case 1: Files from OS (Finder / Explorer)
+  if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+    const file = e.dataTransfer.files[0];
+    if (!file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      card.slots[targetIdx] = { dataUrl: ev.target.result, name: file.name };
+      renderAll();
+    };
+    reader.readAsDataURL(file);
+    return;
+  }
+
+  // Case 2: From another slot (swap)
+  const sourceData = e.dataTransfer.getData('application/x-slot');
+  if (sourceData !== '') {
+    const sourceIdx = parseInt(sourceData);
+    if (sourceIdx === targetIdx) return;
+    const temp = card.slots[targetIdx];
+    card.slots[targetIdx] = card.slots[sourceIdx];
+    card.slots[sourceIdx] = temp;
+    renderAll();
+  }
+}
+
+// Prevent browser from opening dropped files
+document.addEventListener('dragover', (e) => e.preventDefault());
+document.addEventListener('drop', (e) => e.preventDefault());
+
+// ==================== PDF EXPORT ====================
+async function exportPDF() {
+  if (state.cards.length === 0) { alert('Нет карточек для экспорта'); return; }
+
+  const overlay = document.getElementById('export-overlay');
+  overlay.classList.add('show');
+
+  // Small delay to let overlay render
+  await new Promise(r => setTimeout(r, 50));
+
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+  const pageW = 210;
+  const pageH = 297;
+  const gap = 2;
+  const margin = 3;
+
+  for (let ci = 0; ci < state.cards.length; ci++) {
+    if (ci > 0) pdf.addPage();
+    const card = state.cards[ci];
+    const contentW = pageW - margin * 2;
+    // Top photo is 3:2, bottom photos are 2:3
+    // Top height = contentW * (2/3), Bottom height based on slot width
+    const n = card.bottomCount;
+    const slotW = (contentW - gap * (n - 1)) / n;
+    const topH = contentW * (2 / 3);
+    const bottomH = slotW * (3 / 2);
+
+    document.getElementById('export-status').textContent = `Генерация PDF... Карточка ${ci + 1} из ${state.cards.length}`;
+
+    // Background
+    pdf.setFillColor(255, 255, 255);
+    pdf.rect(0, 0, pageW, pageH, 'F');
+
+    // Top photo
+    if (card.slots[0]) {
+      await addImageToPdf(pdf, card.slots[0].dataUrl, margin, margin, contentW, topH);
+    } else {
+      pdf.setFillColor(240, 240, 240);
+      pdf.rect(margin, margin, contentW, topH, 'F');
+    }
+
+    // Bottom photos
+    const bottomY = margin + topH + gap;
+
+    for (let i = 0; i < n; i++) {
+      const x = margin + i * (slotW + gap);
+      const slotData = card.slots[i + 1];
+      if (slotData) {
+        await addImageToPdf(pdf, slotData.dataUrl, x, bottomY, slotW, bottomH);
+      } else {
+        pdf.setFillColor(240, 240, 240);
+        pdf.rect(x, bottomY, slotW, bottomH, 'F');
+      }
+    }
+  }
+
+  const filename = `${state.brand}_${state.shootDate || 'без_даты'}.pdf`;
+  pdf.save(filename);
+  overlay.classList.remove('show');
+}
+
+function addImageToPdf(pdf, dataUrl, x, y, w, h) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const imgRatio = img.width / img.height;
+      const slotRatio = w / h;
+      let sx, sy, sw, sh;
+      if (imgRatio > slotRatio) {
+        sh = img.height;
+        sw = img.height * slotRatio;
+        sx = (img.width - sw) / 2;
+        sy = 0;
+      } else {
+        sw = img.width;
+        sh = img.width / slotRatio;
+        sx = 0;
+        sy = (img.height - sh) / 2;
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(sw);
+      canvas.height = Math.round(sh);
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+      const croppedUrl = canvas.toDataURL('image/jpeg', 0.92);
+      pdf.addImage(croppedUrl, 'JPEG', x, y, w, h);
+      resolve();
+    };
+    img.src = dataUrl;
+  });
+}
+
+// ==================== IndexedDB PERSISTENCE ====================
+const DB_NAME = 'cardMakerDB';
+const DB_VERSION = 1;
+const STORE_NAME = 'appState';
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME);
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function saveState() {
+  try {
+    const db = await openDB();
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    store.put({
+      shootDate: state.shootDate,
+      brand: state.brand,
+      cards: state.cards,
+      currentCardIndex: state.currentCardIndex,
+      savedAt: new Date().toISOString()
+    }, 'current');
+    await new Promise((resolve, reject) => {
+      tx.oncomplete = resolve;
+      tx.onerror = reject;
+    });
+    db.close();
+  } catch (e) {
+    console.warn('Не удалось сохранить состояние:', e);
+  }
+}
+
+async function loadState() {
+  try {
+    const db = await openDB();
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const store = tx.objectStore(STORE_NAME);
+    const req = store.get('current');
+    const result = await new Promise((resolve, reject) => {
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    db.close();
+    return result || null;
+  } catch (e) {
+    console.warn('Не удалось загрузить состояние:', e);
+    return null;
+  }
+}
+
+async function clearDB() {
+  try {
+    const db = await openDB();
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).clear();
+    await new Promise((resolve, reject) => {
+      tx.oncomplete = resolve;
+      tx.onerror = reject;
+    });
+    db.close();
+  } catch (e) {
+    console.warn('Не удалось очистить кеш:', e);
+  }
+}
+
+// Hook save into renderAll
+const _originalRenderAll = renderAll;
+renderAll = function() {
+  _originalRenderAll();
+  saveState();
+};
+
+// Also save when category changes (doesn't go through renderAll)
+const _originalSetCardCategory = setCardCategory;
+setCardCategory = function(val) {
+  _originalSetCardCategory(val);
+  saveState();
+};
+
+async function resumeSession() {
+  const saved = await loadState();
+  if (!saved) return;
+  state.shootDate = saved.shootDate;
+  state.brand = saved.brand;
+  state.cards = saved.cards;
+  state.currentCardIndex = saved.currentCardIndex;
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('editor-screen').style.display = 'block';
+  renderAll();
+}
+
+async function clearCache() {
+  await clearDB();
+  document.getElementById('resume-block').style.display = 'none';
+}
+
+async function resetAll() {
+  if (!confirm('Сбросить все карточки и кеш? Это действие нельзя отменить.')) return;
+  await clearDB();
+  state.cards = [];
+  document.getElementById('setup-screen').style.display = 'block';
+  document.getElementById('editor-screen').style.display = 'none';
+}
+
+// Override goBack to also clear cache
+const _originalGoBack = goBack;
+goBack = function() {
+  if (!confirm('Вернуться к настройкам? Все карточки будут потеряны.')) return;
+  clearDB();
+  document.getElementById('setup-screen').style.display = 'block';
+  document.getElementById('editor-screen').style.display = 'none';
+  state.cards = [];
+};
+
+// ==================== EXPORT PROJECT ====================
+function exportProject() {
+  // Get the full HTML source of this page
+  const html = document.documentElement.outerHTML;
+
+  // Build embedded state JSON
+  const embeddedState = JSON.stringify({
+    shootDate: state.shootDate,
+    brand: state.brand,
+    cards: state.cards,
+    currentCardIndex: state.currentCardIndex
+  });
+
+  // Inject embedded state as a data block before closing body tag
+  const scriptOpen = '<' + 'script id="embedded-project-data" type="application/json">';
+  const scriptClose = '</' + 'script>';
+  const stateScript = '\n' + scriptOpen + embeddedState + scriptClose;
+
+  // Get clean HTML (the current document source)
+  const doctype = '<!DOCTYPE html>';
+  let src = doctype + '\n' + html;
+
+  // Insert the embedded data before </body>
+  src = src.replace('</body>', stateScript + '\n</body>');
+
+  // Download
+  const blob = new Blob([src], { type: 'text/html; charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${state.brand}_проект_${state.shootDate || 'без_даты'}.html`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ==================== EXPORT PHOTO LIST ====================
+function exportPhotoList() {
+  const catNames = { glasses: 'Очки', bag: 'Сумка', accessory: 'Аксессуар', shoes: 'Обувь' };
+  let lines = [];
+  state.cards.forEach((card, i) => {
+    const photos = card.slots.filter(Boolean);
+    if (photos.length === 0) return;
+    lines.push(`--- Карточка ${i + 1} (${catNames[card.category] || card.category}) ---`);
+    photos.forEach(s => lines.push(s.name));
+    lines.push('');
+  });
+  if (lines.length === 0) { alert('Нет фотографий'); return; }
+  const text = lines.join('\n');
+  const blob = new Blob([text], { type: 'text/plain; charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${state.brand}_список_фото_${state.shootDate || 'без_даты'}.txt`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ==================== INIT ====================
+document.getElementById('shoot-date').value = new Date().toISOString().split('T')[0];
+
+// Check for embedded project data first (shared file), then IndexedDB
+(async function() {
+  // 1. Check for embedded project data (file was shared by colleague)
+  const embeddedEl = document.getElementById('embedded-project-data');
+  if (embeddedEl) {
+    try {
+      const embedded = JSON.parse(embeddedEl.textContent);
+      if (embedded && embedded.cards && embedded.cards.length > 0) {
+        const block = document.getElementById('resume-block');
+        const info = document.getElementById('resume-info');
+        const cardCount = embedded.cards.length;
+        const filledSlots = embedded.cards.reduce((sum, c) => sum + c.slots.filter(s => s !== null).length, 0);
+        info.innerHTML = `<strong>${embedded.brand}</strong> — ${cardCount} карт., ${filledSlots} фото` +
+          `<br><small style="color:#999">Встроенный проект</small>`;
+        block.style.display = 'block';
+        if (embedded.shootDate) document.getElementById('shoot-date').value = embedded.shootDate;
+        if (embedded.brand) document.getElementById('brand').value = embedded.brand;
+        // Override resumeSession to use embedded data
+        window._embeddedData = embedded;
+        return;
+      }
+    } catch (e) { console.warn('Ошибка чтения встроенных данных:', e); }
+  }
+
+  // 2. Check IndexedDB
+  const saved = await loadState();
+  if (saved && saved.cards && saved.cards.length > 0) {
+    const block = document.getElementById('resume-block');
+    const info = document.getElementById('resume-info');
+    const cardCount = saved.cards.length;
+    const filledSlots = saved.cards.reduce((sum, c) => sum + c.slots.filter(s => s !== null).length, 0);
+    const date = saved.savedAt ? new Date(saved.savedAt).toLocaleString('ru-RU') : '';
+    info.innerHTML = `<strong>${saved.brand}</strong> — ${cardCount} карт., ${filledSlots} фото` +
+      (date ? `<br><small style="color:#999">Сохранено: ${date}</small>` : '');
+    block.style.display = 'block';
+    if (saved.shootDate) document.getElementById('shoot-date').value = saved.shootDate;
+    if (saved.brand) document.getElementById('brand').value = saved.brand;
+  }
+})();
+
+// Patch resumeSession to handle embedded data
+const _origResume = resumeSession;
+resumeSession = async function() {
+  if (window._embeddedData) {
+    const data = window._embeddedData;
+    state.shootDate = data.shootDate;
+    state.brand = data.brand;
+    state.cards = data.cards;
+    state.currentCardIndex = data.currentCardIndex || 0;
+    document.getElementById('setup-screen').style.display = 'none';
+    document.getElementById('editor-screen').style.display = 'block';
+    renderAll();
+    return;
+  }
+  return _origResume();
+};
+</script>
+</body>
+</html>
