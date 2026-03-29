@@ -373,24 +373,35 @@ function sbUploadCards(projectId, cards, callback) {
 function _sbUploadSlotImages(projectId, slotRows, uploads, done) {
   if (!uploads || uploads.length === 0) { done(); return; }
 
-  var completed = 0;
-  var total = uploads.length;
-  console.log('supabase.js: загрузка ' + total + ' миниатюр в Storage...');
+  var BATCH = 5;
+  var idx = 0;
+  console.log('supabase.js: загрузка ' + uploads.length + ' миниатюр слотов в Storage...');
 
-  for (var i = 0; i < uploads.length; i++) {
-    (function(upload) {
-      sbUploadThumb(projectId, upload.fileName, upload.dataUrl, function(err, publicUrl) {
-        if (!err && publicUrl) {
-          slotRows[upload.slotIdx].thumb_path = publicUrl;
-          console.log('supabase.js: загружена миниатюра', upload.fileName);
-        } else {
-          console.warn('supabase.js: не удалось загрузить', upload.fileName, err);
-        }
-        completed++;
-        if (completed >= total) done();
-      });
-    })(uploads[i]);
+  function nextBatch() {
+    if (idx >= uploads.length) { done(); return; }
+
+    var end = Math.min(idx + BATCH, uploads.length);
+    var batchCount = end - idx;
+    var batchDone = 0;
+
+    for (var i = idx; i < end; i++) {
+      (function(upload) {
+        sbUploadThumb(projectId, upload.fileName, upload.dataUrl, function(err, publicUrl) {
+          if (!err && publicUrl) {
+            slotRows[upload.slotIdx].thumb_path = publicUrl;
+          } else {
+            console.warn('supabase.js: не удалось загрузить', upload.fileName, err);
+          }
+          batchDone++;
+          if (batchDone >= batchCount) nextBatch();
+        });
+      })(uploads[i]);
+    }
+
+    idx = end;
   }
+
+  nextBatch();
 }
 
 
@@ -415,48 +426,68 @@ function sbUploadPreviews(projectId, previews, callback) {
   sbClient.from('previews').delete().eq('project_id', projectId).then(function(delRes) {
     if (delRes.error) { callback('Ошибка удаления превью: ' + delRes.error.message); return; }
 
-    console.log('supabase.js: загрузка ' + previews.length + ' превью в Storage...');
+    console.log('supabase.js: загрузка ' + previews.length + ' превью в Storage (пакетами по 5)...');
 
     var rows = [];
-    var completed = 0;
-    var total = previews.length;
+    var BATCH = 5;  // Параллельно не больше 5 запросов (CORS/rate limit)
+    var idx = 0;
 
-    for (var i = 0; i < previews.length; i++) {
-      (function(pv, idx) {
-        var thumbData = pv.thumb || '';
+    /** Запустить следующий пакет загрузок */
+    function nextBatch() {
+      if (idx >= previews.length) {
+        /* Все загружены — вставляем в таблицу */
+        console.log('supabase.js: все ' + rows.length + ' превью загружены в Storage');
+        _sbInsertPreviewRows(rows, callback);
+        return;
+      }
 
-        // Загружаем thumb в Storage если это base64
-        if (thumbData && thumbData.indexOf('data:') === 0) {
-          var storagePath = projectId + '/pv_' + pv.name;
-          sbUploadThumb(projectId, 'pv_' + pv.name, thumbData, function(err, publicUrl) {
+      var end = Math.min(idx + BATCH, previews.length);
+      var batchCount = end - idx;
+      var batchDone = 0;
+
+      for (var i = idx; i < end; i++) {
+        (function(pv, pos) {
+          var thumbData = pv.thumb || '';
+
+          if (thumbData && thumbData.indexOf('data:') === 0) {
+            sbUploadThumb(projectId, 'pv_' + pv.name, thumbData, function(err, publicUrl) {
+              rows.push({
+                project_id: projectId,
+                file_name: pv.name,
+                thumb_path: publicUrl || null,
+                preview_path: null,
+                rating: pv.rating || 0,
+                orient: pv.orient || 'v',
+                position: pos
+              });
+              batchDone++;
+              if (batchDone >= batchCount) {
+                if (pos % 50 === 0 || pos === previews.length - 1) {
+                  console.log('supabase.js: загружено ' + rows.length + '/' + previews.length + ' превью');
+                }
+                nextBatch();
+              }
+            });
+          } else {
             rows.push({
               project_id: projectId,
               file_name: pv.name,
-              thumb_path: publicUrl || null,
+              thumb_path: null,
               preview_path: null,
               rating: pv.rating || 0,
               orient: pv.orient || 'v',
-              position: idx
+              position: pos
             });
-            completed++;
-            if (completed >= total) _sbInsertPreviewRows(rows, callback);
-          });
-        } else {
-          // Нет base64 — сохраняем только метаданные
-          rows.push({
-            project_id: projectId,
-            file_name: pv.name,
-            thumb_path: null,
-            preview_path: null,
-            rating: pv.rating || 0,
-            orient: pv.orient || 'v',
-            position: idx
-          });
-          completed++;
-          if (completed >= total) _sbInsertPreviewRows(rows, callback);
-        }
-      })(previews[i], i);
+            batchDone++;
+            if (batchDone >= batchCount) nextBatch();
+          }
+        })(previews[i], i);
+      }
+
+      idx = end;
     }
+
+    nextBatch();
   });
 }
 
