@@ -302,7 +302,8 @@ function sbUploadCards(projectId, cards, callback) {
 
     for (var c = 0; c < cards.length; c++) {
       var card = cards[c];
-      var cardId = card.id || ('card_' + c);
+      /* Генерируем новый UUID чтобы избежать конфликта PK при перезаписи */
+      var cardId = crypto.randomUUID ? crypto.randomUUID() : ('card_' + projectId.slice(0,8) + '_' + c + '_' + Date.now());
 
       cardRows.push({
         id: cardId,
