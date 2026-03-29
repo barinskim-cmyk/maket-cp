@@ -831,29 +831,16 @@ function _sbDoLoadByToken(token) {
       }
     }
 
-    /* Загружаем превью-галерею (таблица previews доступна анонимам) */
-    sbDownloadPreviews(data.project_id, function(pvErr, pvList) {
-      if (!pvErr && pvList && pvList.length > 0) {
-        proj.previews = pvList;
-        console.log('supabase.js: загружено ' + pvList.length + ' превью по share-ссылке');
-      }
+    App.projects.push(proj);
+    App.selectedProject = App.projects.length - 1;
+    if (typeof renderProjects === 'function') renderProjects();
 
-      App.projects.push(proj);
-      App.selectedProject = App.projects.length - 1;
-      if (typeof renderProjects === 'function') renderProjects();
+    /* Клиентский режим — превью не грузим, клиенту они не нужны */
+    if (proj._role === 'client' && typeof shEnterClientMode === 'function') {
+      shEnterClientMode();
+    }
 
-      /* Клиентский режим */
-      if (proj._role === 'client' && typeof shEnterClientMode === 'function') {
-        shEnterClientMode();
-      }
-
-      /* Отрисовать превью если функция доступна */
-      if (typeof pvRenderGallery === 'function') {
-        setTimeout(function() { pvRenderGallery(); }, 200);
-      }
-
-      console.log('Проект загружен по share-ссылке:', proj.brand, 'роль:', proj._role);
-    });
+    console.log('Проект загружен по share-ссылке:', proj.brand, 'роль:', proj._role);
   });
 }
 
