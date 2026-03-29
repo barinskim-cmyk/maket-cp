@@ -640,9 +640,7 @@ function shEnterClientMode() {
   var sidebarBtns = document.querySelectorAll('.cp-sidebar .btn');
   for (var i = 0; i < sidebarBtns.length; i++) sidebarBtns[i].style.display = 'none';
 
-  /* Скрыть превью-панель (это инструмент фотографа, не для клиента) */
-  var pvPanel = document.getElementById('cp-previews');
-  if (pvPanel) pvPanel.style.display = 'none';
+  /* Превью-панель: оставляем для клиента (просмотр всех кадров) */
 
   /* Скрыть тулбар карточки (Редактировать шаблон, +V, +H и т.д.) */
   var cpToolbar = document.querySelector('.cp-toolbar');
