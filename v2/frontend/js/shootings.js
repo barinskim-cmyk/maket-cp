@@ -637,8 +637,20 @@ function shEnterClientMode() {
   /* Скрыть кнопки "Добавить карточку" и "Экспорт" в сайдбаре */
   var addBtn = document.querySelector('.cp-add-card-btn');
   if (addBtn) addBtn.style.display = 'none';
-  var exportBtn = document.querySelector('.cp-sidebar .btn');
-  if (exportBtn) exportBtn.style.display = 'none';
+  var sidebarBtns = document.querySelectorAll('.cp-sidebar .btn');
+  for (var i = 0; i < sidebarBtns.length; i++) sidebarBtns[i].style.display = 'none';
+
+  /* Скрыть превью-панель (это инструмент фотографа, не для клиента) */
+  var pvPanel = document.getElementById('cp-previews');
+  if (pvPanel) pvPanel.style.display = 'none';
+
+  /* Скрыть тулбар карточки (Редактировать шаблон, +V, +H и т.д.) */
+  var cpToolbar = document.querySelector('.cp-toolbar');
+  if (cpToolbar) cpToolbar.style.display = 'none';
+
+  /* Скрыть субтабы (Карточки товара / Доп. контент) */
+  var subtabs = document.querySelector('.subtabs');
+  if (subtabs) subtabs.style.display = 'none';
 
   /* Показать панель клиента на главном экране */
   shRenderClientBar();
