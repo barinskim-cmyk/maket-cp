@@ -1391,3 +1391,144 @@ function cpExportList() {
   a.click();
   URL.revokeObjectURL(a.href);
 }
+
+/**
+ * Экспортировать все карточки в PDF.
+ * Каждая карточка = одна страница A4 (landscape).
+ * Фото расставляются по сетке как в UI.
+ */
+function cpExportPDF() {
+  var proj = getActiveProject();
+  if (!proj || !proj.cards || proj.cards.length === 0) { alert('Нет карточек'); return; }
+
+  if (typeof jspdf === 'undefined' && typeof window.jspdf === 'undefined') {
+    alert('Библиотека jsPDF не загружена. Обновите страницу.');
+    return;
+  }
+
+  var jsPDF = (window.jspdf && window.jspdf.jsPDF) || jspdf.jsPDF;
+  var doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+  var pageW = 297; /* A4 landscape width */
+  var pageH = 210; /* A4 landscape height */
+  var margin = 10;
+  var contentW = pageW - margin * 2;
+  var contentH = pageH - margin * 2;
+  var gap = 3;
+
+  /* Заголовок проекта */
+  var brandText = (proj.brand || 'Проект') + (proj.shoot_date ? ' / ' + proj.shoot_date : '');
+
+  for (var ci = 0; ci < proj.cards.length; ci++) {
+    if (ci > 0) doc.addPage();
+    var card = proj.cards[ci];
+    if (!card.slots || card.slots.length === 0) continue;
+
+    /* Заголовок страницы */
+    doc.setFontSize(10);
+    doc.setTextColor(150);
+    doc.text(brandText + '  |  ' + 'Карточка ' + (ci + 1), margin, margin - 2);
+
+    /* Собрать слоты с изображениями */
+    var filledSlots = [];
+    for (var si = 0; si < card.slots.length; si++) {
+      var slot = card.slots[si];
+      if (slot.dataUrl || slot.thumbUrl) {
+        filledSlots.push(slot);
+      }
+    }
+
+    if (filledSlots.length === 0) {
+      doc.setFontSize(14);
+      doc.setTextColor(180);
+      doc.text('(пустая карточка)', pageW / 2, pageH / 2, { align: 'center' });
+      continue;
+    }
+
+    /* Раскладка: определить hero + rest */
+    var hasHero = (card._hasHero !== undefined) ? card._hasHero : true;
+    var heroSlot = (hasHero && filledSlots.length > 0) ? filledSlots[0] : null;
+    var restSlots = hasHero ? filledSlots.slice(1) : filledSlots;
+
+    if (heroSlot && restSlots.length > 0) {
+      /* Hero слева (60%), rest справа (40%) */
+      var heroW = contentW * 0.58;
+      var restW = contentW - heroW - gap;
+      var heroH = contentH;
+
+      /* Hero */
+      _cpPdfDrawImage(doc, heroSlot, margin, margin, heroW, heroH);
+
+      /* Rest: сетка справа */
+      var restX = margin + heroW + gap;
+      var cols = restSlots.length <= 2 ? 1 : 2;
+      var rows = Math.ceil(restSlots.length / cols);
+      var cellW = (restW - gap * (cols - 1)) / cols;
+      var cellH = (contentH - gap * (rows - 1)) / rows;
+
+      for (var ri = 0; ri < restSlots.length; ri++) {
+        var col = ri % cols;
+        var row = Math.floor(ri / cols);
+        var cx = restX + col * (cellW + gap);
+        var cy = margin + row * (cellH + gap);
+        _cpPdfDrawImage(doc, restSlots[ri], cx, cy, cellW, cellH);
+      }
+    } else {
+      /* Без hero: равномерная сетка */
+      var total = filledSlots.length;
+      var gridCols = total <= 2 ? total : (total <= 4 ? 2 : 3);
+      var gridRows = Math.ceil(total / gridCols);
+      var gCellW = (contentW - gap * (gridCols - 1)) / gridCols;
+      var gCellH = (contentH - gap * (gridRows - 1)) / gridRows;
+
+      for (var gi = 0; gi < total; gi++) {
+        var gc = gi % gridCols;
+        var gr = Math.floor(gi / gridCols);
+        var gx = margin + gc * (gCellW + gap);
+        var gy = margin + gr * (gCellH + gap);
+        _cpPdfDrawImage(doc, filledSlots[gi], gx, gy, gCellW, gCellH);
+      }
+    }
+
+    /* Имена файлов внизу */
+    doc.setFontSize(6);
+    doc.setTextColor(180);
+    var names = [];
+    for (var ni = 0; ni < card.slots.length; ni++) {
+      if (card.slots[ni].file) names.push(card.slots[ni].file);
+    }
+    if (names.length > 0) {
+      doc.text(names.join('   '), margin, pageH - 2);
+    }
+  }
+
+  /* Скачать PDF */
+  doc.save((proj.brand || 'project') + '_карточки.pdf');
+}
+
+/**
+ * Нарисовать изображение слота в PDF (object-fit: cover).
+ * @param {jsPDF} doc
+ * @param {Object} slot — слот с dataUrl/thumbUrl
+ * @param {number} x, y, w, h — координаты в мм
+ */
+function _cpPdfDrawImage(doc, slot, x, y, w, h) {
+  var src = slot.dataUrl || slot.thumbUrl || slot.thumb;
+  if (!src) return;
+
+  try {
+    /* Рамка */
+    doc.setDrawColor(230);
+    doc.rect(x, y, w, h);
+
+    /* Добавляем изображение с заполнением области */
+    doc.addImage(src, 'JPEG', x, y, w, h);
+  } catch(e) {
+    /* Если формат не поддерживается -- рисуем плейсхолдер */
+    doc.setFillColor(245, 245, 245);
+    doc.rect(x, y, w, h, 'F');
+    doc.setFontSize(8);
+    doc.setTextColor(180);
+    doc.text(slot.file || '?', x + w / 2, y + h / 2, { align: 'center' });
+  }
+}
