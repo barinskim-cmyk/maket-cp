@@ -618,8 +618,8 @@ var _appClientMode = false;
 function shEnterClientMode() {
   _appClientMode = true;
 
-  /* Скрыть навигацию фотографа */
-  var navbar = document.getElementById('main-nav');
+  /* Скрыть навигацию фотографа (элемент .nav, без id) */
+  var navbar = document.querySelector('.nav');
   if (navbar) navbar.style.display = 'none';
 
   /* Скрыть шапку проектов (кнопки "Новая съёмка", "В облако" и т.д.) */

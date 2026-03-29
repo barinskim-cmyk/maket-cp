@@ -276,7 +276,7 @@ function sbUploadProject(projIdx, callback) {
 
 /**
  * Загрузить карточки проекта в облако.
- * Стратегия: удалить старые → вставить новые (проще чем diff).
+ * Стратегия: удалить старые → загрузить миниатюры в Storage → вставить новые.
  *
  * @param {string} projectId — UUID проекта в Supabase
  * @param {Array} cards — массив карточек из локального проекта
@@ -292,6 +292,8 @@ function sbUploadCards(projectId, cards, callback) {
     // Подготовка строк cards + slots
     var cardRows = [];
     var slotRows = [];
+    /** @type {Array<{slotIdx: number, dataUrl: string, fileName: string}>} */
+    var uploadsNeeded = [];
 
     for (var c = 0; c < cards.length; c++) {
       var card = cards[c];
@@ -311,6 +313,8 @@ function sbUploadCards(projectId, cards, callback) {
       if (card.slots) {
         for (var s = 0; s < card.slots.length; s++) {
           var slot = card.slots[s];
+          var slotIdx = slotRows.length;
+          var fileName = slot.file || ('slot_' + c + '_' + s + '.jpg');
           slotRows.push({
             card_id: cardId,
             project_id: projectId,
@@ -319,27 +323,68 @@ function sbUploadCards(projectId, cards, callback) {
             weight: slot.weight || 1,
             row_num: (slot.row !== undefined) ? slot.row : null,
             rotation: slot.rotation || 0,
-            file_name: slot.file || null,
-            thumb_path: null,      // TODO: загрузить thumb в storage
-            original_path: null    // TODO: загрузить оригинал в storage
+            file_name: fileName,
+            thumb_path: null,
+            original_path: null
           });
+
+          /* Собираем слоты с картинками для загрузки в Storage */
+          var dataUrl = slot.dataUrl || slot.thumbUrl || slot.thumb || null;
+          if (dataUrl && dataUrl.indexOf('data:') === 0) {
+            uploadsNeeded.push({ slotIdx: slotIdx, dataUrl: dataUrl, fileName: fileName });
+          }
         }
       }
     }
 
-    // Вставляем карточки
-    sbClient.from('cards').insert(cardRows).then(function(cardRes) {
-      if (cardRes.error) { callback('Ошибка карточек: ' + cardRes.error.message); return; }
+    /* Загружаем миниатюры в Supabase Storage, затем вставляем записи */
+    _sbUploadSlotImages(projectId, slotRows, uploadsNeeded, function() {
+      // Вставляем карточки
+      sbClient.from('cards').insert(cardRows).then(function(cardRes) {
+        if (cardRes.error) { callback('Ошибка карточек: ' + cardRes.error.message); return; }
 
-      if (slotRows.length === 0) { callback(null); return; }
+        if (slotRows.length === 0) { callback(null); return; }
 
-      // Вставляем слоты
-      sbClient.from('slots').insert(slotRows).then(function(slotRes) {
-        if (slotRes.error) { callback('Ошибка слотов: ' + slotRes.error.message); return; }
-        callback(null);
+        // Вставляем слоты (thumb_path уже заполнен после загрузки)
+        sbClient.from('slots').insert(slotRows).then(function(slotRes) {
+          if (slotRes.error) { callback('Ошибка слотов: ' + slotRes.error.message); return; }
+          callback(null);
+        });
       });
     });
   });
+}
+
+/**
+ * Загрузить миниатюры слотов в Supabase Storage (параллельно).
+ * По завершении заполняет slotRows[i].thumb_path публичным URL.
+ *
+ * @param {string} projectId
+ * @param {Array} slotRows — массив строк для вставки в таблицу slots
+ * @param {Array} uploads — [{slotIdx, dataUrl, fileName}]
+ * @param {function} done — callback() без аргументов, вызывается после всех загрузок
+ */
+function _sbUploadSlotImages(projectId, slotRows, uploads, done) {
+  if (!uploads || uploads.length === 0) { done(); return; }
+
+  var completed = 0;
+  var total = uploads.length;
+  console.log('supabase.js: загрузка ' + total + ' миниатюр в Storage...');
+
+  for (var i = 0; i < uploads.length; i++) {
+    (function(upload) {
+      sbUploadThumb(projectId, upload.fileName, upload.dataUrl, function(err, publicUrl) {
+        if (!err && publicUrl) {
+          slotRows[upload.slotIdx].thumb_path = publicUrl;
+          console.log('supabase.js: загружена миниатюра', upload.fileName);
+        } else {
+          console.warn('supabase.js: не удалось загрузить', upload.fileName, err);
+        }
+        completed++;
+        if (completed >= total) done();
+      });
+    })(uploads[i]);
+  }
 }
 
 /**
@@ -409,7 +454,7 @@ function sbDownloadProject(cloudId, callback) {
               row: rs.row_num,
               rotation: rs.rotation,
               file: rs.file_name,
-              dataUrl: null,
+              dataUrl: rs.thumb_path || null,
               path: null
             });
           }
@@ -601,7 +646,7 @@ function _sbDoLoadByToken(token) {
               row: rs.row_num,
               rotation: rs.rotation || 0,
               file: rs.file_name || null,
-              dataUrl: null,
+              dataUrl: rs.thumb_path || null,
               path: null
             });
           }
