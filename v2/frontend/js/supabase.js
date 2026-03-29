@@ -269,7 +269,12 @@ function sbUploadProject(projIdx, callback) {
     // Загружаем карточки
     sbUploadCards(savedProj.id, proj.cards || [], function(err) {
       if (err) { callback(err); return; }
-      callback(null, savedProj.id);
+
+      // Загружаем превью-галерею
+      sbUploadPreviews(savedProj.id, proj.previews || [], function(err2) {
+        if (err2) console.warn('sbUploadPreviews:', err2);
+        callback(null, savedProj.id);
+      });
     });
   });
 }
@@ -387,6 +392,141 @@ function _sbUploadSlotImages(projectId, slotRows, uploads, done) {
   }
 }
 
+
+// ══════════════════════════════════════════════
+//  Загрузка превью-галереи в облако
+// ══════════════════════════════════════════════
+
+/**
+ * Загрузить все превью проекта в облако:
+ * 1) Удалить старые записи из таблицы previews
+ * 2) Загрузить миниатюры (thumb) в Supabase Storage
+ * 3) Вставить метаданные в таблицу previews
+ *
+ * @param {string} projectId — UUID проекта
+ * @param {Array} previews — массив превью [{name, thumb, preview, rating, orient, ...}]
+ * @param {function} callback — callback(error)
+ */
+function sbUploadPreviews(projectId, previews, callback) {
+  if (!previews || previews.length === 0) { callback(null); return; }
+
+  // Удаляем старые превью
+  sbClient.from('previews').delete().eq('project_id', projectId).then(function(delRes) {
+    if (delRes.error) { callback('Ошибка удаления превью: ' + delRes.error.message); return; }
+
+    console.log('supabase.js: загрузка ' + previews.length + ' превью в Storage...');
+
+    var rows = [];
+    var completed = 0;
+    var total = previews.length;
+
+    for (var i = 0; i < previews.length; i++) {
+      (function(pv, idx) {
+        var thumbData = pv.thumb || '';
+
+        // Загружаем thumb в Storage если это base64
+        if (thumbData && thumbData.indexOf('data:') === 0) {
+          var storagePath = projectId + '/pv_' + pv.name;
+          sbUploadThumb(projectId, 'pv_' + pv.name, thumbData, function(err, publicUrl) {
+            rows.push({
+              project_id: projectId,
+              file_name: pv.name,
+              thumb_path: publicUrl || null,
+              preview_path: null,
+              rating: pv.rating || 0,
+              orient: pv.orient || 'v',
+              position: idx
+            });
+            completed++;
+            if (completed >= total) _sbInsertPreviewRows(rows, callback);
+          });
+        } else {
+          // Нет base64 — сохраняем только метаданные
+          rows.push({
+            project_id: projectId,
+            file_name: pv.name,
+            thumb_path: null,
+            preview_path: null,
+            rating: pv.rating || 0,
+            orient: pv.orient || 'v',
+            position: idx
+          });
+          completed++;
+          if (completed >= total) _sbInsertPreviewRows(rows, callback);
+        }
+      })(previews[i], i);
+    }
+  });
+}
+
+/**
+ * Вставить строки превью в таблицу (батчами по 50).
+ * @param {Array} rows
+ * @param {function} callback
+ */
+function _sbInsertPreviewRows(rows, callback) {
+  if (rows.length === 0) { callback(null); return; }
+
+  // Сортируем по position
+  rows.sort(function(a, b) { return a.position - b.position; });
+
+  // Вставляем батчами (Supabase лимит ~1000 строк)
+  var batchSize = 50;
+  var batches = [];
+  for (var i = 0; i < rows.length; i += batchSize) {
+    batches.push(rows.slice(i, i + batchSize));
+  }
+
+  var batchIdx = 0;
+  function nextBatch() {
+    if (batchIdx >= batches.length) {
+      console.log('supabase.js: загружено ' + rows.length + ' превью в таблицу');
+      callback(null);
+      return;
+    }
+    sbClient.from('previews').insert(batches[batchIdx]).then(function(res) {
+      if (res.error) { callback('Ошибка превью: ' + res.error.message); return; }
+      batchIdx++;
+      nextBatch();
+    });
+  }
+  nextBatch();
+}
+
+/**
+ * Скачать превью проекта из облака.
+ * Возвращает массив в формате [{name, thumb, rating, orient}].
+ *
+ * @param {string} projectId
+ * @param {function} callback — callback(error, previews[])
+ */
+function sbDownloadPreviews(projectId, callback) {
+  sbClient.from('previews')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('position')
+    .then(function(res) {
+      if (res.error) { callback(res.error.message, []); return; }
+
+      var previews = [];
+      var rows = res.data || [];
+      for (var i = 0; i < rows.length; i++) {
+        var r = rows[i];
+        previews.push({
+          name: r.file_name,
+          thumb: r.thumb_path || '',
+          preview: r.preview_path || r.thumb_path || '',
+          rating: r.rating || 0,
+          orient: r.orient || 'v',
+          path: '',
+          folders: []
+        });
+      }
+      callback(null, previews);
+    });
+}
+
+
 /**
  * Скачать проект из облака по ID.
  * Конвертирует таблицы Supabase обратно в локальный формат.
@@ -462,7 +602,11 @@ function sbDownloadProject(cloudId, callback) {
           proj.cards.push(card);
         }
 
-        callback(null, proj);
+        // Загружаем превью-галерею
+        sbDownloadPreviews(cloudId, function(pvErr, pvList) {
+          if (!pvErr && pvList) proj.previews = pvList;
+          callback(null, proj);
+        });
       });
     });
   });
@@ -655,16 +799,29 @@ function _sbDoLoadByToken(token) {
       }
     }
 
-    App.projects.push(proj);
-    App.selectedProject = App.projects.length - 1;
-    if (typeof renderProjects === 'function') renderProjects();
+    /* Загружаем превью-галерею (таблица previews доступна анонимам) */
+    sbDownloadPreviews(data.project_id, function(pvErr, pvList) {
+      if (!pvErr && pvList && pvList.length > 0) {
+        proj.previews = pvList;
+        console.log('supabase.js: загружено ' + pvList.length + ' превью по share-ссылке');
+      }
 
-    /* Клиентский режим */
-    if (proj._role === 'client' && typeof shEnterClientMode === 'function') {
-      shEnterClientMode();
-    }
+      App.projects.push(proj);
+      App.selectedProject = App.projects.length - 1;
+      if (typeof renderProjects === 'function') renderProjects();
 
-    console.log('Проект загружен по share-ссылке:', proj.brand, 'роль:', proj._role);
+      /* Клиентский режим */
+      if (proj._role === 'client' && typeof shEnterClientMode === 'function') {
+        shEnterClientMode();
+      }
+
+      /* Отрисовать превью если функция доступна */
+      if (typeof pvRenderGallery === 'function') {
+        setTimeout(function() { pvRenderGallery(); }, 200);
+      }
+
+      console.log('Проект загружен по share-ссылке:', proj.brand, 'роль:', proj._role);
+    });
   });
 }
 
