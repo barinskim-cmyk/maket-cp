@@ -109,6 +109,7 @@
         <div id="cp-cards-list"></div>
         <button class="cp-add-card-btn" onclick="cpAddCard()">+ Новая карточка</button>
         <button class="btn btn-sm" style="width:100%;margin-top:6px" onclick="cpExportList()">Экспорт списка</button>
+        <button class="btn btn-sm" style="width:100%;margin-top:6px" onclick="cpExportPDF()">Экспорт PDF</button>
       </div>
       <div class="cp-view" id="cp-view">
         <div class="cp-empty">Создайте или откройте съёмку, затем добавьте карточки</div>
@@ -440,6 +441,7 @@
 <!-- ══════════════ Скрипты ══════════════ -->
 <!-- Supabase SDK v2 (jsdelivr CDN) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <script src="js/state.js"></script>
 <script src="js/nav.js"></script>
