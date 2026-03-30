@@ -1085,11 +1085,85 @@ var _sbCardSyncTimer = null;
 var SB_CARD_SYNC_DELAY = 2000; // 2 секунды после последнего изменения
 
 /**
+ * Лёгкая синхронизация карточек: только метаданные (без перезаливки картинок).
+ * Удаляет старые карточки/слоты и вставляет новые, но thumb_path берёт из
+ * существующих записей в базе (по file_name), а не загружает заново.
+ *
+ * @param {string} projectId
+ * @param {Array} cards
+ * @param {function} callback — callback(error)
+ */
+function sbSyncCardsLight(projectId, cards, callback) {
+  if (!sbClient) { callback('Supabase не подключён'); return; }
+
+  /* Сначала получаем существующие thumb_path по file_name */
+  sbClient.from('slots').select('file_name, thumb_path').eq('project_id', projectId).then(function(existRes) {
+    var thumbMap = {};
+    (existRes.data || []).forEach(function(r) {
+      if (r.file_name && r.thumb_path) thumbMap[r.file_name] = r.thumb_path;
+    });
+
+    /* Удаляем старые карточки (каскадно удалит слоты) */
+    sbClient.from('cards').delete().eq('project_id', projectId).then(function(delRes) {
+      if (delRes.error) { callback('Ошибка удаления: ' + delRes.error.message); return; }
+      if (!cards || cards.length === 0) { callback(null); return; }
+
+      var cardRows = [];
+      var slotRows = [];
+
+      for (var c = 0; c < cards.length; c++) {
+        var card = cards[c];
+        var cardId = crypto.randomUUID ? crypto.randomUUID() : ('card_' + projectId.slice(0,8) + '_' + c + '_' + Date.now());
+
+        cardRows.push({
+          id: cardId,
+          project_id: projectId,
+          position: c,
+          status: card.status || 'draft',
+          has_hero: card._hasHero !== undefined ? card._hasHero : true,
+          h_aspect: card._hAspect || '3/2',
+          v_aspect: card._vAspect || '2/3',
+          lock_rows: card._lockRows || false
+        });
+
+        if (card.slots) {
+          for (var s = 0; s < card.slots.length; s++) {
+            var slot = card.slots[s];
+            var fileName = slot.file || ('slot_' + c + '_' + s + '.jpg');
+            slotRows.push({
+              card_id: cardId,
+              project_id: projectId,
+              position: s,
+              orient: slot.orient || 'v',
+              weight: slot.weight || 1,
+              row_num: (slot.row !== undefined) ? slot.row : null,
+              rotation: slot.rotation || 0,
+              file_name: fileName,
+              thumb_path: thumbMap[fileName] || null,
+              original_path: null
+            });
+          }
+        }
+      }
+
+      sbClient.from('cards').insert(cardRows).then(function(cardRes) {
+        if (cardRes.error) { callback('Ошибка карточек: ' + cardRes.error.message); return; }
+        if (slotRows.length === 0) { callback(null); return; }
+
+        sbClient.from('slots').insert(slotRows).then(function(slotRes) {
+          if (slotRes.error) { callback('Ошибка слотов: ' + slotRes.error.message); return; }
+          callback(null);
+        });
+      });
+    });
+  });
+}
+
+/**
  * Вызывается из cpSaveHistory после каждого изменения карточки.
  * Debounce: синхронизирует карточки через 2 сек после последнего изменения.
- * Работает в двух режимах:
- *   - Фотограф (авторизован): sbUploadCards
- *   - Клиент (share-ссылка): sbSaveCardsByToken
+ * Использует sbSyncCardsLight (без перезаливки картинок).
+ * Для клиента: sbSaveCardsByToken через RPC.
  */
 function sbAutoSyncCards() {
   var proj = getActiveProject();
@@ -1113,10 +1187,10 @@ function sbAutoSyncCards() {
         else console.log('supabase.js: карточки клиента сохранены');
       });
     } else {
-      console.log('supabase.js: авто-синхронизация карточек...');
-      sbUploadCards(proj._cloudId, proj.cards || [], function(err) {
+      console.log('supabase.js: авто-синхронизация карточек (лёгкая)...');
+      sbSyncCardsLight(proj._cloudId, proj.cards || [], function(err) {
         if (err) console.warn('Авто-синхронизация карточек:', err);
-        else console.log('supabase.js: карточки синхронизированы');
+        else console.log('supabase.js: карточки синхронизированы (без перезаливки картинок)');
       });
     }
   }, SB_CARD_SYNC_DELAY);
