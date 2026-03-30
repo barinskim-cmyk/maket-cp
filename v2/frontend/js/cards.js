@@ -335,14 +335,12 @@ function cpSlotHTML(slotIdx, span, hasHero) {
     var src = slot.dataUrl || ('images/' + slot.file);
     var rot = slot.rotation || 0;
     var rotStyle = rot ? ' style="transform:rotate(' + rot + 'deg)"' : '';
-    /* Кнопка: лупа (полный экран). Поворот и ориентация временно скрыты */
-    var zoomBtn = '<button class="slot-btn" onclick="cpShowFullscreen(' + slotIdx + ',event)" title="На весь экран">&#8599;</button>';
-    var toolbarFilled = '<div class="slot-toolbar">';
-    toolbarFilled += zoomBtn;
-    toolbarFilled += '</div>';
+    /* Кнопка увеличения: прямо на фото, иконка expand */
+    var expandSvg = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
+    var zoomBtn = '<button class="slot-expand" onclick="cpShowFullscreen(' + slotIdx + ',event)" title="На весь экран">' + expandSvg + '</button>';
     return '<div class="photo-slot filled' + mainCls + '" data-slot="' + slotIdx + '" draggable="true">' +
       '<img src="' + src + '" loading="lazy"' + rotStyle + '>' +
-      toolbarFilled +
+      zoomBtn +
       '<button class="remove-btn" onclick="cpClearSlotPhoto(' + slotIdx + ',event)">&times;</button></div>';
   }
 
