@@ -316,73 +316,90 @@ function sbUploadProject(projIdx, callback) {
  * @param {function} callback — callback(error)
  */
 function sbUploadCards(projectId, cards, callback) {
-  // Удаляем старые карточки (каскадно удалит слоты)
-  sbClient.from('cards').delete().eq('project_id', projectId).then(function(delRes) {
-    if (delRes.error) { callback('Ошибка удаления карточек: ' + delRes.error.message); return; }
+  /* Сначала сохраняем существующие thumb_path чтобы не потерять их */
+  sbClient.from('slots').select('file_name, thumb_path').eq('project_id', projectId).then(function(existRes) {
+    var thumbMap = {};
+    (existRes.data || []).forEach(function(r) {
+      if (r.file_name && r.thumb_path) thumbMap[r.file_name] = r.thumb_path;
+    });
 
-    if (!cards || cards.length === 0) { callback(null); return; }
+    // Удаляем старые карточки (каскадно удалит слоты)
+    sbClient.from('cards').delete().eq('project_id', projectId).then(function(delRes) {
+      if (delRes.error) { callback('Ошибка удаления карточек: ' + delRes.error.message); return; }
 
-    // Подготовка строк cards + slots
-    var cardRows = [];
-    var slotRows = [];
-    /** @type {Array<{slotIdx: number, dataUrl: string, fileName: string}>} */
-    var uploadsNeeded = [];
+      if (!cards || cards.length === 0) { callback(null); return; }
 
-    for (var c = 0; c < cards.length; c++) {
-      var card = cards[c];
-      /* Генерируем новый UUID чтобы избежать конфликта PK при перезаписи */
-      var cardId = crypto.randomUUID ? crypto.randomUUID() : ('card_' + projectId.slice(0,8) + '_' + c + '_' + Date.now());
+      // Подготовка строк cards + slots
+      var cardRows = [];
+      var slotRows = [];
+      /** @type {Array<{slotIdx: number, dataUrl: string, fileName: string}>} */
+      var uploadsNeeded = [];
 
-      cardRows.push({
-        id: cardId,
-        project_id: projectId,
-        position: c,
-        status: card.status || 'draft',
-        has_hero: card._hasHero !== undefined ? card._hasHero : true,
-        h_aspect: card._hAspect || '3/2',
-        v_aspect: card._vAspect || '2/3',
-        lock_rows: card._lockRows || false
-      });
+      for (var c = 0; c < cards.length; c++) {
+        var card = cards[c];
+        /* Генерируем новый UUID чтобы избежать конфликта PK при перезаписи */
+        var cardId = crypto.randomUUID ? crypto.randomUUID() : ('card_' + projectId.slice(0,8) + '_' + c + '_' + Date.now());
 
-      if (card.slots) {
-        for (var s = 0; s < card.slots.length; s++) {
-          var slot = card.slots[s];
-          var slotIdx = slotRows.length;
-          var fileName = slot.file || ('slot_' + c + '_' + s + '.jpg');
-          slotRows.push({
-            card_id: cardId,
-            project_id: projectId,
-            position: s,
-            orient: slot.orient || 'v',
-            weight: slot.weight || 1,
-            row_num: (slot.row !== undefined) ? slot.row : null,
-            rotation: slot.rotation || 0,
-            file_name: fileName,
-            thumb_path: null,
-            original_path: null
-          });
+        cardRows.push({
+          id: cardId,
+          project_id: projectId,
+          position: c,
+          status: card.status || 'draft',
+          has_hero: card._hasHero !== undefined ? card._hasHero : true,
+          h_aspect: card._hAspect || '3/2',
+          v_aspect: card._vAspect || '2/3',
+          lock_rows: card._lockRows || false
+        });
 
-          /* Собираем слоты с картинками для загрузки в Storage */
-          var dataUrl = slot.dataUrl || slot.thumbUrl || slot.thumb || null;
-          if (dataUrl && dataUrl.indexOf('data:') === 0) {
-            uploadsNeeded.push({ slotIdx: slotIdx, dataUrl: dataUrl, fileName: fileName });
+        if (card.slots) {
+          for (var s = 0; s < card.slots.length; s++) {
+            var slot = card.slots[s];
+            var slotIdx = slotRows.length;
+            var fileName = slot.file || ('slot_' + c + '_' + s + '.jpg');
+
+            /* Сохраняем существующий thumb_path если есть, или URL из dataUrl */
+            var existingThumb = thumbMap[fileName] || null;
+            var dataUrl = slot.dataUrl || slot.thumbUrl || slot.thumb || null;
+
+            /* Если dataUrl — это уже URL из Storage, используем как thumb_path */
+            if (!existingThumb && dataUrl && dataUrl.indexOf('http') === 0) {
+              existingThumb = dataUrl;
+            }
+
+            slotRows.push({
+              card_id: cardId,
+              project_id: projectId,
+              position: s,
+              orient: slot.orient || 'v',
+              weight: slot.weight || 1,
+              row_num: (slot.row !== undefined) ? slot.row : null,
+              rotation: slot.rotation || 0,
+              file_name: fileName,
+              thumb_path: existingThumb,
+              original_path: null
+            });
+
+            /* Собираем слоты с base64 картинками для загрузки в Storage */
+            if (dataUrl && dataUrl.indexOf('data:') === 0) {
+              uploadsNeeded.push({ slotIdx: slotIdx, dataUrl: dataUrl, fileName: fileName });
+            }
           }
         }
       }
-    }
 
-    /* Загружаем миниатюры в Supabase Storage, затем вставляем записи */
-    _sbUploadSlotImages(projectId, slotRows, uploadsNeeded, function() {
-      // Вставляем карточки
-      sbClient.from('cards').insert(cardRows).then(function(cardRes) {
-        if (cardRes.error) { callback('Ошибка карточек: ' + cardRes.error.message); return; }
+      /* Загружаем миниатюры в Supabase Storage, затем вставляем записи */
+      _sbUploadSlotImages(projectId, slotRows, uploadsNeeded, function() {
+        // Вставляем карточки
+        sbClient.from('cards').insert(cardRows).then(function(cardRes) {
+          if (cardRes.error) { callback('Ошибка карточек: ' + cardRes.error.message); return; }
 
-        if (slotRows.length === 0) { callback(null); return; }
+          if (slotRows.length === 0) { callback(null); return; }
 
-        // Вставляем слоты (thumb_path уже заполнен после загрузки)
-        sbClient.from('slots').insert(slotRows).then(function(slotRes) {
-          if (slotRes.error) { callback('Ошибка слотов: ' + slotRes.error.message); return; }
-          callback(null);
+          // Вставляем слоты (thumb_path уже заполнен после загрузки)
+          sbClient.from('slots').insert(slotRows).then(function(slotRes) {
+            if (slotRes.error) { callback('Ошибка слотов: ' + slotRes.error.message); return; }
+            callback(null);
+          });
         });
       });
     });
