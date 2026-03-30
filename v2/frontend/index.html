@@ -123,6 +123,7 @@
         <div class="pv-toolbar" id="pv-toolbar" style="display:none">
           <span id="pv-count">0 фото</span>
           <input type="range" id="pv-thumb-slider" min="2" max="6" value="3" class="pv-slider" title="Размер миниатюр" oninput="pvSetColumns(this.value)">
+          <button class="btn btn-sm" onclick="pvDownloadSorted()">Скачать</button>
           <button class="btn btn-sm" onclick="pvClearAll()">Очистить</button>
         </div>
         <div class="pv-filter" id="pv-filter" style="display:none">
@@ -442,6 +443,8 @@
 <!-- Supabase SDK v2 (jsdelivr CDN) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
 <script src="js/state.js"></script>
 <script src="js/nav.js"></script>
