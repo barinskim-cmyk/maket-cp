@@ -337,6 +337,14 @@ window.onPreviewDone = function(data) {
   /* Сохранить превью в IndexedDB (thumb + 1200px preview) */
   pvDbSaveProjectPreviews(proj);
 
+  /* Авто-синхронизация превью с облаком (инкрементально, без дублей) */
+  if (proj._cloudId && typeof sbUploadPreviews === 'function') {
+    sbUploadPreviews(proj._cloudId, proj.previews, function(err) {
+      if (err) console.warn('Авто-синхронизация превью:', err);
+      else console.log('Превью синхронизированы с облаком');
+    });
+  }
+
   /* Авто-фиксация этапа 0 ("Преотбор и превью") при завершении загрузки */
   pvAutoAdvancePreselect();
 };
@@ -531,6 +539,13 @@ function pvLoadFilesWithProgress(files, store, dzId, folderName) {
       /* Сохранить превью в IndexedDB */
       var proj = getActiveProject();
       if (proj) pvDbSaveProjectPreviews(proj);
+      /* Авто-синхронизация превью с облаком */
+      if (proj && proj._cloudId && typeof sbUploadPreviews === 'function') {
+        sbUploadPreviews(proj._cloudId, proj.previews, function(err) {
+          if (err) console.warn('Авто-синхронизация превью:', err);
+          else console.log('Превью синхронизированы с облаком');
+        });
+      }
       /* Авто-фиксация этапа 0 ("Преотбор и превью") при завершении загрузки */
       pvAutoAdvancePreselect();
       return;
