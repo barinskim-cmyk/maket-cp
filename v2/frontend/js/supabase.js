@@ -304,7 +304,7 @@ function sbUploadProject(projIdx, callback) {
           doUpload(null);
         }
       });
-  });
+  }
 }
 
 /**
