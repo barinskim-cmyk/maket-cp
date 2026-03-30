@@ -1017,6 +1017,50 @@ function sbCheckShareToken() {
      Здесь ничего не делаем — оставлено для обратной совместимости. */
 }
 
+// ══════════════════════════════════════════════
+//  Авто-синхронизация карточек (debounce)
+// ══════════════════════════════════════════════
+
+var _sbCardSyncTimer = null;
+var SB_CARD_SYNC_DELAY = 2000; // 2 секунды после последнего изменения
+
+/**
+ * Вызывается из cpSaveHistory после каждого изменения карточки.
+ * Debounce: синхронизирует карточки через 2 сек после последнего изменения.
+ */
+function sbAutoSyncCards() {
+  if (!sbIsLoggedIn()) return;
+  var proj = getActiveProject();
+  if (!proj || !proj._cloudId) return;
+
+  if (_sbCardSyncTimer) clearTimeout(_sbCardSyncTimer);
+  _sbCardSyncTimer = setTimeout(function() {
+    _sbCardSyncTimer = null;
+    console.log('supabase.js: авто-синхронизация карточек...');
+    sbUploadCards(proj._cloudId, proj.cards || [], function(err) {
+      if (err) console.warn('Авто-синхронизация карточек:', err);
+      else console.log('supabase.js: карточки синхронизированы');
+    });
+  }, SB_CARD_SYNC_DELAY);
+}
+
+/**
+ * Принудительная синхронизация карточек (без debounce).
+ * Можно вызвать из консоли: sbForceSyncCards()
+ */
+function sbForceSyncCards() {
+  var proj = getActiveProject();
+  if (!proj) { console.error('Нет активного проекта'); return; }
+  if (!proj._cloudId) { console.error('Проект не привязан к облаку (_cloudId отсутствует)'); return; }
+  if (!sbIsLoggedIn()) { console.error('Не авторизован в Supabase'); return; }
+
+  console.log('Принудительная синхронизация: ' + (proj.cards || []).length + ' карточек...');
+  sbUploadCards(proj._cloudId, proj.cards || [], function(err) {
+    if (err) console.error('Ошибка синхронизации:', err);
+    else console.log('Синхронизация завершена успешно!');
+  });
+}
+
 // Автоинициализация
 if (typeof window !== 'undefined') {
   // Вызовется после загрузки Supabase SDK

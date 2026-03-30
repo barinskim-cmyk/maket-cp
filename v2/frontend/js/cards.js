@@ -328,21 +328,16 @@ function cpSlotHTML(slotIdx, span, hasHero) {
 
   var mainCls = isHero ? ' main-slot' : '';
 
-  /* Тулбар слота: ориентация (H/V) */
-  var toolbar = '<div class="slot-toolbar">';
-  toolbar += '<button class="slot-btn" onclick="cpToggleOrient(' + slotIdx + ',event)" title="Сменить ориентацию">' + (orient === 'h' ? 'H' : 'V') + '</button>';
-  toolbar += '</div>';
+  /* Тулбар слота: только лупа (ориентация и поворот временно скрыты) */
+  var toolbar = '<div class="slot-toolbar"></div>';
 
   if (slot.file || slot.dataUrl) {
     var src = slot.dataUrl || ('images/' + slot.file);
     var rot = slot.rotation || 0;
     var rotStyle = rot ? ' style="transform:rotate(' + rot + 'deg)"' : '';
-    /* Кнопки: поворот + лупа (полный экран) */
-    var rotBtn = '<button class="slot-btn" onclick="cpRotateSlot(' + slotIdx + ',event)" title="Повернуть 90">R</button>';
+    /* Кнопка: лупа (полный экран). Поворот и ориентация временно скрыты */
     var zoomBtn = '<button class="slot-btn" onclick="cpShowFullscreen(' + slotIdx + ',event)" title="На весь экран">Q</button>';
     var toolbarFilled = '<div class="slot-toolbar">';
-    toolbarFilled += '<button class="slot-btn" onclick="cpToggleOrient(' + slotIdx + ',event)" title="Сменить ориентацию">' + (orient === 'h' ? 'H' : 'V') + '</button>';
-    toolbarFilled += rotBtn;
     toolbarFilled += zoomBtn;
     toolbarFilled += '</div>';
     return '<div class="photo-slot filled' + mainCls + '" data-slot="' + slotIdx + '" draggable="true">' +
@@ -1309,6 +1304,9 @@ function cpSaveHistory() {
   };
   card._history.push(JSON.stringify(snap));
   if (card._history.length > CP_MAX_HISTORY) card._history.shift();
+
+  /* Авто-синхронизация карточек с облаком (debounced) */
+  if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
 }
 
 /**
