@@ -778,7 +778,8 @@ function pvShowFullscreen(pvIdx, e) {
   var proj = getActiveProject();
   if (!proj || !proj.previews || !proj.previews[pvIdx]) return;
   var pv = proj.previews[pvIdx];
-  var src = pv.thumb || pv.dataUrl || '';
+  /* Сначала показываем preview (1200px) или thumb (300px) */
+  var src = pv.preview || pv.thumb || pv.dataUrl || '';
   if (!src) return;
 
   var overlay = document.createElement('div');
@@ -804,6 +805,19 @@ function pvShowFullscreen(pvIdx, e) {
   document.body.appendChild(overlay);
 
   document.addEventListener('keydown', _pvFullscreenEsc);
+
+  /* Desktop: подгружаем оригинал через pywebview */
+  if (pv.path && window.pywebview && window.pywebview.api) {
+    window.pywebview.api.get_full_image(pv.path).then(function(result) {
+      if (result && result.data_url) {
+        var currentOverlay = document.querySelector('.cp-fullscreen-overlay');
+        if (currentOverlay) {
+          var fullImg = currentOverlay.querySelector('.cp-fullscreen-img');
+          if (fullImg) fullImg.src = result.data_url;
+        }
+      }
+    });
+  }
 }
 
 function pvCloseFullscreen() {
