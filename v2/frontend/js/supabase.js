@@ -917,6 +917,66 @@ function _sbDoLoadByToken(token) {
 
 
 // ══════════════════════════════════════════════
+//  Сохранение карточек клиентом (по share-токену)
+// ══════════════════════════════════════════════
+
+/**
+ * Сохранить изменения карточек от клиента через RPC.
+ * Клиент не авторизован — используем share_token для проверки доступа.
+ * RPC save_cards_by_token: security definer, проверяет токен, обновляет слоты.
+ *
+ * @param {string} token — share-токен из URL
+ * @param {Array} cards — массив карточек из App.projects[].cards
+ * @param {function} callback — callback(error)
+ */
+function sbSaveCardsByToken(token, cards, callback) {
+  if (!token) { callback('Нет share-токена'); return; }
+  if (!sbClient) { callback('Supabase не инициализирован'); return; }
+
+  /* Собираем JSON для RPC: массив карточек со слотами */
+  var cardsJson = [];
+  for (var c = 0; c < cards.length; c++) {
+    var card = cards[c];
+    var slotsJson = [];
+    if (card.slots) {
+      for (var s = 0; s < card.slots.length; s++) {
+        var slot = card.slots[s];
+        slotsJson.push({
+          position: s,
+          orient: slot.orient || 'v',
+          weight: slot.weight || 1,
+          row_num: (slot.row !== undefined) ? slot.row : null,
+          rotation: slot.rotation || 0,
+          file_name: slot.file || null
+        });
+      }
+    }
+    cardsJson.push({
+      position: c,
+      status: card.status || 'draft',
+      has_hero: card._hasHero !== undefined ? card._hasHero : true,
+      h_aspect: card._hAspect || '3/2',
+      v_aspect: card._vAspect || '2/3',
+      lock_rows: card._lockRows || false,
+      slots: slotsJson
+    });
+  }
+
+  sbClient.rpc('save_cards_by_token', {
+    share_token: token,
+    cards_data: JSON.stringify(cardsJson)
+  }).then(function(res) {
+    if (res.error) {
+      console.error('save_cards_by_token:', res.error);
+      callback('Ошибка сохранения: ' + res.error.message);
+    } else {
+      console.log('supabase.js: карточки клиента сохранены (' + cards.length + ' шт.)');
+      callback(null);
+    }
+  });
+}
+
+// ══════════════════════════════════════════════
 //  Комментарии
 // ══════════════════════════════════════════════
 
@@ -1027,20 +1087,38 @@ var SB_CARD_SYNC_DELAY = 2000; // 2 секунды после последнег
 /**
  * Вызывается из cpSaveHistory после каждого изменения карточки.
  * Debounce: синхронизирует карточки через 2 сек после последнего изменения.
+ * Работает в двух режимах:
+ *   - Фотограф (авторизован): sbUploadCards
+ *   - Клиент (share-ссылка): sbSaveCardsByToken
  */
 function sbAutoSyncCards() {
-  if (!sbIsLoggedIn()) return;
   var proj = getActiveProject();
   if (!proj || !proj._cloudId) return;
+
+  /* Клиент по share-ссылке (не авторизован, есть токен) */
+  var isClient = !!window._shareToken;
+  /* Фотограф (авторизован) */
+  var isOwner = sbIsLoggedIn();
+
+  if (!isClient && !isOwner) return;
 
   if (_sbCardSyncTimer) clearTimeout(_sbCardSyncTimer);
   _sbCardSyncTimer = setTimeout(function() {
     _sbCardSyncTimer = null;
-    console.log('supabase.js: авто-синхронизация карточек...');
-    sbUploadCards(proj._cloudId, proj.cards || [], function(err) {
-      if (err) console.warn('Авто-синхронизация карточек:', err);
-      else console.log('supabase.js: карточки синхронизированы');
-    });
+
+    if (isClient) {
+      console.log('supabase.js: авто-синхронизация карточек (клиент)...');
+      sbSaveCardsByToken(window._shareToken, proj.cards || [], function(err) {
+        if (err) console.warn('Авто-синхронизация (клиент):', err);
+        else console.log('supabase.js: карточки клиента сохранены');
+      });
+    } else {
+      console.log('supabase.js: авто-синхронизация карточек...');
+      sbUploadCards(proj._cloudId, proj.cards || [], function(err) {
+        if (err) console.warn('Авто-синхронизация карточек:', err);
+        else console.log('supabase.js: карточки синхронизированы');
+      });
+    }
   }, SB_CARD_SYNC_DELAY);
 }
 
