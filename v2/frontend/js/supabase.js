@@ -240,7 +240,6 @@ function sbUploadProject(projIdx, callback) {
   var cloudId = proj._cloudId || null;
 
   // Формируем данные проекта
-  // Поддерживаем оба формата: shoot_date (browser) и shootDate (legacy)
   var projData = {
     owner_id: sbUser.id,
     brand: proj.brand || '',
@@ -251,31 +250,60 @@ function sbUploadProject(projIdx, callback) {
     updated_at: new Date().toISOString()
   };
 
-  var upsertProject;
-  if (cloudId) {
-    // Обновляем существующий
-    upsertProject = sbClient.from('projects').update(projData).eq('id', cloudId).select().single();
-  } else {
-    // Создаём новый
-    upsertProject = sbClient.from('projects').insert(projData).select().single();
-  }
+  /**
+   * Если _cloudId нет — ищем существующий проект по brand + shoot_date,
+   * чтобы не создавать дубли при повторной загрузке.
+   */
+  function doUpload(existingId) {
+    var upsertProject;
+    if (existingId) {
+      upsertProject = sbClient.from('projects').update(projData).eq('id', existingId).select().single();
+    } else {
+      upsertProject = sbClient.from('projects').insert(projData).select().single();
+    }
 
-  upsertProject.then(function(res) {
-    if (res.error) { callback('Ошибка проекта: ' + res.error.message); return; }
+    upsertProject.then(function(res) {
+      if (res.error) { callback('Ошибка проекта: ' + res.error.message); return; }
 
-    var savedProj = res.data;
-    proj._cloudId = savedProj.id;
+      var savedProj = res.data;
+      proj._cloudId = savedProj.id;
 
-    // Загружаем карточки
-    sbUploadCards(savedProj.id, proj.cards || [], function(err) {
-      if (err) { callback(err); return; }
+      // Загружаем карточки
+      sbUploadCards(savedProj.id, proj.cards || [], function(err) {
+        if (err) { callback(err); return; }
 
-      // Загружаем превью-галерею
-      sbUploadPreviews(savedProj.id, proj.previews || [], function(err2) {
-        if (err2) console.warn('sbUploadPreviews:', err2);
-        callback(null, savedProj.id);
+        // Загружаем превью-галерею
+        sbUploadPreviews(savedProj.id, proj.previews || [], function(err2) {
+          if (err2) console.warn('sbUploadPreviews:', err2);
+          callback(null, savedProj.id);
+        });
       });
     });
+  }
+
+  if (cloudId) {
+    /* cloudId известен — обновляем существующий */
+    doUpload(cloudId);
+  } else {
+    /* cloudId нет — ищем проект по brand + shoot_date у текущего пользователя */
+    var brand = proj.brand || '';
+    var shootDate = proj.shoot_date || proj.shootDate || '';
+    sbClient.from('projects')
+      .select('id')
+      .eq('owner_id', sbUser.id)
+      .eq('brand', brand)
+      .eq('shoot_date', shootDate)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .then(function(findRes) {
+        if (findRes.data && findRes.data.length > 0) {
+          var foundId = findRes.data[0].id;
+          console.log('supabase.js: найден существующий проект', brand, '->', foundId);
+          doUpload(foundId);
+        } else {
+          doUpload(null);
+        }
+      });
   });
 }
 
