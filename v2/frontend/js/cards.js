@@ -1505,22 +1505,46 @@ function cpExportPDF() {
 }
 
 /**
- * Нарисовать изображение слота в PDF (object-fit: cover).
+ * Нарисовать изображение слота в PDF (object-fit: contain).
+ * Вписывает картинку в ячейку с сохранением пропорций.
  * @param {jsPDF} doc
  * @param {Object} slot — слот с dataUrl/thumbUrl
- * @param {number} x, y, w, h — координаты в мм
+ * @param {number} x — X координата ячейки (мм)
+ * @param {number} y — Y координата ячейки (мм)
+ * @param {number} w — ширина ячейки (мм)
+ * @param {number} h — высота ячейки (мм)
  */
 function _cpPdfDrawImage(doc, slot, x, y, w, h) {
   var src = slot.dataUrl || slot.thumbUrl || slot.thumb;
   if (!src) return;
 
   try {
-    /* Рамка */
-    doc.setDrawColor(230);
-    doc.rect(x, y, w, h);
+    /* Фон ячейки */
+    doc.setFillColor(250, 250, 250);
+    doc.rect(x, y, w, h, 'F');
 
-    /* Добавляем изображение с заполнением области */
-    doc.addImage(src, 'JPEG', x, y, w, h);
+    /* Пропорции по ориентации слота:
+       orient='h' (горизонтальное фото) -> ~3:2
+       orient='v' (вертикальное фото) -> ~2:3 */
+    var imgAspect = (slot.orient === 'h') ? (3 / 2) : (2 / 3);
+    var cellAspect = w / h;
+    var drawW, drawH, drawX, drawY;
+
+    if (imgAspect > cellAspect) {
+      /* Картинка шире ячейки -- ограничиваем по ширине */
+      drawW = w;
+      drawH = w / imgAspect;
+      drawX = x;
+      drawY = y + (h - drawH) / 2;
+    } else {
+      /* Картинка выше ячейки -- ограничиваем по высоте */
+      drawH = h;
+      drawW = h * imgAspect;
+      drawX = x + (w - drawW) / 2;
+      drawY = y;
+    }
+
+    doc.addImage(src, 'JPEG', drawX, drawY, drawW, drawH);
   } catch(e) {
     /* Если формат не поддерживается -- рисуем плейсхолдер */
     doc.setFillColor(245, 245, 245);

@@ -1221,6 +1221,140 @@ function pvInitColumns() {
   if (slider) slider.value = pvColumns;
 }
 
+// ── Скачать превью: ZIP с тремя папками ──
+
+/**
+ * Скачать превью отсортированные по трём папкам:
+ *   1_cards/     — фото, которые уже в карточках
+ *   2_rating_1/  — рейтинг >= 1, минус те что в карточках
+ *   3_rating_2/  — рейтинг >= 2, минус те что в карточках
+ *
+ * Использует JSZip + FileSaver (CDN).
+ */
+function pvDownloadSorted() {
+  if (typeof JSZip === 'undefined') {
+    alert('Библиотека JSZip не загружена. Обновите страницу.');
+    return;
+  }
+
+  var proj = getActiveProject();
+  if (!proj || !proj.previews || proj.previews.length === 0) {
+    alert('Нет превью для скачивания');
+    return;
+  }
+
+  /* Собрать имена файлов в карточках */
+  var inCards = {};
+  if (proj.cards) {
+    for (var c = 0; c < proj.cards.length; c++) {
+      var card = proj.cards[c];
+      if (!card.slots) continue;
+      for (var s = 0; s < card.slots.length; s++) {
+        if (card.slots[s].file) inCards[card.slots[s].file] = true;
+      }
+    }
+  }
+
+  /* Разделить превью на 3 группы */
+  var groups = { cards: [], r1: [], r2: [] };
+  for (var i = 0; i < proj.previews.length; i++) {
+    var pv = proj.previews[i];
+    var src = pv.thumb || pv.dataUrl || '';
+    if (!src) continue;
+
+    if (inCards[pv.name]) {
+      groups.cards.push({ name: pv.name || ('photo_' + i + '.jpg'), src: src });
+    } else if ((pv.rating || 0) >= 2) {
+      groups.r2.push({ name: pv.name || ('photo_' + i + '.jpg'), src: src });
+    } else if ((pv.rating || 0) >= 1) {
+      groups.r1.push({ name: pv.name || ('photo_' + i + '.jpg'), src: src });
+    }
+  }
+
+  var total = groups.cards.length + groups.r1.length + groups.r2.length;
+  if (total === 0) {
+    alert('Нет фото для скачивания (нужны фото в карточках или с рейтингом)');
+    return;
+  }
+
+  console.log('Скачивание:', groups.cards.length, 'в карточках,',
+    groups.r1.length, '1 звезда,', groups.r2.length, '2 звезды');
+
+  var zip = new JSZip();
+  var folderCards = zip.folder('1_cards');
+  var folderR1 = zip.folder('2_rating_1');
+  var folderR2 = zip.folder('3_rating_2');
+
+  /* Собрать все задачи загрузки */
+  var tasks = [];
+  groups.cards.forEach(function(item) { tasks.push({ folder: folderCards, item: item }); });
+  groups.r1.forEach(function(item) { tasks.push({ folder: folderR1, item: item }); });
+  groups.r2.forEach(function(item) { tasks.push({ folder: folderR2, item: item }); });
+
+  var done = 0;
+
+  /* Загрузить одну картинку и добавить в ZIP */
+  function addToZip(task, cb) {
+    var src = task.item.src;
+
+    if (src.indexOf('data:') === 0) {
+      /* base64 — сразу в ZIP */
+      var b64 = src.split(',')[1];
+      if (b64) task.folder.file(task.item.name, b64, { base64: true });
+      done++;
+      cb();
+    } else if (src.indexOf('http') === 0) {
+      /* URL (Supabase Storage) — скачиваем как blob */
+      fetch(src).then(function(resp) {
+        return resp.blob();
+      }).then(function(blob) {
+        task.folder.file(task.item.name, blob);
+        done++;
+        if (done % 50 === 0) console.log('Скачано:', done + '/' + total);
+        cb();
+      }).catch(function() {
+        console.warn('Не удалось скачать:', task.item.name);
+        done++;
+        cb();
+      });
+    } else {
+      done++;
+      cb();
+    }
+  }
+
+  /* Скачиваем батчами по 10 чтобы не перегрузить сеть */
+  var BATCH = 10;
+  var idx = 0;
+
+  function nextBatch() {
+    if (idx >= tasks.length) {
+      /* Всё скачано — генерируем ZIP */
+      console.log('Формируем ZIP:', done, 'файлов...');
+      zip.generateAsync({ type: 'blob' }).then(function(blob) {
+        var name = (proj.brand || 'project') + '_previews.zip';
+        saveAs(blob, name);
+        console.log('ZIP готов:', name);
+      });
+      return;
+    }
+
+    var end = Math.min(idx + BATCH, tasks.length);
+    var batchLeft = end - idx;
+
+    for (var b = idx; b < end; b++) {
+      addToZip(tasks[b], function() {
+        batchLeft--;
+        if (batchLeft <= 0) nextBatch();
+      });
+    }
+
+    idx = end;
+  }
+
+  nextBatch();
+}
+
 // Initialize resize + columns on page load
 document.addEventListener('DOMContentLoaded', function() {
   pvInitResize();
