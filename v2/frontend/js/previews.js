@@ -758,11 +758,62 @@ function pvBuildHTML(store, used, from, to) {
     html += '<div class="pv-thumb' + orientCls + (inCard ? ' pv-in-card' : '') + '" draggable="true" data-pv-name="' + esc(pv.name) + '" data-pv-idx="' + i + '" title="' + esc(pv.name) + '">';
     html += '<img src="' + pv.thumb + '" loading="lazy">';
     if (inCard) html += '<span class="pv-check"></span>';
+    html += '<button class="pv-zoom" onclick="pvShowFullscreen(' + i + ',event)" title="На весь экран">Q</button>';
     html += '<button class="pv-remove" onclick="pvRemoveByName(\'' + esc(pv.name).replace(/'/g, "\\'") + '\',event)">&times;</button>';
     html += '<span class="pv-name">' + esc(pvShortName(pv.name)) + '</span>';
     html += '</div>';
   }
   return html;
+}
+
+// ── Полноэкранный просмотр превью ──
+
+/**
+ * Показать превью на весь экран.
+ * Использует тот же оверлей что cpShowFullscreen в cards.js.
+ * @param {number} pvIdx — индекс в текущем отфильтрованном массиве превью
+ */
+function pvShowFullscreen(pvIdx, e) {
+  if (e) e.stopPropagation();
+  var proj = getActiveProject();
+  if (!proj || !proj.previews || !proj.previews[pvIdx]) return;
+  var pv = proj.previews[pvIdx];
+  var src = pv.thumb || pv.dataUrl || '';
+  if (!src) return;
+
+  var overlay = document.createElement('div');
+  overlay.className = 'cp-fullscreen-overlay';
+  overlay.onclick = function(ev) { if (ev.target === overlay) pvCloseFullscreen(); };
+
+  var img = document.createElement('img');
+  img.src = src;
+  img.className = 'cp-fullscreen-img';
+
+  var closeBtn = document.createElement('button');
+  closeBtn.className = 'cp-fullscreen-close';
+  closeBtn.innerHTML = '&times;';
+  closeBtn.onclick = pvCloseFullscreen;
+
+  var nameEl = document.createElement('div');
+  nameEl.className = 'cp-fullscreen-name';
+  nameEl.textContent = pv.name || '';
+
+  overlay.appendChild(img);
+  overlay.appendChild(closeBtn);
+  overlay.appendChild(nameEl);
+  document.body.appendChild(overlay);
+
+  document.addEventListener('keydown', _pvFullscreenEsc);
+}
+
+function pvCloseFullscreen() {
+  var overlay = document.querySelector('.cp-fullscreen-overlay');
+  if (overlay) overlay.remove();
+  document.removeEventListener('keydown', _pvFullscreenEsc);
+}
+
+function _pvFullscreenEsc(e) {
+  if (e.key === 'Escape') pvCloseFullscreen();
 }
 
 // ── Фильтр по рейтингу ──
