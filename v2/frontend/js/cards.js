@@ -336,7 +336,7 @@ function cpSlotHTML(slotIdx, span, hasHero) {
     var rot = slot.rotation || 0;
     var rotStyle = rot ? ' style="transform:rotate(' + rot + 'deg)"' : '';
     /* Кнопка: лупа (полный экран). Поворот и ориентация временно скрыты */
-    var zoomBtn = '<button class="slot-btn" onclick="cpShowFullscreen(' + slotIdx + ',event)" title="На весь экран">Q</button>';
+    var zoomBtn = '<button class="slot-btn" onclick="cpShowFullscreen(' + slotIdx + ',event)" title="На весь экран">&#8599;</button>';
     var toolbarFilled = '<div class="slot-toolbar">';
     toolbarFilled += zoomBtn;
     toolbarFilled += '</div>';

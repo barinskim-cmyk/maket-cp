@@ -580,10 +580,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   background: #f5f5f5;
 }
 
-/* Тулбар (счётчик + очистить) */
+/* Тулбар (счётчик + очистить) — sticky при скролле превью */
 .pv-toolbar {
   display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 10px; padding: 0 2px;
+  margin-bottom: 0; padding: 6px 2px;
+  position: sticky; top: 0; z-index: 5;
+  background: #fff;
 }
 .pv-toolbar span { font-size: 12px; color: #999; }
 /* Ползунок размера миниатюр */
@@ -663,10 +665,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 }
 .pv-in-card { opacity: 0.75; }
 
-/* Фильтр по рейтингу */
+/* Фильтр по рейтингу — sticky под тулбаром */
 .pv-filter {
   display: flex; align-items: center; gap: 6px;
-  margin-bottom: 8px; padding: 0 2px;
+  margin-bottom: 0; padding: 4px 2px;
+  position: sticky; top: 32px; z-index: 4;
+  background: #fff;
 }
 .pv-filter-label { font-size: 11px; color: #999; }
 .pv-filter-stars { display: flex; gap: 1px; }
@@ -688,9 +692,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .pv-filter-reset:hover { color: #333; background: #eee; }
 .pv-filter-reset.active { color: #333; font-weight: 600; }
 
-/* Фильтр по папке */
+/* Фильтр по папке — sticky под фильтром рейтинга */
 .pv-folder-filter {
-  margin-bottom: 8px; padding: 0 2px;
+  margin-bottom: 8px; padding: 4px 2px;
+  position: sticky; top: 56px; z-index: 3;
+  background: #fff;
 }
 .pv-folder-select {
   width: 100%; padding: 4px 6px;

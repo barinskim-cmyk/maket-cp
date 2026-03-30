@@ -758,7 +758,7 @@ function pvBuildHTML(store, used, from, to) {
     html += '<div class="pv-thumb' + orientCls + (inCard ? ' pv-in-card' : '') + '" draggable="true" data-pv-name="' + esc(pv.name) + '" data-pv-idx="' + i + '" title="' + esc(pv.name) + '">';
     html += '<img src="' + pv.thumb + '" loading="lazy">';
     if (inCard) html += '<span class="pv-check"></span>';
-    html += '<button class="pv-zoom" onclick="pvShowFullscreen(' + i + ',event)" title="На весь экран">Q</button>';
+    html += '<button class="pv-zoom" onclick="pvShowFullscreen(' + i + ',event)" title="На весь экран">&#8599;</button>';
     html += '<button class="pv-remove" onclick="pvRemoveByName(\'' + esc(pv.name).replace(/'/g, "\\'") + '\',event)">&times;</button>';
     html += '<span class="pv-name">' + esc(pvShortName(pv.name)) + '</span>';
     html += '</div>';
