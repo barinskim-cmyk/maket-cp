@@ -1024,7 +1024,7 @@ function sbSaveCardsByToken(token, cards, callback) {
 
   sbClient.rpc('save_cards_by_token', {
     share_token: token,
-    cards_data: JSON.stringify(cardsJson),
+    cards_data: cardsJson,
     oc_data: JSON.stringify(ocNames)
   }).then(function(res) {
     if (res.error) {
