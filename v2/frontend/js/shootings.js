@@ -483,8 +483,9 @@ function _shDoAutoSave() {
       }
       toSave.push(light);
 
-      /* Сохраняем превью отдельно (только thumbs) */
-      if (proj.previews && proj.previews.length > 0) {
+      /* Сохраняем превью отдельно (только thumbs).
+         Пропускаем если проект в облаке — там source of truth. */
+      if (proj.previews && proj.previews.length > 0 && !proj._cloudId) {
         var pvKey = SH_PREVIEWS_KEY_PREFIX + _shProjKey(proj);
         try {
           localStorage.setItem(pvKey, JSON.stringify(_shLightenPreviews(proj.previews)));
