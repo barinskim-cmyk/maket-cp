@@ -511,6 +511,7 @@ function authCheckOnLoad() {
   var shareToken = params.get('share');
   if (shareToken) {
     window._isShareLink = true;  /* флаг: не грузить все проекты */
+    window._shareToken = shareToken; /* сохраняем для записи клиента */
     authUnlock();
     sbLoadByShareToken(shareToken);
     return;
