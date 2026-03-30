@@ -635,11 +635,10 @@ function shEnterClientMode() {
   var pipelinePanel = document.querySelector('.pipeline-panel');
   if (pipelinePanel) pipelinePanel.style.display = 'none';
 
-  /* Скрыть кнопки "Добавить карточку" и "Экспорт" в сайдбаре */
-  var addBtn = document.querySelector('.cp-add-card-btn');
-  if (addBtn) addBtn.style.display = 'none';
+  /* Сайдбар: оставить "Добавить карточку", скрыть экспорт и шаблон */
   var sidebarBtns = document.querySelectorAll('.cp-sidebar .btn');
   for (var i = 0; i < sidebarBtns.length; i++) sidebarBtns[i].style.display = 'none';
+  /* Кнопка "Добавить карточку" остаётся для клиента */
 
   /* Превью-панель: оставляем для клиента (просмотр всех кадров) */
 
@@ -647,9 +646,7 @@ function shEnterClientMode() {
   var cpToolbar = document.querySelector('.cp-toolbar');
   if (cpToolbar) cpToolbar.style.display = 'none';
 
-  /* Скрыть субтабы (Карточки товара / Доп. контент) */
-  var subtabs = document.querySelector('.subtabs');
-  if (subtabs) subtabs.style.display = 'none';
+  /* Субтабы: оставить для клиента (Карточки товара / Доп. контент) */
 
   /* Показать панель клиента на главном экране */
   shRenderClientBar();

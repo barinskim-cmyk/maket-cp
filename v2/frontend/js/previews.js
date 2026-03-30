@@ -1025,6 +1025,8 @@ function ocInitField() {
       }
       proj.otherContent.push({ name: pv.name, path: pv.path || '', thumb: pv.thumb });
       ocRenderField();
+      /* Авто-синхронизация доп. контента */
+      if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
     } catch(err) {}
   });
 }
@@ -1068,6 +1070,7 @@ function ocRemoveItem(idx, e) {
   var store = ocGetStore();
   if (idx >= 0 && idx < store.length) store.splice(idx, 1);
   ocRenderField();
+  if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
 }
 
 function ocClearAll() {
@@ -1076,6 +1079,7 @@ function ocClearAll() {
   if (!confirm('Очистить весь доп. контент?')) return;
   proj.otherContent = [];
   ocRenderField();
+  if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
 }
 
 // ══════════════════════════════════════════════

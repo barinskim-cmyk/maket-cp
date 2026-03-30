@@ -240,6 +240,9 @@ function sbUploadProject(projIdx, callback) {
   var cloudId = proj._cloudId || null;
 
   // Формируем данные проекта
+  /* Собрать имена файлов доп. контента (без base64) */
+  var ocNames = (proj.otherContent || []).map(function(oc) { return oc.name; });
+
   var projData = {
     owner_id: sbUser.id,
     brand: proj.brand || '',
@@ -247,6 +250,7 @@ function sbUploadProject(projIdx, callback) {
     template_id: proj.templateId || '',
     stage: proj._stage || proj.stage || 0,
     channels: JSON.stringify(proj.channels || []),
+    other_content: JSON.stringify(ocNames),
     updated_at: new Date().toISOString()
   };
 
@@ -657,6 +661,7 @@ function sbDownloadProject(cloudId, callback) {
       _stage: remote.stage || 0,
       _stageHistory: {},
       channels: (typeof remote.channels === 'string') ? JSON.parse(remote.channels || '[]') : (remote.channels || []),
+      _ocNames: (typeof remote.other_content === 'string') ? JSON.parse(remote.other_content || '[]') : (remote.other_content || []),
       cards: [],
       previews: [],
       otherContent: []
@@ -712,6 +717,22 @@ function sbDownloadProject(cloudId, callback) {
         // Загружаем превью-галерею
         sbDownloadPreviews(cloudId, function(pvErr, pvList) {
           if (!pvErr && pvList) proj.previews = pvList;
+
+          /* Восстановить otherContent из имён файлов + превью */
+          if (proj._ocNames && proj._ocNames.length > 0 && proj.previews) {
+            var pvByName = {};
+            for (var pi = 0; pi < proj.previews.length; pi++) {
+              pvByName[proj.previews[pi].name] = proj.previews[pi];
+            }
+            for (var oi = 0; oi < proj._ocNames.length; oi++) {
+              var ocPv = pvByName[proj._ocNames[oi]];
+              if (ocPv) {
+                proj.otherContent.push({ name: ocPv.name, path: '', thumb: ocPv.thumb });
+              }
+            }
+          }
+          delete proj._ocNames;
+
           callback(null, proj);
         });
       });
@@ -861,6 +882,7 @@ function _sbDoLoadByToken(token) {
     }
 
     /* Собираем проект из ответа RPC */
+    var ocRaw = data.other_content || '[]';
     var proj = {
       _cloudId: data.project_id,
       brand: data.brand || '',
@@ -870,6 +892,7 @@ function _sbDoLoadByToken(token) {
       _stageHistory: {},
       _role: data.role || 'client',
       channels: [],
+      _ocNames: (typeof ocRaw === 'string') ? JSON.parse(ocRaw) : (ocRaw || []),
       cards: [],
       previews: [],
       otherContent: []
@@ -912,6 +935,22 @@ function _sbDoLoadByToken(token) {
         proj.previews = pvList;
         console.log('supabase.js: загружено ' + pvList.length + ' превью по share-ссылке');
       }
+
+      /* Восстановить otherContent из имён файлов + превью */
+      if (proj._ocNames && proj._ocNames.length > 0 && proj.previews) {
+        var pvByName = {};
+        for (var pi = 0; pi < proj.previews.length; pi++) {
+          pvByName[proj.previews[pi].name] = proj.previews[pi];
+        }
+        for (var oi = 0; oi < proj._ocNames.length; oi++) {
+          var ocPv = pvByName[proj._ocNames[oi]];
+          if (ocPv) {
+            proj.otherContent.push({ name: ocPv.name, path: '', thumb: ocPv.thumb });
+          }
+        }
+        console.log('supabase.js: восстановлено ' + proj.otherContent.length + ' доп. контент');
+      }
+      delete proj._ocNames;
 
       App.projects.push(proj);
       App.selectedProject = App.projects.length - 1;
@@ -979,15 +1018,20 @@ function sbSaveCardsByToken(token, cards, callback) {
     });
   }
 
+  /* Собираем доп. контент (имена файлов) */
+  var proj = getActiveProject();
+  var ocNames = (proj && proj.otherContent) ? proj.otherContent.map(function(oc) { return oc.name; }) : [];
+
   sbClient.rpc('save_cards_by_token', {
     share_token: token,
-    cards_data: JSON.stringify(cardsJson)
+    cards_data: JSON.stringify(cardsJson),
+    oc_data: JSON.stringify(ocNames)
   }).then(function(res) {
     if (res.error) {
       console.error('save_cards_by_token:', res.error);
       callback('Ошибка сохранения: ' + res.error.message);
     } else {
-      console.log('supabase.js: карточки клиента сохранены (' + cards.length + ' шт.)');
+      console.log('supabase.js: данные клиента сохранены (' + cards.length + ' карточек, ' + ocNames.length + ' доп. контент)');
       callback(null);
     }
   });
@@ -1113,6 +1157,16 @@ var SB_CARD_SYNC_DELAY = 3000; // 3 секунды после последнег
  */
 function sbSyncCardsLight(projectId, cards, callback) {
   if (!sbClient) { callback('Supabase не подключён'); return; }
+
+  /* Обновить other_content в проекте */
+  var proj = getActiveProject();
+  if (proj) {
+    var ocNames = (proj.otherContent || []).map(function(oc) { return oc.name; });
+    sbClient.from('projects').update({
+      other_content: JSON.stringify(ocNames),
+      updated_at: new Date().toISOString()
+    }).eq('id', projectId).then(function() {});
+  }
 
   /* Сначала получаем существующие thumb_path по file_name */
   sbClient.from('slots').select('file_name, thumb_path').eq('project_id', projectId).then(function(existRes) {
