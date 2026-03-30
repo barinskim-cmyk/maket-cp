@@ -1082,7 +1082,8 @@ function sbCheckShareToken() {
 // ══════════════════════════════════════════════
 
 var _sbCardSyncTimer = null;
-var SB_CARD_SYNC_DELAY = 2000; // 2 секунды после последнего изменения
+var _sbCardSyncRunning = false; // блокировка: не запускать новый sync пока старый не завершился
+var SB_CARD_SYNC_DELAY = 3000; // 3 секунды после последнего изменения
 
 /**
  * Лёгкая синхронизация карточек: только метаданные (без перезаливки картинок).
@@ -1169,6 +1170,9 @@ function sbAutoSyncCards() {
   var proj = getActiveProject();
   if (!proj || !proj._cloudId) return;
 
+  /* Не запускать если предыдущая синхронизация ещё идёт */
+  if (_sbCardSyncRunning) return;
+
   /* Клиент по share-ссылке (не авторизован, есть токен) */
   var isClient = !!window._shareToken;
   /* Фотограф (авторизован) */
@@ -1179,19 +1183,18 @@ function sbAutoSyncCards() {
   if (_sbCardSyncTimer) clearTimeout(_sbCardSyncTimer);
   _sbCardSyncTimer = setTimeout(function() {
     _sbCardSyncTimer = null;
+    _sbCardSyncRunning = true;
+
+    function onDone(err) {
+      _sbCardSyncRunning = false;
+      if (err) console.warn('Авто-синхронизация карточек:', err);
+      else console.log('supabase.js: карточки синхронизированы');
+    }
 
     if (isClient) {
-      console.log('supabase.js: авто-синхронизация карточек (клиент)...');
-      sbSaveCardsByToken(window._shareToken, proj.cards || [], function(err) {
-        if (err) console.warn('Авто-синхронизация (клиент):', err);
-        else console.log('supabase.js: карточки клиента сохранены');
-      });
+      sbSaveCardsByToken(window._shareToken, proj.cards || [], onDone);
     } else {
-      console.log('supabase.js: авто-синхронизация карточек (лёгкая)...');
-      sbSyncCardsLight(proj._cloudId, proj.cards || [], function(err) {
-        if (err) console.warn('Авто-синхронизация карточек:', err);
-        else console.log('supabase.js: карточки синхронизированы (без перезаливки картинок)');
-      });
+      sbSyncCardsLight(proj._cloudId, proj.cards || [], onDone);
     }
   }, SB_CARD_SYNC_DELAY);
 }
