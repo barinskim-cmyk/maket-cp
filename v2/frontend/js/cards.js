@@ -1596,3 +1596,515 @@ function _cpPdfDrawImage(doc, slot, x, y, w, h) {
     doc.text(slot.file || '?', x + w / 2, y + h / 2, { align: 'center' });
   }
 }
+
+
+// ══════════════════════════════════════════════
+//  Мобильный клиентский режим
+// ══════════════════════════════════════════════
+//
+//  Непрерывная вертикальная лента карточек для мобильного клиента.
+//  Активируется когда _appClientMode && viewport < 768px.
+//  Не меняет десктопный рендер — отдельный путь отрисовки.
+// ══════════════════════════════════════════════
+
+/** @type {boolean} Текущий режим: true = карточки, false = галерея */
+var _mobViewCards = true;
+
+/**
+ * Проверить, нужен ли мобильный режим.
+ * @returns {boolean}
+ */
+function cpIsMobileClient() {
+  return _appClientMode && window.innerWidth < 768;
+}
+
+/**
+ * Главная точка входа: если мобильный клиент — рендерить ленту,
+ * иначе — обычный десктопный рендер.
+ * Вызывается из shEnterClientMode() после инициализации.
+ */
+function cpMobileInit() {
+  if (!cpIsMobileClient()) return;
+
+  /* Скрыть весь десктопный контент, показать мобильную обёртку */
+  var appMain = document.getElementById('app-main');
+  if (!appMain) return;
+
+  /* Создать мобильный контейнер если нет */
+  var mobWrap = document.getElementById('mob-wrap');
+  if (!mobWrap) {
+    mobWrap = document.createElement('div');
+    mobWrap.id = 'mob-wrap';
+    appMain.appendChild(mobWrap);
+  }
+
+  /* Скрыть все дочерние элементы кроме mob-wrap */
+  for (var i = 0; i < appMain.children.length; i++) {
+    var child = appMain.children[i];
+    if (child.id !== 'mob-wrap') {
+      child.style.display = 'none';
+    }
+  }
+
+  _mobViewCards = true;
+  cpMobileRender();
+}
+
+/**
+ * Отрисовать мобильный интерфейс (шапка + лента/галерея).
+ */
+function cpMobileRender() {
+  var mobWrap = document.getElementById('mob-wrap');
+  if (!mobWrap) return;
+
+  var proj = getActiveProject();
+  var brandName = proj ? esc(proj.brand || '') : '';
+  var toggleLabel = _mobViewCards ? 'SHOW GALLERY' : 'GO BACK TO CARDS';
+
+  var html = '';
+
+  /* Sticky-шапка */
+  html += '<div class="mob-header">';
+  html += '<div class="mob-header-title">' + (brandName || 'Просмотр') + '</div>';
+  html += '<button class="mob-header-btn" onclick="cpMobileToggleView()">' + toggleLabel + '</button>';
+  html += '</div>';
+
+  if (_mobViewCards) {
+    html += cpMobileRenderFeed();
+  } else {
+    html += cpMobileRenderGallery();
+  }
+
+  mobWrap.innerHTML = html;
+
+  /* Привязать touch-события к каруселям */
+  if (_mobViewCards) {
+    cpMobileBindCarousels();
+    cpMobileBindDoubleTap();
+  }
+}
+
+/**
+ * Переключение карточки/галерея.
+ */
+function cpMobileToggleView() {
+  _mobViewCards = !_mobViewCards;
+  cpMobileRender();
+}
+
+/**
+ * Рендер непрерывной ленты карточек (мобильный).
+ * @returns {string} HTML
+ */
+function cpMobileRenderFeed() {
+  var proj = getActiveProject();
+  if (!proj || !proj.cards || proj.cards.length === 0) {
+    return '<div style="padding:40px 16px;text-align:center;color:#999">Нет карточек</div>';
+  }
+
+  var html = '<div class="mob-feed">';
+
+  for (var ci = 0; ci < proj.cards.length; ci++) {
+    var card = proj.cards[ci];
+    if (!card.slots) continue;
+
+    /* Определить, есть ли hero у карточки */
+    var projTmpl = proj._template || null;
+    var tmpl = proj.templateId ? getUserTemplate(proj.templateId) : null;
+    var cardHasHero = (card._hasHero !== undefined) ? card._hasHero :
+      (projTmpl && projTmpl.hasHero !== undefined ? projTmpl.hasHero :
+      (tmpl && tmpl.hasHero !== undefined ? tmpl.hasHero : false));
+
+    /* Разделитель */
+    html += '<div class="mob-card-block" data-card-idx="' + ci + '">';
+    html += '<div class="mob-card-divider">Карточка ' + (ci + 1) + ' / ' + proj.cards.length + '</div>';
+    html += '<div class="mob-card-slots">';
+
+    for (var si = 0; si < card.slots.length; si++) {
+      var slot = card.slots[si];
+      var orient = slot.orient || 'v';
+      var isHero = (cardHasHero && si === 0);
+      var weight = slot.weight || 1;
+      var isHeroByWeight = (weight >= 2 && si === 0);
+
+      /* Класс слота: hero/h/v */
+      var slotClass = 'mob-slot-v';
+      if (isHero || isHeroByWeight) slotClass = 'mob-slot-hero';
+      else if (orient === 'h') slotClass = 'mob-slot-h';
+
+      var hasFoto = slot.file || slot.dataUrl;
+
+      if (hasFoto) {
+        var src = slot.dataUrl || slot.thumbUrl || slot.thumb || '';
+        html += '<div class="' + slotClass + ' mob-carousel-wrap" data-card="' + ci + '" data-slot="' + si + '">';
+        html += '<img src="' + src + '" loading="lazy">';
+        /* Стрелки карусели */
+        html += '<div class="mob-carousel-arrows">';
+        html += '<button class="mob-carousel-arrow" onclick="cpMobileCarousel(' + ci + ',' + si + ',-1)">&lsaquo;</button>';
+        html += '<button class="mob-carousel-arrow" onclick="cpMobileCarousel(' + ci + ',' + si + ',1)">&rsaquo;</button>';
+        html += '</div>';
+        /* Кнопка удаления */
+        html += '<button class="mob-slot-remove" onclick="cpMobileClearSlot(' + ci + ',' + si + ')">&times;</button>';
+        html += '</div>';
+      } else {
+        /* Пустой слот */
+        html += '<div class="' + slotClass + ' mob-slot-empty" data-card="' + ci + '" data-slot="' + si + '">';
+        html += '<div class="mob-slot-empty-text">Нажмите дважды чтобы добавить фото</div>';
+        html += '</div>';
+      }
+    }
+
+    html += '</div></div>'; /* mob-card-slots, mob-card-block */
+  }
+
+  /* Кнопки согласования в конце ленты */
+  html += '<div class="mob-approve-block">';
+  html += '<div class="mob-approve-title">Просмотр завершён</div>';
+  html += '<button class="mob-btn-approve" onclick="cpMobileApprove()">Согласовать отбор</button>';
+  html += '<button class="mob-btn-reject" onclick="cpMobileReject()">Вернуть на доработку</button>';
+  html += '</div>';
+
+  html += '</div>'; /* mob-feed */
+  return html;
+}
+
+/**
+ * Получить ближайшие превью по ориентации для карусели.
+ * @param {string} currentFile - имя текущего файла в слоте
+ * @param {string} orient - 'h' или 'v'
+ * @param {number} range - диапазон в каждую сторону (по умолчанию 15)
+ * @returns {Array} массив объектов превью
+ */
+function cpGetNearbyPreviews(currentFile, orient, range) {
+  var proj = getActiveProject();
+  if (!proj || !proj.previews) return [];
+  range = range || 15;
+
+  /* Фильтруем по ориентации */
+  var filtered = [];
+  for (var i = 0; i < proj.previews.length; i++) {
+    var pv = proj.previews[i];
+    var pvOrient = (pv.width && pv.height) ? (pv.width > pv.height ? 'h' : 'v') :
+      (pv.orient || 'v');
+    if (pvOrient === orient || orient === 'any') {
+      filtered.push(pv);
+    }
+  }
+
+  if (filtered.length === 0) return filtered;
+
+  /* Найти индекс текущего файла */
+  var currentIdx = -1;
+  for (var j = 0; j < filtered.length; j++) {
+    if (filtered[j].name === currentFile || filtered[j].stem === currentFile) {
+      currentIdx = j;
+      break;
+    }
+  }
+
+  /* Если не нашли — вернуть первые 2*range */
+  if (currentIdx < 0) {
+    return filtered.slice(0, range * 2);
+  }
+
+  /* Вырезать диапазон вокруг текущего */
+  var start = Math.max(0, currentIdx - range);
+  var end = Math.min(filtered.length, currentIdx + range + 1);
+  return filtered.slice(start, end);
+}
+
+/**
+ * Карусель: заменить фото в слоте на следующее/предыдущее.
+ * @param {number} cardIdx - индекс карточки
+ * @param {number} slotIdx - индекс слота
+ * @param {number} dir - направление (-1 = назад, 1 = вперёд)
+ */
+function cpMobileCarousel(cardIdx, slotIdx, dir) {
+  var proj = getActiveProject();
+  if (!proj || !proj.cards || !proj.cards[cardIdx]) return;
+
+  var card = proj.cards[cardIdx];
+  var slot = card.slots[slotIdx];
+  if (!slot) return;
+
+  var orient = slot.orient || 'v';
+  var currentFile = slot.file || '';
+
+  /* Получить ближайшие по ориентации */
+  var nearby = cpGetNearbyPreviews(currentFile, orient, 15);
+  if (nearby.length === 0) return;
+
+  /* Найти текущий в списке nearby */
+  var curIdx = -1;
+  for (var i = 0; i < nearby.length; i++) {
+    if (nearby[i].name === currentFile || nearby[i].stem === currentFile) {
+      curIdx = i;
+      break;
+    }
+  }
+
+  /* Следующий/предыдущий */
+  var newIdx = curIdx + dir;
+  if (newIdx < 0) newIdx = 0;
+  if (newIdx >= nearby.length) newIdx = nearby.length - 1;
+  if (newIdx === curIdx) return;
+
+  var newPv = nearby[newIdx];
+
+  /* Обновить слот */
+  slot.file = newPv.name || newPv.stem || '';
+  slot.dataUrl = newPv.preview || newPv.thumb || '';
+  slot.path = newPv.path || '';
+
+  /* Авто-синхронизация */
+  if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
+  if (typeof shAutoSave === 'function') shAutoSave();
+
+  /* Перерисовать только этот слот (перерисовываем всю ленту — проще и безопаснее) */
+  cpMobileRender();
+}
+
+/**
+ * Удалить фото из слота (мобильный).
+ * @param {number} cardIdx
+ * @param {number} slotIdx
+ */
+function cpMobileClearSlot(cardIdx, slotIdx) {
+  var proj = getActiveProject();
+  if (!proj || !proj.cards || !proj.cards[cardIdx]) return;
+
+  var slot = proj.cards[cardIdx].slots[slotIdx];
+  if (!slot) return;
+
+  slot.file = null;
+  slot.dataUrl = null;
+  slot.path = null;
+
+  if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
+  if (typeof shAutoSave === 'function') shAutoSave();
+
+  cpMobileRender();
+}
+
+/**
+ * Согласовать отбор (мобильный клиент).
+ */
+function cpMobileApprove() {
+  if (typeof shClientApprove === 'function') {
+    shClientApprove();
+  }
+}
+
+/**
+ * Вернуть на доработку (мобильный клиент).
+ */
+function cpMobileReject() {
+  if (typeof shClientRequestExtra === 'function') {
+    shClientRequestExtra();
+  }
+}
+
+/**
+ * Привязать touch-свайп к каруселям.
+ * Pointer Events: pointerdown → сохранить X, pointerup → определить свайп.
+ */
+function cpMobileBindCarousels() {
+  var carousels = document.querySelectorAll('.mob-carousel-wrap');
+  for (var i = 0; i < carousels.length; i++) {
+    (function(el) {
+      var startX = 0;
+      var startY = 0;
+      el.addEventListener('pointerdown', function(e) {
+        startX = e.clientX;
+        startY = e.clientY;
+      });
+      el.addEventListener('pointerup', function(e) {
+        var dx = e.clientX - startX;
+        var dy = e.clientY - startY;
+        /* Минимальный свайп 40px, горизонтальнее чем вертикальный */
+        if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+          var ci = parseInt(el.getAttribute('data-card'));
+          var si = parseInt(el.getAttribute('data-slot'));
+          var dir = dx < 0 ? 1 : -1; /* свайп влево = следующее */
+          cpMobileCarousel(ci, si, dir);
+        }
+      });
+    })(carousels[i]);
+  }
+}
+
+/**
+ * Привязать двойной тап на пустые слоты.
+ * При двойном тапе — автоматически вставить следующее фото из галереи.
+ */
+function cpMobileBindDoubleTap() {
+  var empties = document.querySelectorAll('.mob-slot-empty');
+  for (var i = 0; i < empties.length; i++) {
+    (function(el) {
+      var lastTap = 0;
+      el.addEventListener('touchend', function(e) {
+        var now = Date.now();
+        if (now - lastTap < 350) {
+          /* Двойной тап! */
+          e.preventDefault();
+          var ci = parseInt(el.getAttribute('data-card'));
+          var si = parseInt(el.getAttribute('data-slot'));
+          cpMobileAutoFillSlot(ci, si);
+        }
+        lastTap = now;
+      });
+    })(empties[i]);
+  }
+}
+
+/**
+ * Автозаполнение пустого слота: следующее фото из галереи
+ * (по порядку после первого файла в этой карточке, с учётом ориентации).
+ * @param {number} cardIdx
+ * @param {number} slotIdx
+ */
+function cpMobileAutoFillSlot(cardIdx, slotIdx) {
+  var proj = getActiveProject();
+  if (!proj || !proj.cards || !proj.cards[cardIdx]) return;
+  if (!proj.previews || proj.previews.length === 0) return;
+
+  var card = proj.cards[cardIdx];
+  var slot = card.slots[slotIdx];
+  if (!slot) return;
+  if (slot.file || slot.dataUrl) return; /* не пустой */
+
+  var orient = slot.orient || 'v';
+
+  /* Найти первый заполненный слот в этой карточке для определения якоря */
+  var anchorFile = '';
+  for (var s = 0; s < card.slots.length; s++) {
+    if (card.slots[s].file) {
+      anchorFile = card.slots[s].file;
+      break;
+    }
+  }
+
+  /* Получить ближайшие по ориентации */
+  var nearby = cpGetNearbyPreviews(anchorFile, orient, 15);
+  if (nearby.length === 0) return;
+
+  /* Собрать уже использованные файлы в этой карточке */
+  var used = {};
+  for (var u = 0; u < card.slots.length; u++) {
+    if (card.slots[u].file) used[card.slots[u].file] = true;
+  }
+
+  /* Найти первый неиспользованный */
+  var newPv = null;
+  /* Начинаем после якоря */
+  var anchorIdx = -1;
+  for (var a = 0; a < nearby.length; a++) {
+    if (nearby[a].name === anchorFile) { anchorIdx = a; break; }
+  }
+  var searchStart = anchorIdx >= 0 ? anchorIdx + 1 : 0;
+  for (var n = searchStart; n < nearby.length; n++) {
+    if (!used[nearby[n].name]) {
+      newPv = nearby[n];
+      break;
+    }
+  }
+  /* Если не нашли после якоря, ищем с начала */
+  if (!newPv) {
+    for (var m = 0; m < nearby.length; m++) {
+      if (!used[nearby[m].name]) {
+        newPv = nearby[m];
+        break;
+      }
+    }
+  }
+
+  if (!newPv) return;
+
+  slot.file = newPv.name || newPv.stem || '';
+  slot.dataUrl = newPv.preview || newPv.thumb || '';
+  slot.path = newPv.path || '';
+
+  if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
+  if (typeof shAutoSave === 'function') shAutoSave();
+
+  cpMobileRender();
+}
+
+/**
+ * Рендер мобильной галереи с галочками.
+ * @returns {string} HTML
+ */
+function cpMobileRenderGallery() {
+  var proj = getActiveProject();
+  if (!proj || !proj.previews || proj.previews.length === 0) {
+    return '<div style="padding:40px 16px;text-align:center;color:#999">Нет фотографий</div>';
+  }
+
+  /* Текущий список other_content */
+  var ocList = proj._otherContent || [];
+  var ocMap = {};
+  for (var o = 0; o < ocList.length; o++) {
+    ocMap[ocList[o]] = true;
+  }
+
+  var html = '<div class="mob-gallery">';
+
+  for (var i = 0; i < proj.previews.length; i++) {
+    var pv = proj.previews[i];
+    var src = pv.preview || pv.thumb || '';
+    if (!src) continue;
+
+    var pvOrient = (pv.width && pv.height) ? (pv.width > pv.height ? 'h' : 'v') :
+      (pv.orient || 'v');
+    var itemClass = pvOrient === 'h' ? 'mob-gallery-item-h' : 'mob-gallery-item-v';
+    var pvName = pv.name || pv.stem || '';
+    var isChecked = ocMap[pvName] ? ' checked' : '';
+
+    html += '<div class="mob-gallery-item ' + itemClass + '">';
+    html += '<img src="' + src + '" loading="lazy" onclick="cpMobileGalleryFullscreen(' + i + ')">';
+    html += '<div class="mob-gallery-check' + isChecked + '" onclick="cpMobileToggleOC(\'' + esc(pvName) + '\',this)">';
+    html += isChecked ? '&#10003;' : '';
+    html += '</div>';
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+/**
+ * Переключить галочку "Доп. контент" на фото в мобильной галерее.
+ * @param {string} pvName - имя файла превью
+ * @param {HTMLElement} el - элемент галочки
+ */
+function cpMobileToggleOC(pvName, el) {
+  var proj = getActiveProject();
+  if (!proj) return;
+
+  if (!proj._otherContent) proj._otherContent = [];
+
+  var idx = proj._otherContent.indexOf(pvName);
+  if (idx >= 0) {
+    proj._otherContent.splice(idx, 1);
+    el.className = 'mob-gallery-check';
+    el.innerHTML = '';
+  } else {
+    proj._otherContent.push(pvName);
+    el.className = 'mob-gallery-check checked';
+    el.innerHTML = '&#10003;';
+  }
+
+  /* Синхронизация */
+  if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
+  if (typeof shAutoSave === 'function') shAutoSave();
+}
+
+/**
+ * Полноэкранный просмотр фото из мобильной галереи.
+ * @param {number} pvIdx - индекс в proj.previews
+ */
+function cpMobileGalleryFullscreen(pvIdx) {
+  if (typeof pvShowFullscreen === 'function') {
+    pvShowFullscreen(pvIdx);
+  }
+}

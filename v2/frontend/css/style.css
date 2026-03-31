@@ -858,3 +858,183 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   font-size: 14px;
   border-radius: 6px;
 }
+
+/* ══════════════════════════════════════════════
+   Мобильный режим клиента (< 768px)
+   ══════════════════════════════════════════════ */
+
+/* --- Мобильная шапка (sticky) --- */
+.mob-header {
+  position: sticky; top: 0; z-index: 60;
+  background: #fff; border-bottom: 1px solid #e0e0e0;
+  padding: 12px 16px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.mob-header-title {
+  font-size: 16px; font-weight: 600; color: #333;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 55%;
+}
+.mob-header-btn {
+  padding: 8px 14px; font-size: 13px; font-weight: 500;
+  background: #333; color: #fff; border: none; border-radius: 6px;
+  cursor: pointer; white-space: nowrap;
+}
+.mob-header-btn:active { background: #555; }
+
+/* --- Мобильная лента карточек --- */
+.mob-feed {
+  padding: 0; background: #f5f5f5;
+}
+.mob-card-block {
+  margin-bottom: 12px; background: #fff;
+  border-bottom: 1px solid #eee;
+}
+.mob-card-divider {
+  padding: 10px 16px; font-size: 13px; font-weight: 600;
+  color: #888; background: #f5f5f5;
+}
+.mob-card-slots {
+  display: flex; flex-wrap: wrap; gap: 2px;
+  padding: 2px;
+}
+
+/* Hero: на всю ширину */
+.mob-slot-hero {
+  width: 100%; position: relative;
+}
+.mob-slot-hero img {
+  width: 100%; height: auto; display: block;
+}
+
+/* Горизонталь (не hero): на всю ширину */
+.mob-slot-h {
+  width: 100%; position: relative;
+}
+.mob-slot-h img {
+  width: 100%; height: auto; display: block;
+}
+
+/* Вертикаль: по 2 в ряд */
+.mob-slot-v {
+  width: calc(50% - 1px); position: relative;
+}
+.mob-slot-v img {
+  width: 100%; height: auto; display: block;
+}
+
+/* Пустой слот (мобильный) */
+.mob-slot-empty {
+  background: #f0f0f0; display: flex; align-items: center;
+  justify-content: center; min-height: 120px;
+  border: 2px dashed #ccc; border-radius: 4px;
+  cursor: pointer;
+}
+.mob-slot-empty-text {
+  font-size: 13px; color: #bbb; text-align: center;
+  padding: 20px;
+}
+
+/* Кнопка удаления на мобильном слоте */
+.mob-slot-remove {
+  position: absolute; top: 6px; left: 6px;
+  width: 28px; height: 28px;
+  background: rgba(0,0,0,0.5); color: #fff;
+  border: none; border-radius: 50%;
+  font-size: 18px; line-height: 28px; text-align: center;
+  cursor: pointer; z-index: 2;
+}
+
+/* --- Карусель (навигация по фото в слоте) --- */
+.mob-carousel-wrap {
+  position: relative; overflow: hidden;
+  touch-action: pan-y;
+}
+.mob-carousel-arrows {
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  display: flex; justify-content: space-between; align-items: center;
+  pointer-events: none; z-index: 3;
+}
+.mob-carousel-arrow {
+  pointer-events: auto;
+  width: 36px; height: 36px;
+  background: rgba(0,0,0,0.35); color: #fff;
+  border: none; border-radius: 50%;
+  font-size: 18px; line-height: 36px; text-align: center;
+  cursor: pointer; margin: 0 6px;
+}
+.mob-carousel-arrow:active { background: rgba(0,0,0,0.6); }
+
+/* Индикатор позиции в карусели */
+.mob-carousel-indicator {
+  position: absolute; bottom: 8px; left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.5); color: #fff;
+  font-size: 11px; padding: 2px 8px; border-radius: 10px;
+  z-index: 3; pointer-events: none;
+}
+
+/* --- Мобильные кнопки согласования (конец ленты) --- */
+.mob-approve-block {
+  padding: 24px 16px; background: #fff;
+  border-top: 1px solid #eee;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.mob-approve-title {
+  font-size: 15px; font-weight: 600; color: #333;
+  text-align: center; margin-bottom: 4px;
+}
+.mob-btn-approve {
+  width: 100%; padding: 14px; font-size: 15px; font-weight: 600;
+  background: #333; color: #fff; border: none; border-radius: 8px;
+  cursor: pointer;
+}
+.mob-btn-approve:active { background: #555; }
+.mob-btn-reject {
+  width: 100%; padding: 14px; font-size: 15px; font-weight: 500;
+  background: #fff; color: #e65100; border: 1px solid #ff9800;
+  border-radius: 8px; cursor: pointer;
+}
+.mob-btn-reject:active { background: #fff3e0; }
+
+/* --- Мобильная галерея с галочками --- */
+.mob-gallery {
+  display: flex; flex-wrap: wrap; gap: 2px; padding: 2px;
+}
+.mob-gallery-item {
+  position: relative; overflow: hidden;
+}
+.mob-gallery-item img {
+  width: 100%; height: auto; display: block;
+}
+.mob-gallery-item-v { width: calc(33.333% - 2px); }
+.mob-gallery-item-h { width: calc(50% - 1px); flex-grow: 1; }
+
+.mob-gallery-check {
+  position: absolute; top: 6px; right: 6px;
+  width: 28px; height: 28px;
+  background: rgba(255,255,255,0.7); color: #333;
+  border: 2px solid #ccc; border-radius: 50%;
+  font-size: 16px; line-height: 24px; text-align: center;
+  cursor: pointer; z-index: 2;
+}
+.mob-gallery-check.checked {
+  background: #333; color: #fff; border-color: #333;
+}
+
+/* --- Адаптивные скрытия для мобильного клиента --- */
+@media (max-width: 767px) {
+  /* Скрыть десктопный сайдбар карточек */
+  .cp-sidebar { display: none !important; }
+  /* Скрыть десктопную панель превью */
+  .cp-previews { display: none !important; }
+  /* Контейнер карточек на всю ширину */
+  .cp-container { display: block !important; }
+  .cp-view { width: 100% !important; padding: 0 !important; }
+  /* Скрыть субтабы на мобильном */
+  .subtabs { display: none !important; }
+  /* Скрыть десктопную панель клиента */
+  .client-action-bar { display: none !important; }
+  /* Общий контейнер без отступов */
+  .container { padding: 0 !important; }
+}
