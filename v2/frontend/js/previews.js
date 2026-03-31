@@ -771,13 +771,34 @@ function pvBuildHTML(store, used, from, to) {
 /**
  * Показать превью на весь экран.
  * Использует тот же оверлей что cpShowFullscreen в cards.js.
- * @param {number} pvIdx — индекс в текущем отфильтрованном массиве превью
+ * Ищет превью по имени файла через data-pv-name атрибут,
+ * чтобы корректно работать с отфильтрованным списком.
+ * @param {number} pvIdx — индекс (фолбэк, если имя не найдено)
+ * @param {Event} e — событие клика
  */
 function pvShowFullscreen(pvIdx, e) {
   if (e) e.stopPropagation();
   var proj = getActiveProject();
-  if (!proj || !proj.previews || !proj.previews[pvIdx]) return;
-  var pv = proj.previews[pvIdx];
+  if (!proj || !proj.previews) return;
+
+  /* Ищем имя файла через DOM — надёжнее чем индекс */
+  var pvName = '';
+  if (e && e.target) {
+    var thumb = e.target.closest('.pv-thumb');
+    if (thumb) pvName = thumb.getAttribute('data-pv-name') || '';
+  }
+
+  /* Находим превью по имени в полном массиве */
+  var pv = null;
+  if (pvName) {
+    for (var p = 0; p < proj.previews.length; p++) {
+      if (proj.previews[p].name === pvName) { pv = proj.previews[p]; break; }
+    }
+  }
+  /* Фолбэк по индексу */
+  if (!pv && proj.previews[pvIdx]) pv = proj.previews[pvIdx];
+  if (!pv) return;
+
   /* Сначала показываем preview (1200px) или thumb (300px) */
   var src = pv.preview || pv.thumb || pv.dataUrl || '';
   if (!src) return;
