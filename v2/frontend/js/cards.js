@@ -106,7 +106,16 @@ function cpAddCard() {
     slotsConfig = slotsConfigFromCard(prevCard);
   }
 
-  /* 2. Шаблон проекта */
+  /* 2. proj._template (установленный через редактор шаблона) */
+  if (!slotsConfig || slotsConfig.length === 0) {
+    if (proj._template && proj._template.slots && proj._template.slots.length > 0) {
+      slotsConfig = proj._template.slots.map(function(s) {
+        return { orient: s.orient || 'v', weight: s.weight || 1, main: false };
+      });
+    }
+  }
+
+  /* 3. Шаблон проекта (UserTemplates) */
   if (!slotsConfig || slotsConfig.length === 0) {
     if (proj.templateId) {
       var tmpl = getUserTemplate(proj.templateId);
@@ -118,7 +127,7 @@ function cpAddCard() {
     }
   }
 
-  /* 3. Фолбэк: 4 вертикали */
+  /* 4. Фолбэк: 4 вертикали */
   if (!slotsConfig || slotsConfig.length === 0) {
     slotsConfig = [
       { orient: 'v', main: false },
@@ -144,6 +153,18 @@ function cpAddCard() {
     category: '',
     slots: slots
   };
+
+  /* Копировать параметры шаблона в карточку: prev card > proj._template > proj.templateId */
+  var prevCard = (proj.cards && proj.cards.length > 0) ? proj.cards[proj.cards.length - 1] : null;
+  var projTmpl = proj._template || null;
+  var userTmpl = proj.templateId ? getUserTemplate(proj.templateId) : null;
+
+  card._hAspect = (prevCard && prevCard._hAspect) || (projTmpl && projTmpl.hAspect) || (userTmpl && userTmpl.hAspect) || null;
+  card._vAspect = (prevCard && prevCard._vAspect) || (projTmpl && projTmpl.vAspect) || (userTmpl && userTmpl.vAspect) || null;
+  card._lockRows = (prevCard && prevCard._lockRows) || (projTmpl && projTmpl.lockRows) || (userTmpl && userTmpl.lockRows) || false;
+  if (prevCard && prevCard._hasHero !== undefined) card._hasHero = prevCard._hasHero;
+  else if (projTmpl && projTmpl.hasHero !== undefined) card._hasHero = projTmpl.hasHero;
+  else if (userTmpl && userTmpl.hasHero !== undefined) card._hasHero = userTmpl.hasHero;
 
   if (!proj.cards) proj.cards = [];
   proj.cards.push(card);
@@ -256,12 +277,15 @@ function cpRenderCard() {
 
   /* ── Layout карточки ── */
   var tmpl = getUserTemplate(proj.templateId);
-  /* Card-level overrides (from template editor "Apply to card") */
-  var cardHasHero = (card._hasHero !== undefined) ? card._hasHero : (tmpl && tmpl.hasHero !== undefined ? tmpl.hasHero : undefined);
+  var projTmpl = proj._template || null;
+  /* Card-level overrides > proj._template > UserTemplate > defaults */
+  var cardHasHero = (card._hasHero !== undefined) ? card._hasHero :
+    (projTmpl && projTmpl.hasHero !== undefined ? projTmpl.hasHero :
+    (tmpl && tmpl.hasHero !== undefined ? tmpl.hasHero : undefined));
   var layTmpl = {
-    hAspect: (card._hAspect) || (tmpl && tmpl.hAspect) || '3/2',
-    vAspect: (card._vAspect) || (tmpl && tmpl.vAspect) || '2/3',
-    lockRows: card._lockRows || (tmpl && tmpl.lockRows) || false,
+    hAspect: card._hAspect || (projTmpl && projTmpl.hAspect) || (tmpl && tmpl.hAspect) || '3/2',
+    vAspect: card._vAspect || (projTmpl && projTmpl.vAspect) || (tmpl && tmpl.vAspect) || '2/3',
+    lockRows: card._lockRows || (projTmpl && projTmpl.lockRows) || (tmpl && tmpl.lockRows) || false,
     hasHero: cardHasHero
   };
   html += layBuildLayout(card, layTmpl, function(si) { return cpSlotHTML(si, undefined, cardHasHero); });
@@ -1289,10 +1313,15 @@ function cpSaveHistory() {
   if (!card._history) card._history = [];
   var snap = {
     category: card.category,
+    _hasHero: card._hasHero,
+    _lockRows: card._lockRows,
+    _hAspect: card._hAspect,
+    _vAspect: card._vAspect,
     slots: card.slots.map(function(s) {
       return {
         orient: s.orient,
         weight: s.weight || 1,
+        row: s.row,
         aspect: s.aspect || null,
         file: s.file,
         dataUrl: s.dataUrl,
@@ -1316,6 +1345,11 @@ function cpUndo() {
   var snap = JSON.parse(card._history.pop());
   card.slots = snap.slots;
   if (snap.category !== undefined) card.category = snap.category;
+  /* Восстановить параметры шаблона карточки */
+  if (snap._hasHero !== undefined) card._hasHero = snap._hasHero;
+  if (snap._lockRows !== undefined) card._lockRows = snap._lockRows;
+  if (snap._hAspect !== undefined) card._hAspect = snap._hAspect;
+  if (snap._vAspect !== undefined) card._vAspect = snap._vAspect;
   cpSyncFiles(card);
   cpRenderList();
 }
