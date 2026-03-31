@@ -125,6 +125,7 @@ function pvDbRestoreProjectPreviews(proj, callback) {
       console.log('IndexedDB: восстановлено ' + items.length + ' превью для ' + proj.brand);
 
       /* Обновить dataUrl слотов карточек: заменить 300px thumb на 1200px preview */
+      var slotsUpdated = false;
       if (proj.cards) {
         var pvMap = {};
         for (var p = 0; p < items.length; p++) {
@@ -141,12 +142,22 @@ function pvDbRestoreProjectPreviews(proj, callback) {
               if (match.preview) {
                 slot.dataUrl = match.preview;
                 slot.thumbUrl = match.thumb;
+                slotsUpdated = true;
               } else if (match.thumb) {
                 slot.dataUrl = match.thumb;
+              }
+              /* Восстановить path из превью (для get_full_image) */
+              if (match.path && !slot.path) {
+                slot.path = match.path;
+                slotsUpdated = true;
               }
             }
           }
         }
+      }
+      /* Перерисовать карточки если слоты обновились */
+      if (slotsUpdated && typeof cpRenderCard === 'function') {
+        cpRenderCard();
       }
     }
     if (callback) callback();

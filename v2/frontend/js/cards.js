@@ -1255,6 +1255,16 @@ function cpBindSlotEvents() {
           cpRenderCard();
           cpRenderList();
           if (typeof shAutoSave === 'function') shAutoSave();
+
+          /* Desktop: если preview (1200px) нет, подгрузить оригинал через pywebview */
+          if (!pv.preview && pv.path && window.pywebview && window.pywebview.api) {
+            window.pywebview.api.get_full_image(pv.path).then(function(result) {
+              if (result && result.data_url) {
+                slot.dataUrl = result.data_url;
+                cpRenderCard();
+              }
+            });
+          }
         } catch(err) {}
         return;
       }
