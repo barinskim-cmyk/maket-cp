@@ -654,6 +654,11 @@ function shEnterClientMode() {
   /* Автоматически перейти на страницу Контент → Карточки */
   showPage('content');
   if (typeof showSubpage === 'function') showSubpage('cp');
+
+  /* Мобильный режим клиента: если viewport < 768px, активировать ленту */
+  if (typeof cpMobileInit === 'function') {
+    cpMobileInit();
+  }
 }
 
 /**
