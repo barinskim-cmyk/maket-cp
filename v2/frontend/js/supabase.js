@@ -782,7 +782,14 @@ function sbCreateShareLink(projectId, role, label, callback) {
     if (res.error) { callback(res.error.message); return; }
 
     var link = res.data;
-    var url = window.location.origin + window.location.pathname + '?share=' + link.token;
+    /* Кастомный домен для share-ссылок (обход блокировки Netlify в России).
+       Если сайт открыт на Netlify — подставляем app.barinski.com,
+       если уже на кастомном домене — используем текущий origin. */
+    var origin = window.location.origin;
+    if (origin.indexOf('netlify.app') !== -1) {
+      origin = 'https://app.barinski.com';
+    }
+    var url = origin + window.location.pathname + '?share=' + link.token;
 
     callback(null, { token: link.token, url: url, id: link.id });
   });
