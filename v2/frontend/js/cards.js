@@ -355,15 +355,25 @@ function cpSlotHTML(slotIdx, span, hasHero) {
   /* Тулбар слота: только лупа (ориентация и поворот временно скрыты) */
   var toolbar = '<div class="slot-toolbar"></div>';
 
-  if (slot.file || slot.dataUrl) {
-    var src = slot.dataUrl || ('images/' + slot.file);
+  if (slot.dataUrl || slot.file) {
+    var src = slot.dataUrl || slot.thumbUrl || '';
+    /* Если нет ни dataUrl ни thumbUrl — показать пустой слот (не битую картинку) */
+    if (!src && slot.file && typeof slot.file === 'string') {
+      src = 'images/' + slot.file;
+    }
+    if (!src) {
+      /* Файл привязан но картинки нет — показать как пустой */
+      return '<div class="photo-slot empty' + mainCls + '" data-slot="' + slotIdx + '">' +
+        '<div class="ph-text">' + esc(slot.file || 'Нет изображения') + '</div>' +
+        '</div>';
+    }
     var rot = slot.rotation || 0;
     var rotStyle = rot ? ' style="transform:rotate(' + rot + 'deg)"' : '';
     /* Кнопка увеличения: прямо на фото, иконка expand */
     var expandSvg = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
     var zoomBtn = '<button class="slot-expand" onclick="cpShowFullscreen(' + slotIdx + ',event)" title="На весь экран">' + expandSvg + '</button>';
     return '<div class="photo-slot filled' + mainCls + '" data-slot="' + slotIdx + '" draggable="true">' +
-      '<img src="' + src + '" loading="lazy"' + rotStyle + '>' +
+      '<img src="' + src + '" loading="lazy"' + rotStyle + ' onerror="this.parentNode.classList.add(\'img-error\')">' +
       zoomBtn +
       '<button class="remove-btn" onclick="cpClearSlotPhoto(' + slotIdx + ',event)">&times;</button></div>';
   }
@@ -552,6 +562,8 @@ function cpClearSlotPhoto(slotIdx, e) {
   cpRenderCard();
   cpRenderList();
   if (typeof shAutoSave === 'function') shAutoSave();
+  /* Авто-синхронизация для клиента */
+  if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
 }
 
 

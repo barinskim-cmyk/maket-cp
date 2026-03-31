@@ -527,24 +527,48 @@ function sbUploadPreviews(projectId, previews, callback) {
           (function(item) {
             var pv = item.pv;
             var thumbData = pv.thumb || '';
+            var previewData = pv.preview || '';
 
             if (thumbData && thumbData.indexOf('data:') === 0) {
-              sbUploadThumb(projectId, 'pv_' + pv.name, thumbData, function(err, publicUrl) {
-                rows.push({
-                  project_id: projectId,
-                  file_name: pv.name,
-                  thumb_path: publicUrl || null,
-                  preview_path: null,
-                  rating: pv.rating || 0,
-                  orient: pv.orient || 'v',
-                  position: item.position
-                });
-                batchDone++;
-                if (batchDone >= batchCount) {
-                  if (rows.length % 50 === 0 || idx + batchCount >= newPreviews.length) {
-                    console.log('supabase.js: загружено ' + rows.length + '/' + newPreviews.length + ' превью');
+              /* Загрузить 300px thumb */
+              sbUploadThumb(projectId, 'pv_' + pv.name, thumbData, function(err, thumbUrl) {
+                /* Загрузить 1200px preview (если есть) */
+                if (previewData && previewData.indexOf('data:') === 0) {
+                  sbUploadThumb(projectId, 'full_' + pv.name, previewData, function(err2, previewUrl) {
+                    rows.push({
+                      project_id: projectId,
+                      file_name: pv.name,
+                      thumb_path: thumbUrl || null,
+                      preview_path: previewUrl || null,
+                      rating: pv.rating || 0,
+                      orient: pv.orient || 'v',
+                      position: item.position
+                    });
+                    batchDone++;
+                    if (batchDone >= batchCount) {
+                      if (rows.length % 50 === 0 || idx + batchCount >= newPreviews.length) {
+                        console.log('supabase.js: загружено ' + rows.length + '/' + newPreviews.length + ' превью');
+                      }
+                      nextBatch();
+                    }
+                  });
+                } else {
+                  rows.push({
+                    project_id: projectId,
+                    file_name: pv.name,
+                    thumb_path: thumbUrl || null,
+                    preview_path: null,
+                    rating: pv.rating || 0,
+                    orient: pv.orient || 'v',
+                    position: item.position
+                  });
+                  batchDone++;
+                  if (batchDone >= batchCount) {
+                    if (rows.length % 50 === 0 || idx + batchCount >= newPreviews.length) {
+                      console.log('supabase.js: загружено ' + rows.length + '/' + newPreviews.length + ' превью');
+                    }
+                    nextBatch();
                   }
-                  nextBatch();
                 }
               });
             } else {
@@ -552,7 +576,7 @@ function sbUploadPreviews(projectId, previews, callback) {
                 project_id: projectId,
                 file_name: pv.name,
                 thumb_path: (pv.thumb && pv.thumb.indexOf('http') === 0) ? pv.thumb : null,
-                preview_path: null,
+                preview_path: (pv.preview && pv.preview.indexOf('http') === 0) ? pv.preview : null,
                 rating: pv.rating || 0,
                 orient: pv.orient || 'v',
                 position: item.position
@@ -627,6 +651,8 @@ function sbDownloadPreviews(projectId, callback) {
           name: r.file_name,
           thumb: r.thumb_path || '',
           preview: r.preview_path || r.thumb_path || '',
+          width: r.width || 0,
+          height: r.height || 0,
           rating: r.rating || 0,
           orient: r.orient || 'v',
           path: '',
@@ -928,7 +954,8 @@ function _sbDoLoadByToken(token) {
               row: rs.row_num,
               rotation: rs.rotation || 0,
               file: rs.file_name || null,
-              dataUrl: rs.thumb_path || null,
+              dataUrl: rs.preview_path || rs.thumb_path || null,
+              thumbUrl: rs.thumb_path || null,
               path: null
             });
           }
