@@ -782,14 +782,15 @@ function sbCreateShareLink(projectId, role, label, callback) {
     if (res.error) { callback(res.error.message); return; }
 
     var link = res.data;
-    /* Кастомный домен для share-ссылок (обход блокировки Netlify в России).
-       Если сайт открыт на Netlify — подставляем app.barinski.com,
-       если уже на кастомном домене — используем текущий origin. */
+    /* Share-ссылки всегда через GitHub Pages (Netlify заблокирован в России).
+       Если сайт открыт на Netlify или localhost — подставляем GitHub Pages URL. */
     var origin = window.location.origin;
-    if (origin.indexOf('netlify.app') !== -1) {
-      origin = 'https://app.barinski.com';
+    var pathname = window.location.pathname;
+    if (origin.indexOf('netlify.app') !== -1 || origin.indexOf('localhost') !== -1 || origin.indexOf('127.0.0.1') !== -1) {
+      origin = 'https://barinskim-cmyk.github.io';
+      pathname = '/maket-cp/';
     }
-    var url = origin + window.location.pathname + '?share=' + link.token;
+    var url = origin + pathname + '?share=' + link.token;
 
     callback(null, { token: link.token, url: url, id: link.id });
   });
