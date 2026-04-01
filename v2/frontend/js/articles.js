@@ -1692,7 +1692,7 @@ function _arMatchWithPdfPages(cards, skuList, pdfPages, apiKey, proj, statusEl) 
     }
 
     var body = {
-      model: 'chatgpt-4o-latest',
+      model: 'gpt-4o',
       messages: [{ role: 'user', content: msgContent }],
       max_tokens: 300,
       temperature: 0.2
