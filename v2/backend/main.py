@@ -8,8 +8,38 @@ Maket CP v2 — Entry Point.
 from __future__ import annotations
 
 import os
+import subprocess
 import sys
 from pathlib import Path
+
+
+def _ensure_deps() -> None:
+    """Автоматически доустановить зависимости при первом запуске.
+
+    Проверяет наличие обязательных пакетов и ставит недостающие
+    через pip, чтобы пользователю не приходилось заходить в терминал.
+    """
+    required = {
+        "pdfplumber": "pdfplumber",
+        "PIL": "Pillow",
+        "openpyxl": "openpyxl",
+    }
+    missing = []
+    for import_name, pip_name in required.items():
+        try:
+            __import__(import_name)
+        except ImportError:
+            missing.append(pip_name)
+
+    if missing:
+        print(f"[Maket CP] Устанавливаю зависимости: {', '.join(missing)} ...")
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", "--quiet"] + missing
+        )
+        print("[Maket CP] Зависимости установлены.")
+
+
+_ensure_deps()
 
 import webview
 
