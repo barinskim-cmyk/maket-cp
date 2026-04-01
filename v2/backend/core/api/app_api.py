@@ -310,7 +310,7 @@ class AppAPI:
         try:
             with pdfplumber.open(str(path)) as pdf:
                 for page in pdf.pages:
-                    img = page.to_image(resolution=200).original
+                    img = page.to_image(resolution=300).original
                     buf = io.BytesIO()
                     if img.mode in ("RGBA", "P"):
                         img = img.convert("RGB")

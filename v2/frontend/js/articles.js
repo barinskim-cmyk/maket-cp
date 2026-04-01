@@ -1611,10 +1611,25 @@ function arAutoMatchAll() {
   }
 
   var statusEl = document.getElementById('ar-stats');
-  console.log('articles.js: arAutoMatchAll — ' + cards.length + ' cards, refImages strategy');
+  console.log('articles.js: arAutoMatchAll — ' + cards.length + ' cards, PDF pages strategy');
 
-  /* Основная стратегия: батчи refImage (крупные вырезанные картинки из PDF) */
-  _arMatchWithRefImages(cards, proj, pvByName, apiKey, statusEl);
+  /* Основная стратегия: PDF страницы (все артикулы видны на одной картинке) */
+  if (_arLastPdfPath && window.pywebview && window.pywebview.api && window.pywebview.api.pdf_pages_to_images) {
+    if (statusEl) statusEl.textContent = 'Рендерю PDF (300 DPI)...';
+    window.pywebview.api.pdf_pages_to_images(_arLastPdfPath).then(function(result) {
+      if (result && result.pages && result.pages.length > 0) {
+        console.log('articles.js: PDF rendered — ' + result.pages.length + ' pages');
+        _arMatchWithPdfPages(cards, skuList, result.pages, apiKey, proj, statusEl);
+      } else {
+        if (statusEl) statusEl.textContent = 'PDF не отрендерился, пробую refImage...';
+        _arMatchWithRefImages(cards, proj, pvByName, apiKey, statusEl);
+      }
+    }).catch(function() {
+      _arMatchWithRefImages(cards, proj, pvByName, apiKey, statusEl);
+    });
+  } else {
+    _arMatchWithRefImages(cards, proj, pvByName, apiKey, statusEl);
+  }
 }
 
 
@@ -1640,95 +1655,59 @@ function _arMatchWithPdfPages(cards, skuList, pdfPages, apiKey, proj, statusEl) 
     var ci = cards[idx];
     if (statusEl) statusEl.textContent = 'AI: карточка ' + (idx + 1) + '/' + total + '...';
 
-    /* Пересобрать свободные SKU (предыдущие могли быть привязаны) */
+    /* Пересобрать свободные SKU */
     var freeSkus = [];
     for (var a = 0; a < (proj.articles || []).length; a++) {
       if (proj.articles[a].cardIdx < 0) freeSkus.push({ idx: a, sku: proj.articles[a].sku });
     }
+    if (freeSkus.length === 0) { idx = cards.length; processNext(); return; }
 
-    if (freeSkus.length === 0) {
-      idx = cards.length;
-      processNext();
-      return;
-    }
-
-    /* Построить промпт */
-    var catHint = '';
-    if (ci.category) {
-      catHint = '\nIMPORTANT: This card is specifically for category: "' + ci.category + '".\n'
-        + 'The photos may show a complete outfit (look) with multiple items, but you must ONLY match the '
-        + ci.category + ' item. Ignore other items in the photo (bags, shoes, clothing that are NOT ' + ci.category + ').\n';
-    } else {
-      catHint = '\nWARNING: The photos may show a complete outfit (look) with multiple items.\n'
-        + 'Focus on the MAIN SUBJECT — the item that is most prominent, centered, or shown in close-up.\n'
-        + 'First determine what type of product this card is about (shoes, bag, clothing, accessory), '
-        + 'then find ONLY that specific item in the checklist.\n';
-    }
-
-    var promptText = 'You receive TWO documents:\n\n'
-      + 'DOCUMENT 1 — PRODUCT CARD: ' + ci.imgs.length + ' professional photos from a photoshoot.\n'
-      + 'These photos show ONE specific product, possibly as part of a styled look/outfit.\n'
-      + 'The CLOSE-UP photo (usually first) shows the target product best.\n'
-      + catHint
-      + '\nDOCUMENT 2 — CHECKLIST PDF: catalog pages with small reference photos and SKU codes.\n\n'
-      + 'YOUR TASK: Match the SPECIFIC product from the card to its SKU in the checklist.\n'
-      + 'Compare: shape, silhouette, color, material, texture, style, details (buckles, heels, straps, logo).\n\n'
-      + 'Available SKUs (not yet matched):\n';
+    /* Простой промпт */
+    var promptText = 'I have ' + ci.imgs.length + ' photoshoot photos of ONE product and '
+      + pdfPages.length + ' pages from a product checklist PDF.\n\n'
+      + 'The photoshoot may show a styled outfit. Look at which item is shown in close-up '
+      + 'or appears most prominently — that is the target product.\n\n'
+      + 'Find this product in the checklist PDF pages. The PDF has small reference photos next to SKU codes.\n\n'
+      + 'Available SKUs:\n';
     for (var si = 0; si < freeSkus.length; si++) {
-      promptText += '- "' + freeSkus[si].sku + '"\n';
+      promptText += '"' + freeSkus[si].sku + '", ';
     }
-    promptText += '\nReturn ONLY JSON: {"match": "EXACT_SKU_STRING", "confidence": "high"} or {"match": null} if not found.\n'
-      + 'WRONG match is worse than no match. If unsure, return null.';
+    promptText += '\n\nReturn JSON: {"match": "EXACT_SKU", "confidence": "high|medium|low"} or {"match": null}';
 
     var msgContent = [];
     msgContent.push({ type: 'text', text: promptText });
 
-    /* ДОКУМЕНТ 1: Фото карточки (до 3 ракурсов) */
-    msgContent.push({ type: 'text', text: '=== DOCUMENT 1: PRODUCT CARD ===' });
+    /* Фото карточки */
     for (var k = 0; k < ci.imgs.length; k++) {
       var cUrl = ci.imgs[k];
       if (cUrl.indexOf('data:') !== 0 && cUrl.indexOf('http') !== 0) {
         cUrl = 'data:image/jpeg;base64,' + cUrl;
       }
-      var label = (k === 0) ? 'Close-up / main photo' : 'Angle ' + (k + 1);
-      msgContent.push({ type: 'text', text: '--- ' + label + ' ---' });
       msgContent.push({ type: 'image_url', image_url: { url: cUrl, detail: 'high' } });
     }
 
-    /* ДОКУМЕНТ 2: Страницы PDF чек-листа */
-    msgContent.push({ type: 'text', text: '=== DOCUMENT 2: CHECKLIST PDF ===' });
+    /* Страницы PDF */
     for (var pi = 0; pi < pdfPages.length; pi++) {
-      msgContent.push({ type: 'text', text: '--- Page ' + (pi + 1) + ' ---' });
       msgContent.push({ type: 'image_url', image_url: { url: pdfPages[pi], detail: 'high' } });
     }
 
     var body = {
-      model: 'gpt-4o',
+      model: 'chatgpt-4o-latest',
       messages: [{ role: 'user', content: msgContent }],
-      max_tokens: 200,
-      temperature: 0.1
+      max_tokens: 300,
+      temperature: 0.2
     };
 
-    var xhr = new XMLHttpRequest();
-    xhr.open('POST', 'https://api.openai.com/v1/chat/completions', true);
-    xhr.setRequestHeader('Content-Type', 'application/json');
-    xhr.setRequestHeader('Authorization', 'Bearer ' + apiKey);
-    xhr.timeout = 90000;
-
-    xhr.onload = function() {
-      if (xhr.status === 200) {
+    _arSendWithRetry(body, apiKey, 0, function(text) {
+      if (text) {
         try {
-          var resp = JSON.parse(xhr.responseText);
-          var text = resp.choices[0].message.content.trim();
-          console.log('articles.js: card ' + ci.idx + ' AI (PDF) response:', text);
           var jsonMatch = text.match(/\{[\s\S]*\}/);
           var result = JSON.parse(jsonMatch ? jsonMatch[0] : text);
+          console.log('articles.js: card ' + ci.idx + ' AI:', JSON.stringify(result));
           if (result.match && result.match !== 'null' && result.match !== null) {
-            /* Найти артикул по SKU */
             var matchedSku = String(result.match).trim();
             for (var fi = 0; fi < freeSkus.length; fi++) {
               if (freeSkus[fi].sku === matchedSku) {
-                console.log('articles.js: card ' + ci.idx + ' -> ' + matchedSku);
                 arDoMatch(freeSkus[fi].idx, ci.idx);
                 applied++;
                 arRenderMatching();
@@ -1739,18 +1718,54 @@ function _arMatchWithPdfPages(cards, skuList, pdfPages, apiKey, proj, statusEl) 
         } catch(e) {
           console.error('articles.js: card ' + ci.idx + ' parse error:', e);
         }
-      } else {
-        console.error('articles.js: card ' + ci.idx + ' API error ' + xhr.status);
       }
       idx++;
-      setTimeout(processNext, 2000);
-    };
-    xhr.onerror = function() { idx++; setTimeout(processNext, 2000); };
-    xhr.ontimeout = function() { idx++; setTimeout(processNext, 2000); };
-    xhr.send(JSON.stringify(body));
+      setTimeout(processNext, 2500);
+    });
   }
 
   processNext();
+}
+
+
+/**
+ * Отправить запрос к OpenAI с автоматическим retry при 429.
+ * @param {Object} body — тело запроса
+ * @param {string} apiKey
+ * @param {number} attempt — номер попытки (0-based)
+ * @param {function} onDone — callback(responseText) или callback(null)
+ */
+function _arSendWithRetry(body, apiKey, attempt, onDone) {
+  var maxRetries = 3;
+  var xhr = new XMLHttpRequest();
+  xhr.open('POST', 'https://api.openai.com/v1/chat/completions', true);
+  xhr.setRequestHeader('Content-Type', 'application/json');
+  xhr.setRequestHeader('Authorization', 'Bearer ' + apiKey);
+  xhr.timeout = 90000;
+
+  xhr.onload = function() {
+    if (xhr.status === 200) {
+      try {
+        var resp = JSON.parse(xhr.responseText);
+        onDone(resp.choices[0].message.content.trim());
+      } catch(e) { onDone(null); }
+    } else if (xhr.status === 429 && attempt < maxRetries) {
+      /* Rate limit — ждём и пробуем снова */
+      var wait = (attempt + 1) * 5000; /* 5s, 10s, 15s */
+      console.log('articles.js: 429 rate limit, retry in ' + (wait / 1000) + 's (attempt ' + (attempt + 1) + ')');
+      var statusEl = document.getElementById('ar-stats');
+      if (statusEl) statusEl.textContent = 'Rate limit, жду ' + (wait / 1000) + 'с...';
+      setTimeout(function() {
+        _arSendWithRetry(body, apiKey, attempt + 1, onDone);
+      }, wait);
+    } else {
+      console.error('articles.js: API error ' + xhr.status);
+      onDone(null);
+    }
+  };
+  xhr.onerror = function() { onDone(null); };
+  xhr.ontimeout = function() { onDone(null); };
+  xhr.send(JSON.stringify(body));
 }
 
 
