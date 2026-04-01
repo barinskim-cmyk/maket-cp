@@ -362,8 +362,12 @@ async function checkBackend() {
 window.addEventListener('pywebviewready', function() { checkBackend(); });
 setTimeout(checkBackend, 1000);
 
-/* Загрузить автосохранённые проекты при старте (browser fallback) */
+/* Загрузить автосохранённые проекты при старте (browser fallback).
+   Если открыта share-ссылка (?share=), пропускаем — будет загружен только share-проект. */
 window.addEventListener('DOMContentLoaded', function() {
+  var params = new URLSearchParams(window.location.search);
+  if (params.get('share')) return; /* share-ссылка — не грузим localStorage */
+
   if (typeof shLoadAutoSaved === 'function' && App.projects.length === 0) {
     shLoadAutoSaved();
     if (App.projects.length > 0 && typeof renderProjects === 'function') {

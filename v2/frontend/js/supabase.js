@@ -987,8 +987,9 @@ function _sbDoLoadByToken(token) {
       }
       delete proj._ocNames;
 
-      App.projects.push(proj);
-      App.selectedProject = App.projects.length - 1;
+      /* Share-ссылка: заменяем все проекты, чтобы гарантировать правильный выбор */
+      App.projects = [proj];
+      App.selectedProject = 0;
       if (typeof renderProjects === 'function') renderProjects();
 
       /* Клиентский режим */
