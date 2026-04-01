@@ -715,7 +715,8 @@ function arRenderMatching() {
         /* Фото-полоска: все слоты карточки */
         html += '<div class="ar-card-photos">';
         if (card.slots) {
-          for (var si = 0; si < card.slots.length; si++) {
+          var maxPhotos = Math.min(card.slots.length, 3);
+          for (var si = 0; si < maxPhotos; si++) {
             var slot = card.slots[si];
             var imgSrc = slot.dataUrl || slot.thumbUrl || '';
             /* Если нет URL в слоте — попробовать найти в превью по file_name */
