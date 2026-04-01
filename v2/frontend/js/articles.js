@@ -36,10 +36,101 @@ var _arSelectedSku = null;
 /** @type {number|null} Индекс выбранной карточки для сопоставления */
 var _arSelectedCard = null;
 
+/** @type {string} Кэшированный OpenAI API key (загружается при старте) */
+var _arOpenAIKey = '';
+
 
 /* ──────────────────────────────────────────────
-   Инициализация: обновить при переключении на вкладку
+   Инициализация
    ────────────────────────────────────────────── */
+
+/**
+ * Загрузить OpenAI API key из доступных источников (в порядке приоритета):
+ * 1. Supabase app_config (для обновления из админки)
+ * 2. Локальный config.json (для десктопа)
+ * 3. localStorage (ручной ввод пользователя)
+ *
+ * Вызывается автоматически при загрузке модуля.
+ */
+function _arLoadOpenAIKey() {
+  /* 1. Supabase: таблица app_config */
+  if (typeof sbClient !== 'undefined' && sbClient) {
+    sbClient.from('app_config').select('value').eq('key', 'openai_api_key').single()
+      .then(function(resp) {
+        if (resp.data && resp.data.value) {
+          _arOpenAIKey = resp.data.value;
+          console.log('articles.js: OpenAI key loaded from Supabase');
+          return;
+        }
+        /* Supabase не дал — пробуем config.json */
+        _arLoadKeyFromConfig();
+      })
+      .catch(function() {
+        _arLoadKeyFromConfig();
+      });
+    return;
+  }
+
+  /* Нет Supabase — пробуем config.json */
+  _arLoadKeyFromConfig();
+}
+
+
+/**
+ * Загрузить ключ из локального config.json (фолбэк).
+ */
+function _arLoadKeyFromConfig() {
+  /* Desktop: через Python бэкенд */
+  if (window.pywebview && window.pywebview.api && window.pywebview.api.read_text_file) {
+    try {
+      var configText = window.pywebview.api.read_text_file('config.json');
+      if (configText && configText.indexOf('ERROR') !== 0) {
+        var cfg = JSON.parse(configText);
+        if (cfg.openai_api_key) {
+          _arOpenAIKey = cfg.openai_api_key;
+          console.log('articles.js: OpenAI key loaded from config.json (desktop)');
+          return;
+        }
+      }
+    } catch(e) {}
+  }
+
+  /* Browser: fetch config.json */
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', 'config.json', true);
+  xhr.onload = function() {
+    if (xhr.status === 200) {
+      try {
+        var cfg = JSON.parse(xhr.responseText);
+        if (cfg.openai_api_key) {
+          _arOpenAIKey = cfg.openai_api_key;
+          console.log('articles.js: OpenAI key loaded from config.json');
+          return;
+        }
+      } catch(e) {}
+    }
+    /* Последний фолбэк: localStorage */
+    _arOpenAIKey = localStorage.getItem('openai_api_key') || '';
+    if (_arOpenAIKey) console.log('articles.js: OpenAI key loaded from localStorage');
+  };
+  xhr.onerror = function() {
+    _arOpenAIKey = localStorage.getItem('openai_api_key') || '';
+  };
+  xhr.send();
+}
+
+/* Запуск загрузки ключа при загрузке скрипта */
+_arLoadOpenAIKey();
+
+
+/**
+ * Получить текущий OpenAI API key.
+ * Используется всеми AI-функциями.
+ */
+function _arGetOpenAIKey() {
+  return _arOpenAIKey || localStorage.getItem('openai_api_key') || '';
+}
+
 
 /**
  * Вызывается при показе вкладки «Артикулы» (из nav.js → showPage).
@@ -375,15 +466,17 @@ function _arLoadViaBrowser(proj) {
  * Настроить API-ключ OpenAI. Сохраняется в localStorage.
  */
 function arSetOpenAIKey() {
-  var current = localStorage.getItem('openai_api_key') || '';
+  var current = _arGetOpenAIKey();
   var masked = current ? (current.substr(0, 7) + '...' + current.substr(-4)) : 'не задан';
   var key = prompt('OpenAI API Key (текущий: ' + masked + ').\n\nВведите ключ или оставьте пустым для удаления:', '');
   if (key === null) return; /* отмена */
   if (key.trim()) {
     localStorage.setItem('openai_api_key', key.trim());
+    _arOpenAIKey = key.trim();
     alert('Ключ сохранён.');
   } else {
     localStorage.removeItem('openai_api_key');
+    _arOpenAIKey = '';
     alert('Ключ удалён.');
   }
 }
@@ -404,7 +497,7 @@ function arLoadViaOpenAI() {
   var proj = getActiveProject();
   if (!proj) { alert('Сначала выберите съёмку'); return; }
 
-  var apiKey = localStorage.getItem('openai_api_key') || '';
+  var apiKey = _arGetOpenAIKey();
   if (!apiKey) {
     alert('Для распознавания PDF через AI нужен ключ OpenAI.\n\nНажмите кнопку "API Key" чтобы ввести ключ.');
     return;
@@ -1104,7 +1197,7 @@ function arAIFindForCard(cardIdx) {
   var proj = getActiveProject();
   if (!proj) return;
 
-  var apiKey = localStorage.getItem('openai_api_key') || '';
+  var apiKey = _arGetOpenAIKey();
   if (!apiKey) {
     alert('Нужен ключ OpenAI. Нажмите "API Key".');
     return;
@@ -1237,7 +1330,7 @@ function arAutoMatchAll() {
   var proj = getActiveProject();
   if (!proj || !proj.cards) return;
 
-  var apiKey = localStorage.getItem('openai_api_key') || '';
+  var apiKey = _arGetOpenAIKey();
   if (!apiKey) {
     alert('Нужен ключ OpenAI. Нажмите "API Key".');
     return;
@@ -1441,7 +1534,7 @@ function arAutoMatchAI() {
   var proj = getActiveProject();
   if (!proj) { alert('Сначала выберите съёмку'); return; }
 
-  var apiKey = localStorage.getItem('openai_api_key') || '';
+  var apiKey = _arGetOpenAIKey();
   if (!apiKey) {
     alert('Для авто-сопоставления нужен ключ OpenAI.\nНажмите "API Key" чтобы ввести ключ.');
     return;
