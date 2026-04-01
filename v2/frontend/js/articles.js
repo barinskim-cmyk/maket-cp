@@ -128,6 +128,75 @@ function arRenderChecklist() {
 
 
 /**
+ * Показать все фото карточки крупно (полуэкранный оверлей).
+ * Клик по карточке в панели сопоставления — увеличенный просмотр.
+ */
+function arPreviewCard(cardIdx) {
+  var proj = getActiveProject();
+  if (!proj || !proj.cards || !proj.cards[cardIdx]) return;
+  var card = proj.cards[cardIdx];
+  if (!card.slots || card.slots.length === 0) return;
+
+  /* Построить карту превью */
+  var pvByName = {};
+  if (proj.previews) {
+    for (var pi = 0; pi < proj.previews.length; pi++) {
+      pvByName[proj.previews[pi].name] = proj.previews[pi];
+    }
+  }
+
+  /* Собрать все фото слотов */
+  var images = [];
+  for (var si = 0; si < card.slots.length; si++) {
+    var slot = card.slots[si];
+    var imgSrc = slot.dataUrl || slot.thumbUrl || '';
+    if (!imgSrc && slot.file && pvByName[slot.file]) {
+      var pv = pvByName[slot.file];
+      imgSrc = pv.preview || pv.thumb || '';
+    }
+    if (imgSrc) {
+      images.push({ src: imgSrc, name: slot.file || ('Слот ' + (si + 1)) });
+    }
+  }
+  if (images.length === 0) return;
+
+  /* Создать оверлей */
+  var overlay = document.createElement('div');
+  overlay.className = 'ar-card-overlay';
+  overlay.onclick = function(e) {
+    if (e.target === overlay) document.body.removeChild(overlay);
+  };
+
+  var html = '<div class="ar-card-preview">';
+  html += '<div class="ar-card-preview-header">Карточка ' + (cardIdx + 1);
+
+  /* Показать привязанный артикул если есть */
+  if (proj.articles) {
+    for (var a = 0; a < proj.articles.length; a++) {
+      if (proj.articles[a].cardIdx === cardIdx) {
+        html += ' &mdash; ' + esc(proj.articles[a].sku);
+        break;
+      }
+    }
+  }
+  html += '<button class="ar-card-preview-close" onclick="this.closest(\'.ar-card-overlay\').remove()">x</button>';
+  html += '</div>';
+
+  html += '<div class="ar-card-preview-grid">';
+  for (var i = 0; i < images.length; i++) {
+    html += '<div class="ar-card-preview-item">';
+    html += '<img src="' + images[i].src + '" alt="' + esc(images[i].name) + '">';
+    html += '<div class="ar-card-preview-name">' + esc(images[i].name) + '</div>';
+    html += '</div>';
+  }
+  html += '</div></div>';
+
+  overlay.innerHTML = html;
+  document.body.appendChild(overlay);
+}
+
+
+/**
  * Показать увеличенное референс-фото артикула (модальное окно).
  */
 function arShowRefImage(idx) {
@@ -295,6 +364,240 @@ function _arLoadViaBrowser(proj) {
     reader2.readAsText(file);
   };
   input.click();
+}
+
+
+/* ──────────────────────────────────────────────
+   OpenAI Vision — распознавание PDF через AI
+   ────────────────────────────────────────────── */
+
+/**
+ * Настроить API-ключ OpenAI. Сохраняется в localStorage.
+ */
+function arSetOpenAIKey() {
+  var current = localStorage.getItem('openai_api_key') || '';
+  var masked = current ? (current.substr(0, 7) + '...' + current.substr(-4)) : 'не задан';
+  var key = prompt('OpenAI API Key (текущий: ' + masked + ').\n\nВведите ключ или оставьте пустым для удаления:', '');
+  if (key === null) return; /* отмена */
+  if (key.trim()) {
+    localStorage.setItem('openai_api_key', key.trim());
+    alert('Ключ сохранён.');
+  } else {
+    localStorage.removeItem('openai_api_key');
+    alert('Ключ удалён.');
+  }
+}
+
+
+/**
+ * Загрузить PDF и распознать артикулы через OpenAI Vision.
+ * Работает и в desktop, и в браузере — нужен только API-ключ.
+ *
+ * Алгоритм:
+ * 1. Пользователь выбирает PDF
+ * 2. Каждая страница рендерится в canvas (pdf.js)
+ * 3. Canvas -> base64 JPEG -> отправляется в OpenAI Vision
+ * 4. GPT-4o извлекает артикулы + описания
+ * 5. Результат загружается как чек-лист
+ */
+function arLoadViaOpenAI() {
+  var proj = getActiveProject();
+  if (!proj) { alert('Сначала выберите съёмку'); return; }
+
+  var apiKey = localStorage.getItem('openai_api_key') || '';
+  if (!apiKey) {
+    alert('Для распознавания PDF через AI нужен ключ OpenAI.\n\nНажмите кнопку "API Key" чтобы ввести ключ.');
+    return;
+  }
+
+  if (typeof pdfjsLib === 'undefined') {
+    alert('pdf.js не загружен. Проверьте подключение библиотеки.');
+    return;
+  }
+
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.pdf';
+  input.onchange = function(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    _arProcessPdfWithOpenAI(proj, file, apiKey);
+  };
+  input.click();
+}
+
+
+/**
+ * Рендерить страницы PDF и отправлять в OpenAI Vision.
+ */
+function _arProcessPdfWithOpenAI(proj, file, apiKey) {
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    var typedArray = new Uint8Array(ev.target.result);
+
+    pdfjsLib.getDocument({ data: typedArray }).promise.then(function(pdf) {
+      var totalPages = pdf.numPages;
+      var allArticles = [];
+      var processed = 0;
+
+      /* Статус */
+      var statusEl = document.getElementById('ar-stats');
+      if (statusEl) statusEl.textContent = 'AI: обработка 0/' + totalPages + ' страниц...';
+
+      /* Обрабатываем страницы по одной */
+      function processPage(pageNum) {
+        if (pageNum > totalPages) {
+          /* Все страницы обработаны */
+          if (statusEl) statusEl.textContent = '';
+          var articles = _arConvertOpenAIResult(allArticles);
+          _arApplyLoaded(proj, articles, file.name + ' (AI)');
+          return;
+        }
+
+        pdf.getPage(pageNum).then(function(page) {
+          /* Рендерим страницу в canvas */
+          var scale = 2.0; /* хорошее качество для OCR */
+          var viewport = page.getViewport({ scale: scale });
+          var canvas = document.createElement('canvas');
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          var ctx = canvas.getContext('2d');
+
+          page.render({ canvasContext: ctx, viewport: viewport }).promise.then(function() {
+            /* Canvas -> JPEG base64 */
+            var imageBase64 = canvas.toDataURL('image/jpeg', 0.85);
+            var base64Data = imageBase64.replace('data:image/jpeg;base64,', '');
+
+            /* Отправить в OpenAI Vision */
+            _arCallOpenAIVision(apiKey, base64Data, pageNum, totalPages, function(err, pageArticles) {
+              processed++;
+              if (statusEl) statusEl.textContent = 'AI: обработка ' + processed + '/' + totalPages + ' страниц...';
+
+              if (!err && pageArticles && pageArticles.length > 0) {
+                allArticles = allArticles.concat(pageArticles);
+              }
+
+              /* Следующая страница */
+              processPage(pageNum + 1);
+            });
+          });
+        });
+      }
+
+      processPage(1);
+
+    }).catch(function(err) {
+      alert('Ошибка чтения PDF: ' + err.message);
+    });
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+
+/**
+ * Отправить изображение страницы в OpenAI Vision API.
+ * Просит GPT-4o извлечь артикулы, категории, цвета.
+ */
+function _arCallOpenAIVision(apiKey, base64Image, pageNum, totalPages, callback) {
+  var prompt = 'This is page ' + pageNum + ' of ' + totalPages + ' of a product catalog PDF.\n'
+    + 'Extract ALL product article codes (SKUs) visible on this page.\n'
+    + 'For each article, provide:\n'
+    + '- "sku": the article/SKU code (e.g. "PL01056CN-13-black-26S")\n'
+    + '- "category": product category if visible (shoes, bag, glasses, accessory, or empty)\n'
+    + '- "color": color if visible in the SKU or near it\n'
+    + '- "description": brief visual description of the product (1-2 words, e.g. "black heels", "red bag")\n\n'
+    + 'Return ONLY valid JSON array: [{"sku":"...","category":"...","color":"...","description":"..."}]\n'
+    + 'If no articles found on this page, return empty array: []\n'
+    + 'Do NOT include any text before or after the JSON array.';
+
+  var body = {
+    model: 'gpt-4o',
+    messages: [{
+      role: 'user',
+      content: [
+        { type: 'text', text: prompt },
+        {
+          type: 'image_url',
+          image_url: {
+            url: 'data:image/jpeg;base64,' + base64Image,
+            detail: 'high'
+          }
+        }
+      ]
+    }],
+    max_tokens: 4000,
+    temperature: 0.1
+  };
+
+  var xhr = new XMLHttpRequest();
+  xhr.open('POST', 'https://api.openai.com/v1/chat/completions', true);
+  xhr.setRequestHeader('Content-Type', 'application/json');
+  xhr.setRequestHeader('Authorization', 'Bearer ' + apiKey);
+  xhr.timeout = 60000;
+
+  xhr.onload = function() {
+    if (xhr.status !== 200) {
+      console.error('OpenAI API error:', xhr.status, xhr.responseText);
+      var errMsg = 'OpenAI API ошибка ' + xhr.status;
+      try {
+        var errData = JSON.parse(xhr.responseText);
+        if (errData.error && errData.error.message) errMsg = errData.error.message;
+      } catch(e) {}
+      callback(errMsg, null);
+      return;
+    }
+
+    try {
+      var resp = JSON.parse(xhr.responseText);
+      var content = resp.choices[0].message.content.trim();
+
+      /* Извлечь JSON из ответа (может быть обёрнут в ```json ... ```) */
+      var jsonStr = content;
+      var jsonMatch = content.match(/\[[\s\S]*\]/);
+      if (jsonMatch) jsonStr = jsonMatch[0];
+
+      var articles = JSON.parse(jsonStr);
+      callback(null, articles);
+    } catch(e) {
+      console.error('OpenAI parse error:', e, 'raw:', xhr.responseText);
+      callback('Ошибка разбора ответа AI', null);
+    }
+  };
+
+  xhr.onerror = function() {
+    callback('Сетевая ошибка', null);
+  };
+
+  xhr.ontimeout = function() {
+    callback('Таймаут запроса', null);
+  };
+
+  xhr.send(JSON.stringify(body));
+}
+
+
+/**
+ * Конвертировать результат OpenAI в формат Article.
+ */
+function _arConvertOpenAIResult(rawArticles) {
+  var articles = [];
+  var seen = {};
+  for (var i = 0; i < rawArticles.length; i++) {
+    var a = rawArticles[i];
+    var sku = String(a.sku || a.article || a.SKU || '').trim();
+    if (!sku || seen[sku]) continue;
+    seen[sku] = true;
+    articles.push({
+      id: 'ar_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+      sku: sku,
+      category: a.category || '',
+      color: a.color || '',
+      refImage: '',  /* OpenAI не возвращает картинки, только текст */
+      status: 'unmatched',
+      cardIdx: -1
+    });
+  }
+  return articles;
 }
 
 
@@ -711,6 +1014,9 @@ function arRenderMatching() {
         var matchedCls = linkedSku ? ' ar-matched' : '';
 
         html += '<div class="ar-match-item ar-card-item' + sel + matchedCls + '" onclick="arSelectCard(' + c + ')">';
+
+        /* Кнопка просмотра крупно */
+        html += '<button class="ar-zoom-btn" onclick="event.stopPropagation();arPreviewCard(' + c + ')" title="Увеличить">+</button>';
 
         /* Фото-полоска: все слоты карточки */
         html += '<div class="ar-card-photos">';

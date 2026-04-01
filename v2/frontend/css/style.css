@@ -1122,17 +1122,20 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 /* Полоска фото карточки (все слоты) */
 .ar-card-photos {
   display: flex; gap: 3px; flex-shrink: 0; overflow: hidden; max-width: 400px;
+  align-items: center;
 }
 .ar-card-photo {
-  width: 48px; height: 72px; object-fit: contain; border-radius: 3px; background: #f8f8f8; flex-shrink: 0;
+  height: 68px; max-width: 90px; width: auto;
+  object-fit: contain; border-radius: 3px; background: #f8f8f8; flex-shrink: 0;
 }
 .ar-card-photo-empty {
   display: flex; align-items: center; justify-content: center;
-  width: 48px; height: 72px;
+  width: 48px; height: 68px;
   font-size: 8px; color: #bbb; border: 1px dashed #ddd;
 }
 .ar-card-thumb {
-  width: 44px; height: 68px; object-fit: contain; border-radius: 4px; background: #f8f8f8; flex-shrink: 0;
+  height: 64px; max-width: 84px; width: auto;
+  object-fit: contain; border-radius: 4px; background: #f8f8f8; flex-shrink: 0;
 }
 .ar-match-info { min-width: 0; flex: 1; }
 .ar-match-num { font-size: 13px; font-weight: 600; }
@@ -1166,9 +1169,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .ar-verify-item.ar-verified { border-color: #4caf50; background: #e8f5e9; }
 
 .ar-verify-ref img, .ar-verify-card img {
-  width: 56px; height: 80px; object-fit: contain; border-radius: 4px; background: #f8f8f8;
+  height: 72px; max-width: 96px; width: auto;
+  object-fit: contain; border-radius: 4px; background: #f8f8f8;
 }
-.ar-verify-ref, .ar-verify-card { flex-shrink: 0; width: 56px; height: 80px; }
+.ar-verify-ref, .ar-verify-card { flex-shrink: 0; height: 72px; }
 .ar-verify-info { flex: 1; min-width: 0; }
 .ar-verify-sku { font-size: 14px; font-weight: 600; font-family: monospace; }
 .ar-verify-cat { font-size: 12px; color: #999; }
@@ -1185,7 +1189,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 /* ── Референс-фото в таблице чек-листа ── */
 .ar-ref-cell { width: 44px; text-align: center; }
 .ar-ref-thumb {
-  width: 36px; height: 52px; object-fit: contain; border-radius: 3px;
+  height: 48px; max-width: 64px; width: auto; object-fit: contain; border-radius: 3px;
   background: #f8f8f8; cursor: pointer; border: 1px solid #e0e0e0;
   transition: transform 0.15s;
 }
@@ -1194,7 +1198,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
 /* ── Референс-фото в панели сопоставления ── */
 .ar-sku-ref {
-  width: 44px; height: 64px; object-fit: contain; border-radius: 3px;
+  height: 60px; max-width: 80px; width: auto; object-fit: contain; border-radius: 3px;
   background: #f8f8f8; flex-shrink: 0; border: 1px solid #e0e0e0;
 }
 .ar-sku-item { display: flex; align-items: center; gap: 8px; }
@@ -1216,4 +1220,57 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 }
 .ar-ref-modal-sku {
   margin-top: 8px; font-family: monospace; font-size: 14px; font-weight: 600; color: #333;
+}
+
+/* ── Кнопка увеличения на карточке ── */
+.ar-zoom-btn {
+  position: absolute; top: 4px; right: 4px; z-index: 2;
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 1px solid #ccc; background: #fff; color: #666;
+  font-size: 14px; line-height: 18px; text-align: center;
+  cursor: pointer; opacity: 0; transition: opacity 0.15s;
+  padding: 0;
+}
+.ar-card-item { position: relative; }
+.ar-card-item:hover .ar-zoom-btn { opacity: 1; }
+.ar-zoom-btn:hover { background: #2196f3; color: #fff; border-color: #2196f3; }
+
+/* ── Полуэкранный просмотр карточки ── */
+.ar-card-overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.6); z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+}
+.ar-card-preview {
+  background: #fff; border-radius: 10px; padding: 0;
+  width: 50vw; max-height: 85vh; overflow-y: auto;
+  box-shadow: 0 12px 48px rgba(0,0,0,0.35);
+}
+.ar-card-preview-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px; border-bottom: 1px solid #eee;
+  font-size: 15px; font-weight: 600; color: #333;
+}
+.ar-card-preview-close {
+  background: none; border: 1px solid #ddd; border-radius: 50%;
+  width: 28px; height: 28px; font-size: 14px; cursor: pointer;
+  color: #999; display: flex; align-items: center; justify-content: center;
+}
+.ar-card-preview-close:hover { background: #f5f5f5; color: #333; }
+.ar-card-preview-grid {
+  display: flex; flex-wrap: wrap; gap: 12px; padding: 18px;
+  justify-content: center;
+}
+.ar-card-preview-item {
+  text-align: center;
+}
+.ar-card-preview-item img {
+  max-height: 35vh; max-width: 100%; width: auto;
+  object-fit: contain; border-radius: 4px; background: #f8f8f8;
+  border: 1px solid #eee;
+}
+.ar-card-preview-name {
+  font-size: 10px; color: #999; margin-top: 4px;
+  font-family: monospace; max-width: 200px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }

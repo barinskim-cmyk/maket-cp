@@ -188,9 +188,11 @@
 
     <div id="ar-main" style="display:none">
       <div class="ar-toolbar">
-        <button class="btn btn-sm" onclick="arLoadChecklist()" title="Загрузить чек-лист (JSON, CSV, TXT)">Загрузить чек-лист</button>
+        <button class="btn btn-sm" onclick="arLoadChecklist()" title="Загрузить чек-лист (PDF, JSON, CSV, Excel)">Загрузить чек-лист</button>
+        <button class="btn btn-sm" onclick="arLoadViaOpenAI()" title="Распознать PDF через OpenAI Vision (с картинками)">Распознать PDF (AI)</button>
         <button class="btn btn-sm" onclick="arAddManual()" title="Добавить артикул вручную">+ Вручную</button>
-        <span id="ar-stats" style="color:#888;font-size:12px;margin-left:12px"></span>
+        <button class="btn btn-sm" onclick="arSetOpenAIKey()" title="Настроить ключ OpenAI" style="margin-left:auto;color:#888;font-size:11px">API Key</button>
+        <span id="ar-stats" style="color:#888;font-size:12px;margin-left:8px"></span>
       </div>
 
       <!-- Блок 1: Чек-лист артикулов -->
