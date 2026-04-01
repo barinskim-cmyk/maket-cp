@@ -845,24 +845,27 @@ function _arAutoMatchIfReady(proj) {
   }
   if (!hasUnmatched) return;
 
-  /* Ключ может ещё загружаться (async). Ждём до 3 сек с проверкой каждые 300ms */
+  /* Ключ может ещё загружаться (async). Ждём до 5 сек с проверкой каждые 500ms */
   var attempts = 0;
   var maxAttempts = 10;
+  var statusEl = document.getElementById('ar-stats');
 
   function checkAndRun() {
     var key = _arGetOpenAIKey();
+    attempts++;
+    if (statusEl) statusEl.textContent = 'Жду ключ OpenAI... (попытка ' + attempts + '/' + maxAttempts + ')';
+    console.log('articles.js: checkAndRun #' + attempts + ', key=' + (key ? 'YES (' + key.substr(0, 12) + '...)' : 'NO'));
+
     if (key) {
-      console.log('articles.js: авто-расстановка AI запущена');
-      var statusEl = document.getElementById('ar-stats');
       if (statusEl) statusEl.textContent = 'AI расставляет артикулы...';
       arAutoMatchAll();
       return;
     }
-    attempts++;
     if (attempts < maxAttempts) {
-      setTimeout(checkAndRun, 300);
+      setTimeout(checkAndRun, 500);
     } else {
-      console.log('articles.js: ключ OpenAI не найден, авто-расстановка пропущена');
+      if (statusEl) statusEl.textContent = 'Ключ OpenAI не найден. Нажмите "Расставить (AI)" вручную.';
+      console.log('articles.js: ключ OpenAI не найден после ' + maxAttempts + ' попыток');
     }
   }
 
@@ -1524,11 +1527,21 @@ function arAIFindForCard(cardIdx) {
  */
 function arAutoMatchAll() {
   var proj = getActiveProject();
-  if (!proj || !proj.cards) return;
+  if (!proj || !proj.cards) {
+    console.log('articles.js: arAutoMatchAll — нет проекта или карточек');
+    return;
+  }
 
   var apiKey = _arGetOpenAIKey();
+  console.log('articles.js: arAutoMatchAll ВЫЗВАНА. key=' + (apiKey ? 'YES' : 'NO') +
+    ', cards=' + (proj.cards ? proj.cards.length : 0) +
+    ', articles=' + (proj.articles ? proj.articles.length : 0) +
+    ', previews=' + (proj.previews ? proj.previews.length : 0));
+
   if (!apiKey) {
     console.log('articles.js: arAutoMatchAll — ключ OpenAI не найден');
+    var s = document.getElementById('ar-stats');
+    if (s) s.textContent = 'AI: ключ не найден';
     return;
   }
 
@@ -1542,6 +1555,7 @@ function arAutoMatchAll() {
 
   /* Собрать незакреплённые карточки с фото */
   var cards = [];
+  var cardsNoImg = 0;
   for (var c = 0; c < proj.cards.length; c++) {
     var hasMatch = false;
     for (var a = 0; a < (proj.articles || []).length; a++) {
@@ -1561,27 +1575,46 @@ function arAutoMatchAll() {
         }
         if (cardImg) break;
       }
+      /* Диагностика: почему нет фото? */
+      if (!cardImg && card.slots.length > 0) {
+        var slot0 = card.slots[0];
+        console.log('articles.js: card ' + c + ' slot[0]: file=' + (slot0.file || '?') +
+          ', dataUrl=' + (slot0.dataUrl ? 'YES(' + slot0.dataUrl.substr(0, 30) + ')' : 'NO') +
+          ', thumbUrl=' + (slot0.thumbUrl ? 'YES(' + slot0.thumbUrl.substr(0, 30) + ')' : 'NO') +
+          ', inPvMap=' + !!(slot0.file && pvByName[slot0.file]));
+      }
     }
     if (cardImg) {
       cards.push({ idx: c, img: cardImg });
+    } else {
+      cardsNoImg++;
     }
   }
 
+  console.log('articles.js: cards with images=' + cards.length + ', without images=' + cardsNoImg);
+
   if (cards.length === 0) {
     console.log('articles.js: arAutoMatchAll — нет карточек с фото для сопоставления');
+    var s2 = document.getElementById('ar-stats');
+    if (s2) s2.textContent = 'AI: нет карточек с фото (' + cardsNoImg + ' без фото)';
     return;
   }
 
   /* Собрать свободные артикулы с refImage */
   var articles = [];
+  var artNoImg = 0;
   for (var a2 = 0; a2 < (proj.articles || []).length; a2++) {
     var art = proj.articles[a2];
-    if (art.cardIdx >= 0 || !art.refImage) continue;
+    if (art.cardIdx >= 0) continue;
+    if (!art.refImage) { artNoImg++; continue; }
     articles.push({ idx: a2, sku: art.sku, refImage: art.refImage });
   }
+  console.log('articles.js: articles with refImage=' + articles.length + ', without=' + artNoImg);
 
   if (articles.length === 0) {
     console.log('articles.js: arAutoMatchAll — нет артикулов с фото для сопоставления');
+    var s3 = document.getElementById('ar-stats');
+    if (s3) s3.textContent = 'AI: нет артикулов с ref-фото (' + artNoImg + ' без фото)';
     return;
   }
 
