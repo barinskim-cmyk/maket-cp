@@ -116,78 +116,186 @@ function arRenderChecklist() {
 
 
 /**
- * Загрузить чек-лист (PDF — desktop only, вызывает Python).
- * В браузере показывает сообщение.
+ * Загрузить чек-лист из файла (JSON, CSV, TXT).
+ * Универсальная функция — работает и в desktop и в браузере.
+ * JSON: [{sku, category, color, refImage}] или {articles: [...]}
+ * CSV/TXT: строки с разделителями (tab, ;, ,) или по одному артикулу на строку.
+ * Первая строка CSV может быть заголовком (sku/article/артикул).
  */
 function arLoadChecklist() {
-  if (window.pywebview && window.pywebview.api) {
-    /* Desktop: Python парсит PDF */
-    window.pywebview.api.parse_article_checklist().then(function(result) {
-      if (result && result.articles) {
-        var proj = getActiveProject();
-        if (!proj) return;
-        proj.articles = result.articles;
-        arRenderChecklist();
-        arRenderMatching();
-        arUpdateStats();
-        if (typeof shAutoSave === 'function') shAutoSave();
-      }
-    }).catch(function(e) {
-      alert('Ошибка парсинга: ' + e);
-    });
-  } else {
-    alert('Загрузка PDF доступна только в desktop-версии.\nИспользуйте "Импорт JSON" для загрузки артикулов в браузере.');
-  }
-}
+  var proj = getActiveProject();
+  if (!proj) { alert('Сначала выберите съёмку'); return; }
 
-
-/**
- * Импорт артикулов из JSON-файла (браузерный режим).
- * Формат: [{sku, category, color, refImage}]
- */
-function arImportChecklistJson() {
   var input = document.createElement('input');
   input.type = 'file';
-  input.accept = '.json';
+  input.accept = '.json,.csv,.tsv,.txt';
   input.onchange = function(e) {
     var file = e.target.files[0];
     if (!file) return;
     var reader = new FileReader();
     reader.onload = function(ev) {
-      try {
-        var data = JSON.parse(ev.target.result);
-        var articles = Array.isArray(data) ? data : (data.articles || data);
-        if (!Array.isArray(articles)) {
-          alert('Неверный формат JSON');
-          return;
-        }
-        var proj = getActiveProject();
-        if (!proj) { alert('Сначала выберите съёмку'); return; }
+      var text = ev.target.result;
+      var articles = null;
+      var ext = (file.name.split('.').pop() || '').toLowerCase();
 
-        proj.articles = [];
-        for (var i = 0; i < articles.length; i++) {
-          var a = articles[i];
-          proj.articles.push({
-            id: 'ar_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
-            sku: a.sku || a.name || '',
-            category: a.category || a.cat || '',
-            color: a.color || '',
-            refImage: a.refImage || a.ref || '',
-            status: 'unmatched',
-            cardIdx: -1
-          });
-        }
-        arRenderChecklist();
-        arRenderMatching();
-        arUpdateStats();
-        if (typeof shAutoSave === 'function') shAutoSave();
-      } catch(ex) {
-        alert('Ошибка чтения JSON: ' + ex.message);
+      if (ext === 'json') {
+        articles = _arParseJson(text);
+      } else {
+        articles = _arParseCsvTxt(text);
       }
+
+      if (!articles || articles.length === 0) {
+        alert('Не удалось распознать артикулы в файле.\n\nПоддерживаемые форматы:\n- JSON: [{sku, category, color}]\n- CSV/TXT: строки с артикулами (разделитель: tab, ; или ,)');
+        return;
+      }
+
+      /* Спросить: заменить или добавить */
+      var mode = 'replace';
+      if (proj.articles && proj.articles.length > 0) {
+        mode = confirm('Уже загружено ' + proj.articles.length + ' артикулов.\n\nОК = заменить все\nОтмена = добавить к существующим') ? 'replace' : 'append';
+      }
+
+      if (mode === 'replace') {
+        proj.articles = articles;
+      } else {
+        proj.articles = (proj.articles || []).concat(articles);
+      }
+
+      arRenderChecklist();
+      arRenderMatching();
+      arUpdateStats();
+      if (typeof shAutoSave === 'function') shAutoSave();
+      console.log('articles.js: загружено ' + articles.length + ' артикулов из ' + file.name);
     };
     reader.readAsText(file);
   };
   input.click();
+}
+
+
+/**
+ * Парсинг JSON-файла с артикулами.
+ * Поддерживает: массив [{sku, ...}], объект {articles: [...]},
+ * а также поля-синонимы (name, article, cat, ref).
+ * @param {string} text — содержимое файла
+ * @returns {Array|null} массив Article-объектов или null
+ */
+function _arParseJson(text) {
+  try {
+    var data = JSON.parse(text);
+    var raw = Array.isArray(data) ? data : (data.articles || data.items || data.data || null);
+    if (!Array.isArray(raw)) return null;
+
+    var articles = [];
+    for (var i = 0; i < raw.length; i++) {
+      var a = raw[i];
+      /* Поддержка разных форматов ключей */
+      var sku = a.sku || a.article || a.name || a.artikul || a['артикул'] || '';
+      if (!sku && typeof a === 'string') sku = a; /* массив строк */
+      if (!sku) continue;
+
+      articles.push({
+        id: 'ar_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+        sku: String(sku).trim(),
+        category: a.category || a.cat || a['категория'] || '',
+        color: a.color || a['цвет'] || '',
+        refImage: a.refImage || a.ref || a.image || '',
+        status: 'unmatched',
+        cardIdx: -1
+      });
+    }
+    return articles.length > 0 ? articles : null;
+  } catch(e) {
+    return null;
+  }
+}
+
+
+/**
+ * Парсинг CSV/TXT файла с артикулами.
+ * Автоопределение разделителя (tab > ; > ,).
+ * Первая строка: если содержит "sku"/"article"/"артикул" — считается заголовком.
+ * Колонки: 1=sku, 2=category, 3=color (опционально).
+ * @param {string} text — содержимое файла
+ * @returns {Array|null} массив Article-объектов или null
+ */
+function _arParseCsvTxt(text) {
+  var lines = text.split(/\r?\n/).filter(function(l) { return l.trim() !== ''; });
+  if (lines.length === 0) return null;
+
+  /* Определяем разделитель по первой строке */
+  var sep = '\t';
+  if (lines[0].indexOf('\t') < 0) {
+    sep = lines[0].indexOf(';') >= 0 ? ';' : ',';
+  }
+
+  /* Проверяем заголовок */
+  var startIdx = 0;
+  var headerCheck = lines[0].toLowerCase();
+  if (headerCheck.indexOf('sku') >= 0 || headerCheck.indexOf('article') >= 0 ||
+      headerCheck.indexOf('артикул') >= 0 || headerCheck.indexOf('артікул') >= 0) {
+    startIdx = 1;
+  }
+
+  /* Определяем индексы колонок из заголовка */
+  var skuCol = 0, catCol = -1, colorCol = -1;
+  if (startIdx === 1) {
+    var headers = lines[0].split(sep).map(function(h) { return h.trim().toLowerCase(); });
+    for (var h = 0; h < headers.length; h++) {
+      var hdr = headers[h];
+      if (hdr === 'category' || hdr === 'категория' || hdr === 'cat') catCol = h;
+      if (hdr === 'color' || hdr === 'цвет') colorCol = h;
+      if (hdr === 'sku' || hdr === 'article' || hdr === 'артикул' || hdr === 'name') skuCol = h;
+    }
+  }
+
+  var articles = [];
+  for (var i = startIdx; i < lines.length; i++) {
+    var parts = lines[i].split(sep);
+    var sku = (parts[skuCol] || '').trim();
+    if (!sku) continue;
+
+    articles.push({
+      id: 'ar_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+      sku: sku,
+      category: catCol >= 0 ? (parts[catCol] || '').trim() : '',
+      color: colorCol >= 0 ? (parts[colorCol] || '').trim() : '',
+      refImage: '',
+      status: 'unmatched',
+      cardIdx: -1
+    });
+  }
+  return articles.length > 0 ? articles : null;
+}
+
+
+/**
+ * Добавить один артикул вручную (prompt).
+ */
+function arAddManual() {
+  var proj = getActiveProject();
+  if (!proj) { alert('Сначала выберите съёмку'); return; }
+  if (!proj.articles) proj.articles = [];
+
+  var sku = prompt('Введите артикул (SKU):');
+  if (!sku || !sku.trim()) return;
+
+  var category = prompt('Категория (необязательно):') || '';
+
+  proj.articles.push({
+    id: 'ar_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+    sku: sku.trim(),
+    category: category.trim(),
+    color: '',
+    refImage: '',
+    status: 'unmatched',
+    cardIdx: -1
+  });
+
+  arRenderChecklist();
+  arRenderMatching();
+  arUpdateStats();
+  if (typeof shAutoSave === 'function') shAutoSave();
 }
 
 
