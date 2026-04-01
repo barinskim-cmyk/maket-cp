@@ -215,10 +215,10 @@ class AppAPI:
                 directory="",
                 allow_multiple=False,
                 file_types=(
-                    "Все поддерживаемые (*.pdf;*.json;*.csv;*.txt;*.xlsx)",
                     "PDF (*.pdf)",
                     "JSON (*.json)",
-                    "CSV/TXT (*.csv;*.txt)",
+                    "CSV (*.csv)",
+                    "TXT (*.txt)",
                     "Excel (*.xlsx)",
                 ),
             )
@@ -247,10 +247,10 @@ class AppAPI:
                 directory="",
                 allow_multiple=False,
                 file_types=(
-                    "Все поддерживаемые (*.pdf;*.json;*.csv;*.txt;*.xlsx)",
                     "PDF (*.pdf)",
                     "JSON (*.json)",
-                    "CSV/TXT (*.csv;*.txt)",
+                    "CSV (*.csv)",
+                    "TXT (*.txt)",
                     "Excel (*.xlsx)",
                 ),
             )
