@@ -62,6 +62,7 @@ function arOnPageShow() {
 
   arRenderChecklist();
   arRenderMatching();
+  arRenderVerification();
   arUpdateStats();
 }
 
@@ -81,12 +82,12 @@ function arRenderChecklist() {
   if (!el) return;
 
   if (proj.articles.length === 0) {
-    el.innerHTML = '<div class="empty-state">Артикулы не загружены. Нажмите "Загрузить чек-лист" или "Импорт JSON".</div>';
+    el.innerHTML = '<div class="empty-state">Артикулы не загружены. Нажмите "Загрузить чек-лист" для загрузки из файла (JSON, CSV, TXT).</div>';
     return;
   }
 
   var html = '<table class="ar-table"><thead><tr>'
-    + '<th>#</th><th>Статус</th><th>Артикул</th><th>Категория</th><th>Референс</th><th>Карточка</th>'
+    + '<th>#</th><th></th><th>Артикул</th><th>Категория</th><th>Цвет</th><th>Карточка</th><th></th>'
     + '</tr></thead><tbody>';
 
   for (var i = 0; i < proj.articles.length; i++) {
@@ -102,16 +103,56 @@ function arRenderChecklist() {
     html += '<td><span class="ar-status-dot ' + statusCls + '">' + statusText + '</span></td>';
     html += '<td class="ar-sku">' + esc(art.sku) + '</td>';
     html += '<td>' + esc(art.category || '') + '</td>';
-    html += '<td>';
-    if (art.refImage) {
-      html += '<img class="ar-ref-thumb" src="' + art.refImage + '" alt="ref">';
-    }
-    html += '</td>';
+    html += '<td>' + esc(art.color || '') + '</td>';
     html += '<td>' + cardLabel + '</td>';
+    html += '<td class="ar-row-actions"><button onclick="arDeleteArticle(' + i + ')" title="Удалить">x</button></td>';
     html += '</tr>';
   }
   html += '</tbody></table>';
+
+  /* Кнопка очистки внизу */
+  html += '<div style="margin-top:8px;text-align:right">'
+    + '<button class="btn btn-sm" onclick="arClearAll()" style="color:#e57373;border-color:#e57373">Очистить все артикулы</button>'
+    + '</div>';
+
   el.innerHTML = html;
+}
+
+
+/**
+ * Удалить один артикул по индексу.
+ */
+function arDeleteArticle(idx) {
+  var proj = getActiveProject();
+  if (!proj || !proj.articles || !proj.articles[idx]) return;
+
+  proj.articles.splice(idx, 1);
+
+  /* Пересчитать cardIdx: индексы артикулов сместились */
+  /* (cardIdx ссылается на индекс карточки, не артикула — пересчёт не нужен) */
+
+  arRenderChecklist();
+  arRenderMatching();
+  arRenderVerification();
+  arUpdateStats();
+  if (typeof shAutoSave === 'function') shAutoSave();
+}
+
+
+/**
+ * Очистить все артикулы (с подтверждением).
+ */
+function arClearAll() {
+  var proj = getActiveProject();
+  if (!proj || !proj.articles || proj.articles.length === 0) return;
+  if (!confirm('Удалить все ' + proj.articles.length + ' артикулов?')) return;
+
+  proj.articles = [];
+  arRenderChecklist();
+  arRenderMatching();
+  arRenderVerification();
+  arUpdateStats();
+  if (typeof shAutoSave === 'function') shAutoSave();
 }
 
 
@@ -311,35 +352,38 @@ function arRenderMatching() {
   var proj = getActiveProject();
   if (!proj) return;
 
-  /* Карточки */
+  /* Карточки (слева) */
   var cardsEl = document.getElementById('ar-cards-list');
   if (cardsEl) {
     if (!proj.cards || proj.cards.length === 0) {
-      cardsEl.innerHTML = '<div class="empty-state">Нет карточек</div>';
+      cardsEl.innerHTML = '<div class="empty-state">Нет карточек. Перейдите на вкладку "Контент".</div>';
     } else {
       var html = '';
       for (var c = 0; c < proj.cards.length; c++) {
         var card = proj.cards[c];
         /* Найти привязанный артикул */
         var linkedSku = '';
+        var linkedIdx = -1;
         for (var a = 0; a < (proj.articles || []).length; a++) {
           if (proj.articles[a].cardIdx === c) {
             linkedSku = proj.articles[a].sku;
+            linkedIdx = a;
             break;
           }
         }
         var sel = (_arSelectedCard === c) ? ' ar-selected' : '';
+        var matchedCls = linkedSku ? ' ar-matched' : '';
         var thumb = '';
         if (card.slots && card.slots[0] && (card.slots[0].dataUrl || card.slots[0].thumbUrl)) {
           thumb = '<img class="ar-card-thumb" src="' + (card.slots[0].thumbUrl || card.slots[0].dataUrl) + '">';
         }
-        html += '<div class="ar-match-item ar-card-item' + sel + '" onclick="arSelectCard(' + c + ')">';
+        html += '<div class="ar-match-item ar-card-item' + sel + matchedCls + '" onclick="arSelectCard(' + c + ')">';
         html += thumb;
         html += '<div class="ar-match-info">';
         html += '<div class="ar-match-num">Карточка ' + (c + 1) + '</div>';
-        html += '<div class="ar-match-cat">' + esc(card.category || '') + '</div>';
         if (linkedSku) {
           html += '<div class="ar-match-sku">' + esc(linkedSku) + '</div>';
+          html += '<button class="ar-unmatch-btn" onclick="event.stopPropagation();arUnmatch(' + linkedIdx + ')">Отвязать</button>';
         }
         html += '</div></div>';
       }
@@ -347,24 +391,33 @@ function arRenderMatching() {
     }
   }
 
-  /* Артикулы */
+  /* Артикулы (справа) — только несопоставленные сверху, потом сопоставленные */
   var skusEl = document.getElementById('ar-skus-list');
   if (skusEl) {
     if (!proj.articles || proj.articles.length === 0) {
-      skusEl.innerHTML = '<div class="empty-state">Артикулы не загружены</div>';
+      skusEl.innerHTML = '<div class="empty-state">Загрузите чек-лист</div>';
     } else {
       var html2 = '';
+      /* Сначала несопоставленные */
       for (var s = 0; s < proj.articles.length; s++) {
         var art2 = proj.articles[s];
+        if (art2.cardIdx >= 0) continue;
         var sel2 = (_arSelectedSku === s) ? ' ar-selected' : '';
-        var matched = (art2.cardIdx >= 0) ? ' ar-matched' : '';
-        html2 += '<div class="ar-match-item ar-sku-item' + sel2 + matched + '" onclick="arSelectSku(' + s + ')">';
-        if (art2.refImage) {
-          html2 += '<img class="ar-ref-thumb" src="' + art2.refImage + '">';
-        }
+        html2 += '<div class="ar-match-item ar-sku-item' + sel2 + '" onclick="arSelectSku(' + s + ')">';
         html2 += '<div class="ar-match-info">';
         html2 += '<div class="ar-match-sku">' + esc(art2.sku) + '</div>';
-        html2 += '<div class="ar-match-cat">' + esc(art2.category || '') + '</div>';
+        if (art2.category) html2 += '<div class="ar-match-cat">' + esc(art2.category) + '</div>';
+        html2 += '</div></div>';
+      }
+      /* Потом сопоставленные (серые) */
+      for (var s2 = 0; s2 < proj.articles.length; s2++) {
+        var art3 = proj.articles[s2];
+        if (art3.cardIdx < 0) continue;
+        var cardNum = art3.cardIdx + 1;
+        html2 += '<div class="ar-match-item ar-sku-item ar-matched">';
+        html2 += '<div class="ar-match-info">';
+        html2 += '<div class="ar-match-sku">' + esc(art3.sku) + '</div>';
+        html2 += '<div class="ar-match-cat">-> Карточка ' + cardNum + '</div>';
         html2 += '</div></div>';
       }
       skusEl.innerHTML = html2;
@@ -413,43 +466,41 @@ function arDoMatch(skuIdx, cardIdx) {
   var art = proj.articles[skuIdx];
   if (!art) return;
 
-  /* Снять предыдущую привязку артикула если была */
+  /* Снять предыдущую привязку другого артикула с этой карточки */
+  for (var i = 0; i < proj.articles.length; i++) {
+    if (proj.articles[i].cardIdx === cardIdx && i !== skuIdx) {
+      proj.articles[i].cardIdx = -1;
+      proj.articles[i].status = 'unmatched';
+    }
+  }
+
   art.cardIdx = cardIdx;
   art.status = 'matched';
 
-  /* Обновить карточку */
-  if (proj.cards && proj.cards[cardIdx]) {
-    proj.cards[cardIdx].articleId = art.id;
-  }
-
   arRenderChecklist();
   arRenderMatching();
+  arRenderVerification();
   arUpdateStats();
-  arCheckVerification();
   if (typeof shAutoSave === 'function') shAutoSave();
 }
 
 
 /**
- * Проверить: все артикулы привязаны? → показать блок верификации.
+ * Отвязать артикул от карточки.
+ * @param {number} skuIdx — индекс артикула
  */
-function arCheckVerification() {
+function arUnmatch(skuIdx) {
   var proj = getActiveProject();
-  if (!proj || !proj.articles) return;
+  if (!proj || !proj.articles || !proj.articles[skuIdx]) return;
 
-  var allMatched = true;
-  for (var i = 0; i < proj.articles.length; i++) {
-    if (proj.articles[i].status === 'unmatched') {
-      allMatched = false;
-      break;
-    }
-  }
+  proj.articles[skuIdx].cardIdx = -1;
+  proj.articles[skuIdx].status = 'unmatched';
 
-  var verifySection = document.getElementById('ar-verify-section');
-  if (verifySection) {
-    verifySection.style.display = allMatched ? '' : 'none';
-    if (allMatched) arRenderVerification();
-  }
+  arRenderChecklist();
+  arRenderMatching();
+  arRenderVerification();
+  arUpdateStats();
+  if (typeof shAutoSave === 'function') shAutoSave();
 }
 
 
@@ -458,19 +509,46 @@ function arCheckVerification() {
    ────────────────────────────────────────────── */
 
 /**
- * Отрисовать чек-лист верификации: артикул + ref-фото + фото из карточки.
+ * Отрисовать блок верификации: сопоставленные артикулы рядом с фото из карточки.
+ * Кликаем = подтверждаем / снимаем подтверждение.
+ * Показывается всегда (даже если не все сопоставлены) — для уже сопоставленных.
  */
 function arRenderVerification() {
   var proj = getActiveProject();
   if (!proj || !proj.articles) return;
+
+  var verifySection = document.getElementById('ar-verify-section');
   var el = document.getElementById('ar-verify-list');
-  if (!el) return;
+  if (!el || !verifySection) return;
 
-  var html = '';
+  /* Посчитать сопоставленные */
+  var matchedItems = [];
+  var verifiedCount = 0;
   for (var i = 0; i < proj.articles.length; i++) {
-    var art = proj.articles[i];
-    if (art.cardIdx < 0) continue;
+    if (proj.articles[i].cardIdx >= 0) {
+      matchedItems.push(i);
+      if (proj.articles[i].status === 'verified') verifiedCount++;
+    }
+  }
 
+  /* Показать секцию если есть что верифицировать */
+  if (matchedItems.length === 0) {
+    verifySection.style.display = 'none';
+    return;
+  }
+  verifySection.style.display = '';
+
+  /* Тулбар верификации */
+  var toolbarHtml = '<div class="ar-verify-toolbar">'
+    + '<button class="btn btn-sm" onclick="arConfirmAll()">Подтвердить все</button>'
+    + '<button class="btn btn-sm" onclick="arResetVerification()" style="color:#999">Сбросить</button>'
+    + '<span class="ar-verify-progress">' + verifiedCount + ' / ' + matchedItems.length + ' проверено</span>'
+    + '</div>';
+
+  var html = toolbarHtml;
+  for (var m = 0; m < matchedItems.length; m++) {
+    var idx = matchedItems[m];
+    var art = proj.articles[idx];
     var card = (proj.cards && proj.cards[art.cardIdx]) ? proj.cards[art.cardIdx] : null;
     var cardThumb = '';
     if (card && card.slots && card.slots[0]) {
@@ -478,22 +556,27 @@ function arRenderVerification() {
     }
 
     var verified = (art.status === 'verified') ? ' ar-verified' : '';
-    html += '<div class="ar-verify-item' + verified + '" data-idx="' + i + '" onclick="arToggleVerify(' + i + ')">';
-    html += '<div class="ar-verify-ref">';
-    if (art.refImage) {
-      html += '<img src="' + art.refImage + '" alt="ref">';
-    }
-    html += '</div>';
-    html += '<div class="ar-verify-info">';
-    html += '<div class="ar-verify-sku">' + esc(art.sku) + '</div>';
-    html += '<div class="ar-verify-cat">' + esc(art.category || '') + '</div>';
-    html += '<div class="ar-verify-status">' + (art.status === 'verified' ? 'OK' : 'Не проверено') + '</div>';
-    html += '</div>';
+    html += '<div class="ar-verify-item' + verified + '" data-idx="' + idx + '" onclick="arToggleVerify(' + idx + ')">';
+
+    /* Фото из карточки (слева) */
     html += '<div class="ar-verify-card">';
     if (cardThumb) {
       html += '<img src="' + cardThumb + '" alt="card">';
     }
     html += '</div>';
+
+    /* Инфо (центр) */
+    html += '<div class="ar-verify-info">';
+    html += '<div class="ar-verify-sku">' + esc(art.sku) + '</div>';
+    if (art.category) html += '<div class="ar-verify-cat">' + esc(art.category) + '</div>';
+    html += '<div class="ar-verify-status">' + (art.status === 'verified' ? 'OK' : 'Кликните для подтверждения') + '</div>';
+    html += '</div>';
+
+    /* Референс (справа, если есть) */
+    if (art.refImage) {
+      html += '<div class="ar-verify-ref"><img src="' + art.refImage + '" alt="ref"></div>';
+    }
+
     html += '</div>';
   }
   el.innerHTML = html;
@@ -518,7 +601,7 @@ function arToggleVerify(idx) {
 
 
 /**
- * Подтвердить все артикулы как верифицированные.
+ * Подтвердить все сопоставленные артикулы как верифицированные.
  */
 function arConfirmAll() {
   var proj = getActiveProject();
@@ -527,6 +610,25 @@ function arConfirmAll() {
   for (var i = 0; i < proj.articles.length; i++) {
     if (proj.articles[i].status === 'matched') {
       proj.articles[i].status = 'verified';
+    }
+  }
+  arRenderChecklist();
+  arRenderVerification();
+  arUpdateStats();
+  if (typeof shAutoSave === 'function') shAutoSave();
+}
+
+
+/**
+ * Сбросить верификацию: все verified → matched.
+ */
+function arResetVerification() {
+  var proj = getActiveProject();
+  if (!proj || !proj.articles) return;
+
+  for (var i = 0; i < proj.articles.length; i++) {
+    if (proj.articles[i].status === 'verified') {
+      proj.articles[i].status = 'matched';
     }
   }
   arRenderChecklist();
