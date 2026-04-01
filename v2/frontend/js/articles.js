@@ -589,7 +589,15 @@ function arRenderMatching() {
   var proj = getActiveProject();
   if (!proj) return;
 
-  /* Карточки (слева) */
+  /* Построить карту превью по имени файла для быстрого поиска */
+  var pvByName = {};
+  if (proj.previews) {
+    for (var pi = 0; pi < proj.previews.length; pi++) {
+      pvByName[proj.previews[pi].name] = proj.previews[pi];
+    }
+  }
+
+  /* Карточки (слева) — показываем все фото из слотов */
   var cardsEl = document.getElementById('ar-cards-list');
   if (cardsEl) {
     if (!proj.cards || proj.cards.length === 0) {
@@ -610,12 +618,30 @@ function arRenderMatching() {
         }
         var sel = (_arSelectedCard === c) ? ' ar-selected' : '';
         var matchedCls = linkedSku ? ' ar-matched' : '';
-        var thumb = '';
-        if (card.slots && card.slots[0] && (card.slots[0].dataUrl || card.slots[0].thumbUrl)) {
-          thumb = '<img class="ar-card-thumb" src="' + (card.slots[0].thumbUrl || card.slots[0].dataUrl) + '">';
-        }
+
         html += '<div class="ar-match-item ar-card-item' + sel + matchedCls + '" onclick="arSelectCard(' + c + ')">';
-        html += thumb;
+
+        /* Фото-полоска: все слоты карточки */
+        html += '<div class="ar-card-photos">';
+        if (card.slots) {
+          for (var si = 0; si < card.slots.length; si++) {
+            var slot = card.slots[si];
+            var imgSrc = slot.dataUrl || slot.thumbUrl || '';
+            /* Если нет URL в слоте — попробовать найти в превью по file_name */
+            if (!imgSrc && slot.file && pvByName[slot.file]) {
+              var pv = pvByName[slot.file];
+              imgSrc = pv.thumb || pv.preview || '';
+            }
+            if (imgSrc) {
+              html += '<img class="ar-card-photo" src="' + imgSrc + '">';
+            } else if (slot.file) {
+              html += '<div class="ar-card-photo ar-card-photo-empty">' + esc(slot.file.substr(0, 8)) + '</div>';
+            }
+          }
+        }
+        html += '</div>';
+
+        /* Инфо: номер + привязанный артикул */
         html += '<div class="ar-match-info">';
         html += '<div class="ar-match-num">Карточка ' + (c + 1) + '</div>';
         if (linkedSku) {
