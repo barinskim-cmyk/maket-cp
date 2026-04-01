@@ -1038,3 +1038,133 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   /* Общий контейнер без отступов */
   .container { padding: 0 !important; }
 }
+
+
+/* ══════════════════════════════════════════════
+   Артикулы (articles.js)
+   ══════════════════════════════════════════════ */
+
+/* Тулбар */
+.ar-toolbar {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;
+}
+.ar-toolbar .btn { white-space: nowrap; }
+
+/* Секции */
+.ar-section {
+  background: #fff; border-radius: 8px; padding: 16px; margin-bottom: 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.ar-section h3 {
+  font-size: 14px; font-weight: 600; color: #555; margin-bottom: 12px;
+  padding-bottom: 8px; border-bottom: 1px solid #eee;
+}
+
+/* ── Блок 1: Таблица артикулов ── */
+.ar-table {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+}
+.ar-table th {
+  text-align: left; padding: 6px 10px; font-size: 11px; text-transform: uppercase;
+  color: #999; border-bottom: 2px solid #eee; font-weight: 600;
+}
+.ar-table td {
+  padding: 6px 10px; border-bottom: 1px solid #f0f0f0; vertical-align: middle;
+}
+.ar-table tr:hover { background: #fafafa; }
+
+/* Статус-точка */
+.ar-status-dot {
+  display: inline-block; width: 24px; height: 24px; border-radius: 50%;
+  line-height: 24px; text-align: center; font-size: 10px; font-weight: 700; color: #fff;
+}
+.ar-status-unmatched .ar-status-dot, .ar-status-dot.ar-status-unmatched { background: #ccc; color: #666; }
+.ar-status-matched .ar-status-dot, .ar-status-dot.ar-status-matched { background: #ff9800; }
+.ar-status-verified .ar-status-dot, .ar-status-dot.ar-status-verified { background: #4caf50; }
+
+.ar-sku { font-family: monospace; font-weight: 500; }
+
+.ar-ref-thumb {
+  width: 36px; height: 36px; object-fit: cover; border-radius: 4px; background: #eee;
+}
+
+/* Кнопки в строке таблицы */
+.ar-row-actions { white-space: nowrap; }
+.ar-row-actions button {
+  background: none; border: none; cursor: pointer; padding: 2px 6px;
+  color: #999; font-size: 13px; border-radius: 3px;
+}
+.ar-row-actions button:hover { background: #f0f0f0; color: #333; }
+
+/* ── Блок 2: Сопоставление (двухколоночный layout) ── */
+.ar-matching-layout {
+  display: flex; gap: 16px; min-height: 300px;
+}
+.ar-cards-col, .ar-skus-col {
+  flex: 1; min-width: 0;
+}
+.ar-cards-col h4, .ar-skus-col h4 {
+  font-size: 12px; text-transform: uppercase; color: #999; margin-bottom: 8px;
+  font-weight: 600;
+}
+
+/* Элемент сопоставления (карточка или артикул) */
+.ar-match-item {
+  display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+  border: 1.5px solid #e8e8e8; border-radius: 6px; margin-bottom: 6px;
+  cursor: pointer; transition: border-color 0.15s, background 0.15s;
+}
+.ar-match-item:hover { border-color: #bbb; background: #fafafa; }
+.ar-match-item.ar-selected { border-color: #2196f3; background: #e3f2fd; }
+.ar-match-item.ar-matched { opacity: 0.5; }
+
+.ar-card-thumb {
+  width: 48px; height: 48px; object-fit: cover; border-radius: 4px; background: #eee; flex-shrink: 0;
+}
+.ar-match-info { min-width: 0; flex: 1; }
+.ar-match-num { font-size: 13px; font-weight: 600; }
+.ar-match-cat { font-size: 11px; color: #999; }
+.ar-match-sku { font-size: 11px; color: #2196f3; font-family: monospace; margin-top: 2px; }
+
+/* Кнопка сопоставления */
+.ar-match-btn {
+  display: flex; align-items: center; justify-content: center;
+  padding: 8px; margin-bottom: 12px;
+}
+.ar-match-btn button {
+  padding: 8px 24px; font-size: 13px; font-weight: 600;
+}
+.ar-match-btn button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Кнопка отвязки */
+.ar-unmatch-btn {
+  background: none; border: 1px solid #e57373; color: #e57373; font-size: 11px;
+  padding: 2px 8px; border-radius: 3px; cursor: pointer; margin-left: auto; flex-shrink: 0;
+}
+.ar-unmatch-btn:hover { background: #ffebee; }
+
+/* ── Блок 3: Верификация ── */
+.ar-verify-item {
+  display: flex; align-items: center; gap: 14px; padding: 10px 12px;
+  border: 1.5px solid #e8e8e8; border-radius: 6px; margin-bottom: 6px;
+  cursor: pointer; transition: border-color 0.15s, background 0.15s;
+}
+.ar-verify-item:hover { background: #fafafa; }
+.ar-verify-item.ar-verified { border-color: #4caf50; background: #e8f5e9; }
+
+.ar-verify-ref img, .ar-verify-card img {
+  width: 64px; height: 64px; object-fit: cover; border-radius: 4px; background: #eee;
+}
+.ar-verify-ref, .ar-verify-card { flex-shrink: 0; width: 64px; height: 64px; }
+.ar-verify-info { flex: 1; min-width: 0; }
+.ar-verify-sku { font-size: 14px; font-weight: 600; font-family: monospace; }
+.ar-verify-cat { font-size: 12px; color: #999; }
+.ar-verify-status { font-size: 12px; margin-top: 4px; font-weight: 600; }
+.ar-verified .ar-verify-status { color: #4caf50; }
+
+.ar-verify-toolbar {
+  display: flex; gap: 8px; margin-bottom: 12px; align-items: center;
+}
+.ar-verify-toolbar .ar-verify-progress {
+  font-size: 12px; color: #888; margin-left: auto;
+}
