@@ -1121,17 +1121,18 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
 /* Полоска фото карточки (все слоты) */
 .ar-card-photos {
-  display: flex; gap: 3px; flex-shrink: 0; overflow: hidden; max-width: 240px;
+  display: flex; gap: 3px; flex-shrink: 0; overflow: hidden; max-width: 400px;
 }
 .ar-card-photo {
-  width: 56px; height: 56px; object-fit: cover; border-radius: 3px; background: #eee; flex-shrink: 0;
+  width: 48px; height: 72px; object-fit: contain; border-radius: 3px; background: #f8f8f8; flex-shrink: 0;
 }
 .ar-card-photo-empty {
   display: flex; align-items: center; justify-content: center;
+  width: 48px; height: 72px;
   font-size: 8px; color: #bbb; border: 1px dashed #ddd;
 }
 .ar-card-thumb {
-  width: 48px; height: 48px; object-fit: cover; border-radius: 4px; background: #eee; flex-shrink: 0;
+  width: 44px; height: 68px; object-fit: contain; border-radius: 4px; background: #f8f8f8; flex-shrink: 0;
 }
 .ar-match-info { min-width: 0; flex: 1; }
 .ar-match-num { font-size: 13px; font-weight: 600; }
@@ -1165,9 +1166,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .ar-verify-item.ar-verified { border-color: #4caf50; background: #e8f5e9; }
 
 .ar-verify-ref img, .ar-verify-card img {
-  width: 64px; height: 64px; object-fit: cover; border-radius: 4px; background: #eee;
+  width: 56px; height: 80px; object-fit: contain; border-radius: 4px; background: #f8f8f8;
 }
-.ar-verify-ref, .ar-verify-card { flex-shrink: 0; width: 64px; height: 64px; }
+.ar-verify-ref, .ar-verify-card { flex-shrink: 0; width: 56px; height: 80px; }
 .ar-verify-info { flex: 1; min-width: 0; }
 .ar-verify-sku { font-size: 14px; font-weight: 600; font-family: monospace; }
 .ar-verify-cat { font-size: 12px; color: #999; }
@@ -1184,8 +1185,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 /* ── Референс-фото в таблице чек-листа ── */
 .ar-ref-cell { width: 44px; text-align: center; }
 .ar-ref-thumb {
-  width: 40px; height: 40px; object-fit: cover; border-radius: 3px;
-  background: #f5f5f5; cursor: pointer; border: 1px solid #e0e0e0;
+  width: 36px; height: 52px; object-fit: contain; border-radius: 3px;
+  background: #f8f8f8; cursor: pointer; border: 1px solid #e0e0e0;
   transition: transform 0.15s;
 }
 .ar-ref-thumb:hover { transform: scale(1.15); border-color: #90caf9; }
@@ -1193,8 +1194,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
 /* ── Референс-фото в панели сопоставления ── */
 .ar-sku-ref {
-  width: 48px; height: 48px; object-fit: cover; border-radius: 3px;
-  background: #f5f5f5; flex-shrink: 0; border: 1px solid #e0e0e0;
+  width: 44px; height: 64px; object-fit: contain; border-radius: 3px;
+  background: #f8f8f8; flex-shrink: 0; border: 1px solid #e0e0e0;
 }
 .ar-sku-item { display: flex; align-items: center; gap: 8px; }
 
