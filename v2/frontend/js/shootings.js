@@ -161,6 +161,7 @@ async function createProject() {
         App.projects.push(data);
         App.selectedProject = App.projects.length - 1;
         renderProjects();
+        shAutoSave(); /* Авто-сохранение + синхронизация с облаком */
       }
     } else {
       /* Браузерный фолбэк */
@@ -184,6 +185,7 @@ async function createProject() {
       App.projects.push(proj);
       App.selectedProject = App.projects.length - 1;
       renderProjects();
+      shAutoSave(); /* Авто-сохранение + синхронизация с облаком */
     }
   } catch(e) {
     alert('Ошибка: ' + e);
@@ -403,19 +405,117 @@ var SH_AUTOSAVE_DELAY = 2000;
 /**
  * Запланировать автосохранение (debounce 2 сек).
  * Вызывается после значимых действий: drop фото, удаление, смена этапа и т.д.
- * В browser-режиме сохраняет в localStorage.
- * В desktop-режиме — помечает "не сохранено" (ручное сохранение через кнопку).
+ * Сохраняет в localStorage + автоматически синхронизирует с облаком.
  */
 function shAutoSave() {
   if (_shAutoSaveTimer) clearTimeout(_shAutoSaveTimer);
   _shAutoSaveTimer = setTimeout(function() {
     _shAutoSaveTimer = null;
     _shDoAutoSave();
+
+    /* Авто-синхронизация с облаком (desktop + browser) */
+    shAutoCloudSync();
   }, SH_AUTOSAVE_DELAY);
 
   /* Показать индикатор "не сохранено" */
   shSetSaveStatus('saving');
 }
+
+
+/* ──────────────────────────────────────────────
+   Авто-синхронизация с облаком
+   ──────────────────────────────────────────────
+   Единый flow для desktop и browser:
+   - При каждом shAutoSave → пытаемся синхронизировать с Supabase
+   - Если проект ещё не в облаке (нет _cloudId) → автоматически загружаем
+   - Если нет интернета → сохраняем в localStorage, ставим флаг _pendingSync
+   - При восстановлении интернета → синхронизируем все pending проекты
+   ────────────────────────────────────────────── */
+
+/** @type {boolean} Блокировка: не запускать новый cloud sync пока старый идёт */
+var _shCloudSyncRunning = false;
+
+/**
+ * Автоматическая синхронизация активного проекта с облаком.
+ * Вызывается после каждого автосохранения в localStorage.
+ */
+function shAutoCloudSync() {
+  if (_shCloudSyncRunning) return;
+  if (typeof sbIsLoggedIn !== 'function' || !sbIsLoggedIn()) return;
+
+  var proj = getActiveProject();
+  if (!proj) return;
+
+  /* Проект ещё не в облаке — загружаем впервые */
+  if (!proj._cloudId) {
+    _shCloudSyncRunning = true;
+    console.log('cloud-sync: первичная загрузка "' + proj.brand + '" в облако...');
+    sbUploadProject(App.selectedProject, function(err, cloudId) {
+      _shCloudSyncRunning = false;
+      if (err) {
+        console.warn('cloud-sync: ошибка загрузки:', err);
+        proj._pendingSync = true; /* пометить для повторной попытки */
+      } else {
+        proj._pendingSync = false;
+        console.log('cloud-sync: проект загружен, cloudId:', cloudId);
+      }
+    });
+    return;
+  }
+
+  /* Проект уже в облаке — лёгкая синхронизация карточек */
+  if (typeof sbAutoSyncCards === 'function') {
+    sbAutoSyncCards();
+  }
+}
+
+/**
+ * Синхронизировать все проекты с флагом _pendingSync.
+ * Вызывается при восстановлении интернета.
+ */
+function shSyncPendingProjects() {
+  if (typeof sbIsLoggedIn !== 'function' || !sbIsLoggedIn()) return;
+
+  for (var i = 0; i < App.projects.length; i++) {
+    var proj = App.projects[i];
+    if (!proj._pendingSync) continue;
+
+    if (!proj._cloudId) {
+      /* Первичная загрузка */
+      (function(idx) {
+        sbUploadProject(idx, function(err) {
+          if (!err) {
+            App.projects[idx]._pendingSync = false;
+            console.log('cloud-sync: pending проект загружен:', App.projects[idx].brand);
+          }
+        });
+      })(i);
+    } else {
+      /* Синхронизация карточек */
+      (function(p) {
+        sbSyncCardsLight(p._cloudId, p.cards || [], function(err) {
+          if (!err) {
+            p._pendingSync = false;
+            console.log('cloud-sync: pending карточки синхронизированы:', p.brand);
+          }
+        });
+      })(proj);
+    }
+  }
+}
+
+/* Слушатель: при восстановлении интернета — синхронизировать pending */
+window.addEventListener('online', function() {
+  console.log('cloud-sync: интернет восстановлен, синхронизируем...');
+  shSyncPendingProjects();
+});
+
+/* Слушатель: при потере интернета — пометить */
+window.addEventListener('offline', function() {
+  console.log('cloud-sync: интернет потерян, работаем в оффлайн-режиме');
+  var statusEl = document.getElementById('cloud-status');
+  if (statusEl) statusEl.textContent = 'Оффлайн';
+});
 
 /** @type {string} localStorage key prefix для превью проекта */
 var SH_PREVIEWS_KEY_PREFIX = 'maketcp_pv_';
