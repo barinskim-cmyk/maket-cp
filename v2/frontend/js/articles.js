@@ -1891,18 +1891,23 @@ function _arGetCardImages(card, pvByName) {
 function _arMatchOneCard(cardIdx, cardImgs, category, candidates, apiKey, onDone) {
   var cands = candidates;
 
-  /* Промпт: фокус на крупном плане, без категории */
-  var promptText = 'TASK: Match a product from photoshoot to its catalog reference.\n\n'
-    + 'PHOTOSHOOT: ' + cardImgs.length + ' photos. The FIRST photo is a CLOSE-UP — it shows the target product best.\n'
-    + 'The photos may show a styled outfit with multiple items. Identify which SPECIFIC item is the subject '
-    + 'by looking at the close-up: whatever item fills most of the close-up frame is the target.\n\n'
-    + 'CATALOG REFERENCES (this batch):\n';
+  /* Промпт: анализ всех фото, определение предмета */
+  var promptText = 'TASK: Match a product from a photoshoot to its catalog reference.\n\n'
+    + 'PHOTOSHOOT CARD: ' + cardImgs.length + ' photos from the same product card.\n'
+    + 'These photos may include close-ups, detail shots, and full-body model shots.\n'
+    + 'The card is about ONE specific product. To identify it:\n'
+    + '- If there is a close-up: the close-up shows the target product.\n'
+    + '- If all photos are full-body/model shots: look at what product is highlighted, '
+    + 'or what item appears consistently across all angles. The product may be shoes, a bag, '
+    + 'clothing, glasses, jewelry, or any accessory.\n'
+    + '- A single card is always about ONE product, even if the model wears an entire outfit.\n\n'
+    + 'CATALOG REFERENCES (batch ' + (cands.length) + ' items):\n';
   for (var i = 0; i < cands.length; i++) {
     promptText += '- A' + (i + 1) + ': "' + cands[i].sku + '"\n';
   }
-  promptText += '\nCompare the close-up product to each reference photo.\n'
-    + 'Key details: shape, silhouette, color, material, texture, hardware (buckles, clasps, zippers), heel shape, sole, stitching, logo placement.\n'
-    + 'Return JSON: {"match": "A3", "confidence": "high|medium|low"} or {"match": null} if none match this batch.';
+  promptText += '\nCompare the target product to each reference.\n'
+    + 'Key details: shape, silhouette, color, material, texture, hardware, heel type, sole, stitching, logo.\n'
+    + 'Return JSON: {"match": "A3", "confidence": "high|medium|low"} or {"match": null} if none in this batch.';
 
   var msgContent = [];
   msgContent.push({ type: 'text', text: promptText });
