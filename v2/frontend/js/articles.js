@@ -845,32 +845,62 @@ function _arAutoMatchIfReady(proj) {
   }
   if (!hasUnmatched) return;
 
-  /* Ключ может ещё загружаться (async). Ждём до 5 сек с проверкой каждые 500ms */
+  /* Ключ может ещё загружаться (async) или pywebview ещё не готов.
+     Активно пытаемся загрузить ключ при каждой попытке. */
   var attempts = 0;
-  var maxAttempts = 10;
+  var maxAttempts = 12;
   var statusEl = document.getElementById('ar-stats');
 
-  function checkAndRun() {
-    var key = _arGetOpenAIKey();
+  function tryLoadAndRun() {
     attempts++;
-    if (statusEl) statusEl.textContent = 'Жду ключ OpenAI... (попытка ' + attempts + '/' + maxAttempts + ')';
-    console.log('articles.js: checkAndRun #' + attempts + ', key=' + (key ? 'YES (' + key.substr(0, 12) + '...)' : 'NO'));
+    var key = _arGetOpenAIKey();
 
+    /* Если ключа нет — активно пытаемся загрузить через бэкенд */
+    if (!key && window.pywebview && window.pywebview.api && window.pywebview.api.get_config_value) {
+      if (statusEl) statusEl.textContent = 'Загружаю ключ OpenAI... (попытка ' + attempts + ')';
+      console.log('articles.js: tryLoadAndRun #' + attempts + ' — вызываю get_config_value');
+      window.pywebview.api.get_config_value('openai_api_key').then(function(val) {
+        if (val) {
+          _arOpenAIKey = val;
+          console.log('articles.js: ключ загружен! ' + val.substr(0, 12) + '...');
+          if (statusEl) statusEl.textContent = 'AI расставляет артикулы...';
+          arAutoMatchAll();
+        } else {
+          console.log('articles.js: get_config_value вернул пустое значение');
+          retryOrGiveUp();
+        }
+      }).catch(function(e) {
+        console.log('articles.js: get_config_value ошибка:', e);
+        retryOrGiveUp();
+      });
+      return;
+    }
+
+    /* Ключ уже есть — запускаем */
     if (key) {
+      console.log('articles.js: ключ уже загружен, запускаю AI');
       if (statusEl) statusEl.textContent = 'AI расставляет артикулы...';
       arAutoMatchAll();
       return;
     }
+
+    /* pywebview ещё не готов — ждём */
+    if (statusEl) statusEl.textContent = 'Жду pywebview... (попытка ' + attempts + ')';
+    console.log('articles.js: tryLoadAndRun #' + attempts + ' — pywebview not ready');
+    retryOrGiveUp();
+  }
+
+  function retryOrGiveUp() {
     if (attempts < maxAttempts) {
-      setTimeout(checkAndRun, 500);
+      setTimeout(tryLoadAndRun, 500);
     } else {
-      if (statusEl) statusEl.textContent = 'Ключ OpenAI не найден. Нажмите "Расставить (AI)" вручную.';
-      console.log('articles.js: ключ OpenAI не найден после ' + maxAttempts + ' попыток');
+      if (statusEl) statusEl.textContent = 'Ключ OpenAI не найден. Проверьте config.json';
+      console.log('articles.js: ключ не найден после ' + maxAttempts + ' попыток');
     }
   }
 
-  /* Небольшая задержка чтобы UI отрендерился */
-  setTimeout(checkAndRun, 500);
+  /* Первая попытка через 1 секунду (дать pywebview инициализироваться) */
+  setTimeout(tryLoadAndRun, 1000);
 }
 
 
