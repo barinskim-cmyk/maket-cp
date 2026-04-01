@@ -169,48 +169,72 @@ function arLoadChecklist() {
 
   var input = document.createElement('input');
   input.type = 'file';
-  input.accept = '.json,.csv,.tsv,.txt';
+  input.accept = '.json,.csv,.tsv,.txt,.xlsx,.xls,.pdf';
   input.onchange = function(e) {
     var file = e.target.files[0];
     if (!file) return;
-    var reader = new FileReader();
-    reader.onload = function(ev) {
+    var ext = (file.name.split('.').pop() || '').toLowerCase();
+
+    /* PDF — асинхронный парсинг через pdf.js */
+    if (ext === 'pdf') {
+      _arParsePdf(file, function(articles) {
+        _arApplyLoaded(proj, articles, file.name);
+      });
+      return;
+    }
+
+    /* Excel — бинарный парсинг через SheetJS */
+    if (ext === 'xlsx' || ext === 'xls') {
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        var articles = _arParseXlsx(ev.target.result);
+        _arApplyLoaded(proj, articles, file.name);
+      };
+      reader.readAsArrayBuffer(file);
+      return;
+    }
+
+    /* JSON / CSV / TXT — текстовый парсинг */
+    var reader2 = new FileReader();
+    reader2.onload = function(ev) {
       var text = ev.target.result;
-      var articles = null;
-      var ext = (file.name.split('.').pop() || '').toLowerCase();
-
-      if (ext === 'json') {
-        articles = _arParseJson(text);
-      } else {
-        articles = _arParseCsvTxt(text);
-      }
-
-      if (!articles || articles.length === 0) {
-        alert('Не удалось распознать артикулы в файле.\n\nПоддерживаемые форматы:\n- JSON: [{sku, category, color}]\n- CSV/TXT: строки с артикулами (разделитель: tab, ; или ,)');
-        return;
-      }
-
-      /* Спросить: заменить или добавить */
-      var mode = 'replace';
-      if (proj.articles && proj.articles.length > 0) {
-        mode = confirm('Уже загружено ' + proj.articles.length + ' артикулов.\n\nОК = заменить все\nОтмена = добавить к существующим') ? 'replace' : 'append';
-      }
-
-      if (mode === 'replace') {
-        proj.articles = articles;
-      } else {
-        proj.articles = (proj.articles || []).concat(articles);
-      }
-
-      arRenderChecklist();
-      arRenderMatching();
-      arUpdateStats();
-      if (typeof shAutoSave === 'function') shAutoSave();
-      console.log('articles.js: загружено ' + articles.length + ' артикулов из ' + file.name);
+      var articles = (ext === 'json') ? _arParseJson(text) : _arParseCsvTxt(text);
+      _arApplyLoaded(proj, articles, file.name);
     };
-    reader.readAsText(file);
+    reader2.readAsText(file);
   };
   input.click();
+}
+
+
+/**
+ * Применить загруженные артикулы к проекту.
+ * Общая логика для всех форматов: проверка, выбор режима, рендер.
+ */
+function _arApplyLoaded(proj, articles, fileName) {
+  if (!articles || articles.length === 0) {
+    alert('Не удалось распознать артикулы в файле "' + fileName + '".\n\nПоддерживаемые форматы:\n- Excel (.xlsx)\n- PDF (таблица с артикулами)\n- JSON: [{sku, category, color}]\n- CSV/TXT: строки с разделителями');
+    return;
+  }
+
+  /* Спросить: заменить или добавить */
+  var mode = 'replace';
+  if (proj.articles && proj.articles.length > 0) {
+    mode = confirm('Уже загружено ' + proj.articles.length + ' артикулов.\nНайдено ' + articles.length + ' новых.\n\nОК = заменить все\nОтмена = добавить к существующим') ? 'replace' : 'append';
+  }
+
+  if (mode === 'replace') {
+    proj.articles = articles;
+  } else {
+    proj.articles = (proj.articles || []).concat(articles);
+  }
+
+  arRenderChecklist();
+  arRenderMatching();
+  arRenderVerification();
+  arUpdateStats();
+  if (typeof shAutoSave === 'function') shAutoSave();
+  console.log('articles.js: загружено ' + articles.length + ' артикулов из ' + fileName);
 }
 
 
@@ -306,6 +330,219 @@ function _arParseCsvTxt(text) {
       cardIdx: -1
     });
   }
+  return articles.length > 0 ? articles : null;
+}
+
+
+/**
+ * Парсинг Excel-файла (.xlsx / .xls) через SheetJS.
+ * Ищет колонку с артикулами по заголовку (sku, article, артикул, наименование, код).
+ * Если заголовок не найден — берёт первую колонку.
+ * @param {ArrayBuffer} data — содержимое файла
+ * @returns {Array|null} массив Article-объектов или null
+ */
+function _arParseXlsx(data) {
+  if (typeof XLSX === 'undefined') {
+    alert('Библиотека SheetJS не загружена. Проверьте интернет-соединение.');
+    return null;
+  }
+  try {
+    var workbook = XLSX.read(data, { type: 'array' });
+    var sheetName = workbook.SheetNames[0];
+    var sheet = workbook.Sheets[sheetName];
+
+    /* Конвертируем в массив массивов (включая заголовок) */
+    var rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+    if (!rows || rows.length < 2) return null;
+
+    /* Ищем колонку-артикул по заголовку */
+    var headerRow = rows[0];
+    var skuCol = -1, catCol = -1, colorCol = -1;
+    for (var h = 0; h < headerRow.length; h++) {
+      var hdr = String(headerRow[h]).toLowerCase().trim();
+      if (skuCol < 0 && (hdr === 'sku' || hdr === 'article' || hdr === 'артикул' ||
+          hdr === 'artikul' || hdr === 'код' || hdr === 'code' || hdr === 'name' ||
+          hdr === 'наименование' || hdr.indexOf('артикул') >= 0 || hdr.indexOf('sku') >= 0)) {
+        skuCol = h;
+      }
+      if (catCol < 0 && (hdr === 'category' || hdr === 'категория' || hdr === 'cat' ||
+          hdr === 'тип' || hdr === 'type' || hdr === 'группа' || hdr === 'group')) {
+        catCol = h;
+      }
+      if (colorCol < 0 && (hdr === 'color' || hdr === 'цвет' || hdr === 'colour')) {
+        colorCol = h;
+      }
+    }
+
+    /* Если заголовок не найден — первая колонка = артикул */
+    var startRow = 1; /* пропускаем заголовок */
+    if (skuCol < 0) {
+      skuCol = 0;
+      /* Может быть без заголовка — проверяем: если первая строка похожа на артикул */
+      var firstVal = String(rows[0][0] || '').trim();
+      if (firstVal && firstVal.length > 2 && !firstVal.match(/^(sku|article|артикул|код|name)/i)) {
+        startRow = 0; /* нет заголовка, начинаем с первой строки */
+      }
+    }
+
+    var articles = [];
+    for (var i = startRow; i < rows.length; i++) {
+      var row = rows[i];
+      var sku = String(row[skuCol] || '').trim();
+      if (!sku) continue;
+
+      articles.push({
+        id: 'ar_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+        sku: sku,
+        category: catCol >= 0 ? String(row[catCol] || '').trim() : '',
+        color: colorCol >= 0 ? String(row[colorCol] || '').trim() : '',
+        refImage: '',
+        status: 'unmatched',
+        cardIdx: -1
+      });
+    }
+    console.log('articles.js: Excel parsed, sheet "' + sheetName + '", ' + articles.length + ' rows, skuCol=' + skuCol);
+    return articles.length > 0 ? articles : null;
+  } catch(e) {
+    console.error('articles.js: Excel parse error:', e);
+    return null;
+  }
+}
+
+
+/**
+ * Парсинг PDF-файла через pdf.js.
+ * Извлекает текст со всех страниц, ищет строки похожие на артикулы.
+ * @param {File} file — PDF файл
+ * @param {function} callback — callback(articles)
+ */
+function _arParsePdf(file, callback) {
+  if (typeof pdfjsLib === 'undefined') {
+    alert('Библиотека PDF.js не загружена. Проверьте интернет-соединение.');
+    callback(null);
+    return;
+  }
+
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    var data = new Uint8Array(ev.target.result);
+    pdfjsLib.getDocument({ data: data }).promise.then(function(pdf) {
+      var allText = [];
+      var pagesLeft = pdf.numPages;
+
+      /* Извлечь текст со всех страниц */
+      for (var p = 1; p <= pdf.numPages; p++) {
+        (function(pageNum) {
+          pdf.getPage(pageNum).then(function(page) {
+            page.getTextContent().then(function(content) {
+              /* Собрать строки, группируя по Y-координатам (строки таблицы) */
+              var lines = {};
+              for (var k = 0; k < content.items.length; k++) {
+                var item = content.items[k];
+                var y = Math.round(item.transform[5]); /* Y координата */
+                if (!lines[y]) lines[y] = [];
+                lines[y].push({ x: item.transform[4], text: item.str });
+              }
+
+              /* Сортируем строки по Y (сверху вниз = убывание Y) */
+              var yKeys = Object.keys(lines).sort(function(a, b) { return b - a; });
+              for (var li = 0; li < yKeys.length; li++) {
+                /* Сортируем ячейки в строке по X (слева направо) */
+                var cells = lines[yKeys[li]].sort(function(a, b) { return a.x - b.x; });
+                var lineText = cells.map(function(c) { return c.text.trim(); }).filter(function(t) { return t; });
+                if (lineText.length > 0) {
+                  allText.push({ page: pageNum, cells: lineText, raw: lineText.join('\t') });
+                }
+              }
+              pagesLeft--;
+              if (pagesLeft === 0) {
+                /* Все страницы обработаны — парсим артикулы */
+                var articles = _arExtractFromPdfLines(allText);
+                callback(articles);
+              }
+            });
+          });
+        })(p);
+      }
+    }).catch(function(e) {
+      console.error('articles.js: PDF parse error:', e);
+      alert('Ошибка чтения PDF: ' + e.message);
+      callback(null);
+    });
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+
+/**
+ * Извлечь артикулы из распарсенных строк PDF.
+ * Ищет заголовок (sku, артикул, код), определяет колонку, парсит строки.
+ * @param {Array} lines — [{page, cells: [string], raw: string}]
+ * @returns {Array|null}
+ */
+function _arExtractFromPdfLines(lines) {
+  if (!lines || lines.length === 0) return null;
+
+  /* Ищем строку-заголовок */
+  var skuCol = -1, catCol = -1, colorCol = -1;
+  var headerIdx = -1;
+
+  for (var i = 0; i < Math.min(lines.length, 20); i++) {
+    var cells = lines[i].cells;
+    for (var c = 0; c < cells.length; c++) {
+      var val = cells[c].toLowerCase();
+      if (skuCol < 0 && (val.indexOf('артикул') >= 0 || val.indexOf('sku') >= 0 ||
+          val.indexOf('article') >= 0 || val.indexOf('код') >= 0 || val === 'code')) {
+        skuCol = c;
+        headerIdx = i;
+      }
+      if (catCol < 0 && (val.indexOf('категория') >= 0 || val.indexOf('category') >= 0 ||
+          val.indexOf('группа') >= 0 || val.indexOf('тип') >= 0)) {
+        catCol = c;
+      }
+      if (colorCol < 0 && (val.indexOf('цвет') >= 0 || val.indexOf('color') >= 0)) {
+        colorCol = c;
+      }
+    }
+    if (headerIdx >= 0) break;
+  }
+
+  /* Если заголовок не найден — берём всё как список артикулов (первая ячейка каждой строки) */
+  var startIdx = 0;
+  if (headerIdx >= 0) {
+    startIdx = headerIdx + 1;
+  } else {
+    skuCol = 0;
+  }
+
+  var articles = [];
+  var seen = {}; /* дедупликация */
+  for (var j = startIdx; j < lines.length; j++) {
+    var rowCells = lines[j].cells;
+    if (!rowCells || rowCells.length === 0) continue;
+
+    var sku = (skuCol >= 0 && skuCol < rowCells.length) ? rowCells[skuCol].trim() : rowCells[0].trim();
+    if (!sku || sku.length < 2) continue;
+
+    /* Пропускаем строки-заголовки страниц (повторы) */
+    if (sku.toLowerCase().indexOf('артикул') >= 0 || sku.toLowerCase().indexOf('sku') >= 0) continue;
+
+    /* Дедупликация */
+    if (seen[sku]) continue;
+    seen[sku] = true;
+
+    articles.push({
+      id: 'ar_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+      sku: sku,
+      category: (catCol >= 0 && catCol < rowCells.length) ? rowCells[catCol].trim() : '',
+      color: (colorCol >= 0 && colorCol < rowCells.length) ? rowCells[colorCol].trim() : '',
+      refImage: '',
+      status: 'unmatched',
+      cardIdx: -1
+    });
+  }
+
+  console.log('articles.js: PDF parsed, ' + articles.length + ' articles from ' + lines.length + ' lines');
   return articles.length > 0 ? articles : null;
 }
 
