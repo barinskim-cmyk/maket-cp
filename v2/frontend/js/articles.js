@@ -973,17 +973,26 @@ function arAddManual() {
 
 /* ──────────────────────────────────────────────
    Блок 2: Сопоставление артикулов с карточками
+   Новый UX: единый список — карточка | артикул (или выбор)
    ────────────────────────────────────────────── */
 
 /**
- * Отрисовать панель сопоставления: карточки слева, артикулы справа.
- * Клик на карточку + клик на артикул = привязка.
+ * Отрисовать панель сопоставления.
+ * Каждая карточка — одна строка: фото | номер | привязанный артикул или выпадающий список.
  */
 function arRenderMatching() {
   var proj = getActiveProject();
   if (!proj) return;
 
-  /* Построить карту превью по имени файла для быстрого поиска */
+  var listEl = document.getElementById('ar-match-list');
+  if (!listEl) return;
+
+  if (!proj.cards || proj.cards.length === 0) {
+    listEl.innerHTML = '<div class="empty-state">Нет карточек. Перейдите на вкладку "Контент".</div>';
+    return;
+  }
+
+  /* Построить карту превью */
   var pvByName = {};
   if (proj.previews) {
     for (var pi = 0; pi < proj.previews.length; pi++) {
@@ -991,136 +1000,377 @@ function arRenderMatching() {
     }
   }
 
-  /* Карточки (слева) — показываем все фото из слотов */
-  var cardsEl = document.getElementById('ar-cards-list');
-  if (cardsEl) {
-    if (!proj.cards || proj.cards.length === 0) {
-      cardsEl.innerHTML = '<div class="empty-state">Нет карточек. Перейдите на вкладку "Контент".</div>';
-    } else {
-      var html = '';
-      for (var c = 0; c < proj.cards.length; c++) {
-        var card = proj.cards[c];
-        /* Найти привязанный артикул */
-        var linkedSku = '';
-        var linkedIdx = -1;
-        for (var a = 0; a < (proj.articles || []).length; a++) {
-          if (proj.articles[a].cardIdx === c) {
-            linkedSku = proj.articles[a].sku;
-            linkedIdx = a;
-            break;
-          }
-        }
-        var sel = (_arSelectedCard === c) ? ' ar-selected' : '';
-        var matchedCls = linkedSku ? ' ar-matched' : '';
-
-        html += '<div class="ar-match-item ar-card-item' + sel + matchedCls + '" onclick="arSelectCard(' + c + ')">';
-
-        /* Кнопка просмотра крупно */
-        html += '<button class="ar-zoom-btn" onclick="event.stopPropagation();arPreviewCard(' + c + ')" title="Увеличить">+</button>';
-
-        /* Фото-полоска: все слоты карточки */
-        html += '<div class="ar-card-photos">';
-        if (card.slots) {
-          var maxPhotos = Math.min(card.slots.length, 3);
-          for (var si = 0; si < maxPhotos; si++) {
-            var slot = card.slots[si];
-            var imgSrc = slot.dataUrl || slot.thumbUrl || '';
-            /* Если нет URL в слоте — попробовать найти в превью по file_name */
-            if (!imgSrc && slot.file && pvByName[slot.file]) {
-              var pv = pvByName[slot.file];
-              imgSrc = pv.thumb || pv.preview || '';
-            }
-            if (imgSrc) {
-              html += '<img class="ar-card-photo" src="' + imgSrc + '">';
-            } else if (slot.file) {
-              html += '<div class="ar-card-photo ar-card-photo-empty">' + esc(slot.file.substr(0, 8)) + '</div>';
-            }
-          }
-        }
-        html += '</div>';
-
-        /* Инфо: номер + привязанный артикул */
-        html += '<div class="ar-match-info">';
-        html += '<div class="ar-match-num">Карточка ' + (c + 1) + '</div>';
-        if (linkedSku) {
-          html += '<div class="ar-match-sku">' + esc(linkedSku) + '</div>';
-          html += '<button class="ar-unmatch-btn" onclick="event.stopPropagation();arUnmatch(' + linkedIdx + ')">Отвязать</button>';
-        }
-        html += '</div></div>';
-      }
-      cardsEl.innerHTML = html;
-    }
+  /* Собрать список незакреплённых артикулов для выпадающего списка */
+  var freeArts = [];
+  for (var fa = 0; fa < (proj.articles || []).length; fa++) {
+    if (proj.articles[fa].cardIdx < 0) freeArts.push(fa);
   }
 
-  /* Артикулы (справа) — только несопоставленные сверху, потом сопоставленные */
-  var skusEl = document.getElementById('ar-skus-list');
-  if (skusEl) {
-    if (!proj.articles || proj.articles.length === 0) {
-      skusEl.innerHTML = '<div class="empty-state">Загрузите чек-лист</div>';
-    } else {
-      var html2 = '';
-      /* Сначала несопоставленные */
-      for (var s = 0; s < proj.articles.length; s++) {
-        var art2 = proj.articles[s];
-        if (art2.cardIdx >= 0) continue;
-        var sel2 = (_arSelectedSku === s) ? ' ar-selected' : '';
-        html2 += '<div class="ar-match-item ar-sku-item' + sel2 + '" onclick="arSelectSku(' + s + ')">';
-        /* Референс-фото из каталога (если есть) */
-        if (art2.refImage) {
-          html2 += '<img class="ar-sku-ref" src="' + art2.refImage + '" alt="ref">';
-        }
-        html2 += '<div class="ar-match-info">';
-        html2 += '<div class="ar-match-sku">' + esc(art2.sku) + '</div>';
-        if (art2.category) html2 += '<div class="ar-match-cat">' + esc(art2.category) + '</div>';
-        html2 += '</div></div>';
+  var html = '';
+  for (var c = 0; c < proj.cards.length; c++) {
+    var card = proj.cards[c];
+
+    /* Найти привязанный артикул */
+    var linkedArt = null;
+    var linkedIdx = -1;
+    for (var a = 0; a < (proj.articles || []).length; a++) {
+      if (proj.articles[a].cardIdx === c) {
+        linkedArt = proj.articles[a];
+        linkedIdx = a;
+        break;
       }
-      /* Потом сопоставленные (серые) */
-      for (var s2 = 0; s2 < proj.articles.length; s2++) {
-        var art3 = proj.articles[s2];
-        if (art3.cardIdx < 0) continue;
-        var cardNum = art3.cardIdx + 1;
-        html2 += '<div class="ar-match-item ar-sku-item ar-matched">';
-        /* Референс-фото */
-        if (art3.refImage) {
-          html2 += '<img class="ar-sku-ref" src="' + art3.refImage + '" alt="ref">';
-        }
-        html2 += '<div class="ar-match-info">';
-        html2 += '<div class="ar-match-sku">' + esc(art3.sku) + '</div>';
-        html2 += '<div class="ar-match-cat">-> Карточка ' + cardNum + '</div>';
-        html2 += '</div></div>';
-      }
-      skusEl.innerHTML = html2;
     }
+
+    var matchedCls = linkedArt ? ' ar-row-matched' : '';
+    html += '<div class="ar-match-row' + matchedCls + '">';
+
+    /* Левая часть: фото карточки */
+    html += '<div class="ar-match-card">';
+    html += '<button class="ar-zoom-btn" onclick="arPreviewCard(' + c + ')" title="Увеличить">+</button>';
+    html += '<div class="ar-card-photos">';
+    if (card.slots) {
+      var maxPhotos = Math.min(card.slots.length, 3);
+      for (var si = 0; si < maxPhotos; si++) {
+        var slot = card.slots[si];
+        var imgSrc = slot.dataUrl || slot.thumbUrl || '';
+        if (!imgSrc && slot.file && pvByName[slot.file]) {
+          var pv = pvByName[slot.file];
+          imgSrc = pv.thumb || pv.preview || '';
+        }
+        if (imgSrc) {
+          html += '<img class="ar-card-photo" src="' + imgSrc + '">';
+        } else if (slot.file) {
+          html += '<div class="ar-card-photo ar-card-photo-empty">' + esc(slot.file.substr(0, 8)) + '</div>';
+        }
+      }
+    }
+    html += '</div>';
+    html += '<div class="ar-match-num">Карточка ' + (c + 1) + '</div>';
+    html += '</div>';
+
+    /* Стрелка */
+    html += '<div class="ar-match-arrow">&rarr;</div>';
+
+    /* Правая часть: привязанный артикул ИЛИ выпадающий список */
+    html += '<div class="ar-match-article">';
+    if (linkedArt) {
+      /* Показать привязанный артикул с refImage */
+      if (linkedArt.refImage) {
+        html += '<img class="ar-sku-ref" src="' + linkedArt.refImage + '" alt="ref" onclick="arShowRefImage(' + linkedIdx + ')">';
+      }
+      html += '<div class="ar-match-art-info">';
+      html += '<div class="ar-match-sku">' + esc(linkedArt.sku) + '</div>';
+      if (linkedArt.category) html += '<div class="ar-match-cat">' + esc(linkedArt.category) + '</div>';
+      html += '</div>';
+      html += '<button class="ar-unmatch-btn" onclick="arUnmatch(' + linkedIdx + ')" title="Отвязать">x</button>';
+    } else {
+      /* Выпадающий список незакреплённых артикулов */
+      html += '<select class="ar-match-select" onchange="arMatchFromSelect(this,' + c + ')">';
+      html += '<option value="">-- выбрать артикул --</option>';
+      for (var fi = 0; fi < freeArts.length; fi++) {
+        var fArt = proj.articles[freeArts[fi]];
+        html += '<option value="' + freeArts[fi] + '">' + esc(fArt.sku);
+        if (fArt.category) html += ' (' + esc(fArt.category) + ')';
+        html += '</option>';
+      }
+      html += '</select>';
+      /* Кнопка AI-поиска для этой карточки */
+      html += '<button class="ar-ai-find-btn" onclick="arAIFindForCard(' + c + ')" title="AI найдёт подходящий артикул">Найти (AI)</button>';
+    }
+    html += '</div>';
+
+    html += '</div>'; /* ar-match-row */
   }
+
+  listEl.innerHTML = html;
 }
 
 
 /**
- * Выбрать карточку для сопоставления.
- * Если артикул уже выбран — привязать.
+ * Привязать артикул из выпадающего списка.
  */
-function arSelectCard(idx) {
-  _arSelectedCard = idx;
-  if (_arSelectedSku !== null) {
-    arDoMatch(_arSelectedSku, _arSelectedCard);
-    _arSelectedSku = null;
-    _arSelectedCard = null;
-  }
-  arRenderMatching();
+function arMatchFromSelect(selectEl, cardIdx) {
+  var skuIdx = parseInt(selectEl.value, 10);
+  if (isNaN(skuIdx) || skuIdx < 0) return;
+  arDoMatch(skuIdx, cardIdx);
 }
 
+
 /**
- * Выбрать артикул для сопоставления.
- * Если карточка уже выбрана — привязать.
+ * AI-поиск артикула для одной карточки.
+ * Отправляет фото карточки + все незакреплённые refImage в OpenAI.
  */
-function arSelectSku(idx) {
-  _arSelectedSku = idx;
-  if (_arSelectedCard !== null) {
-    arDoMatch(_arSelectedSku, _arSelectedCard);
-    _arSelectedSku = null;
-    _arSelectedCard = null;
+function arAIFindForCard(cardIdx) {
+  var proj = getActiveProject();
+  if (!proj) return;
+
+  var apiKey = localStorage.getItem('openai_api_key') || '';
+  if (!apiKey) {
+    alert('Нужен ключ OpenAI. Нажмите "API Key".');
+    return;
   }
-  arRenderMatching();
+
+  /* Построить карту превью */
+  var pvByName = {};
+  if (proj.previews) {
+    for (var pi = 0; pi < proj.previews.length; pi++) {
+      pvByName[proj.previews[pi].name] = proj.previews[pi];
+    }
+  }
+
+  /* Фото карточки (первое непустое) */
+  var card = proj.cards[cardIdx];
+  var cardImg = '';
+  if (card && card.slots) {
+    for (var si = 0; si < card.slots.length; si++) {
+      var slot = card.slots[si];
+      cardImg = slot.dataUrl || slot.thumbUrl || '';
+      if (!cardImg && slot.file && pvByName[slot.file]) {
+        var pv = pvByName[slot.file];
+        cardImg = pv.thumb || pv.preview || '';
+      }
+      if (cardImg) break;
+    }
+  }
+  if (!cardImg) { alert('У карточки нет фото.'); return; }
+
+  /* Незакреплённые артикулы с refImage */
+  var candidates = [];
+  for (var a = 0; a < (proj.articles || []).length; a++) {
+    var art = proj.articles[a];
+    if (art.cardIdx >= 0) continue;
+    if (!art.refImage) continue;
+    candidates.push({ idx: a, sku: art.sku, refImage: art.refImage });
+  }
+  if (candidates.length === 0) {
+    alert('Нет артикулов с референс-фото для сравнения.');
+    return;
+  }
+
+  /* Статус */
+  var statusEl = document.getElementById('ar-stats');
+  if (statusEl) statusEl.textContent = 'AI: ищу артикул для карточки ' + (cardIdx + 1) + '...';
+
+  /* Формируем запрос */
+  var msgContent = [];
+  var promptText = 'I have a photoshoot photo of a product (CARD). '
+    + 'Below are ' + candidates.length + ' catalog reference photos of different products (labeled A1, A2, etc.).\n\n'
+    + 'Which catalog photo shows the SAME product as the CARD photo?\n'
+    + 'Compare product shape, style, color, silhouette.\n\n'
+    + 'Catalog articles:\n';
+  for (var ci = 0; ci < candidates.length; ci++) {
+    promptText += '- A' + (ci + 1) + ': "' + candidates[ci].sku + '"\n';
+  }
+  promptText += '\nReturn ONLY JSON: {"match": "A3", "confidence": "high"}\n'
+    + 'Or if no match: {"match": null}\n'
+    + 'Do NOT include any text before or after the JSON.';
+
+  msgContent.push({ type: 'text', text: promptText });
+
+  /* Фото карточки */
+  msgContent.push({ type: 'text', text: '--- CARD (photoshoot) ---' });
+  var cardUrl = cardImg;
+  if (cardUrl.indexOf('data:') !== 0 && cardUrl.indexOf('http') !== 0) {
+    cardUrl = 'data:image/jpeg;base64,' + cardUrl;
+  }
+  msgContent.push({ type: 'image_url', image_url: { url: cardUrl, detail: 'low' } });
+
+  /* Фото артикулов */
+  for (var ai = 0; ai < candidates.length; ai++) {
+    msgContent.push({ type: 'text', text: '--- A' + (ai + 1) + ': ' + candidates[ai].sku + ' ---' });
+    msgContent.push({ type: 'image_url', image_url: { url: candidates[ai].refImage, detail: 'low' } });
+  }
+
+  var body = {
+    model: 'gpt-4o',
+    messages: [{ role: 'user', content: msgContent }],
+    max_tokens: 200,
+    temperature: 0.1
+  };
+
+  var xhr = new XMLHttpRequest();
+  xhr.open('POST', 'https://api.openai.com/v1/chat/completions', true);
+  xhr.setRequestHeader('Content-Type', 'application/json');
+  xhr.setRequestHeader('Authorization', 'Bearer ' + apiKey);
+  xhr.timeout = 60000;
+
+  xhr.onload = function() {
+    if (statusEl) statusEl.textContent = '';
+    if (xhr.status !== 200) {
+      var errMsg = 'OpenAI ошибка ' + xhr.status;
+      try { errMsg = JSON.parse(xhr.responseText).error.message; } catch(e) {}
+      alert(errMsg);
+      return;
+    }
+    try {
+      var resp = JSON.parse(xhr.responseText);
+      var text = resp.choices[0].message.content.trim();
+      var jsonMatch = text.match(/\{[\s\S]*\}/);
+      var result = JSON.parse(jsonMatch ? jsonMatch[0] : text);
+
+      if (result.match) {
+        var artNum = parseInt(String(result.match).replace(/\D/g, ''), 10);
+        var cand = candidates[artNum - 1];
+        if (cand) {
+          arDoMatch(cand.idx, cardIdx);
+          return;
+        }
+      }
+      alert('AI не нашёл подходящий артикул для карточки ' + (cardIdx + 1) + '. Выберите вручную.');
+    } catch(e) {
+      console.error('AI find parse error:', e);
+      alert('Ошибка разбора ответа AI');
+    }
+  };
+
+  xhr.onerror = function() { if (statusEl) statusEl.textContent = ''; alert('Сетевая ошибка'); };
+  xhr.ontimeout = function() { if (statusEl) statusEl.textContent = ''; alert('Таймаут'); };
+  xhr.send(JSON.stringify(body));
+}
+
+
+/**
+ * Найти артикулы для ВСЕХ незакреплённых карточек.
+ * Запускает arAIFindForCard последовательно для каждой.
+ */
+function arAutoMatchAll() {
+  var proj = getActiveProject();
+  if (!proj || !proj.cards) return;
+
+  var apiKey = localStorage.getItem('openai_api_key') || '';
+  if (!apiKey) {
+    alert('Нужен ключ OpenAI. Нажмите "API Key".');
+    return;
+  }
+
+  /* Собрать индексы незакреплённых карточек */
+  var unmatchedCards = [];
+  for (var c = 0; c < proj.cards.length; c++) {
+    var hasMatch = false;
+    for (var a = 0; a < (proj.articles || []).length; a++) {
+      if (proj.articles[a].cardIdx === c) { hasMatch = true; break; }
+    }
+    if (!hasMatch) unmatchedCards.push(c);
+  }
+
+  if (unmatchedCards.length === 0) {
+    alert('Все карточки уже сопоставлены.'); return;
+  }
+
+  var statusEl = document.getElementById('ar-stats');
+  var total = unmatchedCards.length;
+  var idx = 0;
+
+  function processNext() {
+    if (idx >= unmatchedCards.length) {
+      if (statusEl) statusEl.textContent = '';
+      arRenderMatching();
+      arRenderVerification();
+      alert('Готово! AI обработал ' + total + ' карточек. Проверьте результат.');
+      return;
+    }
+    if (statusEl) statusEl.textContent = 'AI: карточка ' + (idx + 1) + '/' + total + '...';
+
+    /* Используем общую логику AI-поиска, но с коллбэком */
+    _arAIFindForCardAsync(unmatchedCards[idx], apiKey, proj, function() {
+      idx++;
+      /* Небольшая пауза чтобы не превысить rate limit */
+      setTimeout(processNext, 500);
+    });
+  }
+
+  processNext();
+}
+
+
+/**
+ * Асинхронная версия AI-поиска для одной карточки (для batch-режима).
+ */
+function _arAIFindForCardAsync(cardIdx, apiKey, proj, onDone) {
+  var pvByName = {};
+  if (proj.previews) {
+    for (var pi = 0; pi < proj.previews.length; pi++) {
+      pvByName[proj.previews[pi].name] = proj.previews[pi];
+    }
+  }
+
+  var card = proj.cards[cardIdx];
+  var cardImg = '';
+  if (card && card.slots) {
+    for (var si = 0; si < card.slots.length; si++) {
+      var slot = card.slots[si];
+      cardImg = slot.dataUrl || slot.thumbUrl || '';
+      if (!cardImg && slot.file && pvByName[slot.file]) {
+        var pv = pvByName[slot.file];
+        cardImg = pv.thumb || pv.preview || '';
+      }
+      if (cardImg) break;
+    }
+  }
+  if (!cardImg) { onDone(); return; }
+
+  var candidates = [];
+  for (var a = 0; a < (proj.articles || []).length; a++) {
+    var art = proj.articles[a];
+    if (art.cardIdx >= 0 || !art.refImage) continue;
+    candidates.push({ idx: a, sku: art.sku, refImage: art.refImage });
+  }
+  if (candidates.length === 0) { onDone(); return; }
+
+  var msgContent = [];
+  var promptText = 'I have a photoshoot photo (CARD). '
+    + 'Below are ' + candidates.length + ' catalog reference photos.\n'
+    + 'Which one shows the SAME product? Compare shape, style, color.\n\n';
+  for (var ci = 0; ci < candidates.length; ci++) {
+    promptText += '- A' + (ci + 1) + ': "' + candidates[ci].sku + '"\n';
+  }
+  promptText += '\nReturn JSON: {"match": "A3", "confidence": "high"} or {"match": null}';
+
+  msgContent.push({ type: 'text', text: promptText });
+  var cardUrl = cardImg;
+  if (cardUrl.indexOf('data:') !== 0 && cardUrl.indexOf('http') !== 0) {
+    cardUrl = 'data:image/jpeg;base64,' + cardUrl;
+  }
+  msgContent.push({ type: 'text', text: '--- CARD ---' });
+  msgContent.push({ type: 'image_url', image_url: { url: cardUrl, detail: 'low' } });
+
+  for (var ai = 0; ai < candidates.length; ai++) {
+    msgContent.push({ type: 'text', text: '--- A' + (ai + 1) + ' ---' });
+    msgContent.push({ type: 'image_url', image_url: { url: candidates[ai].refImage, detail: 'low' } });
+  }
+
+  var body = {
+    model: 'gpt-4o',
+    messages: [{ role: 'user', content: msgContent }],
+    max_tokens: 200,
+    temperature: 0.1
+  };
+
+  var xhr = new XMLHttpRequest();
+  xhr.open('POST', 'https://api.openai.com/v1/chat/completions', true);
+  xhr.setRequestHeader('Content-Type', 'application/json');
+  xhr.setRequestHeader('Authorization', 'Bearer ' + apiKey);
+  xhr.timeout = 60000;
+
+  xhr.onload = function() {
+    if (xhr.status === 200) {
+      try {
+        var resp = JSON.parse(xhr.responseText);
+        var text = resp.choices[0].message.content.trim();
+        var jsonMatch = text.match(/\{[\s\S]*\}/);
+        var result = JSON.parse(jsonMatch ? jsonMatch[0] : text);
+        if (result.match) {
+          var artNum = parseInt(String(result.match).replace(/\D/g, ''), 10);
+          var cand = candidates[artNum - 1];
+          if (cand) arDoMatch(cand.idx, cardIdx);
+        }
+      } catch(e) { console.error('AI batch parse error:', e); }
+    }
+    onDone();
+  };
+  xhr.onerror = function() { onDone(); };
+  xhr.ontimeout = function() { onDone(); };
+  xhr.send(JSON.stringify(body));
 }
 
 /**
@@ -1170,6 +1420,232 @@ function arUnmatch(skuIdx) {
   arRenderVerification();
   arUpdateStats();
   if (typeof shAutoSave === 'function') shAutoSave();
+}
+
+
+/* ──────────────────────────────────────────────
+   AI Авто-сопоставление: OpenAI Vision
+   ────────────────────────────────────────────── */
+
+/**
+ * Авто-сопоставление артикулов с карточками через OpenAI Vision.
+ *
+ * Алгоритм:
+ * 1. Собрать все незакреплённые артикулы с refImage
+ * 2. Собрать все незакреплённые карточки с фото слотов
+ * 3. Отправить все изображения в GPT-4o одним запросом
+ * 4. AI определяет какой артикул к какой карточке подходит
+ * 5. Применить привязки, показать результат для верификации
+ */
+function arAutoMatchAI() {
+  var proj = getActiveProject();
+  if (!proj) { alert('Сначала выберите съёмку'); return; }
+
+  var apiKey = localStorage.getItem('openai_api_key') || '';
+  if (!apiKey) {
+    alert('Для авто-сопоставления нужен ключ OpenAI.\nНажмите "API Key" чтобы ввести ключ.');
+    return;
+  }
+
+  if (!proj.articles || proj.articles.length === 0) {
+    alert('Сначала загрузите чек-лист артикулов.'); return;
+  }
+  if (!proj.cards || proj.cards.length === 0) {
+    alert('Нет карточек для сопоставления.'); return;
+  }
+
+  /* Построить карту превью */
+  var pvByName = {};
+  if (proj.previews) {
+    for (var pi = 0; pi < proj.previews.length; pi++) {
+      pvByName[proj.previews[pi].name] = proj.previews[pi];
+    }
+  }
+
+  /* Собрать незакреплённые артикулы с refImage */
+  var unmatchedArts = [];
+  for (var a = 0; a < proj.articles.length; a++) {
+    var art = proj.articles[a];
+    if (art.cardIdx >= 0) continue; /* уже привязан */
+    if (!art.refImage) continue; /* нет фото — AI не сможет */
+    unmatchedArts.push({ idx: a, sku: art.sku, refImage: art.refImage });
+  }
+
+  if (unmatchedArts.length === 0) {
+    alert('Нет незакреплённых артикулов с референс-фото.\nЗагрузите артикулы из PDF с картинками.');
+    return;
+  }
+
+  /* Собрать незакреплённые карточки с фото */
+  var unmatchedCards = [];
+  for (var c = 0; c < proj.cards.length; c++) {
+    /* Проверить не привязана ли уже */
+    var alreadyMatched = false;
+    for (var aa = 0; aa < proj.articles.length; aa++) {
+      if (proj.articles[aa].cardIdx === c) { alreadyMatched = true; break; }
+    }
+    if (alreadyMatched) continue;
+
+    var card = proj.cards[c];
+    if (!card.slots || card.slots.length === 0) continue;
+
+    /* Взять первое непустое фото из слотов */
+    var cardImg = '';
+    for (var si = 0; si < card.slots.length; si++) {
+      var slot = card.slots[si];
+      cardImg = slot.dataUrl || slot.thumbUrl || '';
+      if (!cardImg && slot.file && pvByName[slot.file]) {
+        var pv = pvByName[slot.file];
+        cardImg = pv.thumb || pv.preview || '';
+      }
+      if (cardImg) break;
+    }
+    if (!cardImg) continue;
+
+    unmatchedCards.push({ idx: c, img: cardImg });
+  }
+
+  if (unmatchedCards.length === 0) {
+    alert('Нет незакреплённых карточек с фото.'); return;
+  }
+
+  /* Ограничение: OpenAI принимает до ~20 изображений за раз.
+     Разбиваем на батчи если нужно */
+  var statusEl = document.getElementById('ar-stats');
+  if (statusEl) statusEl.textContent = 'AI: сопоставление ' + unmatchedArts.length + ' артикулов с ' + unmatchedCards.length + ' карточками...';
+
+  _arSendMatchRequest(apiKey, unmatchedArts, unmatchedCards, proj, statusEl);
+}
+
+
+/**
+ * Отправить запрос на сопоставление в OpenAI Vision.
+ * Формирует один запрос со всеми изображениями.
+ */
+function _arSendMatchRequest(apiKey, arts, cards, proj, statusEl) {
+  /* Формируем контент сообщения: текст + изображения */
+  var content = [];
+
+  /* Текстовая инструкция */
+  var prompt = 'You are matching product catalog reference photos with photoshoot card photos.\n\n'
+    + 'ARTICLES (reference catalog photos) — labeled A1, A2, etc.:\n';
+  for (var a = 0; a < arts.length; a++) {
+    prompt += '- A' + (a + 1) + ': SKU "' + arts[a].sku + '"\n';
+  }
+  prompt += '\nCARDS (photoshoot photos) — labeled C1, C2, etc.\n\n'
+    + 'Match each article to the card showing the SAME product.\n'
+    + 'Compare product shape, style, color, and type.\n\n'
+    + 'Return ONLY a JSON array of matches:\n'
+    + '[{"article": "A1", "card": "C3", "confidence": "high"}, ...]\n\n'
+    + 'confidence: "high" = clearly same product, "medium" = likely same, "low" = uncertain.\n'
+    + 'If no good match exists for an article, omit it from the array.\n'
+    + 'Do NOT include any text before or after the JSON.';
+
+  content.push({ type: 'text', text: prompt });
+
+  /* Изображения артикулов */
+  for (var ai = 0; ai < arts.length; ai++) {
+    content.push({ type: 'text', text: '--- Article A' + (ai + 1) + ': ' + arts[ai].sku + ' ---' });
+    content.push({
+      type: 'image_url',
+      image_url: { url: arts[ai].refImage, detail: 'low' }
+    });
+  }
+
+  /* Изображения карточек */
+  for (var ci = 0; ci < cards.length; ci++) {
+    content.push({ type: 'text', text: '--- Card C' + (ci + 1) + ' ---' });
+    var cardUrl = cards[ci].img;
+    /* Убедиться что URL — data:image формат */
+    if (cardUrl && cardUrl.indexOf('data:') !== 0 && cardUrl.indexOf('http') !== 0) {
+      cardUrl = 'data:image/jpeg;base64,' + cardUrl;
+    }
+    content.push({
+      type: 'image_url',
+      image_url: { url: cardUrl, detail: 'low' }
+    });
+  }
+
+  var body = {
+    model: 'gpt-4o',
+    messages: [{ role: 'user', content: content }],
+    max_tokens: 2000,
+    temperature: 0.1
+  };
+
+  var xhr = new XMLHttpRequest();
+  xhr.open('POST', 'https://api.openai.com/v1/chat/completions', true);
+  xhr.setRequestHeader('Content-Type', 'application/json');
+  xhr.setRequestHeader('Authorization', 'Bearer ' + apiKey);
+  xhr.timeout = 120000; /* 2 минуты на много изображений */
+
+  xhr.onload = function() {
+    if (xhr.status !== 200) {
+      if (statusEl) statusEl.textContent = '';
+      var errMsg = 'OpenAI ошибка ' + xhr.status;
+      try {
+        var errData = JSON.parse(xhr.responseText);
+        if (errData.error && errData.error.message) errMsg = errData.error.message;
+      } catch(e) {}
+      alert('AI сопоставление: ' + errMsg);
+      return;
+    }
+
+    try {
+      var resp = JSON.parse(xhr.responseText);
+      var text = resp.choices[0].message.content.trim();
+
+      /* Извлечь JSON */
+      var jsonMatch = text.match(/\[[\s\S]*\]/);
+      var matches = JSON.parse(jsonMatch ? jsonMatch[0] : text);
+
+      /* Применить привязки */
+      var matched = 0;
+      for (var m = 0; m < matches.length; m++) {
+        var match = matches[m];
+        var artLabel = match.article || '';
+        var cardLabel = match.card || '';
+        var confidence = match.confidence || 'low';
+
+        /* Парсить индексы из A1, C3 и т.д. */
+        var artNum = parseInt(artLabel.replace(/\D/g, ''), 10);
+        var cardNum = parseInt(cardLabel.replace(/\D/g, ''), 10);
+        if (!artNum || !cardNum) continue;
+
+        var artEntry = arts[artNum - 1];
+        var cardEntry = cards[cardNum - 1];
+        if (!artEntry || !cardEntry) continue;
+
+        /* Привязать */
+        arDoMatch(artEntry.idx, cardEntry.idx);
+        matched++;
+      }
+
+      if (statusEl) statusEl.textContent = '';
+      if (matched > 0) {
+        alert('AI сопоставил ' + matched + ' артикулов с карточками.\nПроверьте результат в блоке "Верификация".');
+      } else {
+        alert('AI не смог найти совпадения. Попробуйте сопоставить вручную.');
+      }
+
+    } catch(e) {
+      if (statusEl) statusEl.textContent = '';
+      console.error('AI match parse error:', e, xhr.responseText);
+      alert('Ошибка разбора ответа AI');
+    }
+  };
+
+  xhr.onerror = function() {
+    if (statusEl) statusEl.textContent = '';
+    alert('Сетевая ошибка при обращении к OpenAI');
+  };
+
+  xhr.ontimeout = function() {
+    if (statusEl) statusEl.textContent = '';
+    alert('Таймаут запроса к OpenAI (2 минуты). Попробуйте с меньшим количеством артикулов.');
+  };
+
+  xhr.send(JSON.stringify(body));
 }
 
 

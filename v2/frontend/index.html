@@ -204,19 +204,11 @@
       <!-- Блок 2: Сопоставление артикулов с карточками -->
       <div class="ar-section" id="ar-matching-section">
         <h3>Сопоставление</h3>
-        <p style="font-size:12px;color:#999;margin-bottom:10px">
-          Кликните карточку, затем артикул (или наоборот) -- они свяжутся.
-        </p>
-        <div class="ar-matching-layout">
-          <div class="ar-cards-col" id="ar-cards-col">
-            <h4>Карточки</h4>
-            <div id="ar-cards-list"></div>
-          </div>
-          <div class="ar-skus-col" id="ar-skus-col">
-            <h4>Артикулы</h4>
-            <div id="ar-skus-list"></div>
-          </div>
+        <div class="ar-match-toolbar">
+          <button class="btn btn-sm" onclick="arAutoMatchAll()" title="AI ищет артикул для каждой карточки">Найти все (AI)</button>
+          <span style="font-size:12px;color:#999">Или выбирайте артикул вручную напротив каждой карточки</span>
         </div>
+        <div id="ar-match-list" class="ar-match-list"></div>
       </div>
 
       <!-- Блок 3: Верификация -->
