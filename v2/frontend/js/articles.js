@@ -38,6 +38,7 @@ var _arSelectedCard = null;
 
 /** @type {string} Кэшированный OpenAI API key (загружается при старте) */
 var _arOpenAIKey = '';
+var _arLastPdfPath = '';  /* путь к последнему загруженному PDF чек-листу */
 
 
 /* ──────────────────────────────────────────────
@@ -383,6 +384,7 @@ function _arLoadViaBackend(proj) {
 
     var fileName = result.file || 'файл';
     var isPdf = fileName.toLowerCase().indexOf('.pdf') >= 0;
+    if (isPdf && result.file) _arLastPdfPath = result.file;  /* сохранить для AI-расстановки */
 
     /* Проверить качество: если PDF и мало артикулов — попробовать AI */
     if (isPdf && articles.length < 3 && _arGetOpenAIKey()) {
@@ -1560,6 +1562,11 @@ function arAIFindForCard(cardIdx) {
  * Для каждой карточки отправляет 1 фото карточки + все refImage артикулов.
  * Пауза 1 сек между запросами (rate limit).
  */
+/**
+ * AI-расстановка: отправляем страницы PDF чек-листа + фото карточки.
+ * AI видит всю таблицу артикулов на странице и сравнивает с фото товара.
+ * Если PDF нет — фолбэк на индивидуальные refImage (батчами по 12).
+ */
 function arAutoMatchAll() {
   var proj = getActiveProject();
   if (!proj || !proj.cards) return;
@@ -1595,12 +1602,47 @@ function arAutoMatchAll() {
 
   if (cards.length === 0) return;
 
+  /* Список SKU артикулов (для промпта) */
+  var skuList = [];
+  for (var a2 = 0; a2 < (proj.articles || []).length; a2++) {
+    var art2 = proj.articles[a2];
+    if (art2.cardIdx >= 0) continue;
+    skuList.push({ idx: a2, sku: art2.sku });
+  }
+
   var statusEl = document.getElementById('ar-stats');
+  console.log('articles.js: arAutoMatchAll — ' + cards.length + ' cards, ' + skuList.length + ' articles, pdf=' + (_arLastPdfPath || 'none'));
+
+  /* Стратегия: если есть PDF — отправляем страницы PDF, иначе refImage батчами */
+  if (_arLastPdfPath && window.pywebview && window.pywebview.api && window.pywebview.api.pdf_pages_to_images) {
+    if (statusEl) statusEl.textContent = 'Рендерю страницы PDF для AI...';
+    window.pywebview.api.pdf_pages_to_images(_arLastPdfPath).then(function(result) {
+      if (result && result.pages && result.pages.length > 0) {
+        console.log('articles.js: PDF rendered — ' + result.pages.length + ' pages');
+        _arMatchWithPdfPages(cards, skuList, result.pages, apiKey, proj, statusEl);
+      } else {
+        console.log('articles.js: PDF render failed, falling back to refImage');
+        _arMatchWithRefImages(cards, proj, pvByName, apiKey, statusEl);
+      }
+    }).catch(function(e) {
+      console.error('articles.js: pdf_pages_to_images error:', e);
+      _arMatchWithRefImages(cards, proj, pvByName, apiKey, statusEl);
+    });
+  } else {
+    _arMatchWithRefImages(cards, proj, pvByName, apiKey, statusEl);
+  }
+}
+
+
+/**
+ * СТРАТЕГИЯ 1: Сопоставление через страницы PDF.
+ * Для каждой карточки: фото карточки + страницы PDF + список SKU.
+ * AI видит таблицу с картинками артикулов и находит совпадение.
+ */
+function _arMatchWithPdfPages(cards, skuList, pdfPages, apiKey, proj, statusEl) {
   var total = cards.length;
   var applied = 0;
   var idx = 0;
-
-  console.log('articles.js: arAutoMatchAll — ' + total + ' карточек для сопоставления');
 
   function processNext() {
     if (idx >= cards.length) {
@@ -1614,7 +1656,121 @@ function arAutoMatchAll() {
     var ci = cards[idx];
     if (statusEl) statusEl.textContent = 'AI: карточка ' + (idx + 1) + '/' + total + '...';
 
-    /* Собрать свободные артикулы (пересобираем каждый раз — предыдущие могли быть привязаны) */
+    /* Пересобрать свободные SKU (предыдущие могли быть привязаны) */
+    var freeSkus = [];
+    for (var a = 0; a < (proj.articles || []).length; a++) {
+      if (proj.articles[a].cardIdx < 0) freeSkus.push({ idx: a, sku: proj.articles[a].sku });
+    }
+
+    if (freeSkus.length === 0) {
+      idx = cards.length;
+      processNext();
+      return;
+    }
+
+    /* Построить промпт */
+    var promptText = 'I have a product photoshoot with ' + ci.imgs.length + ' photos of the SAME product (different angles).\n'
+      + 'Below are pages from a catalog/checklist PDF that contains product reference photos with SKU codes.\n\n'
+      + 'Available SKUs (not yet matched):\n';
+    for (var si = 0; si < freeSkus.length; si++) {
+      promptText += '- "' + freeSkus[si].sku + '"\n';
+    }
+    promptText += '\nLook at the product in the photoshoot photos. Find the SAME product in the PDF pages.\n'
+      + 'Compare shape, silhouette, color, material, style.\n'
+      + 'Return ONLY JSON: {"match": "EXACT_SKU_STRING", "confidence": "high"} or {"match": null} if not found.';
+
+    var msgContent = [];
+    msgContent.push({ type: 'text', text: promptText });
+
+    /* Фото карточки (до 3 ракурсов) */
+    for (var k = 0; k < ci.imgs.length; k++) {
+      var cUrl = ci.imgs[k];
+      if (cUrl.indexOf('data:') !== 0 && cUrl.indexOf('http') !== 0) {
+        cUrl = 'data:image/jpeg;base64,' + cUrl;
+      }
+      msgContent.push({ type: 'text', text: '--- Product photo ' + (k + 1) + ' ---' });
+      msgContent.push({ type: 'image_url', image_url: { url: cUrl, detail: 'low' } });
+    }
+
+    /* Страницы PDF */
+    for (var pi = 0; pi < pdfPages.length; pi++) {
+      msgContent.push({ type: 'text', text: '--- Checklist page ' + (pi + 1) + ' ---' });
+      msgContent.push({ type: 'image_url', image_url: { url: pdfPages[pi], detail: 'high' } });
+    }
+
+    var body = {
+      model: 'gpt-4o',
+      messages: [{ role: 'user', content: msgContent }],
+      max_tokens: 200,
+      temperature: 0.1
+    };
+
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', 'https://api.openai.com/v1/chat/completions', true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.setRequestHeader('Authorization', 'Bearer ' + apiKey);
+    xhr.timeout = 90000;
+
+    xhr.onload = function() {
+      if (xhr.status === 200) {
+        try {
+          var resp = JSON.parse(xhr.responseText);
+          var text = resp.choices[0].message.content.trim();
+          console.log('articles.js: card ' + ci.idx + ' AI (PDF) response:', text);
+          var jsonMatch = text.match(/\{[\s\S]*\}/);
+          var result = JSON.parse(jsonMatch ? jsonMatch[0] : text);
+          if (result.match && result.match !== 'null' && result.match !== null) {
+            /* Найти артикул по SKU */
+            var matchedSku = String(result.match).trim();
+            for (var fi = 0; fi < freeSkus.length; fi++) {
+              if (freeSkus[fi].sku === matchedSku) {
+                console.log('articles.js: card ' + ci.idx + ' -> ' + matchedSku);
+                arDoMatch(freeSkus[fi].idx, ci.idx);
+                applied++;
+                arRenderMatching();
+                break;
+              }
+            }
+          }
+        } catch(e) {
+          console.error('articles.js: card ' + ci.idx + ' parse error:', e);
+        }
+      } else {
+        console.error('articles.js: card ' + ci.idx + ' API error ' + xhr.status);
+      }
+      idx++;
+      setTimeout(processNext, 2000);
+    };
+    xhr.onerror = function() { idx++; setTimeout(processNext, 2000); };
+    xhr.ontimeout = function() { idx++; setTimeout(processNext, 2000); };
+    xhr.send(JSON.stringify(body));
+  }
+
+  processNext();
+}
+
+
+/**
+ * СТРАТЕГИЯ 2 (фолбэк): сопоставление через refImage батчами.
+ * Когда PDF недоступен — отправляем refImage кандидатов группами по 12.
+ */
+function _arMatchWithRefImages(cards, proj, pvByName, apiKey, statusEl) {
+  var total = cards.length;
+  var applied = 0;
+  var idx = 0;
+
+  function processNext() {
+    if (idx >= cards.length) {
+      if (statusEl) statusEl.textContent = 'AI: ' + applied + ' из ' + total + ' сопоставлено';
+      arRenderMatching();
+      arRenderVerification();
+      if (typeof shAutoSave === 'function') shAutoSave();
+      return;
+    }
+
+    var ci = cards[idx];
+    if (statusEl) statusEl.textContent = 'AI: карточка ' + (idx + 1) + '/' + total + '...';
+
     var candidates = [];
     for (var a = 0; a < (proj.articles || []).length; a++) {
       var art = proj.articles[a];
@@ -1623,8 +1779,7 @@ function arAutoMatchAll() {
     }
 
     if (candidates.length === 0) {
-      /* Все артикулы уже привязаны */
-      idx = cards.length; /* прервать цикл */
+      idx = cards.length;
       processNext();
       return;
     }
@@ -1633,10 +1788,9 @@ function arAutoMatchAll() {
       if (matchedArtIdx >= 0) {
         arDoMatch(matchedArtIdx, ci.idx);
         applied++;
-        arRenderMatching(); /* Обновить UI после каждого матча */
+        arRenderMatching();
       }
       idx++;
-      /* Пауза 1.5 сек между запросами */
       setTimeout(processNext, 1500);
     });
   }
