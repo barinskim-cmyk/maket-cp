@@ -22,6 +22,9 @@ function showPage(name) {
       }, 50);
     }
   }
+  if (name === 'articles') {
+    if (typeof arOnPageShow === 'function') arOnPageShow();
+  }
 }
 
 function showSubpage(name) {
