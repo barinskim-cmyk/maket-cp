@@ -753,7 +753,7 @@ function sbDownloadProject(cloudId, callback) {
             for (var oi = 0; oi < proj._ocNames.length; oi++) {
               var ocPv = pvByName[proj._ocNames[oi]];
               if (ocPv) {
-                proj.otherContent.push({ name: ocPv.name, path: '', thumb: ocPv.thumb });
+                proj.otherContent.push({ name: ocPv.name, path: '', thumb: ocPv.thumb, preview: ocPv.preview || '' });
               }
             }
           }
@@ -980,7 +980,7 @@ function _sbDoLoadByToken(token) {
         for (var oi = 0; oi < proj._ocNames.length; oi++) {
           var ocPv = pvByName[proj._ocNames[oi]];
           if (ocPv) {
-            proj.otherContent.push({ name: ocPv.name, path: '', thumb: ocPv.thumb });
+            proj.otherContent.push({ name: ocPv.name, path: '', thumb: ocPv.thumb, preview: ocPv.preview || '' });
           }
         }
         console.log('supabase.js: восстановлено ' + proj.otherContent.length + ' доп. контент');
