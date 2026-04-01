@@ -368,16 +368,30 @@ function arLoadChecklist() {
 /**
  * Desktop: парсинг через Python бэкенд (pdfplumber + Pillow).
  * Нативный диалог выбора файла, серверный парсинг PDF с изображениями.
+ * Если результат плохой (0 артикулов) — автоматически отправляет в OpenAI Vision.
  */
 function _arLoadViaBackend(proj) {
-  /* Для больших PDF используем асинхронную версию с push-событием */
   window.onArticleParseDone = function(result) {
-    if (result.error) {
-      alert('Ошибка парсинга: ' + result.error);
+    var articles = [];
+    if (!result.error && result.articles) {
+      articles = _arConvertBackendResult(result.articles);
+    }
+
+    var fileName = result.file || 'файл';
+    var isPdf = fileName.toLowerCase().indexOf('.pdf') >= 0;
+
+    /* Проверить качество: если PDF и мало артикулов — попробовать AI */
+    if (isPdf && articles.length < 3 && _arGetOpenAIKey()) {
+      console.log('articles.js: pdfplumber нашёл ' + articles.length + ' артикулов, пробую AI...');
+      var statusEl = document.getElementById('ar-stats');
+      if (statusEl) statusEl.textContent = 'Обычный парсинг: ' + articles.length + ', пробую AI...';
+
+      /* Нужен файл для AI — просим бэкенд прочитать */
+      _arFallbackToAI(proj, fileName, articles);
       return;
     }
-    var articles = _arConvertBackendResult(result.articles || []);
-    _arApplyLoaded(proj, articles, result.file || 'файл');
+
+    _arApplyLoaded(proj, articles, fileName);
   };
 
   var res = window.pywebview.api.parse_article_pdf_async();
@@ -386,7 +400,6 @@ function _arLoadViaBackend(proj) {
     alert('Ошибка: ' + res.error);
     return;
   }
-  /* Результат придёт через onArticleParseDone push-событие */
   console.log('articles.js: парсинг запущен через Python бэкенд');
 }
 
@@ -414,8 +427,78 @@ function _arConvertBackendResult(rawArticles) {
 
 
 /**
+ * Автоматический фолбэк на OpenAI Vision (desktop).
+ * Когда pdfplumber не справился — рендерим страницы через бэкенд и отправляем в AI.
+ * @param {Object} proj — активный проект
+ * @param {string} filePath — путь к PDF файлу
+ * @param {Array} partialArticles — то что pdfplumber уже нашёл (может быть пусто)
+ */
+function _arFallbackToAI(proj, filePath, partialArticles) {
+  var apiKey = _arGetOpenAIKey();
+  var statusEl = document.getElementById('ar-stats');
+
+  /* Desktop: есть бэкенд → рендерим страницы через Python */
+  if (window.pywebview && window.pywebview.api && window.pywebview.api.pdf_pages_to_images) {
+    if (statusEl) statusEl.textContent = 'AI: рендеринг страниц PDF...';
+
+    /* pdf_pages_to_images — синхронный, может быть медленным, но pywebview вернёт результат */
+    var result = window.pywebview.api.pdf_pages_to_images(filePath);
+    if (!result || result.error || !result.pages || result.pages.length === 0) {
+      if (statusEl) statusEl.textContent = '';
+      /* Если AI не помог — отдаём что есть от pdfplumber */
+      _arApplyLoaded(proj, partialArticles, filePath);
+      return;
+    }
+
+    /* Отправить страницы в OpenAI Vision */
+    _arSendPagesToOpenAI(proj, result.pages, apiKey, filePath, statusEl);
+    return;
+  }
+
+  /* Нет бэкенда или нет метода — отдаём что есть */
+  if (statusEl) statusEl.textContent = '';
+  _arApplyLoaded(proj, partialArticles, filePath);
+}
+
+
+/**
+ * Отправить отрендеренные страницы PDF в OpenAI Vision для извлечения артикулов.
+ * Обрабатывает по одной странице, собирает результат.
+ */
+function _arSendPagesToOpenAI(proj, pages, apiKey, fileName, statusEl) {
+  var allArticles = [];
+  var pageIdx = 0;
+  var totalPages = pages.length;
+
+  function processPage() {
+    if (pageIdx >= totalPages) {
+      if (statusEl) statusEl.textContent = '';
+      var articles = _arConvertOpenAIResult(allArticles);
+      _arApplyLoaded(proj, articles, fileName + ' (AI)');
+      return;
+    }
+
+    if (statusEl) statusEl.textContent = 'AI: страница ' + (pageIdx + 1) + '/' + totalPages + '...';
+
+    var base64Data = pages[pageIdx].replace(/^data:image\/\w+;base64,/, '');
+
+    _arCallOpenAIVision(apiKey, base64Data, pageIdx + 1, totalPages, function(err, pageArticles) {
+      if (!err && pageArticles && pageArticles.length > 0) {
+        allArticles = allArticles.concat(pageArticles);
+      }
+      pageIdx++;
+      /* Небольшая пауза чтобы не превысить rate limit */
+      setTimeout(processPage, 300);
+    });
+  }
+
+  processPage();
+}
+
+
+/**
  * Browser: парсинг через JS (pdf.js, SheetJS, текст).
- * Фолбэк для работы без Python.
+ * PDF: сначала текстовый парсинг, если < 3 артикулов — автоматически AI.
  */
 function _arLoadViaBrowser(proj) {
   var input = document.createElement('input');
@@ -426,10 +509,21 @@ function _arLoadViaBrowser(proj) {
     if (!file) return;
     var ext = (file.name.split('.').pop() || '').toLowerCase();
 
-    /* PDF — асинхронный парсинг через pdf.js (без изображений) */
+    /* PDF — сначала текстовый парсинг, потом AI фолбэк */
     if (ext === 'pdf') {
+      var statusEl = document.getElementById('ar-stats');
+      if (statusEl) statusEl.textContent = 'Парсинг PDF...';
+
       _arParsePdf(file, function(articles) {
-        _arApplyLoaded(proj, articles, file.name);
+        /* Проверить качество: мало результатов + есть AI ключ → фолбэк */
+        if ((!articles || articles.length < 3) && _arGetOpenAIKey()) {
+          console.log('articles.js: текстовый парсинг дал ' + (articles ? articles.length : 0) + ', пробую AI...');
+          if (statusEl) statusEl.textContent = 'Текстовый парсинг: мало результатов, подключаю AI...';
+          _arProcessPdfWithOpenAI(proj, file, _arGetOpenAIKey());
+        } else {
+          if (statusEl) statusEl.textContent = '';
+          _arApplyLoaded(proj, articles, file.name);
+        }
       });
       return;
     }
@@ -1066,24 +1160,19 @@ function arAddManual() {
 
 /* ──────────────────────────────────────────────
    Блок 2: Сопоставление артикулов с карточками
-   Новый UX: единый список — карточка | артикул (или выбор)
+   Две колонки: карточки слева, артикулы справа.
+   AI переставляет правую колонку чтобы совпало.
+   Клик на карточку + клик на артикул = ручная привязка.
    ────────────────────────────────────────────── */
 
 /**
- * Отрисовать панель сопоставления.
- * Каждая карточка — одна строка: фото | номер | привязанный артикул или выпадающий список.
+ * Отрисовать панель сопоставления: две колонки.
+ * Левая — карточки (фото + номер), правая — артикулы (фото + SKU).
+ * Привязанные пары стоят напротив друг друга, с пониженной прозрачностью.
  */
 function arRenderMatching() {
   var proj = getActiveProject();
   if (!proj) return;
-
-  var listEl = document.getElementById('ar-match-list');
-  if (!listEl) return;
-
-  if (!proj.cards || proj.cards.length === 0) {
-    listEl.innerHTML = '<div class="empty-state">Нет карточек. Перейдите на вкладку "Контент".</div>';
-    return;
-  }
 
   /* Построить карту превью */
   var pvByName = {};
@@ -1093,99 +1182,166 @@ function arRenderMatching() {
     }
   }
 
-  /* Собрать список незакреплённых артикулов для выпадающего списка */
-  var freeArts = [];
-  for (var fa = 0; fa < (proj.articles || []).length; fa++) {
-    if (proj.articles[fa].cardIdx < 0) freeArts.push(fa);
-  }
-
-  var html = '';
-  for (var c = 0; c < proj.cards.length; c++) {
-    var card = proj.cards[c];
-
-    /* Найти привязанный артикул */
-    var linkedArt = null;
-    var linkedIdx = -1;
-    for (var a = 0; a < (proj.articles || []).length; a++) {
-      if (proj.articles[a].cardIdx === c) {
-        linkedArt = proj.articles[a];
-        linkedIdx = a;
-        break;
-      }
-    }
-
-    var matchedCls = linkedArt ? ' ar-row-matched' : '';
-    html += '<div class="ar-match-row' + matchedCls + '">';
-
-    /* Левая часть: фото карточки */
-    html += '<div class="ar-match-card">';
-    html += '<button class="ar-zoom-btn" onclick="arPreviewCard(' + c + ')" title="Увеличить">+</button>';
-    html += '<div class="ar-card-photos">';
-    if (card.slots) {
-      var maxPhotos = Math.min(card.slots.length, 3);
-      for (var si = 0; si < maxPhotos; si++) {
-        var slot = card.slots[si];
-        var imgSrc = slot.dataUrl || slot.thumbUrl || '';
-        if (!imgSrc && slot.file && pvByName[slot.file]) {
-          var pv = pvByName[slot.file];
-          imgSrc = pv.thumb || pv.preview || '';
-        }
-        if (imgSrc) {
-          html += '<img class="ar-card-photo" src="' + imgSrc + '">';
-        } else if (slot.file) {
-          html += '<div class="ar-card-photo ar-card-photo-empty">' + esc(slot.file.substr(0, 8)) + '</div>';
-        }
-      }
-    }
-    html += '</div>';
-    html += '<div class="ar-match-num">Карточка ' + (c + 1) + '</div>';
-    html += '</div>';
-
-    /* Стрелка */
-    html += '<div class="ar-match-arrow">&rarr;</div>';
-
-    /* Правая часть: привязанный артикул ИЛИ выпадающий список */
-    html += '<div class="ar-match-article">';
-    if (linkedArt) {
-      /* Показать привязанный артикул с refImage */
-      if (linkedArt.refImage) {
-        html += '<img class="ar-sku-ref" src="' + linkedArt.refImage + '" alt="ref" onclick="arShowRefImage(' + linkedIdx + ')">';
-      }
-      html += '<div class="ar-match-art-info">';
-      html += '<div class="ar-match-sku">' + esc(linkedArt.sku) + '</div>';
-      if (linkedArt.category) html += '<div class="ar-match-cat">' + esc(linkedArt.category) + '</div>';
-      html += '</div>';
-      html += '<button class="ar-unmatch-btn" onclick="arUnmatch(' + linkedIdx + ')" title="Отвязать">x</button>';
+  /* ── Левая колонка: КАРТОЧКИ ── */
+  var cardsEl = document.getElementById('ar-cards-list');
+  if (cardsEl) {
+    if (!proj.cards || proj.cards.length === 0) {
+      cardsEl.innerHTML = '<div class="empty-state">Нет карточек</div>';
     } else {
-      /* Выпадающий список незакреплённых артикулов */
-      html += '<select class="ar-match-select" onchange="arMatchFromSelect(this,' + c + ')">';
-      html += '<option value="">-- выбрать артикул --</option>';
-      for (var fi = 0; fi < freeArts.length; fi++) {
-        var fArt = proj.articles[freeArts[fi]];
-        html += '<option value="' + freeArts[fi] + '">' + esc(fArt.sku);
-        if (fArt.category) html += ' (' + esc(fArt.category) + ')';
-        html += '</option>';
-      }
-      html += '</select>';
-      /* Кнопка AI-поиска для этой карточки */
-      html += '<button class="ar-ai-find-btn" onclick="arAIFindForCard(' + c + ')" title="AI найдёт подходящий артикул">Найти (AI)</button>';
-    }
-    html += '</div>';
+      var html = '';
+      for (var c = 0; c < proj.cards.length; c++) {
+        var card = proj.cards[c];
+        /* Найти привязанный артикул */
+        var linkedSku = '';
+        var linkedIdx = -1;
+        for (var a = 0; a < (proj.articles || []).length; a++) {
+          if (proj.articles[a].cardIdx === c) {
+            linkedSku = proj.articles[a].sku;
+            linkedIdx = a;
+            break;
+          }
+        }
+        var sel = (_arSelectedCard === c) ? ' ar-selected' : '';
+        var matchedCls = linkedSku ? ' ar-matched' : '';
 
-    html += '</div>'; /* ar-match-row */
+        html += '<div class="ar-match-item ar-card-item' + sel + matchedCls + '" onclick="arSelectCard(' + c + ')">';
+
+        /* Кнопка увеличения */
+        html += '<button class="ar-zoom-btn" onclick="event.stopPropagation();arPreviewCard(' + c + ')" title="Увеличить">+</button>';
+
+        /* Фото-полоска */
+        html += '<div class="ar-card-photos">';
+        if (card.slots) {
+          var maxPhotos = Math.min(card.slots.length, 3);
+          for (var si = 0; si < maxPhotos; si++) {
+            var slot = card.slots[si];
+            var imgSrc = slot.dataUrl || slot.thumbUrl || '';
+            if (!imgSrc && slot.file && pvByName[slot.file]) {
+              var pv = pvByName[slot.file];
+              imgSrc = pv.thumb || pv.preview || '';
+            }
+            if (imgSrc) {
+              html += '<img class="ar-card-photo" src="' + imgSrc + '">';
+            } else if (slot.file) {
+              html += '<div class="ar-card-photo ar-card-photo-empty">' + esc(slot.file.substr(0, 8)) + '</div>';
+            }
+          }
+        }
+        html += '</div>';
+
+        /* Инфо */
+        html += '<div class="ar-match-info">';
+        html += '<div class="ar-match-num">Карточка ' + (c + 1) + '</div>';
+        if (linkedSku) {
+          html += '<div class="ar-match-sku">' + esc(linkedSku) + '</div>';
+          html += '<button class="ar-unmatch-btn" onclick="event.stopPropagation();arUnmatch(' + linkedIdx + ')">Отвязать</button>';
+        }
+        html += '</div></div>';
+      }
+      cardsEl.innerHTML = html;
+    }
   }
 
-  listEl.innerHTML = html;
+  /* ── Правая колонка: АРТИКУЛЫ ──
+     Порядок: сначала привязанные (в порядке карточек), потом свободные.
+     Привязанные встают НАПРОТИВ своей карточки. */
+  var skusEl = document.getElementById('ar-skus-list');
+  if (skusEl) {
+    if (!proj.articles || proj.articles.length === 0) {
+      skusEl.innerHTML = '<div class="empty-state">Загрузите чек-лист</div>';
+    } else {
+      /* Построить упорядоченный список:
+         для каждой карточки — привязанный артикул (или пустой слот),
+         потом все свободные */
+      var orderedItems = []; /* {type:'matched'|'empty'|'free', artIdx, cardIdx} */
+      var usedArtIdx = {};
+
+      /* Пройти по всем карточкам — найти привязанные артикулы */
+      for (var c2 = 0; c2 < (proj.cards || []).length; c2++) {
+        var found = false;
+        for (var a2 = 0; a2 < proj.articles.length; a2++) {
+          if (proj.articles[a2].cardIdx === c2) {
+            orderedItems.push({ type: 'matched', artIdx: a2, cardIdx: c2 });
+            usedArtIdx[a2] = true;
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          orderedItems.push({ type: 'empty', artIdx: -1, cardIdx: c2 });
+        }
+      }
+
+      /* Добавить свободные артикулы после привязанных */
+      for (var a3 = 0; a3 < proj.articles.length; a3++) {
+        if (!usedArtIdx[a3] && proj.articles[a3].cardIdx < 0) {
+          orderedItems.push({ type: 'free', artIdx: a3, cardIdx: -1 });
+        }
+      }
+
+      var html2 = '';
+      for (var oi = 0; oi < orderedItems.length; oi++) {
+        var item = orderedItems[oi];
+
+        if (item.type === 'empty') {
+          /* Пустой слот напротив карточки — placeholder */
+          html2 += '<div class="ar-match-item ar-sku-placeholder">';
+          html2 += '<div class="ar-match-info"><div class="ar-match-cat">-- не привязан --</div></div>';
+          html2 += '</div>';
+        } else {
+          /* Артикул (привязанный или свободный) */
+          var art = proj.articles[item.artIdx];
+          var selCls = (_arSelectedSku === item.artIdx) ? ' ar-selected' : '';
+          var mCls = (item.type === 'matched') ? ' ar-matched' : '';
+
+          html2 += '<div class="ar-match-item ar-sku-item' + selCls + mCls + '" onclick="arSelectSku(' + item.artIdx + ')">';
+
+          /* Референс-фото */
+          if (art.refImage) {
+            html2 += '<img class="ar-sku-ref" src="' + art.refImage + '" alt="ref">';
+          }
+
+          html2 += '<div class="ar-match-info">';
+          html2 += '<div class="ar-match-sku">' + esc(art.sku) + '</div>';
+          if (art.category) html2 += '<div class="ar-match-cat">' + esc(art.category) + '</div>';
+          if (item.type === 'matched') {
+            html2 += '<div class="ar-match-cat" style="color:#4caf50">Карточка ' + (item.cardIdx + 1) + '</div>';
+          }
+          html2 += '</div></div>';
+        }
+      }
+      skusEl.innerHTML = html2;
+    }
+  }
 }
 
 
 /**
- * Привязать артикул из выпадающего списка.
+ * Выбрать карточку для сопоставления.
+ * Если артикул уже выбран — привязать.
  */
-function arMatchFromSelect(selectEl, cardIdx) {
-  var skuIdx = parseInt(selectEl.value, 10);
-  if (isNaN(skuIdx) || skuIdx < 0) return;
-  arDoMatch(skuIdx, cardIdx);
+function arSelectCard(idx) {
+  _arSelectedCard = idx;
+  if (_arSelectedSku !== null) {
+    arDoMatch(_arSelectedSku, _arSelectedCard);
+    _arSelectedSku = null;
+    _arSelectedCard = null;
+  }
+  arRenderMatching();
+}
+
+/**
+ * Выбрать артикул для сопоставления.
+ * Если карточка уже выбрана — привязать.
+ */
+function arSelectSku(idx) {
+  _arSelectedSku = idx;
+  if (_arSelectedCard !== null) {
+    arDoMatch(_arSelectedSku, _arSelectedCard);
+    _arSelectedSku = null;
+    _arSelectedCard = null;
+  }
+  arRenderMatching();
 }
 
 
