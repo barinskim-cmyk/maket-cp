@@ -64,6 +64,31 @@ class AppAPI:
         )
         return result[0] if result else None
 
+    def get_config_value(self, key: str) -> str:
+        """Прочитать значение из config.json (лежит в v2/frontend/).
+
+        Ищет config.json в нескольких местах относительно backend/.
+        Возвращает значение ключа или пустую строку.
+        """
+        candidates = [
+            Path(__file__).resolve().parent.parent.parent.parent / "frontend" / "config.json",  # v2/frontend/config.json
+            Path.cwd() / ".." / "frontend" / "config.json",
+            Path.cwd() / "config.json",
+            Path.cwd().parent / "config.json",
+        ]
+        for p in candidates:
+            try:
+                p = p.resolve()
+                if p.exists():
+                    import json
+                    cfg = json.loads(p.read_text(encoding="utf-8"))
+                    val = cfg.get(key, "")
+                    if val:
+                        return val
+            except Exception:
+                continue
+        return ""
+
     def read_text_file(self, path: str) -> str:
         try:
             return Path(path).read_text(encoding="utf-8")

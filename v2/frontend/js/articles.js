@@ -77,49 +77,26 @@ function _arLoadOpenAIKey() {
 
 
 /**
- * Загрузить ключ из локального config.json (фолбэк).
- * pywebview API возвращает Promise — используем цепочку.
+ * Загрузить ключ из config.json (фолбэк после Supabase).
+ * Desktop: через бэкенд-метод get_config_value (надёжные абсолютные пути).
+ * Browser: через fetch config.json.
  */
 function _arLoadKeyFromConfig() {
-  /* Desktop: через Python бэкенд — пробуем несколько путей последовательно */
-  if (window.pywebview && window.pywebview.api && window.pywebview.api.read_text_file) {
-    var paths = [
-      '../frontend/config.json',    /* из v2/backend/ */
-      'config.json',                /* текущая директория */
-      '../config.json',             /* корень v2/ */
-      '../../config.json',          /* корень проекта */
-      'v2/frontend/config.json'     /* абсолютно от корня проекта */
-    ];
-    var tryIdx = 0;
-
-    function tryNextPath() {
-      if (tryIdx >= paths.length) {
-        /* Все пути перепробованы — фолбэк на localStorage */
+  /* Desktop: через Python бэкенд — один вызов, бэкенд сам ищет файл */
+  if (window.pywebview && window.pywebview.api && window.pywebview.api.get_config_value) {
+    window.pywebview.api.get_config_value('openai_api_key').then(function(val) {
+      if (val) {
+        _arOpenAIKey = val;
+        console.log('articles.js: OpenAI key loaded from config.json (via backend)');
+      } else {
         _arOpenAIKey = localStorage.getItem('openai_api_key') || '';
         if (_arOpenAIKey) console.log('articles.js: OpenAI key loaded from localStorage');
-        else console.log('articles.js: OpenAI key NOT found (tried ' + paths.length + ' paths + localStorage)');
-        return;
+        else console.log('articles.js: OpenAI key NOT found');
       }
-      var currentPath = paths[tryIdx];
-      tryIdx++;
-      window.pywebview.api.read_text_file(currentPath).then(function(configText) {
-        if (configText && String(configText).indexOf('ERROR') !== 0) {
-          try {
-            var cfg = JSON.parse(configText);
-            if (cfg.openai_api_key) {
-              _arOpenAIKey = cfg.openai_api_key;
-              console.log('articles.js: OpenAI key loaded from ' + currentPath);
-              return; /* Нашли — выходим */
-            }
-          } catch(e) {}
-        }
-        tryNextPath(); /* Этот путь не дал — пробуем следующий */
-      }).catch(function() {
-        tryNextPath(); /* Ошибка — пробуем следующий */
-      });
-    }
-
-    tryNextPath();
+    }).catch(function(e) {
+      console.log('articles.js: get_config_value error:', e);
+      _arOpenAIKey = localStorage.getItem('openai_api_key') || '';
+    });
     return;
   }
 
@@ -137,7 +114,6 @@ function _arLoadKeyFromConfig() {
         }
       } catch(e) {}
     }
-    /* Последний фолбэк: localStorage */
     _arOpenAIKey = localStorage.getItem('openai_api_key') || '';
     if (_arOpenAIKey) console.log('articles.js: OpenAI key loaded from localStorage');
   };
@@ -1542,6 +1518,10 @@ function arAIFindForCard(cardIdx) {
  * Найти артикулы для ВСЕХ незакреплённых карточек.
  * Запускает arAIFindForCard последовательно для каждой.
  */
+/**
+ * Batch AI matching: отправляем ВСЕ карточки и ВСЕ артикулы одним запросом.
+ * AI возвращает массив сопоставлений [{card: 1, article: "A3"}, ...].
+ */
 function arAutoMatchAll() {
   var proj = getActiveProject();
   if (!proj || !proj.cards) return;
@@ -1552,50 +1532,7 @@ function arAutoMatchAll() {
     return;
   }
 
-  /* Собрать индексы незакреплённых карточек */
-  var unmatchedCards = [];
-  for (var c = 0; c < proj.cards.length; c++) {
-    var hasMatch = false;
-    for (var a = 0; a < (proj.articles || []).length; a++) {
-      if (proj.articles[a].cardIdx === c) { hasMatch = true; break; }
-    }
-    if (!hasMatch) unmatchedCards.push(c);
-  }
-
-  if (unmatchedCards.length === 0) {
-    alert('Все карточки уже сопоставлены.'); return;
-  }
-
-  var statusEl = document.getElementById('ar-stats');
-  var total = unmatchedCards.length;
-  var idx = 0;
-
-  function processNext() {
-    if (idx >= unmatchedCards.length) {
-      if (statusEl) statusEl.textContent = '';
-      arRenderMatching();
-      arRenderVerification();
-      alert('Готово! AI обработал ' + total + ' карточек. Проверьте результат.');
-      return;
-    }
-    if (statusEl) statusEl.textContent = 'AI: карточка ' + (idx + 1) + '/' + total + '...';
-
-    /* Используем общую логику AI-поиска, но с коллбэком */
-    _arAIFindForCardAsync(unmatchedCards[idx], apiKey, proj, function() {
-      idx++;
-      /* Небольшая пауза чтобы не превысить rate limit */
-      setTimeout(processNext, 500);
-    });
-  }
-
-  processNext();
-}
-
-
-/**
- * Асинхронная версия AI-поиска для одной карточки (для batch-режима).
- */
-function _arAIFindForCardAsync(cardIdx, apiKey, proj, onDone) {
+  /* Построить карту превью */
   var pvByName = {};
   if (proj.previews) {
     for (var pi = 0; pi < proj.previews.length; pi++) {
@@ -1603,55 +1540,94 @@ function _arAIFindForCardAsync(cardIdx, apiKey, proj, onDone) {
     }
   }
 
-  var card = proj.cards[cardIdx];
-  var cardImg = '';
-  if (card && card.slots) {
-    for (var si = 0; si < card.slots.length; si++) {
-      var slot = card.slots[si];
-      cardImg = slot.dataUrl || slot.thumbUrl || '';
-      if (!cardImg && slot.file && pvByName[slot.file]) {
-        var pv = pvByName[slot.file];
-        cardImg = pv.thumb || pv.preview || '';
+  /* Собрать незакреплённые карточки с фото */
+  var cards = [];
+  for (var c = 0; c < proj.cards.length; c++) {
+    var hasMatch = false;
+    for (var a = 0; a < (proj.articles || []).length; a++) {
+      if (proj.articles[a].cardIdx === c) { hasMatch = true; break; }
+    }
+    if (hasMatch) continue;
+
+    var card = proj.cards[c];
+    var cardImg = '';
+    if (card && card.slots) {
+      for (var si = 0; si < card.slots.length; si++) {
+        var slot = card.slots[si];
+        cardImg = slot.dataUrl || slot.thumbUrl || '';
+        if (!cardImg && slot.file && pvByName[slot.file]) {
+          var pv = pvByName[slot.file];
+          cardImg = pv.thumb || pv.preview || '';
+        }
+        if (cardImg) break;
       }
-      if (cardImg) break;
+    }
+    if (cardImg) {
+      cards.push({ idx: c, img: cardImg });
     }
   }
-  if (!cardImg) { onDone(); return; }
 
-  var candidates = [];
-  for (var a = 0; a < (proj.articles || []).length; a++) {
-    var art = proj.articles[a];
+  if (cards.length === 0) {
+    console.log('articles.js: arAutoMatchAll — нет карточек с фото для сопоставления');
+    return;
+  }
+
+  /* Собрать свободные артикулы с refImage */
+  var articles = [];
+  for (var a2 = 0; a2 < (proj.articles || []).length; a2++) {
+    var art = proj.articles[a2];
     if (art.cardIdx >= 0 || !art.refImage) continue;
-    candidates.push({ idx: a, sku: art.sku, refImage: art.refImage });
+    articles.push({ idx: a2, sku: art.sku, refImage: art.refImage });
   }
-  if (candidates.length === 0) { onDone(); return; }
 
+  if (articles.length === 0) {
+    console.log('articles.js: arAutoMatchAll — нет артикулов с фото для сопоставления');
+    return;
+  }
+
+  var statusEl = document.getElementById('ar-stats');
+  if (statusEl) statusEl.textContent = 'AI сопоставляет ' + cards.length + ' карточек с ' + articles.length + ' артикулами...';
+  console.log('articles.js: batch AI matching — ' + cards.length + ' cards, ' + articles.length + ' articles');
+
+  /* Построить prompt */
+  var promptText = 'I have ' + cards.length + ' photoshoot cards (C1, C2, ...) and '
+    + articles.length + ' catalog reference photos (A1, A2, ...).\n'
+    + 'Match each card to the article showing the SAME product. Compare shape, style, color, silhouette.\n\n'
+    + 'CARDS:\n';
+  for (var ci = 0; ci < cards.length; ci++) {
+    promptText += '- C' + (ci + 1) + ' (card index ' + cards[ci].idx + ')\n';
+  }
+  promptText += '\nARTICLES:\n';
+  for (var ai = 0; ai < articles.length; ai++) {
+    promptText += '- A' + (ai + 1) + ': "' + articles[ai].sku + '"\n';
+  }
+  promptText += '\nReturn JSON array of matches: [{"card": "C1", "article": "A3"}, {"card": "C2", "article": "A1"}, ...]';
+  promptText += '\nOnly include confident matches. If unsure about a card, skip it.';
+
+  /* Собрать multimodal content */
   var msgContent = [];
-  var promptText = 'I have a photoshoot photo (CARD). '
-    + 'Below are ' + candidates.length + ' catalog reference photos.\n'
-    + 'Which one shows the SAME product? Compare shape, style, color.\n\n';
-  for (var ci = 0; ci < candidates.length; ci++) {
-    promptText += '- A' + (ci + 1) + ': "' + candidates[ci].sku + '"\n';
-  }
-  promptText += '\nReturn JSON: {"match": "A3", "confidence": "high"} or {"match": null}';
-
   msgContent.push({ type: 'text', text: promptText });
-  var cardUrl = cardImg;
-  if (cardUrl.indexOf('data:') !== 0 && cardUrl.indexOf('http') !== 0) {
-    cardUrl = 'data:image/jpeg;base64,' + cardUrl;
-  }
-  msgContent.push({ type: 'text', text: '--- CARD ---' });
-  msgContent.push({ type: 'image_url', image_url: { url: cardUrl, detail: 'low' } });
 
-  for (var ai = 0; ai < candidates.length; ai++) {
-    msgContent.push({ type: 'text', text: '--- A' + (ai + 1) + ' ---' });
-    msgContent.push({ type: 'image_url', image_url: { url: candidates[ai].refImage, detail: 'low' } });
+  /* Добавить фото карточек */
+  for (var ci2 = 0; ci2 < cards.length; ci2++) {
+    var cUrl = cards[ci2].img;
+    if (cUrl.indexOf('data:') !== 0 && cUrl.indexOf('http') !== 0) {
+      cUrl = 'data:image/jpeg;base64,' + cUrl;
+    }
+    msgContent.push({ type: 'text', text: '--- C' + (ci2 + 1) + ' ---' });
+    msgContent.push({ type: 'image_url', image_url: { url: cUrl, detail: 'low' } });
+  }
+
+  /* Добавить фото артикулов */
+  for (var ai2 = 0; ai2 < articles.length; ai2++) {
+    msgContent.push({ type: 'text', text: '--- A' + (ai2 + 1) + ' ---' });
+    msgContent.push({ type: 'image_url', image_url: { url: articles[ai2].refImage, detail: 'low' } });
   }
 
   var body = {
     model: 'gpt-4o',
     messages: [{ role: 'user', content: msgContent }],
-    max_tokens: 200,
+    max_tokens: 1000,
     temperature: 0.1
   };
 
@@ -1659,26 +1635,56 @@ function _arAIFindForCardAsync(cardIdx, apiKey, proj, onDone) {
   xhr.open('POST', 'https://api.openai.com/v1/chat/completions', true);
   xhr.setRequestHeader('Content-Type', 'application/json');
   xhr.setRequestHeader('Authorization', 'Bearer ' + apiKey);
-  xhr.timeout = 60000;
+  xhr.timeout = 120000; /* 2 минуты — много картинок */
 
   xhr.onload = function() {
+    console.log('articles.js: AI response status=' + xhr.status);
     if (xhr.status === 200) {
       try {
         var resp = JSON.parse(xhr.responseText);
         var text = resp.choices[0].message.content.trim();
-        var jsonMatch = text.match(/\{[\s\S]*\}/);
-        var result = JSON.parse(jsonMatch ? jsonMatch[0] : text);
-        if (result.match) {
-          var artNum = parseInt(String(result.match).replace(/\D/g, ''), 10);
-          var cand = candidates[artNum - 1];
-          if (cand) arDoMatch(cand.idx, cardIdx);
+        console.log('articles.js: AI raw response:', text);
+
+        /* Парсить JSON-массив из ответа */
+        var arrMatch = text.match(/\[[\s\S]*\]/);
+        var matches = JSON.parse(arrMatch ? arrMatch[0] : text);
+
+        var applied = 0;
+        for (var mi = 0; mi < matches.length; mi++) {
+          var m = matches[mi];
+          var cardNum = parseInt(String(m.card).replace(/\D/g, ''), 10);
+          var artNum = parseInt(String(m.article).replace(/\D/g, ''), 10);
+          var cardData = cards[cardNum - 1];
+          var artData = articles[artNum - 1];
+          if (cardData && artData) {
+            arDoMatch(artData.idx, cardData.idx);
+            applied++;
+          }
         }
-      } catch(e) { console.error('AI batch parse error:', e); }
+        console.log('articles.js: AI applied ' + applied + ' matches out of ' + matches.length);
+        if (statusEl) statusEl.textContent = 'AI: ' + applied + ' из ' + cards.length + ' карточек сопоставлено';
+      } catch(e) {
+        console.error('articles.js: AI parse error:', e);
+        if (statusEl) statusEl.textContent = 'AI: ошибка разбора ответа';
+      }
+    } else {
+      console.error('articles.js: AI request failed:', xhr.status, xhr.responseText);
+      if (statusEl) statusEl.textContent = 'AI: ошибка ' + xhr.status;
     }
-    onDone();
+    arRenderMatching();
+    arRenderVerification();
+    if (typeof shAutoSave === 'function') shAutoSave();
   };
-  xhr.onerror = function() { onDone(); };
-  xhr.ontimeout = function() { onDone(); };
+
+  xhr.onerror = function() {
+    console.error('articles.js: AI network error');
+    if (statusEl) statusEl.textContent = 'AI: ошибка сети';
+  };
+  xhr.ontimeout = function() {
+    console.error('articles.js: AI request timeout');
+    if (statusEl) statusEl.textContent = 'AI: таймаут';
+  };
+
   xhr.send(JSON.stringify(body));
 }
 
