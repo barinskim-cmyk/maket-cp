@@ -48,14 +48,19 @@ Frontend (HTML/JS)  -->  pywebview bridge  -->  AppAPI  -->  Services  -->  Doma
 - Project -- съёмка (brand, template, cards, categories, channels, stage, stage_history)
 - StageEvent -- запись перехода этапа (stage_id, timestamp, trigger)
 - Comment -- комментарий (author, text, created_at)
+- Article -- артикул (id, sku, category, color, refImage, status: unmatched|matched|verified, cardIdx)
 
 ### Frontend модули
 - state.js -- App, константы, утилиты, проверка бэкенда
 - nav.js -- навигация, модалки
-- shootings.js -- проекты, пайплайн
+- shootings.js -- проекты, пайплайн, авто-синхронизация с облаком, оффлайн-режим
+- layout.js -- движок раскладки карточек
 - cards.js -- редактор карточек
 - previews.js -- превью-панель (XMP, фильтры, lazy loading)
+- articles.js -- артикулы: чек-лист, сопоставление, верификация, импорт legacy
 - sync.js -- Rate Setter UI
+- supabase.js -- Supabase SDK: авторизация, CRUD проектов/карточек/слотов, share
+- cloud-ui.js -- UI облака: auth gate, логин, регистрация, загрузка проектов
 
 ### Dual-mode: desktop + browser
 Весь frontend должен работать БЕЗ Python (браузерный фолбэк). Проверка:
@@ -68,7 +73,7 @@ else { /* browser fallback */ }
 
 ### JavaScript
 - Без фреймворков, чистый JS (ES5-совместимый, var вместо let/const)
-- Функции с префиксом модуля: cp* (cards), pv* (previews), rs* (sync)
+- Функции с префиксом модуля: cp* (cards), pv* (previews), rs* (sync), ar* (articles), sh* (shootings), oc* (other content)
 - Никаких emoji/иконок в UI (требование Masha)
 - HTML генерируется строками (html += '...')
 
