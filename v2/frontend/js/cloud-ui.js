@@ -383,9 +383,9 @@ function authUnlock() {
   if (app) app.style.display = '';
   sbUpdateUI();
 
-  /* В браузере: загружаем проекты из облака (не из localStorage).
+  /* Загружаем проекты из облака (desktop + browser).
      Пропускаем для share-ссылок (там загрузка идёт через sbLoadByShareToken). */
-  if (!(window.pywebview && window.pywebview.api) && !window._isShareLink && sbIsLoggedIn() && !window._cloudLoaded) {
+  if (!window._isShareLink && sbIsLoggedIn() && !window._cloudLoaded) {
     window._cloudLoaded = true;
     sbLoadAllFromCloud();
   }
@@ -495,17 +495,10 @@ function authLock() {
 
 /**
  * Проверить авторизацию при загрузке.
- * Desktop (pywebview): пропускаем auth gate.
+ * Desktop + Browser: единый flow — показываем auth gate если не залогинен.
  * Share link (?share=TOKEN): пропускаем auth gate, грузим проект по токену.
- * Browser: показываем auth gate если не залогинен.
  */
 function authCheckOnLoad() {
-  /* Desktop: не требуем авторизации */
-  if (window.pywebview && window.pywebview.api) {
-    authUnlock();
-    return;
-  }
-
   /* Share link: пропускаем auth gate, загружаем проект по токену */
   var params = new URLSearchParams(window.location.search);
   var shareToken = params.get('share');
@@ -517,7 +510,9 @@ function authCheckOnLoad() {
     return;
   }
 
-  /* Browser: проверяем сессию через Supabase */
+  /* Desktop + Browser: проверяем сессию через Supabase.
+     Если залогинен — разблокируем и грузим проекты из облака.
+     Если нет — показываем auth gate. */
   if (sbIsLoggedIn()) {
     authUnlock();
   } else {
