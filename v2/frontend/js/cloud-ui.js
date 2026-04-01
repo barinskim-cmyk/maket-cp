@@ -533,3 +533,10 @@ window.addEventListener('DOMContentLoaded', function() {
     sbUpdateUI();
   }, 500);
 });
+
+/* Desktop (pywebview): API инжектится ПОСЛЕ загрузки страницы.
+   Если authCheckOnLoad сработал до pywebviewready — auth gate блокирует.
+   Повторяем проверку при pywebviewready чтобы разблокировать. */
+window.addEventListener('pywebviewready', function() {
+  authCheckOnLoad();
+});
