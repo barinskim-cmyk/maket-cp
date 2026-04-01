@@ -1597,7 +1597,7 @@ function arAutoMatchAll() {
 
     var card = proj.cards[c];
     var cardImgs = _arGetCardImages(card, pvByName);
-    if (cardImgs.length > 0) cards.push({ idx: c, imgs: cardImgs });
+    if (cardImgs.length > 0) cards.push({ idx: c, imgs: cardImgs, category: card.category || '' });
   }
 
   if (cards.length === 0) return;
@@ -1669,32 +1669,52 @@ function _arMatchWithPdfPages(cards, skuList, pdfPages, apiKey, proj, statusEl) 
     }
 
     /* Построить промпт */
-    var promptText = 'I have a product photoshoot with ' + ci.imgs.length + ' photos of the SAME product (different angles).\n'
-      + 'Below are pages from a catalog/checklist PDF that contains product reference photos with SKU codes.\n\n'
+    var catHint = '';
+    if (ci.category) {
+      catHint = '\nIMPORTANT: This card is specifically for category: "' + ci.category + '".\n'
+        + 'The photos may show a complete outfit (look) with multiple items, but you must ONLY match the '
+        + ci.category + ' item. Ignore other items in the photo (bags, shoes, clothing that are NOT ' + ci.category + ').\n';
+    } else {
+      catHint = '\nWARNING: The photos may show a complete outfit (look) with multiple items.\n'
+        + 'Focus on the MAIN SUBJECT — the item that is most prominent, centered, or shown in close-up.\n'
+        + 'First determine what type of product this card is about (shoes, bag, clothing, accessory), '
+        + 'then find ONLY that specific item in the checklist.\n';
+    }
+
+    var promptText = 'You receive TWO documents:\n\n'
+      + 'DOCUMENT 1 — PRODUCT CARD: ' + ci.imgs.length + ' professional photos from a photoshoot.\n'
+      + 'These photos show ONE specific product, possibly as part of a styled look/outfit.\n'
+      + 'The CLOSE-UP photo (usually first) shows the target product best.\n'
+      + catHint
+      + '\nDOCUMENT 2 — CHECKLIST PDF: catalog pages with small reference photos and SKU codes.\n\n'
+      + 'YOUR TASK: Match the SPECIFIC product from the card to its SKU in the checklist.\n'
+      + 'Compare: shape, silhouette, color, material, texture, style, details (buckles, heels, straps, logo).\n\n'
       + 'Available SKUs (not yet matched):\n';
     for (var si = 0; si < freeSkus.length; si++) {
       promptText += '- "' + freeSkus[si].sku + '"\n';
     }
-    promptText += '\nLook at the product in the photoshoot photos. Find the SAME product in the PDF pages.\n'
-      + 'Compare shape, silhouette, color, material, style.\n'
-      + 'Return ONLY JSON: {"match": "EXACT_SKU_STRING", "confidence": "high"} or {"match": null} if not found.';
+    promptText += '\nReturn ONLY JSON: {"match": "EXACT_SKU_STRING", "confidence": "high"} or {"match": null} if not found.\n'
+      + 'WRONG match is worse than no match. If unsure, return null.';
 
     var msgContent = [];
     msgContent.push({ type: 'text', text: promptText });
 
-    /* Фото карточки (до 3 ракурсов) */
+    /* ДОКУМЕНТ 1: Фото карточки (до 3 ракурсов) */
+    msgContent.push({ type: 'text', text: '=== DOCUMENT 1: PRODUCT CARD ===' });
     for (var k = 0; k < ci.imgs.length; k++) {
       var cUrl = ci.imgs[k];
       if (cUrl.indexOf('data:') !== 0 && cUrl.indexOf('http') !== 0) {
         cUrl = 'data:image/jpeg;base64,' + cUrl;
       }
-      msgContent.push({ type: 'text', text: '--- Product photo ' + (k + 1) + ' ---' });
-      msgContent.push({ type: 'image_url', image_url: { url: cUrl, detail: 'low' } });
+      var label = (k === 0) ? 'Close-up / main photo' : 'Angle ' + (k + 1);
+      msgContent.push({ type: 'text', text: '--- ' + label + ' ---' });
+      msgContent.push({ type: 'image_url', image_url: { url: cUrl, detail: 'high' } });
     }
 
-    /* Страницы PDF */
+    /* ДОКУМЕНТ 2: Страницы PDF чек-листа */
+    msgContent.push({ type: 'text', text: '=== DOCUMENT 2: CHECKLIST PDF ===' });
     for (var pi = 0; pi < pdfPages.length; pi++) {
-      msgContent.push({ type: 'text', text: '--- Checklist page ' + (pi + 1) + ' ---' });
+      msgContent.push({ type: 'text', text: '--- Page ' + (pi + 1) + ' ---' });
       msgContent.push({ type: 'image_url', image_url: { url: pdfPages[pi], detail: 'high' } });
     }
 
