@@ -709,70 +709,70 @@ function sbDownloadProject(cloudId, callback) {
           slotsByCard[sl.card_id].push(sl);
         }
 
-        // Собираем карточки
-        var remoteCards = cardRes.data || [];
-        for (var c = 0; c < remoteCards.length; c++) {
-          var rc = remoteCards[c];
-          var card = {
-            id: rc.id,
-            status: rc.status,
-            _hasHero: rc.has_hero,
-            _hAspect: rc.h_aspect,
-            _vAspect: rc.v_aspect,
-            _lockRows: rc.lock_rows,
-            slots: []
-          };
-
-          var cardSlots = slotsByCard[rc.id] || [];
-          for (var j = 0; j < cardSlots.length; j++) {
-            var rs = cardSlots[j];
-            card.slots.push({
-              orient: rs.orient,
-              weight: rs.weight,
-              row: rs.row_num,
-              rotation: rs.rotation,
-              file: rs.file_name,
-              dataUrl: rs.thumb_path || null,
-              path: null
-            });
-          }
-
-          proj.cards.push(card);
-        }
-
-        // Загружаем превью-галерею
+        /* ── Сначала загружаем превью — это единственный источник правды о фото ── */
         sbDownloadPreviews(cloudId, function(pvErr, pvList) {
           if (!pvErr && pvList) proj.previews = pvList;
 
-          /* Кросс-ссылка: заполняем dataUrl слотов из превью если thumb_path был пуст.
-             Это покрывает случай когда слоты вставлены через SQL без thumb_path,
-             а превью загружены отдельно через UI. */
-          if (proj.previews && proj.previews.length > 0) {
-            var pvByName = {};
+          /* Строим карту превью по имени файла:
+             pvByName['photo.jpg'] = { name, thumb (300px URL), preview (1200px URL), ... } */
+          var pvByName = {};
+          if (proj.previews) {
             for (var pi = 0; pi < proj.previews.length; pi++) {
               pvByName[proj.previews[pi].name] = proj.previews[pi];
             }
+          }
 
-            for (var ci = 0; ci < proj.cards.length; ci++) {
-              var cardSlots = proj.cards[ci].slots;
-              for (var si = 0; si < cardSlots.length; si++) {
-                if (!cardSlots[si].dataUrl && cardSlots[si].file) {
-                  var matchPv = pvByName[cardSlots[si].file];
-                  if (matchPv) {
-                    cardSlots[si].dataUrl = matchPv.thumb || matchPv.preview || null;
-                    console.log('supabase.js: slot thumb восстановлен из превью: ' + cardSlots[si].file);
-                  }
-                }
+          /* Собираем карточки. Слот хранит только file_name + структуру (orient, weight, row).
+             Картинку берём из превью по имени: preview (1200px) приоритет, thumb (300px) фолбэк. */
+          var remoteCards = cardRes.data || [];
+          for (var c = 0; c < remoteCards.length; c++) {
+            var rc = remoteCards[c];
+            var card = {
+              id: rc.id,
+              status: rc.status,
+              _hasHero: rc.has_hero,
+              _hAspect: rc.h_aspect,
+              _vAspect: rc.v_aspect,
+              _lockRows: rc.lock_rows,
+              slots: []
+            };
+
+            var cardSlots = slotsByCard[rc.id] || [];
+            for (var j = 0; j < cardSlots.length; j++) {
+              var rs = cardSlots[j];
+              var fileName = rs.file_name;
+              var pv = fileName ? pvByName[fileName] : null;
+
+              /* dataUrl: preview (1200px) > thumb (300px) > slot.thumb_path (legacy fallback) */
+              var imgUrl = null;
+              if (pv) {
+                imgUrl = pv.preview || pv.thumb || null;
               }
+              if (!imgUrl && rs.thumb_path) {
+                imgUrl = rs.thumb_path; /* legacy: если превью нет, берём из слота */
+              }
+
+              card.slots.push({
+                orient: rs.orient,
+                weight: rs.weight,
+                row: rs.row_num,
+                rotation: rs.rotation,
+                file: fileName,
+                dataUrl: imgUrl,
+                thumbUrl: pv ? (pv.thumb || null) : (rs.thumb_path || null),
+                path: null
+              });
             }
 
-            /* Восстановить otherContent из имён файлов + превью */
-            if (proj._ocNames && proj._ocNames.length > 0) {
-              for (var oi = 0; oi < proj._ocNames.length; oi++) {
-                var ocPv = pvByName[proj._ocNames[oi]];
-                if (ocPv) {
-                  proj.otherContent.push({ name: ocPv.name, path: '', thumb: ocPv.thumb, preview: ocPv.preview || '' });
-                }
+            proj.cards.push(card);
+          }
+
+          /* Восстановить otherContent из имён файлов + превью */
+          if (proj._ocNames && proj._ocNames.length > 0) {
+            for (var oi = 0; oi < proj._ocNames.length; oi++) {
+              var ocPv = pvByName[proj._ocNames[oi]];
+              if (ocPv) {
+                proj.otherContent.push({ name: ocPv.name, path: '', thumb: ocPv.thumb, preview: ocPv.preview || '' });
               }
             }
           }
@@ -951,73 +951,75 @@ function _sbDoLoadByToken(token) {
       otherContent: []
     };
 
-    /* Если RPC вернул карточки — распарсить */
-    if (data.cards && Array.isArray(data.cards)) {
-      for (var c = 0; c < data.cards.length; c++) {
-        var rc = data.cards[c];
-        var card = {
-          id: rc.id,
-          status: rc.status || 'draft',
-          _hasHero: rc.has_hero,
-          _hAspect: rc.h_aspect || '3/2',
-          _vAspect: rc.v_aspect || '2/3',
-          _lockRows: rc.lock_rows || false,
-          slots: []
-        };
-        if (rc.slots && Array.isArray(rc.slots)) {
-          for (var s = 0; s < rc.slots.length; s++) {
-            var rs = rc.slots[s];
-            card.slots.push({
-              orient: rs.orient || 'v',
-              weight: rs.weight || 1,
-              row: rs.row_num,
-              rotation: rs.rotation || 0,
-              file: rs.file_name || null,
-              dataUrl: rs.preview_path || rs.thumb_path || null,
-              thumbUrl: rs.thumb_path || null,
-              path: null
-            });
-          }
-        }
-        proj.cards.push(card);
-      }
-    }
+    /* Временно сохраняем карточки из RPC — соберём после загрузки превью */
+    var _rpcCards = data.cards || [];
 
-    /* Загружаем превью-галерею для клиента */
+    /* ── Сначала загружаем превью — единственный источник правды о фото ── */
     sbDownloadPreviews(data.project_id, function(pvErr, pvList) {
       if (!pvErr && pvList && pvList.length > 0) {
         proj.previews = pvList;
         console.log('supabase.js: загружено ' + pvList.length + ' превью по share-ссылке');
       }
 
-      /* Кросс-ссылка: заполняем dataUrl слотов из превью если thumb_path был пуст */
-      if (proj.previews && proj.previews.length > 0) {
-        var pvByName = {};
+      /* Карта превью по имени файла */
+      var pvByName = {};
+      if (proj.previews) {
         for (var pi = 0; pi < proj.previews.length; pi++) {
           pvByName[proj.previews[pi].name] = proj.previews[pi];
         }
+      }
 
-        for (var ci = 0; ci < proj.cards.length; ci++) {
-          var cardSlots = proj.cards[ci].slots;
-          for (var si = 0; si < cardSlots.length; si++) {
-            if (!cardSlots[si].dataUrl && cardSlots[si].file) {
-              var matchPv = pvByName[cardSlots[si].file];
-              if (matchPv) {
-                cardSlots[si].dataUrl = matchPv.thumb || matchPv.preview || null;
+      /* Собираем карточки. Слот берёт картинку из превью по file_name. */
+      if (_rpcCards && Array.isArray(_rpcCards)) {
+        for (var c = 0; c < _rpcCards.length; c++) {
+          var rc = _rpcCards[c];
+          var card = {
+            id: rc.id,
+            status: rc.status || 'draft',
+            _hasHero: rc.has_hero,
+            _hAspect: rc.h_aspect || '3/2',
+            _vAspect: rc.v_aspect || '2/3',
+            _lockRows: rc.lock_rows || false,
+            slots: []
+          };
+          if (rc.slots && Array.isArray(rc.slots)) {
+            for (var s = 0; s < rc.slots.length; s++) {
+              var rs = rc.slots[s];
+              var fileName = rs.file_name || null;
+              var pv = fileName ? pvByName[fileName] : null;
+
+              /* dataUrl: preview (1200px) > thumb (300px) > slot paths (legacy) */
+              var imgUrl = null;
+              if (pv) {
+                imgUrl = pv.preview || pv.thumb || null;
               }
-            }
-          }
-        }
+              if (!imgUrl) {
+                imgUrl = rs.preview_path || rs.thumb_path || null;
+              }
 
-        /* Восстановить otherContent из имён файлов + превью */
-        if (proj._ocNames && proj._ocNames.length > 0) {
-          for (var oi = 0; oi < proj._ocNames.length; oi++) {
-            var ocPv = pvByName[proj._ocNames[oi]];
-            if (ocPv) {
-              proj.otherContent.push({ name: ocPv.name, path: '', thumb: ocPv.thumb, preview: ocPv.preview || '' });
+              card.slots.push({
+                orient: rs.orient || 'v',
+                weight: rs.weight || 1,
+                row: rs.row_num,
+                rotation: rs.rotation || 0,
+                file: fileName,
+                dataUrl: imgUrl,
+                thumbUrl: pv ? (pv.thumb || null) : (rs.thumb_path || null),
+                path: null
+              });
             }
           }
-          console.log('supabase.js: восстановлено ' + proj.otherContent.length + ' доп. контент');
+          proj.cards.push(card);
+        }
+      }
+
+      /* Восстановить otherContent из имён файлов + превью */
+      if (proj._ocNames && proj._ocNames.length > 0) {
+        for (var oi = 0; oi < proj._ocNames.length; oi++) {
+          var ocPv = pvByName[proj._ocNames[oi]];
+          if (ocPv) {
+            proj.otherContent.push({ name: ocPv.name, path: '', thumb: ocPv.thumb, preview: ocPv.preview || '' });
+          }
         }
       }
       delete proj._ocNames;
