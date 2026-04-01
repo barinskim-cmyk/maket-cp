@@ -1589,8 +1589,8 @@ function arAutoMatchAll() {
     if (hasMatch) continue;
 
     var card = proj.cards[c];
-    var cardImg = _arGetCardImage(card, pvByName);
-    if (cardImg) cards.push({ idx: c, img: cardImg });
+    var cardImgs = _arGetCardImages(card, pvByName);
+    if (cardImgs.length > 0) cards.push({ idx: c, imgs: cardImgs });
   }
 
   if (cards.length === 0) return;
@@ -1629,7 +1629,7 @@ function arAutoMatchAll() {
       return;
     }
 
-    _arMatchOneCard(ci.idx, ci.img, candidates, apiKey, function(matchedArtIdx) {
+    _arMatchOneCard(ci.idx, ci.imgs, candidates, apiKey, function(matchedArtIdx) {
       if (matchedArtIdx >= 0) {
         arDoMatch(matchedArtIdx, ci.idx);
         applied++;
@@ -1646,40 +1646,44 @@ function arAutoMatchAll() {
 
 
 /**
- * Получить изображение карточки (первое доступное фото слота).
+ * Получить до 3 фото карточки (разные ракурсы товара).
+ * @returns {string[]} массив URL/dataURL изображений
  */
-function _arGetCardImage(card, pvByName) {
-  if (!card || !card.slots) return '';
-  for (var si = 0; si < card.slots.length; si++) {
+function _arGetCardImages(card, pvByName) {
+  var imgs = [];
+  if (!card || !card.slots) return imgs;
+  var max = Math.min(card.slots.length, 3);
+  for (var si = 0; si < max; si++) {
     var slot = card.slots[si];
     var img = slot.dataUrl || slot.thumbUrl || '';
     if (!img && slot.file && pvByName[slot.file]) {
       var pv = pvByName[slot.file];
       img = pv.thumb || pv.preview || '';
     }
-    if (img) return img;
+    if (img) imgs.push(img);
   }
-  return '';
+  return imgs;
 }
 
 
 /**
  * AI-сопоставление одной карточки с кандидатами.
- * Отправляет 1 фото карточки + до 15 refImage артикулов.
+ * Отправляет до 3 фото карточки (разные ракурсы) + до 12 refImage артикулов.
  * @param {number} cardIdx — индекс карточки
- * @param {string} cardImg — URL/dataURL фото карточки
+ * @param {string[]} cardImgs — массив URL/dataURL фото карточки (до 3 ракурсов)
  * @param {Array} candidates — [{idx, sku, refImage}]
  * @param {string} apiKey
  * @param {function} onDone — callback(matchedArtIdx) или callback(-1)
  */
-function _arMatchOneCard(cardIdx, cardImg, candidates, apiKey, onDone) {
-  /* Ограничить число кандидатов (OpenAI лимит ~20 картинок на запрос) */
-  var maxCandidates = 15;
+function _arMatchOneCard(cardIdx, cardImgs, candidates, apiKey, onDone) {
+  /* Ограничить кандидатов: 3 фото карточки + N артикулов, всего до ~18 картинок */
+  var maxCandidates = Math.max(5, 18 - cardImgs.length);
   var cands = candidates.length > maxCandidates ? candidates.slice(0, maxCandidates) : candidates;
 
-  var promptText = 'I have a product photoshoot photo (CARD) and '
+  var promptText = 'I have ' + cardImgs.length + ' photoshoot photos of the SAME product (different angles) and '
     + cands.length + ' catalog reference images.\n'
-    + 'Which reference photo shows the SAME product? Compare shape, silhouette, color, style.\n\n';
+    + 'Which reference photo shows the SAME product as in the photoshoot? '
+    + 'Compare shape, silhouette, color, material, style, details.\n\n';
   for (var i = 0; i < cands.length; i++) {
     promptText += '- A' + (i + 1) + ': "' + cands[i].sku + '"\n';
   }
@@ -1688,13 +1692,15 @@ function _arMatchOneCard(cardIdx, cardImg, candidates, apiKey, onDone) {
   var msgContent = [];
   msgContent.push({ type: 'text', text: promptText });
 
-  /* Фото карточки */
-  var cUrl = cardImg;
-  if (cUrl.indexOf('data:') !== 0 && cUrl.indexOf('http') !== 0) {
-    cUrl = 'data:image/jpeg;base64,' + cUrl;
+  /* Фото карточки — до 3 ракурсов */
+  for (var k = 0; k < cardImgs.length; k++) {
+    var cUrl = cardImgs[k];
+    if (cUrl.indexOf('data:') !== 0 && cUrl.indexOf('http') !== 0) {
+      cUrl = 'data:image/jpeg;base64,' + cUrl;
+    }
+    msgContent.push({ type: 'text', text: '--- CARD photo ' + (k + 1) + ' ---' });
+    msgContent.push({ type: 'image_url', image_url: { url: cUrl, detail: 'low' } });
   }
-  msgContent.push({ type: 'text', text: '--- CARD ---' });
-  msgContent.push({ type: 'image_url', image_url: { url: cUrl, detail: 'low' } });
 
   /* Фото кандидатов */
   for (var j = 0; j < cands.length; j++) {
@@ -1703,7 +1709,7 @@ function _arMatchOneCard(cardIdx, cardImg, candidates, apiKey, onDone) {
   }
 
   var body = {
-    model: 'gpt-4o-mini',
+    model: 'gpt-4o',
     messages: [{ role: 'user', content: msgContent }],
     max_tokens: 150,
     temperature: 0.1
