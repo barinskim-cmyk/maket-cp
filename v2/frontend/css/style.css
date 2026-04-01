@@ -1096,28 +1096,37 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 }
 .ar-row-actions button:hover { background: #f0f0f0; color: #333; }
 
-/* ── Блок 2: Сопоставление (двухколоночный layout) ── */
-.ar-matching-layout {
-  display: flex; gap: 16px; min-height: 300px;
+/* ── Блок 2: Сопоставление (строчный layout) ── */
+.ar-matching-header {
+  display: flex; gap: 12px; margin-bottom: 4px;
 }
-.ar-cards-col, .ar-skus-col {
-  flex: 1; min-width: 0;
-}
-.ar-cards-col h4, .ar-skus-col h4 {
-  font-size: 12px; text-transform: uppercase; color: #999; margin-bottom: 8px;
+.ar-matching-header h4 {
+  font-size: 12px; text-transform: uppercase; color: #999; margin: 0;
   font-weight: 600;
 }
+.ar-mh-left { flex: 1; }
+.ar-mh-right { flex: 1; }
 
 /* ── Тулбар сопоставления ── */
 .ar-match-toolbar2 {
   display: flex; align-items: center; margin-bottom: 12px;
 }
 
-/* ── Две колонки ── */
-.ar-col h4 {
-  font-size: 12px; text-transform: uppercase; color: #999; margin-bottom: 8px;
-  font-weight: 600;
+/* Строка сопоставления: карточка + артикул бок о бок */
+.ar-match-row {
+  display: flex; gap: 12px; margin-bottom: 6px; align-items: stretch;
 }
+
+/* Ячейка строки (карточка или артикул) */
+.ar-match-cell {
+  flex: 1; min-width: 0;
+  display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+  border: 1.5px solid #e8e8e8; border-radius: 6px;
+  cursor: pointer; transition: border-color 0.15s, background 0.15s;
+  box-sizing: border-box; overflow: hidden; position: relative;
+}
+.ar-match-cell:hover { border-color: #bbb; background: #fafafa; }
+.ar-match-cell.ar-selected { border-color: #2196f3; background: #e3f2fd; }
 
 /* Placeholder напротив карточки без привязки */
 .ar-sku-placeholder {
@@ -1126,16 +1135,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 }
 .ar-sku-placeholder:hover { border-color: #e0e0e0; background: #fafafa; }
 
-/* Элемент сопоставления */
-.ar-match-item {
+/* Свободные артикулы (снизу) */
+.ar-free-item {
   display: flex; align-items: center; gap: 10px; padding: 8px 10px;
   border: 1.5px solid #e8e8e8; border-radius: 6px; margin-bottom: 6px;
   cursor: pointer; transition: border-color 0.15s, background 0.15s;
-  min-height: 72px;
 }
-.ar-match-item:hover { border-color: #bbb; background: #fafafa; }
-.ar-match-item.ar-selected { border-color: #2196f3; background: #e3f2fd; }
-.ar-match-item.ar-matched { opacity: 0.5; }
+.ar-free-item:hover { border-color: #bbb; background: #fafafa; }
+.ar-free-item.ar-selected { border-color: #2196f3; background: #e3f2fd; }
 
 /* Полоска фото карточки (все слоты) */
 .ar-card-photos {
@@ -1219,7 +1226,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   height: 60px; max-width: 80px; width: auto; object-fit: contain; border-radius: 3px;
   background: #f8f8f8; flex-shrink: 0; border: 1px solid #e0e0e0;
 }
-.ar-sku-item { display: flex; align-items: center; gap: 8px; }
+/* ar-sku-item стили наследуются от ar-match-cell */
 
 /* ── Модальное окно увеличенного фото ── */
 .ar-ref-overlay {
