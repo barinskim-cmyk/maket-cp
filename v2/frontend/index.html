@@ -189,10 +189,8 @@
     <div id="ar-main" style="display:none">
       <div class="ar-toolbar">
         <button class="btn btn-sm" onclick="arLoadChecklist()" title="Загрузить чек-лист (PDF, JSON, CSV, Excel)">Загрузить чек-лист</button>
-        <button class="btn btn-sm" onclick="arLoadViaOpenAI()" title="Распознать PDF через OpenAI Vision (с картинками)">Распознать PDF (AI)</button>
         <button class="btn btn-sm" onclick="arAddManual()" title="Добавить артикул вручную">+ Вручную</button>
-        <button class="btn btn-sm" onclick="arSetOpenAIKey()" title="Настроить ключ OpenAI" style="margin-left:auto;color:#888;font-size:11px">API Key</button>
-        <span id="ar-stats" style="color:#888;font-size:12px;margin-left:8px"></span>
+        <span id="ar-stats" style="color:#888;font-size:12px;margin-left:12px"></span>
       </div>
 
       <!-- Блок 1: Чек-лист артикулов -->
@@ -204,11 +202,20 @@
       <!-- Блок 2: Сопоставление артикулов с карточками -->
       <div class="ar-section" id="ar-matching-section">
         <h3>Сопоставление</h3>
-        <div class="ar-match-toolbar">
-          <button class="btn btn-sm" onclick="arAutoMatchAll()" title="AI ищет артикул для каждой карточки">Найти все (AI)</button>
-          <span style="font-size:12px;color:#999">Или выбирайте артикул вручную напротив каждой карточки</span>
+        <div class="ar-match-toolbar2">
+          <button class="btn btn-sm" onclick="arAutoMatchAll()" title="AI расставит артикулы напротив карточек">Расставить (AI)</button>
+          <span style="font-size:12px;color:#999;margin-left:8px">Или кликни карточку, потом артикул -- они свяжутся</span>
         </div>
-        <div id="ar-match-list" class="ar-match-list"></div>
+        <div class="ar-matching-layout">
+          <div class="ar-col" id="ar-cards-col">
+            <h4>Карточки</h4>
+            <div id="ar-cards-list"></div>
+          </div>
+          <div class="ar-col" id="ar-skus-col">
+            <h4>Артикулы</h4>
+            <div id="ar-skus-list"></div>
+          </div>
+        </div>
       </div>
 
       <!-- Блок 3: Верификация -->

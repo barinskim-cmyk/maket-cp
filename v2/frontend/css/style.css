@@ -1108,50 +1108,25 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   font-weight: 600;
 }
 
-/* ── Новый UX: строка сопоставления (карточка → артикул) ── */
-.ar-match-toolbar {
-  display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+/* ── Тулбар сопоставления ── */
+.ar-match-toolbar2 {
+  display: flex; align-items: center; margin-bottom: 12px;
 }
-.ar-match-list { display: flex; flex-direction: column; gap: 6px; }
 
-.ar-match-row {
-  display: flex; align-items: center; gap: 12px;
-  padding: 8px 12px; border: 1.5px solid #e8e8e8; border-radius: 6px;
-  background: #fff; transition: border-color 0.15s;
+/* ── Две колонки ── */
+.ar-col h4 {
+  font-size: 12px; text-transform: uppercase; color: #999; margin-bottom: 8px;
+  font-weight: 600;
 }
-.ar-match-row:hover { border-color: #bbb; }
-.ar-match-row.ar-row-matched { border-color: #a5d6a7; background: #f1f8e9; }
 
-.ar-match-card {
-  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
-  position: relative; min-width: 200px;
+/* Placeholder напротив карточки без привязки */
+.ar-sku-placeholder {
+  border-style: dashed; border-color: #e0e0e0; background: #fafafa;
+  color: #ccc; cursor: default;
 }
-.ar-match-arrow {
-  color: #ccc; font-size: 18px; flex-shrink: 0;
-}
-.ar-match-article {
-  display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;
-}
-.ar-match-art-info { min-width: 0; flex: 1; }
+.ar-sku-placeholder:hover { border-color: #e0e0e0; background: #fafafa; }
 
-/* Выпадающий список артикулов */
-.ar-match-select {
-  flex: 1; min-width: 180px; max-width: 350px;
-  padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px;
-  font-size: 13px; font-family: monospace; background: #fff;
-}
-.ar-match-select:focus { border-color: #2196f3; outline: none; }
-
-/* Кнопка AI поиска для одной карточки */
-.ar-ai-find-btn {
-  padding: 5px 12px; font-size: 12px; font-weight: 600;
-  border: 1px solid #90caf9; border-radius: 4px;
-  background: #e3f2fd; color: #1565c0; cursor: pointer;
-  white-space: nowrap; flex-shrink: 0;
-}
-.ar-ai-find-btn:hover { background: #bbdefb; }
-
-/* Старый элемент (для обратной совместимости) */
+/* Элемент сопоставления */
 .ar-match-item {
   display: flex; align-items: center; gap: 10px; padding: 8px 10px;
   border: 1.5px solid #e8e8e8; border-radius: 6px; margin-bottom: 6px;

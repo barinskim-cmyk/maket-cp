@@ -237,6 +237,7 @@ class AppAPI:
         """
         def task(path: str):
             result = self.article_service.parse_file(path)
+            result["file"] = path
             self._emit("onArticleParseDone", result)
 
         if not file_path:
@@ -261,3 +262,37 @@ class AppAPI:
         import threading
         threading.Thread(target=task, args=(file_path,), daemon=True).start()
         return {"status": "started", "file": file_path}
+
+    def pdf_pages_to_images(self, file_path: str) -> dict:
+        """Конвертировать страницы PDF в base64 JPEG (для AI Vision).
+
+        Returns:
+            {"pages": ["data:image/jpeg;base64,...", ...], "total": int}
+        """
+        import base64
+        import io
+        try:
+            import pdfplumber
+            from PIL import Image
+        except ImportError:
+            return {"error": "pdfplumber/Pillow не установлен"}
+
+        path = Path(file_path)
+        if not path.exists():
+            return {"error": f"Файл не найден: {file_path}"}
+
+        pages_b64: list[str] = []
+        try:
+            with pdfplumber.open(str(path)) as pdf:
+                for page in pdf.pages:
+                    img = page.to_image(resolution=200).original
+                    buf = io.BytesIO()
+                    if img.mode in ("RGBA", "P"):
+                        img = img.convert("RGB")
+                    img.save(buf, format="JPEG", quality=80)
+                    b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+                    pages_b64.append(f"data:image/jpeg;base64,{b64}")
+        except Exception as e:
+            return {"error": str(e)}
+
+        return {"pages": pages_b64, "total": len(pages_b64)}
