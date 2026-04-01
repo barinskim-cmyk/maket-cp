@@ -1055,7 +1055,7 @@ function ocInitField() {
       for (var k = 0; k < proj.otherContent.length; k++) {
         if (proj.otherContent[k].name === pv.name) return;
       }
-      proj.otherContent.push({ name: pv.name, path: pv.path || '', thumb: pv.thumb });
+      proj.otherContent.push({ name: pv.name, path: pv.path || '', thumb: pv.thumb, preview: pv.preview || '' });
       ocRenderField();
       /* Авто-синхронизация доп. контента */
       if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
@@ -1089,7 +1089,7 @@ function ocRenderField() {
   for (var i = 0; i < store.length; i++) {
     var item = store[i];
     html += '<div class="oc-item" title="' + esc(item.name) + '">';
-    html += '<img src="' + item.thumb + '" loading="lazy">';
+    html += '<img src="' + (item.preview || item.thumb) + '" loading="lazy">';
     html += '<button class="pv-remove" onclick="ocRemoveItem(' + i + ',event)">&times;</button>';
     html += '<span class="pv-name">' + esc(pvShortName(item.name)) + '</span>';
     html += '</div>';
