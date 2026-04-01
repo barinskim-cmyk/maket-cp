@@ -59,6 +59,7 @@
 <div class="nav">
   <button class="nav-btn active" id="nav-shootings" onclick="showPage('shootings')">Съёмки</button>
   <button class="nav-btn" id="nav-content" onclick="showPage('content')">Контент</button>
+  <button class="nav-btn" id="nav-articles" onclick="showPage('articles')">Артикулы</button>
   <button class="nav-btn" id="nav-sync" onclick="showPage('sync')">Синхронизация</button>
 </div>
 
@@ -70,6 +71,7 @@
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
         <button class="btn" onclick="loadProject()">Открыть</button>
         <button class="btn btn-primary" onclick="openNewProjectModal()">Новая съёмка</button>
+        <button class="btn" onclick="shImportLegacyJson()" title="Импорт старого проекта (JSON)">Импорт</button>
         <button class="btn" onclick="sbShowCloudProjects()" title="Скачать из облака">Из облака</button>
         <button class="btn" onclick="sbOpenShareModal()" title="Поделиться ссылкой">Поделиться</button>
       </div>
@@ -173,6 +175,50 @@
           </select>
         </div>
         <div class="pv-gallery" id="oc-pv-gallery"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ Артикулы ══════════════ -->
+<div id="page-articles" class="page">
+  <div class="container">
+    <div class="section-title">Артикулы</div>
+    <div id="ar-no-project" class="empty-state">Выберите съёмку на вкладке "Съёмки"</div>
+
+    <div id="ar-main" style="display:none">
+      <div class="ar-toolbar">
+        <button class="btn btn-sm" onclick="arLoadChecklist()" title="Загрузить PDF/TXT чек-лист (desktop)">Загрузить чек-лист</button>
+        <button class="btn btn-sm" onclick="arImportChecklistJson()" title="Импорт артикулов из JSON">Импорт JSON</button>
+        <span id="ar-stats" style="color:#888;font-size:12px;margin-left:12px"></span>
+      </div>
+
+      <!-- Блок 1: Чек-лист артикулов -->
+      <div class="ar-section" id="ar-checklist-section">
+        <h3>Чек-лист артикулов</h3>
+        <div class="ar-checklist" id="ar-checklist"></div>
+      </div>
+
+      <!-- Блок 2: Сопоставление артикулов с карточками -->
+      <div class="ar-section" id="ar-matching-section">
+        <h3>Сопоставление</h3>
+        <div class="ar-matching-layout">
+          <div class="ar-cards-col" id="ar-cards-col">
+            <h4>Карточки</h4>
+            <div id="ar-cards-list"></div>
+          </div>
+          <div class="ar-skus-col" id="ar-skus-col">
+            <h4>Артикулы</h4>
+            <div id="ar-skus-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Блок 3: Верификация (чек-лист с картинками) -->
+      <div class="ar-section" id="ar-verify-section" style="display:none">
+        <h3>Верификация</h3>
+        <div class="ar-verify-list" id="ar-verify-list"></div>
+        <button class="btn btn-primary" style="margin-top:12px" onclick="arConfirmAll()">Подтвердить все</button>
       </div>
     </div>
   </div>
@@ -451,6 +497,7 @@
 <script src="js/layout.js"></script>
 <script src="js/cards.js"></script>
 <script src="js/previews.js"></script>
+<script src="js/articles.js"></script>
 <script src="js/sync.js"></script>
 <script src="js/supabase.js"></script>
 <script src="js/cloud-ui.js"></script>
