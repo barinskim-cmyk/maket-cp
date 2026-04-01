@@ -87,7 +87,7 @@ function arRenderChecklist() {
   }
 
   var html = '<table class="ar-table"><thead><tr>'
-    + '<th>#</th><th></th><th>Артикул</th><th>Категория</th><th>Цвет</th><th>Карточка</th><th></th>'
+    + '<th>#</th><th></th><th>Фото</th><th>Артикул</th><th>Категория</th><th>Цвет</th><th>Карточка</th><th></th>'
     + '</tr></thead><tbody>';
 
   for (var i = 0; i < proj.articles.length; i++) {
@@ -101,6 +101,14 @@ function arRenderChecklist() {
     html += '<tr class="ar-row ' + statusCls + '" data-idx="' + i + '">';
     html += '<td>' + (i + 1) + '</td>';
     html += '<td><span class="ar-status-dot ' + statusCls + '">' + statusText + '</span></td>';
+    /* Референс-фото из каталога (если есть) */
+    html += '<td class="ar-ref-cell">';
+    if (art.refImage) {
+      html += '<img class="ar-ref-thumb" src="' + art.refImage + '" alt="ref" onclick="arShowRefImage(' + i + ')">';
+    } else {
+      html += '<span class="ar-ref-empty">--</span>';
+    }
+    html += '</td>';
     html += '<td class="ar-sku">' + esc(art.sku) + '</td>';
     html += '<td>' + esc(art.category || '') + '</td>';
     html += '<td>' + esc(art.color || '') + '</td>';
@@ -116,6 +124,27 @@ function arRenderChecklist() {
     + '</div>';
 
   el.innerHTML = html;
+}
+
+
+/**
+ * Показать увеличенное референс-фото артикула (модальное окно).
+ */
+function arShowRefImage(idx) {
+  var proj = getActiveProject();
+  if (!proj || !proj.articles || !proj.articles[idx]) return;
+  var art = proj.articles[idx];
+  if (!art.refImage) return;
+
+  /* Создать модальный оверлей */
+  var overlay = document.createElement('div');
+  overlay.className = 'ar-ref-overlay';
+  overlay.onclick = function() { document.body.removeChild(overlay); };
+  overlay.innerHTML = '<div class="ar-ref-modal">'
+    + '<img src="' + art.refImage + '" alt="' + esc(art.sku) + '">'
+    + '<div class="ar-ref-modal-sku">' + esc(art.sku) + '</div>'
+    + '</div>';
+  document.body.appendChild(overlay);
 }
 
 
@@ -157,16 +186,78 @@ function arClearAll() {
 
 
 /**
- * Загрузить чек-лист из файла (JSON, CSV, TXT).
- * Универсальная функция — работает и в desktop и в браузере.
- * JSON: [{sku, category, color, refImage}] или {articles: [...]}
- * CSV/TXT: строки с разделителями (tab, ;, ,) или по одному артикулу на строку.
- * Первая строка CSV может быть заголовком (sku/article/артикул).
+ * Загрузить чек-лист из файла (PDF/JSON/CSV/TXT/XLSX).
+ * Desktop: использует Python бэкенд (pdfplumber для PDF с изображениями).
+ * Browser: фолбэк на pdf.js / SheetJS / текстовый парсинг.
  */
 function arLoadChecklist() {
   var proj = getActiveProject();
   if (!proj) { alert('Сначала выберите съёмку'); return; }
 
+  /* Desktop-режим: Python-бэкенд парсит все форматы, включая PDF с картинками */
+  if (window.pywebview && window.pywebview.api && window.pywebview.api.parse_article_file) {
+    _arLoadViaBackend(proj);
+    return;
+  }
+
+  /* Browser-режим: локальный парсинг через JS */
+  _arLoadViaBrowser(proj);
+}
+
+
+/**
+ * Desktop: парсинг через Python бэкенд (pdfplumber + Pillow).
+ * Нативный диалог выбора файла, серверный парсинг PDF с изображениями.
+ */
+function _arLoadViaBackend(proj) {
+  /* Для больших PDF используем асинхронную версию с push-событием */
+  window.onArticleParseDone = function(result) {
+    if (result.error) {
+      alert('Ошибка парсинга: ' + result.error);
+      return;
+    }
+    var articles = _arConvertBackendResult(result.articles || []);
+    _arApplyLoaded(proj, articles, result.file || 'файл');
+  };
+
+  var res = window.pywebview.api.parse_article_pdf_async();
+  if (res && res.cancelled) return;
+  if (res && res.error) {
+    alert('Ошибка: ' + res.error);
+    return;
+  }
+  /* Результат придёт через onArticleParseDone push-событие */
+  console.log('articles.js: парсинг запущен через Python бэкенд');
+}
+
+
+/**
+ * Конвертировать результат бэкенда в формат Article для фронтенда.
+ * Добавляет id, status, cardIdx.
+ */
+function _arConvertBackendResult(rawArticles) {
+  var articles = [];
+  for (var i = 0; i < rawArticles.length; i++) {
+    var a = rawArticles[i];
+    articles.push({
+      id: 'ar_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+      sku: String(a.sku || '').trim(),
+      category: a.category || '',
+      color: a.color || '',
+      refImage: a.refImage || '',
+      status: 'unmatched',
+      cardIdx: -1
+    });
+  }
+  return articles;
+}
+
+
+/**
+ * Browser: парсинг через JS (pdf.js, SheetJS, текст).
+ * Фолбэк для работы без Python.
+ */
+function _arLoadViaBrowser(proj) {
   var input = document.createElement('input');
   input.type = 'file';
   input.accept = '.json,.csv,.tsv,.txt,.xlsx,.xls,.pdf';
@@ -175,7 +266,7 @@ function arLoadChecklist() {
     if (!file) return;
     var ext = (file.name.split('.').pop() || '').toLowerCase();
 
-    /* PDF — асинхронный парсинг через pdf.js */
+    /* PDF — асинхронный парсинг через pdf.js (без изображений) */
     if (ext === 'pdf') {
       _arParsePdf(file, function(articles) {
         _arApplyLoaded(proj, articles, file.name);
@@ -667,6 +758,10 @@ function arRenderMatching() {
         if (art2.cardIdx >= 0) continue;
         var sel2 = (_arSelectedSku === s) ? ' ar-selected' : '';
         html2 += '<div class="ar-match-item ar-sku-item' + sel2 + '" onclick="arSelectSku(' + s + ')">';
+        /* Референс-фото из каталога (если есть) */
+        if (art2.refImage) {
+          html2 += '<img class="ar-sku-ref" src="' + art2.refImage + '" alt="ref">';
+        }
         html2 += '<div class="ar-match-info">';
         html2 += '<div class="ar-match-sku">' + esc(art2.sku) + '</div>';
         if (art2.category) html2 += '<div class="ar-match-cat">' + esc(art2.category) + '</div>';
@@ -678,6 +773,10 @@ function arRenderMatching() {
         if (art3.cardIdx < 0) continue;
         var cardNum = art3.cardIdx + 1;
         html2 += '<div class="ar-match-item ar-sku-item ar-matched">';
+        /* Референс-фото */
+        if (art3.refImage) {
+          html2 += '<img class="ar-sku-ref" src="' + art3.refImage + '" alt="ref">';
+        }
         html2 += '<div class="ar-match-info">';
         html2 += '<div class="ar-match-sku">' + esc(art3.sku) + '</div>';
         html2 += '<div class="ar-match-cat">-> Карточка ' + cardNum + '</div>';
