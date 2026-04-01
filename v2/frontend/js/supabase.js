@@ -744,16 +744,35 @@ function sbDownloadProject(cloudId, callback) {
         sbDownloadPreviews(cloudId, function(pvErr, pvList) {
           if (!pvErr && pvList) proj.previews = pvList;
 
-          /* Восстановить otherContent из имён файлов + превью */
-          if (proj._ocNames && proj._ocNames.length > 0 && proj.previews) {
+          /* Кросс-ссылка: заполняем dataUrl слотов из превью если thumb_path был пуст.
+             Это покрывает случай когда слоты вставлены через SQL без thumb_path,
+             а превью загружены отдельно через UI. */
+          if (proj.previews && proj.previews.length > 0) {
             var pvByName = {};
             for (var pi = 0; pi < proj.previews.length; pi++) {
               pvByName[proj.previews[pi].name] = proj.previews[pi];
             }
-            for (var oi = 0; oi < proj._ocNames.length; oi++) {
-              var ocPv = pvByName[proj._ocNames[oi]];
-              if (ocPv) {
-                proj.otherContent.push({ name: ocPv.name, path: '', thumb: ocPv.thumb, preview: ocPv.preview || '' });
+
+            for (var ci = 0; ci < proj.cards.length; ci++) {
+              var cardSlots = proj.cards[ci].slots;
+              for (var si = 0; si < cardSlots.length; si++) {
+                if (!cardSlots[si].dataUrl && cardSlots[si].file) {
+                  var matchPv = pvByName[cardSlots[si].file];
+                  if (matchPv) {
+                    cardSlots[si].dataUrl = matchPv.thumb || matchPv.preview || null;
+                    console.log('supabase.js: slot thumb восстановлен из превью: ' + cardSlots[si].file);
+                  }
+                }
+              }
+            }
+
+            /* Восстановить otherContent из имён файлов + превью */
+            if (proj._ocNames && proj._ocNames.length > 0) {
+              for (var oi = 0; oi < proj._ocNames.length; oi++) {
+                var ocPv = pvByName[proj._ocNames[oi]];
+                if (ocPv) {
+                  proj.otherContent.push({ name: ocPv.name, path: '', thumb: ocPv.thumb, preview: ocPv.preview || '' });
+                }
               }
             }
           }
@@ -971,19 +990,35 @@ function _sbDoLoadByToken(token) {
         console.log('supabase.js: загружено ' + pvList.length + ' превью по share-ссылке');
       }
 
-      /* Восстановить otherContent из имён файлов + превью */
-      if (proj._ocNames && proj._ocNames.length > 0 && proj.previews) {
+      /* Кросс-ссылка: заполняем dataUrl слотов из превью если thumb_path был пуст */
+      if (proj.previews && proj.previews.length > 0) {
         var pvByName = {};
         for (var pi = 0; pi < proj.previews.length; pi++) {
           pvByName[proj.previews[pi].name] = proj.previews[pi];
         }
-        for (var oi = 0; oi < proj._ocNames.length; oi++) {
-          var ocPv = pvByName[proj._ocNames[oi]];
-          if (ocPv) {
-            proj.otherContent.push({ name: ocPv.name, path: '', thumb: ocPv.thumb, preview: ocPv.preview || '' });
+
+        for (var ci = 0; ci < proj.cards.length; ci++) {
+          var cardSlots = proj.cards[ci].slots;
+          for (var si = 0; si < cardSlots.length; si++) {
+            if (!cardSlots[si].dataUrl && cardSlots[si].file) {
+              var matchPv = pvByName[cardSlots[si].file];
+              if (matchPv) {
+                cardSlots[si].dataUrl = matchPv.thumb || matchPv.preview || null;
+              }
+            }
           }
         }
-        console.log('supabase.js: восстановлено ' + proj.otherContent.length + ' доп. контент');
+
+        /* Восстановить otherContent из имён файлов + превью */
+        if (proj._ocNames && proj._ocNames.length > 0) {
+          for (var oi = 0; oi < proj._ocNames.length; oi++) {
+            var ocPv = pvByName[proj._ocNames[oi]];
+            if (ocPv) {
+              proj.otherContent.push({ name: ocPv.name, path: '', thumb: ocPv.thumb, preview: ocPv.preview || '' });
+            }
+          }
+          console.log('supabase.js: восстановлено ' + proj.otherContent.length + ' доп. контент');
+        }
       }
       delete proj._ocNames;
 
