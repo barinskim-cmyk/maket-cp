@@ -15,6 +15,7 @@ from ..services.rate_setter import RateSetterService
 from ..services.card_service import CardService
 from ..services.project_service import ProjectService
 from ..services.preview_service import PreviewService
+from ..services.article_service import ArticleService
 from ..domain.project import Project
 from ..domain.card import CardTemplate
 
@@ -28,6 +29,7 @@ class AppAPI:
         self.card_service = CardService()
         self.project_service = ProjectService()
         self.preview_service = PreviewService()
+        self.article_service = ArticleService()
         self._project: Project | None = None
 
     def set_window(self, window: webview.Window) -> None:
@@ -191,3 +193,71 @@ class AppAPI:
         if not self._project:
             return None
         return self.project_service.to_dict(self._project)
+
+    # ── Артикулы ──
+
+    def parse_article_file(self, file_path: str = "") -> dict:
+        """Парсить файл с артикулами (PDF/JSON/CSV/XLSX).
+
+        Если file_path пустой — открывает нативный диалог выбора файла.
+        PDF: извлекает артикулы + каталожные изображения (base64).
+        JSON/CSV/XLSX: извлекает артикулы из таблицы.
+
+        Returns:
+            {"articles": [{sku, category, color, refImage}], "total": int}
+            или {"error": "..."}
+        """
+        if not file_path:
+            if not self._window:
+                return {"error": "Нет окна"}
+            result = self._window.create_file_dialog(
+                webview.OPEN_DIALOG,
+                directory="",
+                allow_multiple=False,
+                file_types=(
+                    "Все поддерживаемые (*.pdf;*.json;*.csv;*.txt;*.xlsx)",
+                    "PDF (*.pdf)",
+                    "JSON (*.json)",
+                    "CSV/TXT (*.csv;*.txt)",
+                    "Excel (*.xlsx)",
+                ),
+            )
+            if not result:
+                return {"cancelled": True}
+            file_path = result[0] if isinstance(result, (list, tuple)) else result
+
+        return self.article_service.parse_file(file_path)
+
+    def parse_article_pdf_async(self, file_path: str = "") -> dict:
+        """Асинхронная версия для больших PDF (с прогрессом).
+
+        Push-события:
+          onArticleParseDone({articles: [...], total: int})
+          или onArticleParseDone({error: "..."})
+        """
+        def task(path: str):
+            result = self.article_service.parse_file(path)
+            self._emit("onArticleParseDone", result)
+
+        if not file_path:
+            if not self._window:
+                return {"error": "Нет окна"}
+            result = self._window.create_file_dialog(
+                webview.OPEN_DIALOG,
+                directory="",
+                allow_multiple=False,
+                file_types=(
+                    "Все поддерживаемые (*.pdf;*.json;*.csv;*.txt;*.xlsx)",
+                    "PDF (*.pdf)",
+                    "JSON (*.json)",
+                    "CSV/TXT (*.csv;*.txt)",
+                    "Excel (*.xlsx)",
+                ),
+            )
+            if not result:
+                return {"cancelled": True}
+            file_path = result[0] if isinstance(result, (list, tuple)) else result
+
+        import threading
+        threading.Thread(target=task, args=(file_path,), daemon=True).start()
+        return {"status": "started", "file": file_path}
