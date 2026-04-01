@@ -1611,26 +1611,10 @@ function arAutoMatchAll() {
   }
 
   var statusEl = document.getElementById('ar-stats');
-  console.log('articles.js: arAutoMatchAll — ' + cards.length + ' cards, ' + skuList.length + ' articles, pdf=' + (_arLastPdfPath || 'none'));
+  console.log('articles.js: arAutoMatchAll — ' + cards.length + ' cards, refImages strategy');
 
-  /* Стратегия: если есть PDF — отправляем страницы PDF, иначе refImage батчами */
-  if (_arLastPdfPath && window.pywebview && window.pywebview.api && window.pywebview.api.pdf_pages_to_images) {
-    if (statusEl) statusEl.textContent = 'Рендерю страницы PDF для AI...';
-    window.pywebview.api.pdf_pages_to_images(_arLastPdfPath).then(function(result) {
-      if (result && result.pages && result.pages.length > 0) {
-        console.log('articles.js: PDF rendered — ' + result.pages.length + ' pages');
-        _arMatchWithPdfPages(cards, skuList, result.pages, apiKey, proj, statusEl);
-      } else {
-        console.log('articles.js: PDF render failed, falling back to refImage');
-        _arMatchWithRefImages(cards, proj, pvByName, apiKey, statusEl);
-      }
-    }).catch(function(e) {
-      console.error('articles.js: pdf_pages_to_images error:', e);
-      _arMatchWithRefImages(cards, proj, pvByName, apiKey, statusEl);
-    });
-  } else {
-    _arMatchWithRefImages(cards, proj, pvByName, apiKey, statusEl);
-  }
+  /* Основная стратегия: батчи refImage (крупные вырезанные картинки из PDF) */
+  _arMatchWithRefImages(cards, proj, pvByName, apiKey, statusEl);
 }
 
 
@@ -1771,16 +1755,17 @@ function _arMatchWithPdfPages(cards, skuList, pdfPages, apiKey, proj, statusEl) 
 
 
 /**
- * СТРАТЕГИЯ 2 (фолбэк): сопоставление через refImage батчами.
- * Когда PDF недоступен — отправляем refImage кандидатов группами по 12.
+ * Сопоставление через refImage батчами по 10.
+ * Для каждой карточки прогоняем ВСЕ батчи кандидатов, выбираем лучший матч.
  */
 function _arMatchWithRefImages(cards, proj, pvByName, apiKey, statusEl) {
   var total = cards.length;
   var applied = 0;
-  var idx = 0;
+  var cardIdx = 0;
+  var BATCH_SIZE = 10;
 
-  function processNext() {
-    if (idx >= cards.length) {
+  function processNextCard() {
+    if (cardIdx >= cards.length) {
       if (statusEl) statusEl.textContent = 'AI: ' + applied + ' из ' + total + ' сопоставлено';
       arRenderMatching();
       arRenderVerification();
@@ -1788,9 +1773,9 @@ function _arMatchWithRefImages(cards, proj, pvByName, apiKey, statusEl) {
       return;
     }
 
-    var ci = cards[idx];
-    if (statusEl) statusEl.textContent = 'AI: карточка ' + (idx + 1) + '/' + total + '...';
+    var ci = cards[cardIdx];
 
+    /* Собрать свободные кандидаты */
     var candidates = [];
     for (var a = 0; a < (proj.articles || []).length; a++) {
       var art = proj.articles[a];
@@ -1799,23 +1784,76 @@ function _arMatchWithRefImages(cards, proj, pvByName, apiKey, statusEl) {
     }
 
     if (candidates.length === 0) {
-      idx = cards.length;
-      processNext();
+      cardIdx = cards.length;
+      processNextCard();
       return;
     }
 
-    _arMatchOneCard(ci.idx, ci.imgs, candidates, apiKey, function(matchedArtIdx) {
-      if (matchedArtIdx >= 0) {
-        arDoMatch(matchedArtIdx, ci.idx);
-        applied++;
-        arRenderMatching();
+    /* Разбить кандидатов на батчи */
+    var batches = [];
+    for (var b = 0; b < candidates.length; b += BATCH_SIZE) {
+      batches.push(candidates.slice(b, b + BATCH_SIZE));
+    }
+
+    if (statusEl) statusEl.textContent = 'AI: карточка ' + (cardIdx + 1) + '/' + total +
+      ' (' + batches.length + ' батчей по ' + BATCH_SIZE + ')...';
+
+    /* Прогнать все батчи, собрать матчи, выбрать лучший */
+    var allMatches = []; /* [{artIdx, sku, confidence}] */
+    var batchIdx = 0;
+
+    function processNextBatch() {
+      if (batchIdx >= batches.length) {
+        /* Все батчи прошли — выбрать лучший матч */
+        if (allMatches.length > 0) {
+          /* Приоритет: high > medium > low */
+          var best = allMatches[0];
+          for (var mi = 1; mi < allMatches.length; mi++) {
+            if (_arConfScore(allMatches[mi].confidence) > _arConfScore(best.confidence)) {
+              best = allMatches[mi];
+            }
+          }
+          console.log('articles.js: card ' + ci.idx + ' best match: ' + best.sku + ' (' + best.confidence + ')');
+          arDoMatch(best.artIdx, ci.idx);
+          applied++;
+          arRenderMatching();
+        }
+        cardIdx++;
+        setTimeout(processNextCard, 1000);
+        return;
       }
-      idx++;
-      setTimeout(processNext, 1500);
-    });
+
+      var batch = batches[batchIdx];
+      if (statusEl) statusEl.textContent = 'AI: карточка ' + (cardIdx + 1) + '/' + total +
+        ', батч ' + (batchIdx + 1) + '/' + batches.length + '...';
+
+      _arMatchOneCard(ci.idx, ci.imgs, ci.category, batch, apiKey, function(artIdx, confidence) {
+        if (artIdx >= 0) {
+          var matchedCand = null;
+          for (var ci2 = 0; ci2 < batch.length; ci2++) {
+            if (batch[ci2].idx === artIdx) { matchedCand = batch[ci2]; break; }
+          }
+          if (matchedCand) {
+            allMatches.push({ artIdx: artIdx, sku: matchedCand.sku, confidence: confidence || 'medium' });
+          }
+        }
+        batchIdx++;
+        setTimeout(processNextBatch, 1500);
+      });
+    }
+
+    processNextBatch();
   }
 
-  processNext();
+  processNextCard();
+}
+
+/** Числовой скор уверенности для сортировки */
+function _arConfScore(c) {
+  if (c === 'high') return 3;
+  if (c === 'medium') return 2;
+  if (c === 'low') return 1;
+  return 0;
 }
 
 
@@ -1841,51 +1879,55 @@ function _arGetCardImages(card, pvByName) {
 
 
 /**
- * AI-сопоставление одной карточки с кандидатами.
- * Отправляет до 3 фото карточки (разные ракурсы) + до 12 refImage артикулов.
+ * AI-сопоставление одной карточки с батчем кандидатов.
+ * Отправляет 1 фото карточки (крупный план) + до 10 refImage.
  * @param {number} cardIdx — индекс карточки
- * @param {string[]} cardImgs — массив URL/dataURL фото карточки (до 3 ракурсов)
- * @param {Array} candidates — [{idx, sku, refImage}]
+ * @param {string[]} cardImgs — фото карточки (до 3)
+ * @param {string} category — категория карточки
+ * @param {Array} candidates — [{idx, sku, refImage}] (батч до 10)
  * @param {string} apiKey
- * @param {function} onDone — callback(matchedArtIdx) или callback(-1)
+ * @param {function} onDone — callback(matchedArtIdx, confidence) или callback(-1)
  */
-function _arMatchOneCard(cardIdx, cardImgs, candidates, apiKey, onDone) {
-  /* Ограничить кандидатов: 3 фото карточки + N артикулов, всего до ~18 картинок */
-  var maxCandidates = Math.max(5, 18 - cardImgs.length);
-  var cands = candidates.length > maxCandidates ? candidates.slice(0, maxCandidates) : candidates;
+function _arMatchOneCard(cardIdx, cardImgs, category, candidates, apiKey, onDone) {
+  var cands = candidates;
 
-  var promptText = 'I have ' + cardImgs.length + ' photoshoot photos of the SAME product (different angles) and '
-    + cands.length + ' catalog reference images.\n'
-    + 'Which reference photo shows the SAME product as in the photoshoot? '
-    + 'Compare shape, silhouette, color, material, style, details.\n\n';
+  /* Промпт: фокус на крупном плане, без категории */
+  var promptText = 'TASK: Match a product from photoshoot to its catalog reference.\n\n'
+    + 'PHOTOSHOOT: ' + cardImgs.length + ' photos. The FIRST photo is a CLOSE-UP — it shows the target product best.\n'
+    + 'The photos may show a styled outfit with multiple items. Identify which SPECIFIC item is the subject '
+    + 'by looking at the close-up: whatever item fills most of the close-up frame is the target.\n\n'
+    + 'CATALOG REFERENCES (this batch):\n';
   for (var i = 0; i < cands.length; i++) {
     promptText += '- A' + (i + 1) + ': "' + cands[i].sku + '"\n';
   }
-  promptText += '\nReturn ONLY JSON: {"match": "A3", "confidence": "high"} or {"match": null} if none match.';
+  promptText += '\nCompare the close-up product to each reference photo.\n'
+    + 'Key details: shape, silhouette, color, material, texture, hardware (buckles, clasps, zippers), heel shape, sole, stitching, logo placement.\n'
+    + 'Return JSON: {"match": "A3", "confidence": "high|medium|low"} or {"match": null} if none match this batch.';
 
   var msgContent = [];
   msgContent.push({ type: 'text', text: promptText });
 
-  /* Фото карточки — до 3 ракурсов */
+  /* Фото карточки — отправляем ВСЕ ракурсы для лучшего сравнения */
   for (var k = 0; k < cardImgs.length; k++) {
     var cUrl = cardImgs[k];
     if (cUrl.indexOf('data:') !== 0 && cUrl.indexOf('http') !== 0) {
       cUrl = 'data:image/jpeg;base64,' + cUrl;
     }
-    msgContent.push({ type: 'text', text: '--- CARD photo ' + (k + 1) + ' ---' });
-    msgContent.push({ type: 'image_url', image_url: { url: cUrl, detail: 'low' } });
+    var label = (k === 0) ? 'CARD close-up' : 'CARD angle ' + (k + 1);
+    msgContent.push({ type: 'text', text: '--- ' + label + ' ---' });
+    msgContent.push({ type: 'image_url', image_url: { url: cUrl, detail: 'high' } });
   }
 
   /* Фото кандидатов */
   for (var j = 0; j < cands.length; j++) {
     msgContent.push({ type: 'text', text: '--- A' + (j + 1) + ' ---' });
-    msgContent.push({ type: 'image_url', image_url: { url: cands[j].refImage, detail: 'low' } });
+    msgContent.push({ type: 'image_url', image_url: { url: cands[j].refImage, detail: 'high' } });
   }
 
   var body = {
     model: 'gpt-4o',
     messages: [{ role: 'user', content: msgContent }],
-    max_tokens: 150,
+    max_tokens: 200,
     temperature: 0.1
   };
 
@@ -1900,15 +1942,15 @@ function _arMatchOneCard(cardIdx, cardImgs, candidates, apiKey, onDone) {
       try {
         var resp = JSON.parse(xhr.responseText);
         var text = resp.choices[0].message.content.trim();
-        console.log('articles.js: card ' + cardIdx + ' AI response:', text);
+        console.log('articles.js: card ' + cardIdx + ' batch AI response:', text);
         var jsonMatch = text.match(/\{[\s\S]*\}/);
         var result = JSON.parse(jsonMatch ? jsonMatch[0] : text);
-        if (result.match && result.match !== 'null') {
+        if (result.match && result.match !== 'null' && result.match !== null) {
           var artNum = parseInt(String(result.match).replace(/\D/g, ''), 10);
           var cand = cands[artNum - 1];
           if (cand) {
-            console.log('articles.js: card ' + cardIdx + ' -> article ' + cand.sku);
-            onDone(cand.idx);
+            console.log('articles.js: card ' + cardIdx + ' -> ' + cand.sku + ' (' + (result.confidence || '?') + ')');
+            onDone(cand.idx, result.confidence || 'medium');
             return;
           }
         }
@@ -1918,10 +1960,10 @@ function _arMatchOneCard(cardIdx, cardImgs, candidates, apiKey, onDone) {
     } else {
       console.error('articles.js: card ' + cardIdx + ' API error ' + xhr.status);
     }
-    onDone(-1);
+    onDone(-1, null);
   };
-  xhr.onerror = function() { console.error('articles.js: card ' + cardIdx + ' network error'); onDone(-1); };
-  xhr.ontimeout = function() { console.error('articles.js: card ' + cardIdx + ' timeout'); onDone(-1); };
+  xhr.onerror = function() { onDone(-1, null); };
+  xhr.ontimeout = function() { onDone(-1, null); };
   xhr.send(JSON.stringify(body));
 }
 
