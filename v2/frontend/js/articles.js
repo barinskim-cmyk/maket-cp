@@ -78,21 +78,49 @@ function _arLoadOpenAIKey() {
 
 /**
  * Загрузить ключ из локального config.json (фолбэк).
+ * pywebview API возвращает Promise — используем цепочку.
  */
 function _arLoadKeyFromConfig() {
-  /* Desktop: через Python бэкенд */
+  /* Desktop: через Python бэкенд — пробуем несколько путей последовательно */
   if (window.pywebview && window.pywebview.api && window.pywebview.api.read_text_file) {
-    try {
-      var configText = window.pywebview.api.read_text_file('config.json');
-      if (configText && configText.indexOf('ERROR') !== 0) {
-        var cfg = JSON.parse(configText);
-        if (cfg.openai_api_key) {
-          _arOpenAIKey = cfg.openai_api_key;
-          console.log('articles.js: OpenAI key loaded from config.json (desktop)');
-          return;
-        }
+    var paths = [
+      '../frontend/config.json',    /* из v2/backend/ */
+      'config.json',                /* текущая директория */
+      '../config.json',             /* корень v2/ */
+      '../../config.json',          /* корень проекта */
+      'v2/frontend/config.json'     /* абсолютно от корня проекта */
+    ];
+    var tryIdx = 0;
+
+    function tryNextPath() {
+      if (tryIdx >= paths.length) {
+        /* Все пути перепробованы — фолбэк на localStorage */
+        _arOpenAIKey = localStorage.getItem('openai_api_key') || '';
+        if (_arOpenAIKey) console.log('articles.js: OpenAI key loaded from localStorage');
+        else console.log('articles.js: OpenAI key NOT found (tried ' + paths.length + ' paths + localStorage)');
+        return;
       }
-    } catch(e) {}
+      var currentPath = paths[tryIdx];
+      tryIdx++;
+      window.pywebview.api.read_text_file(currentPath).then(function(configText) {
+        if (configText && String(configText).indexOf('ERROR') !== 0) {
+          try {
+            var cfg = JSON.parse(configText);
+            if (cfg.openai_api_key) {
+              _arOpenAIKey = cfg.openai_api_key;
+              console.log('articles.js: OpenAI key loaded from ' + currentPath);
+              return; /* Нашли — выходим */
+            }
+          } catch(e) {}
+        }
+        tryNextPath(); /* Этот путь не дал — пробуем следующий */
+      }).catch(function() {
+        tryNextPath(); /* Ошибка — пробуем следующий */
+      });
+    }
+
+    tryNextPath();
+    return;
   }
 
   /* Browser: fetch config.json */
@@ -104,7 +132,7 @@ function _arLoadKeyFromConfig() {
         var cfg = JSON.parse(xhr.responseText);
         if (cfg.openai_api_key) {
           _arOpenAIKey = cfg.openai_api_key;
-          console.log('articles.js: OpenAI key loaded from config.json');
+          console.log('articles.js: OpenAI key loaded from config.json (browser)');
           return;
         }
       } catch(e) {}
@@ -816,6 +844,54 @@ function _arApplyLoaded(proj, articles, fileName) {
   arUpdateStats();
   if (typeof shAutoSave === 'function') shAutoSave();
   console.log('articles.js: загружено ' + articles.length + ' артикулов из ' + fileName);
+
+  /* Автоматически запустить AI-расстановку если есть ключ и незакреплённые карточки */
+  _arAutoMatchIfReady(proj);
+}
+
+
+/**
+ * Автоматический запуск AI-расстановки после загрузки чек-листа.
+ * Ждёт загрузки ключа (до 3 секунд), потом запускает arAutoMatchAll().
+ */
+function _arAutoMatchIfReady(proj) {
+  if (!proj || !proj.cards || proj.cards.length === 0) return;
+  if (!proj.articles || proj.articles.length === 0) return;
+
+  /* Проверить есть ли незакреплённые карточки */
+  var hasUnmatched = false;
+  for (var c = 0; c < proj.cards.length; c++) {
+    var matched = false;
+    for (var a = 0; a < proj.articles.length; a++) {
+      if (proj.articles[a].cardIdx === c) { matched = true; break; }
+    }
+    if (!matched) { hasUnmatched = true; break; }
+  }
+  if (!hasUnmatched) return;
+
+  /* Ключ может ещё загружаться (async). Ждём до 3 сек с проверкой каждые 300ms */
+  var attempts = 0;
+  var maxAttempts = 10;
+
+  function checkAndRun() {
+    var key = _arGetOpenAIKey();
+    if (key) {
+      console.log('articles.js: авто-расстановка AI запущена');
+      var statusEl = document.getElementById('ar-stats');
+      if (statusEl) statusEl.textContent = 'AI расставляет артикулы...';
+      arAutoMatchAll();
+      return;
+    }
+    attempts++;
+    if (attempts < maxAttempts) {
+      setTimeout(checkAndRun, 300);
+    } else {
+      console.log('articles.js: ключ OpenAI не найден, авто-расстановка пропущена');
+    }
+  }
+
+  /* Небольшая задержка чтобы UI отрендерился */
+  setTimeout(checkAndRun, 500);
 }
 
 
@@ -1182,135 +1258,119 @@ function arRenderMatching() {
     }
   }
 
-  /* ── Левая колонка: КАРТОЧКИ ── */
-  var cardsEl = document.getElementById('ar-cards-list');
-  if (cardsEl) {
-    if (!proj.cards || proj.cards.length === 0) {
-      cardsEl.innerHTML = '<div class="empty-state">Нет карточек</div>';
-    } else {
-      var html = '';
-      for (var c = 0; c < proj.cards.length; c++) {
-        var card = proj.cards[c];
-        /* Найти привязанный артикул */
-        var linkedSku = '';
-        var linkedIdx = -1;
-        for (var a = 0; a < (proj.articles || []).length; a++) {
-          if (proj.articles[a].cardIdx === c) {
-            linkedSku = proj.articles[a].sku;
-            linkedIdx = a;
-            break;
-          }
-        }
-        var sel = (_arSelectedCard === c) ? ' ar-selected' : '';
-        var matchedCls = linkedSku ? ' ar-matched' : '';
+  var rowsEl = document.getElementById('ar-match-rows');
+  var freeEl = document.getElementById('ar-free-articles');
+  if (!rowsEl) return;
 
-        html += '<div class="ar-match-item ar-card-item' + sel + matchedCls + '" onclick="arSelectCard(' + c + ')">';
-
-        /* Кнопка увеличения */
-        html += '<button class="ar-zoom-btn" onclick="event.stopPropagation();arPreviewCard(' + c + ')" title="Увеличить">+</button>';
-
-        /* Фото-полоска */
-        html += '<div class="ar-card-photos">';
-        if (card.slots) {
-          var maxPhotos = Math.min(card.slots.length, 3);
-          for (var si = 0; si < maxPhotos; si++) {
-            var slot = card.slots[si];
-            var imgSrc = slot.dataUrl || slot.thumbUrl || '';
-            if (!imgSrc && slot.file && pvByName[slot.file]) {
-              var pv = pvByName[slot.file];
-              imgSrc = pv.thumb || pv.preview || '';
-            }
-            if (imgSrc) {
-              html += '<img class="ar-card-photo" src="' + imgSrc + '">';
-            } else if (slot.file) {
-              html += '<div class="ar-card-photo ar-card-photo-empty">' + esc(slot.file.substr(0, 8)) + '</div>';
-            }
-          }
-        }
-        html += '</div>';
-
-        /* Инфо */
-        html += '<div class="ar-match-info">';
-        html += '<div class="ar-match-num">Карточка ' + (c + 1) + '</div>';
-        if (linkedSku) {
-          html += '<div class="ar-match-sku">' + esc(linkedSku) + '</div>';
-          html += '<button class="ar-unmatch-btn" onclick="event.stopPropagation();arUnmatch(' + linkedIdx + ')">Отвязать</button>';
-        }
-        html += '</div></div>';
-      }
-      cardsEl.innerHTML = html;
-    }
+  if (!proj.cards || proj.cards.length === 0) {
+    rowsEl.innerHTML = '<div class="empty-state">Нет карточек</div>';
+    if (freeEl) freeEl.innerHTML = '';
+    return;
   }
 
-  /* ── Правая колонка: АРТИКУЛЫ ──
-     Порядок: сначала привязанные (в порядке карточек), потом свободные.
-     Привязанные встают НАПРОТИВ своей карточки. */
-  var skusEl = document.getElementById('ar-skus-list');
-  if (skusEl) {
-    if (!proj.articles || proj.articles.length === 0) {
-      skusEl.innerHTML = '<div class="empty-state">Загрузите чек-лист</div>';
+  /* ── Строки: карточка + артикул бок о бок ── */
+  var html = '';
+  for (var c = 0; c < proj.cards.length; c++) {
+    var card = proj.cards[c];
+
+    /* Найти привязанный артикул */
+    var linkedArt = null;
+    var linkedIdx = -1;
+    for (var a = 0; a < (proj.articles || []).length; a++) {
+      if (proj.articles[a].cardIdx === c) {
+        linkedArt = proj.articles[a];
+        linkedIdx = a;
+        break;
+      }
+    }
+
+    var selCard = (_arSelectedCard === c) ? ' ar-selected' : '';
+
+    html += '<div class="ar-match-row">';
+
+    /* --- Левая половина: КАРТОЧКА --- */
+    html += '<div class="ar-match-cell ar-card-item' + selCard + '" onclick="arSelectCard(' + c + ')">';
+    html += '<button class="ar-zoom-btn" onclick="event.stopPropagation();arPreviewCard(' + c + ')" title="Увеличить">+</button>';
+
+    /* Фото-полоска */
+    html += '<div class="ar-card-photos">';
+    if (card.slots) {
+      var maxPhotos = Math.min(card.slots.length, 3);
+      for (var si = 0; si < maxPhotos; si++) {
+        var slot = card.slots[si];
+        var imgSrc = slot.dataUrl || slot.thumbUrl || '';
+        if (!imgSrc && slot.file && pvByName[slot.file]) {
+          var pv = pvByName[slot.file];
+          imgSrc = pv.thumb || pv.preview || '';
+        }
+        if (imgSrc) {
+          html += '<img class="ar-card-photo" src="' + imgSrc + '">';
+        } else if (slot.file) {
+          html += '<div class="ar-card-photo ar-card-photo-empty">' + esc(slot.file.substr(0, 8)) + '</div>';
+        }
+      }
+    }
+    html += '</div>';
+
+    html += '<div class="ar-match-info">';
+    html += '<div class="ar-match-num">Карточка ' + (c + 1) + '</div>';
+    if (linkedArt) {
+      html += '<div class="ar-match-sku">' + esc(linkedArt.sku) + '</div>';
+    }
+    html += '</div></div>';
+
+    /* --- Правая половина: АРТИКУЛ или placeholder --- */
+    if (linkedArt) {
+      var selSku = (_arSelectedSku === linkedIdx) ? ' ar-selected' : '';
+      html += '<div class="ar-match-cell ar-sku-item' + selSku + '" onclick="arSelectSku(' + linkedIdx + ')">';
+      if (linkedArt.refImage) {
+        html += '<img class="ar-sku-ref" src="' + linkedArt.refImage + '" alt="ref">';
+      }
+      html += '<div class="ar-match-info">';
+      html += '<div class="ar-match-sku">' + esc(linkedArt.sku) + '</div>';
+      if (linkedArt.category) html += '<div class="ar-match-cat">' + esc(linkedArt.category) + '</div>';
+      html += '</div>';
+      html += '<button class="ar-unmatch-btn" onclick="event.stopPropagation();arUnmatch(' + linkedIdx + ')" title="Отвязать">x</button>';
+      html += '</div>';
     } else {
-      /* Построить упорядоченный список:
-         для каждой карточки — привязанный артикул (или пустой слот),
-         потом все свободные */
-      var orderedItems = []; /* {type:'matched'|'empty'|'free', artIdx, cardIdx} */
-      var usedArtIdx = {};
+      html += '<div class="ar-match-cell ar-sku-placeholder" onclick="arSelectCard(' + c + ')">';
+      html += '<div class="ar-match-info"><div class="ar-match-cat">-- не привязан --</div></div>';
+      html += '</div>';
+    }
 
-      /* Пройти по всем карточкам — найти привязанные артикулы */
-      for (var c2 = 0; c2 < (proj.cards || []).length; c2++) {
-        var found = false;
-        for (var a2 = 0; a2 < proj.articles.length; a2++) {
-          if (proj.articles[a2].cardIdx === c2) {
-            orderedItems.push({ type: 'matched', artIdx: a2, cardIdx: c2 });
-            usedArtIdx[a2] = true;
-            found = true;
-            break;
-          }
-        }
-        if (!found) {
-          orderedItems.push({ type: 'empty', artIdx: -1, cardIdx: c2 });
-        }
+    html += '</div>'; /* /ar-match-row */
+  }
+  rowsEl.innerHTML = html;
+
+  /* ── Свободные артикулы (не привязанные ни к одной карточке) ── */
+  if (freeEl) {
+    var usedArt = {};
+    for (var a2 = 0; a2 < (proj.articles || []).length; a2++) {
+      if (proj.articles[a2].cardIdx >= 0) usedArt[a2] = true;
+    }
+
+    var freeHtml = '';
+    var freeCount = 0;
+    for (var a3 = 0; a3 < (proj.articles || []).length; a3++) {
+      if (usedArt[a3]) continue;
+      freeCount++;
+      var art = proj.articles[a3];
+      var selF = (_arSelectedSku === a3) ? ' ar-selected' : '';
+
+      freeHtml += '<div class="ar-free-item' + selF + '" onclick="arSelectSku(' + a3 + ')">';
+      if (art.refImage) {
+        freeHtml += '<img class="ar-sku-ref" src="' + art.refImage + '" alt="ref">';
       }
+      freeHtml += '<div class="ar-match-info">';
+      freeHtml += '<div class="ar-match-sku">' + esc(art.sku) + '</div>';
+      if (art.category) freeHtml += '<div class="ar-match-cat">' + esc(art.category) + '</div>';
+      freeHtml += '</div></div>';
+    }
 
-      /* Добавить свободные артикулы после привязанных */
-      for (var a3 = 0; a3 < proj.articles.length; a3++) {
-        if (!usedArtIdx[a3] && proj.articles[a3].cardIdx < 0) {
-          orderedItems.push({ type: 'free', artIdx: a3, cardIdx: -1 });
-        }
-      }
-
-      var html2 = '';
-      for (var oi = 0; oi < orderedItems.length; oi++) {
-        var item = orderedItems[oi];
-
-        if (item.type === 'empty') {
-          /* Пустой слот напротив карточки — placeholder */
-          html2 += '<div class="ar-match-item ar-sku-placeholder">';
-          html2 += '<div class="ar-match-info"><div class="ar-match-cat">-- не привязан --</div></div>';
-          html2 += '</div>';
-        } else {
-          /* Артикул (привязанный или свободный) */
-          var art = proj.articles[item.artIdx];
-          var selCls = (_arSelectedSku === item.artIdx) ? ' ar-selected' : '';
-          var mCls = (item.type === 'matched') ? ' ar-matched' : '';
-
-          html2 += '<div class="ar-match-item ar-sku-item' + selCls + mCls + '" onclick="arSelectSku(' + item.artIdx + ')">';
-
-          /* Референс-фото */
-          if (art.refImage) {
-            html2 += '<img class="ar-sku-ref" src="' + art.refImage + '" alt="ref">';
-          }
-
-          html2 += '<div class="ar-match-info">';
-          html2 += '<div class="ar-match-sku">' + esc(art.sku) + '</div>';
-          if (art.category) html2 += '<div class="ar-match-cat">' + esc(art.category) + '</div>';
-          if (item.type === 'matched') {
-            html2 += '<div class="ar-match-cat" style="color:#4caf50">Карточка ' + (item.cardIdx + 1) + '</div>';
-          }
-          html2 += '</div></div>';
-        }
-      }
-      skusEl.innerHTML = html2;
+    if (freeCount > 0) {
+      freeEl.innerHTML = '<h4 style="font-size:12px;text-transform:uppercase;color:#999;margin:16px 0 8px">Свободные артикулы (' + freeCount + ')</h4>' + freeHtml;
+    } else {
+      freeEl.innerHTML = '';
     }
   }
 }
@@ -1488,7 +1548,7 @@ function arAutoMatchAll() {
 
   var apiKey = _arGetOpenAIKey();
   if (!apiKey) {
-    alert('Нужен ключ OpenAI. Нажмите "API Key".');
+    console.log('articles.js: arAutoMatchAll — ключ OpenAI не найден');
     return;
   }
 
