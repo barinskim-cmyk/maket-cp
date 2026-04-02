@@ -129,6 +129,65 @@ _arLoadOpenAIKey();
 
 
 /**
+ * Сохранить текущий проект в JSON-файл на диске (через pywebview диалог).
+ * Работает на десктопе (pywebview). В браузере — скачивание через Blob.
+ */
+function arSaveProjectToFile() {
+  var proj = getActiveProject();
+  if (!proj) { alert('Нет активного проекта'); return; }
+
+  /* Подготовить данные: полный проект включая артикулы */
+  var data = JSON.parse(JSON.stringify(proj));
+  /* Убрать тяжёлые base64 данные для уменьшения файла */
+  if (data.previews) {
+    for (var pi = 0; pi < data.previews.length; pi++) {
+      delete data.previews[pi].preview;
+    }
+  }
+  /* Убрать тяжёлые refImage из артикулов (base64 каталожные фото) */
+  if (data.articles) {
+    for (var ai = 0; ai < data.articles.length; ai++) {
+      delete data.articles[ai].refImage;
+    }
+  }
+  var json = JSON.stringify(data, null, 2);
+  var filename = (proj.brand || 'project') + '_' + (proj.shoot_date || 'nodate') + '.json';
+
+  /* Desktop: используем pywebview save_text_to_file() */
+  if (window.pywebview && window.pywebview.api && window.pywebview.api.save_text_to_file) {
+    window.pywebview.api.save_text_to_file(json, filename).then(function(resp) {
+      if (resp && resp.ok) {
+        alert('Проект сохранён: ' + resp.path);
+      } else if (resp && resp.error) {
+        alert('Ошибка: ' + resp.error);
+      }
+      /* cancelled — пользователь закрыл диалог */
+    });
+    return;
+  }
+
+  /* Browser fallback: скачать JSON через Blob */
+  var data = JSON.parse(JSON.stringify(proj));
+  /* Убрать тяжёлые base64 данные для уменьшения файла */
+  if (data.previews) {
+    for (var i = 0; i < data.previews.length; i++) {
+      delete data.previews[i].preview;
+    }
+  }
+  var json = JSON.stringify(data, null, 2);
+  var blob = new Blob([json], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = (proj.brand || 'project') + '_' + (proj.shoot_date || 'nodate') + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+
+/**
  * Получить текущий OpenAI API key.
  * Используется всеми AI-функциями.
  */

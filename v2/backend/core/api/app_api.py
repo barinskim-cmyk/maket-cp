@@ -95,6 +95,34 @@ class AppAPI:
         except Exception as e:
             return f"ERROR: {e}"
 
+    def save_text_to_file(self, content: str, suggested_name: str = "project.json") -> dict:
+        """Сохранить текст в файл через нативный диалог.
+
+        Используется фронтендом для сохранения полного проекта (включая артикулы).
+
+        Args:
+            content: текстовое содержимое для записи
+            suggested_name: предложенное имя файла
+
+        Returns:
+            {"ok": True, "path": str} | {"cancelled": True} | {"error": str}
+        """
+        if not self._window:
+            return {"error": "Нет окна"}
+        try:
+            result = self._window.create_file_dialog(
+                webview.SAVE_DIALOG,
+                directory="",
+                save_filename=suggested_name,
+            )
+            if result:
+                path = Path(result) if isinstance(result, str) else Path(result[0])
+                path.write_text(content, encoding="utf-8")
+                return {"ok": True, "path": str(path)}
+            return {"cancelled": True}
+        except Exception as e:
+            return {"error": str(e)}
+
     # ── Rate Setter ──
 
     def rate_setter_run(self, payload: dict) -> dict:
