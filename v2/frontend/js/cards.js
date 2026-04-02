@@ -2259,49 +2259,25 @@ function cpMobileRenderGallery() {
 }
 
 /**
- * Переключить галочку "Доп. контент" на фото в мобильной галерее.
+ * Переключить галочку на фото в мобильной галерее (Options).
+ * Использует единую pvToggleSelection из previews.js.
  * @param {string} pvName - имя файла превью
  * @param {HTMLElement} el - элемент галочки
  */
 function cpMobileToggleOC(pvName, el) {
-  var proj = getActiveProject();
-  if (!proj) return;
+  if (typeof pvToggleSelection !== 'function') return;
+  var done = pvToggleSelection(pvName);
+  if (!done) return;
 
-  if (!proj.otherContent) proj.otherContent = [];
-
-  /* Найти индекс по полю name */
-  var idx = -1;
-  for (var i = 0; i < proj.otherContent.length; i++) {
-    if (proj.otherContent[i].name === pvName) {
-      idx = i;
-      break;
-    }
-  }
-
-  if (idx >= 0) {
-    proj.otherContent.splice(idx, 1);
-    el.className = 'mob-gallery-check';
-    el.innerHTML = '';
-  } else {
-    /* Найти объект превью с этим именем чтобы получить метаданные */
-    var pvObj = null;
-    for (var j = 0; j < proj.previews.length; j++) {
-      if ((proj.previews[j].name || proj.previews[j].stem) === pvName) {
-        pvObj = proj.previews[j];
-        break;
-      }
-    }
-
-    /* Добавить объект с preview/thumb/path если найдено */
-    var ocItem = { name: pvName };
-    if (pvObj) {
-      if (pvObj.preview) ocItem.preview = pvObj.preview;
-      if (pvObj.thumb) ocItem.thumb = pvObj.thumb;
-      if (pvObj.path) ocItem.path = pvObj.path;
-    }
-    proj.otherContent.push(ocItem);
+  /* Обновить визуал галочки */
+  var inCard = (typeof _pvIsInCard === 'function') ? _pvIsInCard(pvName) >= 0 : false;
+  var inOC = (typeof _pvIsInOtherContent === 'function') ? _pvIsInOtherContent(pvName) : false;
+  if (inCard || inOC) {
     el.className = 'mob-gallery-check checked';
     el.innerHTML = '&#10003;';
+  } else {
+    el.className = 'mob-gallery-check';
+    el.innerHTML = '';
   }
 
   /* Синхронизация */

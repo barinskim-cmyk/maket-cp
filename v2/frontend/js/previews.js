@@ -1054,28 +1054,21 @@ function _pvLbBuildCheck(pv) {
   var labelEl = document.createElement('span');
   if (isLocked) {
     labelEl.textContent = 'В карточке К' + (inCardIdx + 1);
-    checkWrap.style.cursor = 'pointer';
-    checkWrap.onclick = (function(photoName, cIdx) {
-      return function() { _pvLbRemoveFromCard(photoName, cIdx); };
-    })(pv.name, inCardIdx);
   } else if (isInOC) {
     labelEl.textContent = 'В доп. контенте';
-    checkWrap.style.cursor = 'pointer';
-    checkWrap.onclick = function() {
-      _pvLbToggleOC(false);
-      /* Обновить галочку без перестройки */
-      _pvLbMobUpdateUI();
-      if (window.innerWidth >= 768) _pvLbOpen();
-    };
   } else {
     labelEl.textContent = 'Добавить в отбор';
-    checkWrap.style.cursor = 'pointer';
-    checkWrap.onclick = function() {
-      _pvLbToggleOC(true);
-      _pvLbMobUpdateUI();
-      if (window.innerWidth >= 768) _pvLbOpen();
-    };
   }
+  checkWrap.style.cursor = 'pointer';
+  checkWrap.onclick = (function(photoName) {
+    return function() {
+      var done = pvToggleSelection(photoName);
+      if (done) {
+        _pvLbMobUpdateUI();
+        if (window.innerWidth >= 768) _pvLbOpen();
+      }
+    };
+  })(pv.name);
 
   checkWrap.appendChild(circle);
   checkWrap.appendChild(labelEl);
@@ -1134,29 +1127,8 @@ function _pvLbSetFilter(minRating) {
  * @param {number} cardIdx — индекс карточки (0-based)
  */
 function _pvLbRemoveFromCard(name, cardIdx) {
-  if (!confirm('Убрать фото из карточки ' + (cardIdx + 1) + '?')) return;
-
-  var proj = getActiveProject();
-  if (!proj || !proj.cards) return;
-  var card = proj.cards[cardIdx];
-  if (!card || !card.slots) return;
-
-  for (var s = 0; s < card.slots.length; s++) {
-    if (card.slots[s].file === name) {
-      card.slots[s].file = null;
-      card.slots[s].dataUrl = '';
-      card.slots[s].thumbUrl = '';
-      card.slots[s].preview = '';
-      break;
-    }
-  }
-
-  if (typeof shAutoSave === 'function') shAutoSave();
-  if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
-  if (typeof cpRenderCard === 'function') cpRenderCard();
-  if (typeof acRenderField === 'function') acRenderField();
-  if (typeof ocRenderField === 'function') ocRenderField();
-  _pvLbOpen();
+  var done = pvToggleSelection(name);
+  if (done) _pvLbOpen();
 }
 
 /**
@@ -1232,19 +1204,13 @@ function _pvLbKeyHandler(e) {
   if (e.key === 'Escape') { pvCloseFullscreen(); return; }
   if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { _pvLbNav(1); return; }
   if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { _pvLbNav(-1); return; }
-  /* Пробел = переключить галочку (все фото: карточки и OC) */
+  /* Пробел = переключить галочку (единая логика) */
   if (e.key === ' ') {
     e.preventDefault();
     var pv = _pvLbList[_pvLbIdx];
     if (!pv) return;
-    var cardIdx = _pvIsInCard(pv.name);
-    if (cardIdx >= 0) {
-      _pvLbRemoveFromCard(pv.name, cardIdx);
-    } else {
-      var isIn = _pvIsInOtherContent(pv.name);
-      _pvLbToggleOC(!isIn);
-      _pvLbOpen();
-    }
+    var done = pvToggleSelection(pv.name);
+    if (done) _pvLbOpen();
   }
 }
 
@@ -1673,63 +1639,79 @@ function acRenderField() {
 }
 
 /**
- * Убрать фото из допконтента (из галереи «Весь контент»).
+ * Единая функция переключения отбора: карточки, допконтент, добавление.
+ * Работает из галереи «Отбор», Select, Options, лайтбокса — везде одинаково.
+ *
+ * - Если фото в карточке → подтверждение → убрать из слота
+ * - Если фото в допконтенте → убрать из OC
+ * - Если фото нигде → добавить в OC
+ *
  * @param {string} name — имя файла
- * @param {Event} e
+ * @param {Event} [e] — событие клика
+ * @returns {boolean} true если выполнено, false если отменено
  */
-function acRemoveOC(name, e) {
+function pvToggleSelection(name, e) {
   if (e) { e.stopPropagation(); e.preventDefault(); }
   var proj = getActiveProject();
-  if (!proj || !proj.otherContent) return;
+  if (!proj) return false;
 
-  for (var j = proj.otherContent.length - 1; j >= 0; j--) {
-    if (proj.otherContent[j].name === name) {
-      proj.otherContent.splice(j, 1);
+  var inCardIdx = _pvIsInCard(name);
+  var inOC = _pvIsInOtherContent(name);
+
+  if (inCardIdx >= 0) {
+    /* Фото привязано к карточке — нужно подтверждение */
+    if (!confirm('Убрать из отбора? Это фото есть в карточке ' + (inCardIdx + 1) + ' — оно будет удалено из карточки.')) return false;
+
+    var card = proj.cards[inCardIdx];
+    if (card && card.slots) {
+      for (var s = 0; s < card.slots.length; s++) {
+        if (card.slots[s].file === name) {
+          card.slots[s].file = null;
+          card.slots[s].dataUrl = '';
+          card.slots[s].thumbUrl = '';
+          card.slots[s].preview = '';
+          break;
+        }
+      }
     }
+    if (typeof cpRenderCard === 'function') cpRenderCard();
+  } else if (inOC) {
+    /* В допконтенте — убрать */
+    if (!proj.otherContent) return false;
+    for (var j = proj.otherContent.length - 1; j >= 0; j--) {
+      if (proj.otherContent[j].name === name) {
+        proj.otherContent.splice(j, 1);
+      }
+    }
+  } else {
+    /* Нигде нет — добавить в допконтент */
+    if (!proj.otherContent) proj.otherContent = [];
+    var pvObj = null;
+    if (proj.previews) {
+      for (var p = 0; p < proj.previews.length; p++) {
+        if (proj.previews[p].name === name) { pvObj = proj.previews[p]; break; }
+      }
+    }
+    var ocItem = { name: name };
+    if (pvObj) {
+      if (pvObj.preview) ocItem.preview = pvObj.preview;
+      if (pvObj.thumb) ocItem.thumb = pvObj.thumb;
+      if (pvObj.path) ocItem.path = pvObj.path;
+    }
+    proj.otherContent.push(ocItem);
   }
 
+  /* Сохранить и обновить все галереи */
   if (typeof shAutoSave === 'function') shAutoSave();
   if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
-  acRenderField();
+  if (typeof acRenderField === 'function') acRenderField();
   if (typeof ocRenderField === 'function') ocRenderField();
+  return true;
 }
 
-/**
- * Убрать фото из карточки (отжать галочку из галереи «Весь контент»).
- * Фото остаётся в превью, но освобождает слот.
- * @param {string} name — имя файла
- * @param {number} cardIdx — индекс карточки
- * @param {Event} e
- */
-function acToggleCard(name, cardIdx, e) {
-  if (e) { e.stopPropagation(); e.preventDefault(); }
-
-  /* Подтверждение: фото привязано к карточке */
-  if (!confirm('Убрать фото из карточки ' + (cardIdx + 1) + '?')) return;
-
-  var proj = getActiveProject();
-  if (!proj || !proj.cards) return;
-
-  var card = proj.cards[cardIdx];
-  if (!card || !card.slots) return;
-
-  /* Найти и очистить слот с этим файлом */
-  for (var s = 0; s < card.slots.length; s++) {
-    if (card.slots[s].file === name) {
-      card.slots[s].file = null;
-      card.slots[s].dataUrl = '';
-      card.slots[s].thumbUrl = '';
-      card.slots[s].preview = '';
-      break;
-    }
-  }
-
-  if (typeof shAutoSave === 'function') shAutoSave();
-  if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
-  if (typeof cpRenderCard === 'function') cpRenderCard();
-  acRenderField();
-  if (typeof ocRenderField === 'function') ocRenderField();
-}
+/* Обратная совместимость: старые вызовы → единая функция */
+function acRemoveOC(name, e) { pvToggleSelection(name, e); }
+function acToggleCard(name, cardIdx, e) { pvToggleSelection(name, e); }
 
 /**
  * Изменить количество колонок в плитке «Весь контент».
