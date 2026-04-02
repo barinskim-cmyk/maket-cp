@@ -1619,8 +1619,8 @@ function _cpPdfDrawImage(doc, slot, x, y, w, h) {
 //  Не меняет десктопный рендер — отдельный путь отрисовки.
 // ══════════════════════════════════════════════
 
-/** @type {boolean} Текущий режим: true = карточки, false = галерея */
-var _mobViewCards = true;
+/** @type {string} Текущий режим: 'cards' | 'select' | 'options' */
+var _mobViewMode = 'cards';
 
 /**
  * Проверить, нужен ли мобильный режим.
@@ -1658,7 +1658,7 @@ function cpMobileInit() {
     }
   }
 
-  _mobViewCards = true;
+  _mobViewMode = 'cards';
   cpMobileRender();
 }
 
@@ -1678,11 +1678,11 @@ function cpMobileExitFeed() {
     }
   }
 
-  _mobViewCards = false;
+  _mobViewMode = 'cards';
 }
 
 /**
- * Отрисовать мобильный интерфейс (шапка + лента/галерея).
+ * Отрисовать мобильный интерфейс (шапка + лента/галерея/отбор).
  */
 function cpMobileRender() {
   var mobWrap = document.getElementById('mob-wrap');
@@ -1690,18 +1690,23 @@ function cpMobileRender() {
 
   var proj = getActiveProject();
   var brandName = proj ? esc(proj.brand || '') : '';
-  var toggleLabel = _mobViewCards ? 'SHOW GALLERY' : 'GO BACK TO CARDS';
 
   var html = '';
 
-  /* Sticky-шапка */
+  /* Sticky-шапка с тремя кнопками */
   html += '<div class="mob-header">';
   html += '<div class="mob-header-title">' + (brandName || 'Просмотр') + '</div>';
-  html += '<button class="mob-header-btn" onclick="cpMobileToggleView()">' + toggleLabel + '</button>';
+  html += '<div class="mob-header-tabs">';
+  html += '<button class="mob-tab-btn' + (_mobViewMode === 'cards' ? ' mob-tab-active' : '') + '" onclick="cpMobileSetView(\'cards\')">Cards</button>';
+  html += '<button class="mob-tab-btn' + (_mobViewMode === 'select' ? ' mob-tab-active' : '') + '" onclick="cpMobileSetView(\'select\')">Select</button>';
+  html += '<button class="mob-tab-btn' + (_mobViewMode === 'options' ? ' mob-tab-active' : '') + '" onclick="cpMobileSetView(\'options\')">Options</button>';
+  html += '</div>';
   html += '</div>';
 
-  if (_mobViewCards) {
+  if (_mobViewMode === 'cards') {
     html += cpMobileRenderFeed();
+  } else if (_mobViewMode === 'select') {
+    html += cpMobileRenderSelect();
   } else {
     html += cpMobileRenderGallery();
   }
@@ -1709,17 +1714,19 @@ function cpMobileRender() {
   mobWrap.innerHTML = html;
 
   /* Привязать touch-события к каруселям */
-  if (_mobViewCards) {
+  if (_mobViewMode === 'cards') {
     cpMobileBindCarousels();
     cpMobileBindDoubleTap();
+    cpMobileBindSlotTap();
   }
 }
 
 /**
- * Переключение карточки/галерея.
+ * Переключение режима мобильного клиента.
+ * @param {string} mode — 'cards' | 'select' | 'options'
  */
-function cpMobileToggleView() {
-  _mobViewCards = !_mobViewCards;
+function cpMobileSetView(mode) {
+  _mobViewMode = mode;
   cpMobileRender();
 }
 
@@ -1769,13 +1776,14 @@ function cpMobileRenderFeed() {
         var src = slot.dataUrl || slot.thumbUrl || slot.thumb || '';
         html += '<div class="' + slotClass + ' mob-carousel-wrap" data-card="' + ci + '" data-slot="' + si + '">';
         html += '<img src="' + src + '" loading="lazy">';
-        /* Стрелки карусели */
+        /* Стрелки и удаление — скрыты, появляются по тапу на этот слот */
+        html += '<div class="mob-carousel-controls mob-controls-hidden" data-controls="' + ci + '-' + si + '">';
         html += '<div class="mob-carousel-arrows">';
-        html += '<button class="mob-carousel-arrow" onclick="cpMobileCarousel(' + ci + ',' + si + ',-1)">&lsaquo;</button>';
-        html += '<button class="mob-carousel-arrow" onclick="cpMobileCarousel(' + ci + ',' + si + ',1)">&rsaquo;</button>';
+        html += '<button class="mob-carousel-arrow" onclick="cpMobileCarousel(' + ci + ',' + si + ',-1,event)">&lsaquo;</button>';
+        html += '<button class="mob-carousel-arrow" onclick="cpMobileCarousel(' + ci + ',' + si + ',1,event)">&rsaquo;</button>';
         html += '</div>';
-        /* Кнопка удаления */
         html += '<button class="mob-slot-remove" onclick="cpMobileClearSlot(' + ci + ',' + si + ')">&times;</button>';
+        html += '</div>';
         html += '</div>';
       } else {
         /* Пустой слот */
@@ -1846,11 +1854,14 @@ function cpGetNearbyPreviews(currentFile, orient, range) {
 
 /**
  * Карусель: заменить фото в слоте на следующее/предыдущее.
+ * Обновляет ТОЛЬКО img в этом слоте — без перерисовки всей ленты.
  * @param {number} cardIdx - индекс карточки
  * @param {number} slotIdx - индекс слота
  * @param {number} dir - направление (-1 = назад, 1 = вперёд)
+ * @param {Event} [e] - событие клика (останавливаем всплытие)
  */
-function cpMobileCarousel(cardIdx, slotIdx, dir) {
+function cpMobileCarousel(cardIdx, slotIdx, dir, e) {
+  if (e) e.stopPropagation();
   var proj = getActiveProject();
   if (!proj || !proj.cards || !proj.cards[cardIdx]) return;
 
@@ -1882,17 +1893,21 @@ function cpMobileCarousel(cardIdx, slotIdx, dir) {
 
   var newPv = nearby[newIdx];
 
-  /* Обновить слот */
+  /* Обновить слот данные */
   slot.file = newPv.name || newPv.stem || '';
   slot.dataUrl = newPv.preview || newPv.thumb || '';
   slot.path = newPv.path || '';
 
-  /* Авто-синхронизация */
+  /* Обновить ТОЛЬКО картинку в DOM (без перерисовки ленты) */
+  var wrap = document.querySelector('.mob-carousel-wrap[data-card="' + cardIdx + '"][data-slot="' + slotIdx + '"]');
+  if (wrap) {
+    var img = wrap.querySelector('img');
+    if (img) img.src = slot.dataUrl;
+  }
+
+  /* Авто-синхронизация (тихо, без UI перерисовки) */
   if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
   if (typeof shAutoSave === 'function') shAutoSave();
-
-  /* Перерисовать только этот слот (перерисовываем всю ленту — проще и безопаснее) */
-  cpMobileRender();
 }
 
 /**
@@ -1985,6 +2000,107 @@ function cpMobileBindDoubleTap() {
         lastTap = now;
       });
     })(empties[i]);
+  }
+}
+
+/**
+ * Привязать тап на слоты: показать/скрыть стрелки и крестик.
+ * При тапе на один слот — показать его контролы, скрыть остальные.
+ * При тапе вне слотов — скрыть все.
+ */
+function cpMobileBindSlotTap() {
+  var carousels = document.querySelectorAll('.mob-carousel-wrap');
+  for (var i = 0; i < carousels.length; i++) {
+    (function(el) {
+      el.addEventListener('click', function(e) {
+        /* Если кликнули на кнопку (стрелку, удаление) — не трогать */
+        if (e.target.tagName === 'BUTTON') return;
+
+        var controls = el.querySelector('.mob-carousel-controls');
+        if (!controls) return;
+
+        var wasVisible = !controls.classList.contains('mob-controls-hidden');
+
+        /* Скрыть все контролы */
+        _cpMobileHideAllControls();
+
+        /* Если этот был скрыт — показать */
+        if (!wasVisible) {
+          controls.classList.remove('mob-controls-hidden');
+          /* Автоскрытие через 4 секунды */
+          clearTimeout(window._mobControlsTimer);
+          window._mobControlsTimer = setTimeout(function() {
+            _cpMobileHideAllControls();
+          }, 4000);
+        }
+      });
+    })(carousels[i]);
+  }
+
+  /* Тап на пустую область — скрыть все контролы */
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.mob-carousel-wrap')) {
+      _cpMobileHideAllControls();
+    }
+  });
+}
+
+/**
+ * Скрыть все контролы карусели.
+ */
+function _cpMobileHideAllControls() {
+  var all = document.querySelectorAll('.mob-carousel-controls');
+  for (var i = 0; i < all.length; i++) {
+    all[i].classList.add('mob-controls-hidden');
+  }
+  clearTimeout(window._mobControlsTimer);
+}
+
+/**
+ * Рендер мобильной галереи «Отбор» (Select) — только фото из карточек и допконтента.
+ * @returns {string} HTML
+ */
+function cpMobileRenderSelect() {
+  var items = (typeof acGetAllContent === 'function') ? acGetAllContent() : [];
+
+  if (items.length === 0) {
+    return '<div style="padding:40px 16px;text-align:center;color:#999">Нет фото в отборе</div>';
+  }
+
+  var html = '<div class="mob-gallery">';
+
+  for (var i = 0; i < items.length; i++) {
+    var it = items[i];
+    var src = it.preview || it.thumb || '';
+    if (!src) continue;
+
+    var orient = it.orient || 'v';
+    var itemClass = orient === 'h' ? 'mob-gallery-item-h' : 'mob-gallery-item-v';
+
+    html += '<div class="mob-gallery-item ' + itemClass + '">';
+    html += '<img src="' + src + '" loading="lazy" onclick="cpMobileSelectFullscreen(' + i + ')">';
+
+    /* Метка источника */
+    if (it.source === 'card') {
+      html += '<div class="mob-gallery-check checked" style="pointer-events:none">K' + (it.cardIdx + 1) + '</div>';
+    } else {
+      html += '<div class="mob-gallery-check checked" style="pointer-events:none">+</div>';
+    }
+
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+/**
+ * Полноэкранный просмотр из мобильного отбора.
+ * @param {number} idx — индекс в acGetAllContent()
+ */
+function cpMobileSelectFullscreen(idx) {
+  if (typeof acOpenLightbox === 'function') {
+    acOpenLightbox(idx, null);
   }
 }
 

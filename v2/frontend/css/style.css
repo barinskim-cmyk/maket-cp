@@ -1056,6 +1056,18 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   cursor: pointer; white-space: nowrap;
 }
 .mob-header-btn:active { background: #555; }
+.mob-header-tabs {
+  display: flex; gap: 4px;
+}
+.mob-tab-btn {
+  padding: 6px 12px; font-size: 12px; font-weight: 500;
+  background: #f0f0f0; color: #666; border: none; border-radius: 5px;
+  cursor: pointer; white-space: nowrap;
+}
+.mob-tab-btn:active { background: #ddd; }
+.mob-tab-active {
+  background: #333; color: #fff;
+}
 
 /* --- Мобильная лента карточек --- */
 .mob-feed {
@@ -1123,7 +1135,18 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 /* --- Карусель (навигация по фото в слоте) --- */
 .mob-carousel-wrap {
   position: relative; overflow: hidden;
-  touch-action: pan-y;
+  touch-action: pan-y; cursor: pointer;
+}
+/* Контейнер стрелок и крестика — скрывается/показывается по тапу */
+.mob-carousel-controls {
+  transition: opacity 0.2s;
+}
+.mob-controls-hidden {
+  opacity: 0; pointer-events: none;
+}
+.mob-controls-hidden .mob-carousel-arrow,
+.mob-controls-hidden .mob-slot-remove {
+  pointer-events: none;
 }
 .mob-carousel-arrows {
   position: absolute; top: 0; left: 0; right: 0; bottom: 0;
