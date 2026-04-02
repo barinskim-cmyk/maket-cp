@@ -45,6 +45,7 @@ function showSubpage(name) {
     }
   }
   if (name === 'other' && typeof ocOnPageShow === 'function') ocOnPageShow();
+  if (name === 'allcontent' && typeof acOnPageShow === 'function') acOnPageShow();
 }
 
 // ── Модалки ──

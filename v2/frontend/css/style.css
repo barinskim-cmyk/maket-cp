@@ -522,6 +522,34 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   font-size: 13px;
 }
 
+/* Стрелки навигации в лайтбоксе */
+.pv-lb-arrow {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 48px; height: 48px;
+  background: rgba(255,255,255,0.12); color: #fff;
+  border: none; border-radius: 50%;
+  font-size: 36px; line-height: 44px; text-align: center;
+  cursor: pointer; transition: background 0.15s;
+  user-select: none;
+}
+.pv-lb-arrow:hover { background: rgba(255,255,255,0.3); }
+.pv-lb-prev { left: 20px; }
+.pv-lb-next { right: 20px; }
+
+/* Галочка «Доп. контент» в лайтбоксе */
+.pv-lb-check-wrap {
+  position: absolute; top: 20px; left: 24px;
+  display: flex; align-items: center; gap: 6px;
+  color: #fff; font-size: 14px;
+  background: rgba(0,0,0,0.5); padding: 6px 12px; border-radius: 6px;
+  cursor: default; user-select: none;
+}
+.pv-lb-check-wrap input[type="checkbox"] {
+  width: 18px; height: 18px; cursor: pointer;
+  accent-color: #4a9eff;
+}
+.pv-lb-check-wrap label { cursor: pointer; }
+
 .undo-btn {
   padding: 8px 16px; background: #fff3e0; color: #e65100;
   border: 2px solid #e65100; border-radius: 6px; cursor: pointer;
@@ -778,6 +806,16 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 }
 .oc-item:hover .pv-remove { display: block; }
 .oc-item:hover .pv-name { display: block; }
+
+/* Бейдж источника для «Весь контент» */
+.ac-badge {
+  position: absolute; top: 4px; left: 4px;
+  background: rgba(0,0,0,0.55); color: #fff;
+  font-size: 10px; padding: 1px 5px; border-radius: 3px;
+  pointer-events: none;
+}
+.ac-toolbar { display: flex; align-items: center; gap: 12px; }
+.ac-toolbar span { font-size: 13px; color: #999; }
 
 /* ══════════════════════════════════════════════
    Синхронизация / Rate Setter

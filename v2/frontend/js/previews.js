@@ -777,14 +777,16 @@ function pvBuildHTML(store, used, from, to) {
   return html;
 }
 
-// ── Полноэкранный просмотр превью ──
+// ── Полноэкранный просмотр превью (лайтбокс) ──
+
+/** @type {number} Текущий индекс в лайтбоксе */
+var _pvLbIdx = -1;
+/** @type {Array} Текущий список превью для навигации */
+var _pvLbList = [];
 
 /**
- * Показать превью на весь экран.
- * Использует тот же оверлей что cpShowFullscreen в cards.js.
- * Ищет превью по имени файла через data-pv-name атрибут,
- * чтобы корректно работать с отфильтрованным списком.
- * @param {number} pvIdx — индекс (фолбэк, если имя не найдено)
+ * Показать превью в лайтбоксе с навигацией и галочкой «В доп. контент».
+ * @param {number} pvIdx — индекс в массиве превью (фолбэк)
  * @param {Event} e — событие клика
  */
 function pvShowFullscreen(pvIdx, e) {
@@ -792,59 +794,111 @@ function pvShowFullscreen(pvIdx, e) {
   var proj = getActiveProject();
   if (!proj || !proj.previews) return;
 
-  /* Ищем имя файла через DOM — надёжнее чем индекс */
+  /* Ищем имя файла через DOM */
   var pvName = '';
   if (e && e.target) {
     var thumb = e.target.closest('.pv-thumb');
     if (thumb) pvName = thumb.getAttribute('data-pv-name') || '';
   }
 
-  /* Находим превью по имени в полном массиве */
-  var pv = null;
+  /* Определяем индекс в полном массиве */
+  var startIdx = -1;
   if (pvName) {
     for (var p = 0; p < proj.previews.length; p++) {
-      if (proj.previews[p].name === pvName) { pv = proj.previews[p]; break; }
+      if (proj.previews[p].name === pvName) { startIdx = p; break; }
     }
   }
-  /* Фолбэк по индексу */
-  if (!pv && proj.previews[pvIdx]) pv = proj.previews[pvIdx];
+  if (startIdx < 0) startIdx = pvIdx;
+  if (!proj.previews[startIdx]) return;
+
+  _pvLbList = proj.previews;
+  _pvLbIdx = startIdx;
+  _pvLbOpen();
+}
+
+/**
+ * Создать/обновить лайтбокс overlay.
+ */
+function _pvLbOpen() {
+  /* Удалить предыдущий если есть */
+  pvCloseFullscreen();
+
+  var pv = _pvLbList[_pvLbIdx];
   if (!pv) return;
 
-  /* Сначала показываем preview (1200px) или thumb (300px) */
   var src = pv.preview || pv.thumb || pv.dataUrl || '';
   if (!src) return;
 
+  var proj = getActiveProject();
+  var isInOC = _pvIsInOtherContent(pv.name);
+
   var overlay = document.createElement('div');
   overlay.className = 'cp-fullscreen-overlay';
+  overlay.id = 'pv-lightbox';
   overlay.onclick = function(ev) { if (ev.target === overlay) pvCloseFullscreen(); };
 
+  /* Картинка */
   var img = document.createElement('img');
   img.src = src;
   img.className = 'cp-fullscreen-img';
 
+  /* Кнопка закрыть */
   var closeBtn = document.createElement('button');
   closeBtn.className = 'cp-fullscreen-close';
   closeBtn.innerHTML = '&times;';
   closeBtn.onclick = pvCloseFullscreen;
 
+  /* Имя файла + счётчик */
   var nameEl = document.createElement('div');
   nameEl.className = 'cp-fullscreen-name';
-  nameEl.textContent = pv.name || '';
+  nameEl.textContent = (_pvLbIdx + 1) + ' / ' + _pvLbList.length + '  —  ' + (pv.name || '');
+
+  /* Стрелка влево */
+  var prevBtn = document.createElement('button');
+  prevBtn.className = 'pv-lb-arrow pv-lb-prev';
+  prevBtn.innerHTML = '&#8249;';
+  prevBtn.onclick = function(ev) { ev.stopPropagation(); _pvLbNav(-1); };
+
+  /* Стрелка вправо */
+  var nextBtn = document.createElement('button');
+  nextBtn.className = 'pv-lb-arrow pv-lb-next';
+  nextBtn.innerHTML = '&#8250;';
+  nextBtn.onclick = function(ev) { ev.stopPropagation(); _pvLbNav(1); };
+
+  /* Галочка «В доп. контент» */
+  var checkWrap = document.createElement('div');
+  checkWrap.className = 'pv-lb-check-wrap';
+
+  var checkBox = document.createElement('input');
+  checkBox.type = 'checkbox';
+  checkBox.id = 'pv-lb-oc-check';
+  checkBox.checked = isInOC;
+  checkBox.onchange = function() { _pvLbToggleOC(this.checked); };
+
+  var checkLabel = document.createElement('label');
+  checkLabel.htmlFor = 'pv-lb-oc-check';
+  checkLabel.textContent = ' Доп. контент';
+
+  checkWrap.appendChild(checkBox);
+  checkWrap.appendChild(checkLabel);
 
   overlay.appendChild(img);
   overlay.appendChild(closeBtn);
   overlay.appendChild(nameEl);
+  overlay.appendChild(prevBtn);
+  overlay.appendChild(nextBtn);
+  overlay.appendChild(checkWrap);
   document.body.appendChild(overlay);
 
-  document.addEventListener('keydown', _pvFullscreenEsc);
+  document.addEventListener('keydown', _pvLbKeyHandler);
 
-  /* Desktop: подгружаем оригинал через pywebview */
-  if (pv.path && window.pywebview && window.pywebview.api) {
+  /* Desktop: подгружаем оригинал */
+  if (pv.path && window.pywebview && window.pywebview.api && window.pywebview.api.get_full_image) {
     window.pywebview.api.get_full_image(pv.path).then(function(result) {
       if (result && result.data_url) {
-        var currentOverlay = document.querySelector('.cp-fullscreen-overlay');
-        if (currentOverlay) {
-          var fullImg = currentOverlay.querySelector('.cp-fullscreen-img');
+        var lb = document.getElementById('pv-lightbox');
+        if (lb) {
+          var fullImg = lb.querySelector('.cp-fullscreen-img');
           if (fullImg) fullImg.src = result.data_url;
         }
       }
@@ -852,12 +906,86 @@ function pvShowFullscreen(pvIdx, e) {
   }
 }
 
-function pvCloseFullscreen() {
-  var overlay = document.querySelector('.cp-fullscreen-overlay');
-  if (overlay) overlay.remove();
-  document.removeEventListener('keydown', _pvFullscreenEsc);
+/**
+ * Навигация по лайтбоксу: +1 вперёд, -1 назад.
+ */
+function _pvLbNav(dir) {
+  var next = _pvLbIdx + dir;
+  if (next < 0) next = _pvLbList.length - 1;
+  if (next >= _pvLbList.length) next = 0;
+  _pvLbIdx = next;
+  _pvLbOpen();
 }
 
+/**
+ * Добавить/убрать текущую превью из доп. контента.
+ */
+function _pvLbToggleOC(add) {
+  var pv = _pvLbList[_pvLbIdx];
+  if (!pv) return;
+  var proj = getActiveProject();
+  if (!proj) return;
+  if (!proj.otherContent) proj.otherContent = [];
+
+  if (add) {
+    /* Добавить если нет */
+    for (var i = 0; i < proj.otherContent.length; i++) {
+      if (proj.otherContent[i].name === pv.name) return;
+    }
+    proj.otherContent.push({
+      name: pv.name,
+      path: pv.path || '',
+      thumb: pv.thumb || '',
+      preview: pv.preview || ''
+    });
+  } else {
+    /* Убрать */
+    for (var j = proj.otherContent.length - 1; j >= 0; j--) {
+      if (proj.otherContent[j].name === pv.name) {
+        proj.otherContent.splice(j, 1);
+      }
+    }
+  }
+
+  /* Сохранить + синхронизировать */
+  if (typeof shAutoSave === 'function') shAutoSave();
+  if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
+}
+
+/**
+ * Проверить, есть ли фото в доп. контенте.
+ */
+function _pvIsInOtherContent(name) {
+  var proj = getActiveProject();
+  if (!proj || !proj.otherContent) return false;
+  for (var i = 0; i < proj.otherContent.length; i++) {
+    if (proj.otherContent[i].name === name) return true;
+  }
+  return false;
+}
+
+/**
+ * Обработчик клавиш в лайтбоксе.
+ */
+function _pvLbKeyHandler(e) {
+  if (e.key === 'Escape') { pvCloseFullscreen(); return; }
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { _pvLbNav(1); return; }
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { _pvLbNav(-1); return; }
+  /* Пробел = переключить галочку */
+  if (e.key === ' ') {
+    e.preventDefault();
+    var cb = document.getElementById('pv-lb-oc-check');
+    if (cb) { cb.checked = !cb.checked; _pvLbToggleOC(cb.checked); }
+  }
+}
+
+function pvCloseFullscreen() {
+  var overlay = document.getElementById('pv-lightbox');
+  if (overlay) overlay.remove();
+  document.removeEventListener('keydown', _pvLbKeyHandler);
+}
+
+/* Обратная совместимость */
 function _pvFullscreenEsc(e) {
   if (e.key === 'Escape') pvCloseFullscreen();
 }
@@ -1113,6 +1241,117 @@ function ocClearAll() {
   ocRenderField();
   if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
 }
+
+// ══════════════════════════════════════════════
+//  «Весь контент» — все фото из отбора (карточки + доп. контент)
+// ══════════════════════════════════════════════
+
+/** @type {number} Количество колонок в плитке «Весь контент» */
+var _acColumns = 4;
+
+/**
+ * Собрать все фото из отбора: слоты карточек + otherContent.
+ * Возвращает массив {name, thumb, preview, source} (source = 'card' | 'other').
+ */
+function acGetAllContent() {
+  var proj = getActiveProject();
+  if (!proj) return [];
+  var result = [];
+  var seen = {};
+
+  /* 1. Фото из карточек */
+  var cards = proj.cards || [];
+  for (var c = 0; c < cards.length; c++) {
+    var slots = cards[c].slots || [];
+    for (var s = 0; s < slots.length; s++) {
+      var slot = slots[s];
+      var name = slot.file || '';
+      if (!name) continue;
+      if (seen[name]) continue;
+      seen[name] = true;
+      result.push({
+        name: name,
+        thumb: slot.thumbUrl || slot.dataUrl || '',
+        preview: slot.dataUrl || slot.thumbUrl || '',
+        source: 'card',
+        cardIdx: c
+      });
+    }
+  }
+
+  /* 2. Доп. контент */
+  var oc = proj.otherContent || [];
+  for (var i = 0; i < oc.length; i++) {
+    var item = oc[i];
+    if (seen[item.name]) continue;
+    seen[item.name] = true;
+    result.push({
+      name: item.name,
+      thumb: item.thumb || '',
+      preview: item.preview || item.thumb || '',
+      source: 'other'
+    });
+  }
+  return result;
+}
+
+/**
+ * Отрисовать плитку «Весь контент».
+ */
+function acRenderField() {
+  var gallery = document.getElementById('ac-gallery');
+  var toolbar = document.getElementById('ac-toolbar');
+  var countEl = document.getElementById('ac-count');
+  var empty = document.getElementById('ac-field-empty');
+  if (!gallery) return;
+
+  var items = acGetAllContent();
+
+  if (items.length === 0) {
+    gallery.innerHTML = '';
+    if (toolbar) toolbar.style.display = 'none';
+    if (empty) empty.style.display = '';
+    return;
+  }
+
+  if (toolbar) {
+    toolbar.style.display = 'flex';
+    countEl.textContent = items.length + ' фото';
+  }
+  if (empty) empty.style.display = 'none';
+
+  /* Ширина элемента по количеству колонок */
+  var gap = 6;
+  var w = 'calc((100% - ' + ((_acColumns - 1) * gap) + 'px) / ' + _acColumns + ')';
+
+  var html = '';
+  for (var i = 0; i < items.length; i++) {
+    var it = items[i];
+    var label = it.source === 'card' ? 'K' + (it.cardIdx + 1) : 'доп';
+    html += '<div class="oc-item" style="width:' + w + '" title="' + esc(it.name) + '">';
+    html += '<img src="' + (it.preview || it.thumb) + '" loading="lazy">';
+    html += '<span class="ac-badge">' + label + '</span>';
+    html += '<span class="pv-name">' + esc(pvShortName(it.name)) + '</span>';
+    html += '</div>';
+  }
+  gallery.innerHTML = html;
+}
+
+/**
+ * Изменить количество колонок в плитке «Весь контент».
+ */
+function acSetColumns(val) {
+  _acColumns = parseInt(val) || 4;
+  acRenderField();
+}
+
+/**
+ * Вызывается при открытии подвкладки «Весь контент».
+ */
+function acOnPageShow() {
+  acRenderField();
+}
+
 
 // ══════════════════════════════════════════════
 //  Инициализация
