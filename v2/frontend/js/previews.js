@@ -866,18 +866,27 @@ function _pvLbOpen() {
   nextBtn.onclick = function(ev) { ev.stopPropagation(); _pvLbNav(1); };
 
   /* Галочка «В доп. контент» */
+  var inCardIdx = _pvIsInCard(pv.name);
+  var isLocked = inCardIdx >= 0;
+
   var checkWrap = document.createElement('div');
   checkWrap.className = 'pv-lb-check-wrap';
 
   var checkBox = document.createElement('input');
   checkBox.type = 'checkbox';
   checkBox.id = 'pv-lb-oc-check';
-  checkBox.checked = isInOC;
-  checkBox.onchange = function() { _pvLbToggleOC(this.checked); };
+  checkBox.checked = isInOC || isLocked;
+  checkBox.disabled = isLocked;
+  checkBox.onchange = function() { if (!isLocked) _pvLbToggleOC(this.checked); };
 
   var checkLabel = document.createElement('label');
   checkLabel.htmlFor = 'pv-lb-oc-check';
-  checkLabel.textContent = ' Доп. контент';
+  if (isLocked) {
+    checkLabel.textContent = ' В карточке К' + (inCardIdx + 1);
+    checkWrap.style.opacity = '0.7';
+  } else {
+    checkLabel.textContent = isInOC ? ' В доп. контенте' : ' Добавить в отбор';
+  }
 
   checkWrap.appendChild(checkBox);
   checkWrap.appendChild(checkLabel);
@@ -964,6 +973,23 @@ function _pvIsInOtherContent(name) {
     if (proj.otherContent[i].name === name) return true;
   }
   return false;
+}
+
+/**
+ * Проверить, используется ли фото в какой-либо карточке.
+ * @param {string} name — имя файла
+ * @returns {number} индекс карточки (0-based) или -1
+ */
+function _pvIsInCard(name) {
+  var proj = getActiveProject();
+  if (!proj || !proj.cards) return -1;
+  for (var c = 0; c < proj.cards.length; c++) {
+    var slots = proj.cards[c].slots || [];
+    for (var s = 0; s < slots.length; s++) {
+      if (slots[s].file === name) return c;
+    }
+  }
+  return -1;
 }
 
 /**
@@ -1300,7 +1326,8 @@ function acGetAllContent() {
 
 /**
  * Отрисовать плитку «Весь контент».
- * На каждом фото: бейдж источника + кликабельная галочка «В отбор».
+ * Фото из карточек: зелёная галочка (заблокирована, нельзя убрать).
+ * Фото из допконтента (не в карточках): зелёная галочка (можно убрать).
  */
 function acRenderField() {
   var gallery = document.getElementById('ac-gallery');
@@ -1324,26 +1351,31 @@ function acRenderField() {
   }
   if (empty) empty.style.display = 'none';
 
-  /* Устанавливаем grid с нужным количеством колонок */
   gallery.style.gridTemplateColumns = 'repeat(' + _acColumns + ', 1fr)';
 
   var html = '';
   for (var i = 0; i < items.length; i++) {
     var it = items[i];
-    var label = it.source === 'card' ? 'K' + (it.cardIdx + 1) : 'доп';
-    var isInOC = _pvIsInOtherContent(it.name);
-    var checkCls = isInOC ? ' ac-check-on' : '';
-    /* Горизонт занимает 2 колонки */
     var isH = it.orient === 'h';
     var spanStyle = isH ? ' style="grid-column: span 2"' : '';
+
     html += '<div class="ac-tile' + (isH ? ' ac-tile-h' : '') + '"' + spanStyle + ' title="' + esc(it.name) + '">';
     html += '<img src="' + (it.preview || it.thumb) + '" loading="lazy">';
-    html += '<span class="ac-badge">' + label + '</span>';
-    /* Кликабельная галочка «В отбор» */
-    html += '<button class="ac-check' + checkCls + '" onclick="acToggleOC(' + i + ',event)">';
-    html += '<span class="ac-check-icon"></span>';
-    html += '<span class="ac-check-label">' + (isInOC ? 'В отборе' : 'В отбор') + '</span>';
-    html += '</button>';
+
+    if (it.source === 'card') {
+      /* Фото из карточки — заблокированная зелёная галочка */
+      html += '<div class="ac-check ac-check-on ac-check-locked">';
+      html += '<span class="ac-check-icon"></span>';
+      html += '<span class="ac-check-label">К' + (it.cardIdx + 1) + '</span>';
+      html += '</div>';
+    } else {
+      /* Фото из допконтента — можно убрать */
+      html += '<button class="ac-check ac-check-on" onclick="acRemoveOC(\'' + esc(it.name).replace(/'/g, "\\'") + '\',event)">';
+      html += '<span class="ac-check-icon"></span>';
+      html += '<span class="ac-check-label">Доп. контент</span>';
+      html += '</button>';
+    }
+
     html += '<span class="pv-name">' + esc(pvShortName(it.name)) + '</span>';
     html += '</div>';
   }
@@ -1351,43 +1383,24 @@ function acRenderField() {
 }
 
 /**
- * Переключить фото в/из доп. контента (клик на галочке в плитке).
- * @param {number} itemIdx — индекс в acGetAllContent()
+ * Убрать фото из допконтента (только для фото НЕ из карточек).
+ * @param {string} name — имя файла
  * @param {Event} e
  */
-function acToggleOC(itemIdx, e) {
+function acRemoveOC(name, e) {
   if (e) { e.stopPropagation(); e.preventDefault(); }
-  var items = acGetAllContent();
-  var it = items[itemIdx];
-  if (!it) return;
-
   var proj = getActiveProject();
-  if (!proj) return;
-  if (!proj.otherContent) proj.otherContent = [];
+  if (!proj || !proj.otherContent) return;
 
-  var isInOC = _pvIsInOtherContent(it.name);
-  if (isInOC) {
-    /* Убрать из допконтента */
-    for (var j = proj.otherContent.length - 1; j >= 0; j--) {
-      if (proj.otherContent[j].name === it.name) {
-        proj.otherContent.splice(j, 1);
-      }
+  for (var j = proj.otherContent.length - 1; j >= 0; j--) {
+    if (proj.otherContent[j].name === name) {
+      proj.otherContent.splice(j, 1);
     }
-  } else {
-    /* Добавить в допконтент */
-    proj.otherContent.push({
-      name: it.name,
-      path: '',
-      thumb: it.thumb || '',
-      preview: it.preview || ''
-    });
   }
 
-  /* Сохранить + перерисовать */
   if (typeof shAutoSave === 'function') shAutoSave();
   if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
   acRenderField();
-  /* Обновить допконтент если открыт */
   if (typeof ocRenderField === 'function') ocRenderField();
 }
 
