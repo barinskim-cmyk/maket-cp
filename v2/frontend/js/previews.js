@@ -868,28 +868,33 @@ function _pvLbOpen() {
   /* Галочка «В доп. контент» */
   var inCardIdx = _pvIsInCard(pv.name);
   var isLocked = inCardIdx >= 0;
+  var isChecked = isInOC || isLocked;
 
   var checkWrap = document.createElement('div');
   checkWrap.className = 'pv-lb-check-wrap';
+  checkWrap.id = 'pv-lb-oc-wrap';
 
-  var checkBox = document.createElement('input');
-  checkBox.type = 'checkbox';
-  checkBox.id = 'pv-lb-oc-check';
-  checkBox.checked = isInOC || isLocked;
-  checkBox.disabled = isLocked;
-  checkBox.onchange = function() { if (!isLocked) _pvLbToggleOC(this.checked); };
+  /* Круглая галочка как pv-check */
+  var circle = document.createElement('div');
+  circle.className = 'pv-lb-circle' + (isChecked ? ' pv-lb-circle-on' : '');
+  circle.id = 'pv-lb-oc-circle';
 
-  var checkLabel = document.createElement('label');
-  checkLabel.htmlFor = 'pv-lb-oc-check';
+  var labelEl = document.createElement('span');
   if (isLocked) {
-    checkLabel.textContent = ' В карточке К' + (inCardIdx + 1);
-    checkWrap.style.opacity = '0.7';
+    labelEl.textContent = 'В карточке К' + (inCardIdx + 1);
+    checkWrap.style.cursor = 'default';
+  } else if (isInOC) {
+    labelEl.textContent = 'В доп. контенте';
+    checkWrap.style.cursor = 'pointer';
+    checkWrap.onclick = function() { _pvLbToggleOC(false); _pvLbOpen(); };
   } else {
-    checkLabel.textContent = isInOC ? ' В доп. контенте' : ' Добавить в отбор';
+    labelEl.textContent = 'Добавить в отбор';
+    checkWrap.style.cursor = 'pointer';
+    checkWrap.onclick = function() { _pvLbToggleOC(true); _pvLbOpen(); };
   }
 
-  checkWrap.appendChild(checkBox);
-  checkWrap.appendChild(checkLabel);
+  checkWrap.appendChild(circle);
+  checkWrap.appendChild(labelEl);
 
   overlay.appendChild(img);
   overlay.appendChild(closeBtn);
@@ -999,11 +1004,15 @@ function _pvLbKeyHandler(e) {
   if (e.key === 'Escape') { pvCloseFullscreen(); return; }
   if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { _pvLbNav(1); return; }
   if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { _pvLbNav(-1); return; }
-  /* Пробел = переключить галочку */
+  /* Пробел = переключить галочку (только для не-карточных фото) */
   if (e.key === ' ') {
     e.preventDefault();
-    var cb = document.getElementById('pv-lb-oc-check');
-    if (cb) { cb.checked = !cb.checked; _pvLbToggleOC(cb.checked); }
+    var pv = _pvLbList[_pvLbIdx];
+    if (pv && _pvIsInCard(pv.name) < 0) {
+      var isIn = _pvIsInOtherContent(pv.name);
+      _pvLbToggleOC(!isIn);
+      _pvLbOpen();
+    }
   }
 }
 
@@ -1241,16 +1250,40 @@ function ocRenderField() {
   }
   if (empty) empty.style.display = 'none';
 
+  var zoomSvg = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
+
   var html = '';
   for (var i = 0; i < store.length; i++) {
     var item = store[i];
     html += '<div class="oc-item" title="' + esc(item.name) + '">';
     html += '<img src="' + (item.preview || item.thumb) + '" loading="lazy">';
+    html += '<button class="oc-zoom" onclick="ocOpenLightbox(' + i + ',event)" title="На весь экран">' + zoomSvg + '</button>';
     html += '<button class="pv-remove" onclick="ocRemoveItem(' + i + ',event)">&times;</button>';
     html += '<span class="pv-name">' + esc(pvShortName(item.name)) + '</span>';
     html += '</div>';
   }
   gallery.innerHTML = html;
+}
+
+/**
+ * Открыть лайтбокс из допконтента.
+ */
+function ocOpenLightbox(idx, e) {
+  if (e) e.stopPropagation();
+  var store = ocGetStore();
+  if (!store[idx]) return;
+  var lbList = [];
+  for (var i = 0; i < store.length; i++) {
+    lbList.push({
+      name: store[i].name,
+      thumb: store[i].thumb || '',
+      preview: store[i].preview || store[i].thumb || '',
+      path: ''
+    });
+  }
+  _pvLbList = lbList;
+  _pvLbIdx = idx;
+  _pvLbOpen();
 }
 
 function ocRemoveItem(idx, e) {
@@ -1353,6 +1386,8 @@ function acRenderField() {
 
   gallery.style.gridTemplateColumns = 'repeat(' + _acColumns + ', 1fr)';
 
+  var zoomSvg = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
+
   var html = '';
   for (var i = 0; i < items.length; i++) {
     var it = items[i];
@@ -1363,19 +1398,17 @@ function acRenderField() {
     html += '<img src="' + (it.preview || it.thumb) + '" loading="lazy">';
 
     if (it.source === 'card') {
-      /* Фото из карточки — заблокированная зелёная галочка */
-      html += '<div class="ac-check ac-check-on ac-check-locked">';
-      html += '<span class="ac-check-icon"></span>';
+      /* Фото из карточки — зелёная круглая галочка (заблокирована) */
+      html += '<div class="ac-check ac-check-on ac-check-locked"></div>';
       html += '<span class="ac-check-label">К' + (it.cardIdx + 1) + '</span>';
-      html += '</div>';
     } else {
-      /* Фото из допконтента — можно убрать */
-      html += '<button class="ac-check ac-check-on" onclick="acRemoveOC(\'' + esc(it.name).replace(/'/g, "\\'") + '\',event)">';
-      html += '<span class="ac-check-icon"></span>';
-      html += '<span class="ac-check-label">Доп. контент</span>';
-      html += '</button>';
+      /* Фото из допконтента — зелёная галочка, можно убрать */
+      html += '<button class="ac-check ac-check-on" onclick="acRemoveOC(\'' + esc(it.name).replace(/'/g, "\\'") + '\',event)"></button>';
+      html += '<span class="ac-check-label">Доп.</span>';
     }
 
+    /* Кнопка zoom → открывает лайтбокс */
+    html += '<button class="ac-zoom" onclick="acOpenLightbox(' + i + ',event)" title="На весь экран">' + zoomSvg + '</button>';
     html += '<span class="pv-name">' + esc(pvShortName(it.name)) + '</span>';
     html += '</div>';
   }
@@ -1410,6 +1443,30 @@ function acRemoveOC(name, e) {
 function acSetColumns(val) {
   _acColumns = parseInt(val) || 4;
   acRenderField();
+}
+
+/**
+ * Открыть лайтбокс из плитки «Весь контент».
+ * Собирает все фото в acGetAllContent() и открывает по индексу.
+ */
+function acOpenLightbox(idx, e) {
+  if (e) e.stopPropagation();
+  var items = acGetAllContent();
+  if (!items[idx]) return;
+
+  /* Собираем массив в формате совместимом с _pvLbList */
+  var lbList = [];
+  for (var i = 0; i < items.length; i++) {
+    lbList.push({
+      name: items[i].name,
+      thumb: items[i].thumb || '',
+      preview: items[i].preview || '',
+      path: ''
+    });
+  }
+  _pvLbList = lbList;
+  _pvLbIdx = idx;
+  _pvLbOpen();
 }
 
 /**
