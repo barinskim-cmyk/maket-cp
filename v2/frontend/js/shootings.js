@@ -581,6 +581,10 @@ function _shDoAutoSave() {
       if (light.cards && light.cards.length > 0) {
         light.cards = _shLightenCards(light.cards);
       }
+      /* Убираем тяжёлые refImage из артикулов (base64 каталожные фото) */
+      if (light.articles && light.articles.length > 0) {
+        light.articles = _shLightenArticles(light.articles);
+      }
       toSave.push(light);
 
       /* Сохраняем превью отдельно (только thumbs).
@@ -606,6 +610,27 @@ function _shDoAutoSave() {
  * Облегчить карточки для сохранения: заменить тяжёлый dataUrl на thumbUrl.
  * Возвращает копию массива (не мутирует оригинал).
  */
+/**
+ * Облегчить артикулы для сохранения: убрать тяжёлые refImage (base64).
+ * Сохраняет все остальные поля (sku, category, color, status, cardIdx).
+ * @param {Array} articles
+ * @returns {Array}
+ */
+function _shLightenArticles(articles) {
+  var result = [];
+  for (var i = 0; i < articles.length; i++) {
+    var art = articles[i];
+    var copy = {};
+    for (var k in art) {
+      if (!art.hasOwnProperty(k)) continue;
+      if (k === 'refImage') continue;  /* base64 каталожное фото — тяжёлое */
+      copy[k] = art[k];
+    }
+    result.push(copy);
+  }
+  return result;
+}
+
 function _shLightenCards(cards) {
   var result = [];
   for (var c = 0; c < cards.length; c++) {
