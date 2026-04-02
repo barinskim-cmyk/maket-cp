@@ -536,27 +536,41 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .pv-lb-prev { left: 20px; }
 .pv-lb-next { right: 20px; }
 
-/* Галочка в лайтбоксе — круглая как pv-check */
+/* Контейнер картинки в лайтбоксе (для позиционирования галочки) */
+.pv-lb-img-wrap {
+  position: relative; display: inline-block;
+  max-width: 90vw; max-height: 80vh;
+}
+.pv-lb-img-wrap .cp-fullscreen-img {
+  position: relative; display: block;
+}
+
+/* Галочка в лайтбоксе — круглая, справа вплотную к фото */
 .pv-lb-check-wrap {
-  position: absolute; top: 20px; left: 24px;
-  display: flex; align-items: center; gap: 8px;
-  color: #fff; font-size: 14px;
-  background: rgba(0,0,0,0.5); padding: 8px 14px; border-radius: 8px;
-  user-select: none;
+  position: absolute; top: 8px; right: 8px;
+  display: flex; align-items: center; gap: 6px;
+  flex-direction: row-reverse;
+  color: #fff; font-size: 13px;
+  user-select: none; z-index: 5;
+}
+.pv-lb-check-wrap span {
+  text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+  white-space: nowrap;
 }
 .pv-lb-circle {
-  width: 22px; height: 22px;
-  border: 2px solid rgba(255,255,255,0.6); border-radius: 50%;
+  width: 24px; height: 24px;
+  border: 2px solid rgba(255,255,255,0.8); border-radius: 50%;
   position: relative; flex-shrink: 0;
   transition: background 0.15s, border-color 0.15s;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
 }
 .pv-lb-circle-on {
   background: #4caf50; border-color: #4caf50;
 }
 .pv-lb-circle-on::after {
   content: '';
-  position: absolute; top: 3px; left: 6px;
-  width: 6px; height: 10px;
+  position: absolute; top: 3px; left: 7px;
+  width: 6px; height: 11px;
   border: solid #fff; border-width: 0 2.5px 2.5px 0;
   transform: rotate(45deg);
 }
