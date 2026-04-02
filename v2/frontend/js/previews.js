@@ -820,7 +820,18 @@ function pvShowFullscreen(pvIdx, e) {
  * Создать/обновить лайтбокс overlay.
  */
 function _pvLbOpen() {
-  /* Удалить предыдущий если есть */
+  /* Мобильный: iPhone-стиль карусель со snap-scroll */
+  if (window.innerWidth < 768) {
+    _pvLbOpenMobile();
+    return;
+  }
+  _pvLbOpenDesktop();
+}
+
+/**
+ * Десктопный лайтбокс (стрелки + клавиши).
+ */
+function _pvLbOpenDesktop() {
   pvCloseFullscreen();
 
   var pv = _pvLbList[_pvLbIdx];
@@ -829,7 +840,6 @@ function _pvLbOpen() {
   var src = pv.preview || pv.thumb || pv.dataUrl || '';
   if (!src) return;
 
-  var proj = getActiveProject();
   var isInOC = _pvIsInOtherContent(pv.name);
 
   var overlay = document.createElement('div');
@@ -837,7 +847,6 @@ function _pvLbOpen() {
   overlay.id = 'pv-lightbox';
   overlay.onclick = function(ev) { if (ev.target === overlay) pvCloseFullscreen(); };
 
-  /* Контейнер картинки (для позиционирования галочки относительно фото) */
   var imgWrap = document.createElement('div');
   imgWrap.className = 'pv-lb-img-wrap';
 
@@ -845,63 +854,26 @@ function _pvLbOpen() {
   img.src = src;
   img.className = 'cp-fullscreen-img';
 
-  /* Кнопка закрыть */
   var closeBtn = document.createElement('button');
   closeBtn.className = 'cp-fullscreen-close';
   closeBtn.innerHTML = '&times;';
   closeBtn.onclick = pvCloseFullscreen;
 
-  /* Имя файла + счётчик */
   var nameEl = document.createElement('div');
   nameEl.className = 'cp-fullscreen-name';
   nameEl.textContent = (_pvLbIdx + 1) + ' / ' + _pvLbList.length + '  —  ' + (pv.name || '');
 
-  /* Стрелка влево */
   var prevBtn = document.createElement('button');
   prevBtn.className = 'pv-lb-arrow pv-lb-prev';
   prevBtn.innerHTML = '&#8249;';
   prevBtn.onclick = function(ev) { ev.stopPropagation(); _pvLbNav(-1); };
 
-  /* Стрелка вправо */
   var nextBtn = document.createElement('button');
   nextBtn.className = 'pv-lb-arrow pv-lb-next';
   nextBtn.innerHTML = '&#8250;';
   nextBtn.onclick = function(ev) { ev.stopPropagation(); _pvLbNav(1); };
 
-  /* Галочка «В доп. контент» */
-  var inCardIdx = _pvIsInCard(pv.name);
-  var isLocked = inCardIdx >= 0;
-  var isChecked = isInOC || isLocked;
-
-  var checkWrap = document.createElement('div');
-  checkWrap.className = 'pv-lb-check-wrap';
-  checkWrap.id = 'pv-lb-oc-wrap';
-
-  /* Круглая галочка как pv-check */
-  var circle = document.createElement('div');
-  circle.className = 'pv-lb-circle' + (isChecked ? ' pv-lb-circle-on' : '');
-  circle.id = 'pv-lb-oc-circle';
-
-  var labelEl = document.createElement('span');
-  if (isLocked) {
-    /* Карточечное фото — кликабельно, убирает из карточки */
-    labelEl.textContent = 'В карточке К' + (inCardIdx + 1);
-    checkWrap.style.cursor = 'pointer';
-    checkWrap.onclick = (function(photoName, cIdx) {
-      return function() { _pvLbRemoveFromCard(photoName, cIdx); };
-    })(pv.name, inCardIdx);
-  } else if (isInOC) {
-    labelEl.textContent = 'В доп. контенте';
-    checkWrap.style.cursor = 'pointer';
-    checkWrap.onclick = function() { _pvLbToggleOC(false); _pvLbOpen(); };
-  } else {
-    labelEl.textContent = 'Добавить в отбор';
-    checkWrap.style.cursor = 'pointer';
-    checkWrap.onclick = function() { _pvLbToggleOC(true); _pvLbOpen(); };
-  }
-
-  checkWrap.appendChild(circle);
-  checkWrap.appendChild(labelEl);
+  var checkWrap = _pvLbBuildCheck(pv);
 
   imgWrap.appendChild(img);
   imgWrap.appendChild(checkWrap);
@@ -913,9 +885,6 @@ function _pvLbOpen() {
   document.body.appendChild(overlay);
 
   document.addEventListener('keydown', _pvLbKeyHandler);
-
-  /* Мобильный свайп для навигации */
-  _pvLbBindSwipe(overlay);
 
   /* Desktop: подгружаем оригинал */
   if (pv.path && window.pywebview && window.pywebview.api && window.pywebview.api.get_full_image) {
@@ -929,6 +898,188 @@ function _pvLbOpen() {
       }
     });
   }
+}
+
+/**
+ * Мобильный лайтбокс: горизонтальный snap-scroll как в iPhone Photos.
+ * 3-панельный скроллер (prev, current, next) с пересборкой при snap.
+ */
+function _pvLbOpenMobile() {
+  pvCloseFullscreen();
+
+  var pv = _pvLbList[_pvLbIdx];
+  if (!pv) return;
+
+  var overlay = document.createElement('div');
+  overlay.className = 'cp-fullscreen-overlay pv-lb-mobile';
+  overlay.id = 'pv-lightbox';
+
+  /* Крестик закрытия */
+  var closeBtn = document.createElement('button');
+  closeBtn.className = 'cp-fullscreen-close';
+  closeBtn.innerHTML = '&times;';
+  closeBtn.onclick = pvCloseFullscreen;
+
+  /* Счётчик */
+  var nameEl = document.createElement('div');
+  nameEl.className = 'cp-fullscreen-name';
+  nameEl.id = 'pv-lb-mob-name';
+  nameEl.textContent = (_pvLbIdx + 1) + ' / ' + _pvLbList.length;
+
+  /* Горизонтальный скроллер: 3 панели */
+  var scroller = document.createElement('div');
+  scroller.className = 'pv-lb-scroller';
+  scroller.id = 'pv-lb-scroller';
+
+  _pvLbMobBuildPanels(scroller);
+
+  /* Галочка под скроллером */
+  var checkWrap = _pvLbBuildCheck(pv);
+  checkWrap.id = 'pv-lb-mob-check';
+
+  overlay.appendChild(closeBtn);
+  overlay.appendChild(scroller);
+  overlay.appendChild(checkWrap);
+  overlay.appendChild(nameEl);
+  document.body.appendChild(overlay);
+
+  /* Прокрутить к центральной (текущей) панели */
+  var panelW = scroller.offsetWidth;
+  scroller.scrollLeft = panelW;
+
+  /* Слушать окончание прокрутки (snap) */
+  var scrollTimer = null;
+  scroller.addEventListener('scroll', function() {
+    clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(function() {
+      _pvLbMobOnSnap(scroller);
+    }, 120);
+  }, { passive: true });
+
+  document.addEventListener('keydown', _pvLbKeyHandler);
+}
+
+/**
+ * Собрать 3 панели (prev, current, next) в скроллере.
+ */
+function _pvLbMobBuildPanels(scroller) {
+  scroller.innerHTML = '';
+
+  var len = _pvLbList.length;
+  var prevIdx = (_pvLbIdx - 1 + len) % len;
+  var nextIdx = (_pvLbIdx + 1) % len;
+  var indices = [prevIdx, _pvLbIdx, nextIdx];
+
+  for (var i = 0; i < 3; i++) {
+    var p = _pvLbList[indices[i]];
+    var panel = document.createElement('div');
+    panel.className = 'pv-lb-panel';
+
+    var img = document.createElement('img');
+    img.src = p ? (p.preview || p.thumb || p.dataUrl || '') : '';
+    img.className = 'pv-lb-panel-img';
+    panel.appendChild(img);
+
+    scroller.appendChild(panel);
+  }
+}
+
+/**
+ * Обработка snap: определить куда прокрутили, обновить индекс и пересобрать.
+ */
+function _pvLbMobOnSnap(scroller) {
+  var panelW = scroller.offsetWidth;
+  if (panelW === 0) return;
+
+  var scrollPos = scroller.scrollLeft;
+  var snappedPanel = Math.round(scrollPos / panelW);
+
+  if (snappedPanel === 1) return; /* остались на центральной — ничего не делать */
+
+  var len = _pvLbList.length;
+  if (snappedPanel === 0) {
+    /* Свайп вправо → предыдущее фото */
+    _pvLbIdx = (_pvLbIdx - 1 + len) % len;
+  } else {
+    /* Свайп влево → следующее фото */
+    _pvLbIdx = (_pvLbIdx + 1) % len;
+  }
+
+  /* Пересобрать панели и обновить UI */
+  _pvLbMobBuildPanels(scroller);
+  scroller.scrollLeft = panelW; /* мгновенно центрировать */
+
+  /* Обновить счётчик и галочку */
+  _pvLbMobUpdateUI();
+}
+
+/**
+ * Обновить счётчик и галочку в мобильном лайтбоксе.
+ */
+function _pvLbMobUpdateUI() {
+  var pv = _pvLbList[_pvLbIdx];
+  if (!pv) return;
+
+  var nameEl = document.getElementById('pv-lb-mob-name');
+  if (nameEl) {
+    nameEl.textContent = (_pvLbIdx + 1) + ' / ' + _pvLbList.length;
+  }
+
+  /* Пересобрать галочку */
+  var oldCheck = document.getElementById('pv-lb-mob-check');
+  if (oldCheck) {
+    var newCheck = _pvLbBuildCheck(pv);
+    newCheck.id = 'pv-lb-mob-check';
+    oldCheck.parentNode.replaceChild(newCheck, oldCheck);
+  }
+}
+
+/**
+ * Построить блок галочки для фото.
+ * @param {Object} pv — объект превью {name, ...}
+ * @returns {HTMLElement}
+ */
+function _pvLbBuildCheck(pv) {
+  var isInOC = _pvIsInOtherContent(pv.name);
+  var inCardIdx = _pvIsInCard(pv.name);
+  var isLocked = inCardIdx >= 0;
+  var isChecked = isInOC || isLocked;
+
+  var checkWrap = document.createElement('div');
+  checkWrap.className = 'pv-lb-check-wrap';
+
+  var circle = document.createElement('div');
+  circle.className = 'pv-lb-circle' + (isChecked ? ' pv-lb-circle-on' : '');
+
+  var labelEl = document.createElement('span');
+  if (isLocked) {
+    labelEl.textContent = 'В карточке К' + (inCardIdx + 1);
+    checkWrap.style.cursor = 'pointer';
+    checkWrap.onclick = (function(photoName, cIdx) {
+      return function() { _pvLbRemoveFromCard(photoName, cIdx); };
+    })(pv.name, inCardIdx);
+  } else if (isInOC) {
+    labelEl.textContent = 'В доп. контенте';
+    checkWrap.style.cursor = 'pointer';
+    checkWrap.onclick = function() {
+      _pvLbToggleOC(false);
+      /* Обновить галочку без перестройки */
+      _pvLbMobUpdateUI();
+      if (window.innerWidth >= 768) _pvLbOpen();
+    };
+  } else {
+    labelEl.textContent = 'Добавить в отбор';
+    checkWrap.style.cursor = 'pointer';
+    checkWrap.onclick = function() {
+      _pvLbToggleOC(true);
+      _pvLbMobUpdateUI();
+      if (window.innerWidth >= 768) _pvLbOpen();
+    };
+  }
+
+  checkWrap.appendChild(circle);
+  checkWrap.appendChild(labelEl);
+  return checkWrap;
 }
 
 /**
@@ -975,29 +1126,6 @@ function _pvLbSetFilter(minRating) {
     }
   }
   _pvLbOpen();
-}
-
-/**
- * Привязать свайп-навигацию к лайтбоксу (мобильный).
- * Свайп влево = следующее, вправо = предыдущее.
- * @param {HTMLElement} overlay
- */
-function _pvLbBindSwipe(overlay) {
-  var startX = 0;
-  var startY = 0;
-  overlay.addEventListener('touchstart', function(e) {
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-  }, { passive: true });
-  overlay.addEventListener('touchend', function(e) {
-    var dx = e.changedTouches[0].clientX - startX;
-    var dy = e.changedTouches[0].clientY - startY;
-    /* Минимум 50px, горизонтальнее чем вертикальный */
-    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.3) {
-      if (dx < 0) _pvLbNav(1);   /* свайп влево = следующее */
-      else _pvLbNav(-1);          /* свайп вправо = предыдущее */
-    }
-  }, { passive: true });
 }
 
 /**
