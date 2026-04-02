@@ -903,44 +903,6 @@ function _pvLbOpen() {
   checkWrap.appendChild(circle);
   checkWrap.appendChild(labelEl);
 
-  /* Фильтр по рейтингу внутри лайтбокса */
-  var filterBar = document.createElement('div');
-  filterBar.className = 'pv-lb-filter-bar';
-  filterBar.id = 'pv-lb-filter-bar';
-
-  var filterLabel = document.createElement('span');
-  filterLabel.className = 'pv-lb-filter-label';
-  filterLabel.textContent = 'Фильтр: ';
-  filterBar.appendChild(filterLabel);
-
-  for (var st = 1; st <= 5; st++) {
-    var starBtn = document.createElement('button');
-    starBtn.className = 'pv-filter-star pv-lb-filter-star' + (st <= _pvLbRatingFilter ? ' active' : '');
-    starBtn.setAttribute('data-star', st);
-    starBtn.innerHTML = '&#9733;';
-    starBtn.onclick = (function(sv) {
-      return function(ev) { ev.stopPropagation(); _pvLbSetFilter(sv); };
-    })(st);
-    filterBar.appendChild(starBtn);
-  }
-
-  var resetBtn = document.createElement('button');
-  resetBtn.className = 'pv-lb-filter-reset' + (_pvLbRatingFilter === 0 ? ' active' : '');
-  resetBtn.textContent = 'Все';
-  resetBtn.onclick = function(ev) { ev.stopPropagation(); _pvLbSetFilter(0); };
-  filterBar.appendChild(resetBtn);
-
-  /* Показать текущий рейтинг фото */
-  var pvRating = _pvGetRating(pv.name);
-  if (pvRating > 0) {
-    var ratingDisplay = document.createElement('span');
-    ratingDisplay.className = 'pv-lb-rating-display';
-    var starsStr = '';
-    for (var rs = 0; rs < pvRating; rs++) starsStr += '\u2605';
-    ratingDisplay.textContent = '  ' + starsStr;
-    filterBar.appendChild(ratingDisplay);
-  }
-
   imgWrap.appendChild(img);
   imgWrap.appendChild(checkWrap);
   overlay.appendChild(imgWrap);
@@ -948,10 +910,12 @@ function _pvLbOpen() {
   overlay.appendChild(nameEl);
   overlay.appendChild(prevBtn);
   overlay.appendChild(nextBtn);
-  overlay.appendChild(filterBar);
   document.body.appendChild(overlay);
 
   document.addEventListener('keydown', _pvLbKeyHandler);
+
+  /* Мобильный свайп для навигации */
+  _pvLbBindSwipe(overlay);
 
   /* Desktop: подгружаем оригинал */
   if (pv.path && window.pywebview && window.pywebview.api && window.pywebview.api.get_full_image) {
@@ -1011,6 +975,29 @@ function _pvLbSetFilter(minRating) {
     }
   }
   _pvLbOpen();
+}
+
+/**
+ * Привязать свайп-навигацию к лайтбоксу (мобильный).
+ * Свайп влево = следующее, вправо = предыдущее.
+ * @param {HTMLElement} overlay
+ */
+function _pvLbBindSwipe(overlay) {
+  var startX = 0;
+  var startY = 0;
+  overlay.addEventListener('touchstart', function(e) {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+  overlay.addEventListener('touchend', function(e) {
+    var dx = e.changedTouches[0].clientX - startX;
+    var dy = e.changedTouches[0].clientY - startY;
+    /* Минимум 50px, горизонтальнее чем вертикальный */
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.3) {
+      if (dx < 0) _pvLbNav(1);   /* свайп влево = следующее */
+      else _pvLbNav(-1);          /* свайп вправо = предыдущее */
+    }
+  }, { passive: true });
 }
 
 /**
