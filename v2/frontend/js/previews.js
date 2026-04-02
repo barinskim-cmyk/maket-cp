@@ -1134,6 +1134,8 @@ function _pvLbSetFilter(minRating) {
  * @param {number} cardIdx — индекс карточки (0-based)
  */
 function _pvLbRemoveFromCard(name, cardIdx) {
+  if (!confirm('Убрать фото из карточки ' + (cardIdx + 1) + '?')) return;
+
   var proj = getActiveProject();
   if (!proj || !proj.cards) return;
   var card = proj.cards[cardIdx];
@@ -1701,6 +1703,10 @@ function acRemoveOC(name, e) {
  */
 function acToggleCard(name, cardIdx, e) {
   if (e) { e.stopPropagation(); e.preventDefault(); }
+
+  /* Подтверждение: фото привязано к карточке */
+  if (!confirm('Убрать фото из карточки ' + (cardIdx + 1) + '?')) return;
+
   var proj = getActiveProject();
   if (!proj || !proj.cards) return;
 
