@@ -565,30 +565,11 @@ function _shDoAutoSave() {
        Исключаем тяжёлые данные (preview 1200px) для экономии места.
        Превью (thumbs 300px) сохраняются отдельно по ключу проекта.
        Для слотов карточек: сохраняем thumbUrl (300px) вместо dataUrl (1200px). */
-    var toSave = [];
+    var toSave = _shBuildSavePayload(false);
+
+    /* Сохраняем превью отдельно (только для локальных проектов) */
     for (var i = 0; i < App.projects.length; i++) {
       var proj = App.projects[i];
-      var light = {};
-      for (var key in proj) {
-        if (!proj.hasOwnProperty(key)) continue;
-        /* Пропускаем превью — сохраняются отдельно */
-        if (key === 'previews' || key === 'otherContent') continue;
-        /* Пропускаем undo-историю */
-        if (key === '_history') continue;
-        light[key] = proj[key];
-      }
-      /* Заменяем тяжёлые dataUrl в слотах на лёгкие thumbUrl */
-      if (light.cards && light.cards.length > 0) {
-        light.cards = _shLightenCards(light.cards);
-      }
-      /* Убираем тяжёлые refImage из артикулов (base64 каталожные фото) */
-      if (light.articles && light.articles.length > 0) {
-        light.articles = _shLightenArticles(light.articles);
-      }
-      toSave.push(light);
-
-      /* Сохраняем превью отдельно (только thumbs).
-         Пропускаем если проект в облаке — там source of truth. */
       if (proj.previews && proj.previews.length > 0 && !proj._cloudId) {
         var pvKey = SH_PREVIEWS_KEY_PREFIX + _shProjKey(proj);
         try {
@@ -598,7 +579,32 @@ function _shDoAutoSave() {
         }
       }
     }
-    localStorage.setItem(SH_AUTOSAVE_KEY, JSON.stringify(toSave));
+
+    /* Попытка сохранить; при переполнении — aggressive mode */
+    try {
+      localStorage.setItem(SH_AUTOSAVE_KEY, JSON.stringify(toSave));
+    } catch(quotaErr) {
+      console.warn('Автосохранение: localStorage переполнен, aggressive mode...');
+      toSave = _shBuildSavePayload(true);
+      try {
+        localStorage.setItem(SH_AUTOSAVE_KEY, JSON.stringify(toSave));
+      } catch(quotaErr2) {
+        /* Совсем не помещается — сохраняем только метаданные без карточек */
+        console.warn('Автосохранение: aggressive не помог, сохраняем минимум...');
+        for (var qi = 0; qi < toSave.length; qi++) {
+          if (toSave[qi]._cloudId) {
+            /* Облачный проект: карточки восстановятся из Supabase */
+            toSave[qi].cards = [];
+            toSave[qi]._needsCloudRestore = true;
+          }
+        }
+        try {
+          localStorage.setItem(SH_AUTOSAVE_KEY, JSON.stringify(toSave));
+        } catch(quotaErr3) {
+          console.error('Автосохранение: невозможно сохранить даже минимум:', quotaErr3);
+        }
+      }
+    }
     shSetSaveStatus('saved');
   } catch(e) {
     console.error('Автосохранение:', e);
@@ -631,7 +637,43 @@ function _shLightenArticles(articles) {
   return result;
 }
 
-function _shLightenCards(cards) {
+/**
+ * Собрать payload для localStorage: облегчённые проекты.
+ * @param {boolean} aggressive — если true, убирает ВСЕ base64 из всех проектов
+ * @returns {Array}
+ */
+function _shBuildSavePayload(aggressive) {
+  var toSave = [];
+  for (var i = 0; i < App.projects.length; i++) {
+    var proj = App.projects[i];
+    var light = {};
+    for (var key in proj) {
+      if (!proj.hasOwnProperty(key)) continue;
+      if (key === 'previews' || key === 'otherContent') continue;
+      if (key === '_history') continue;
+      light[key] = proj[key];
+    }
+    /* Для облачных проектов ВСЕГДА aggressive (base64 не нужен — есть URL).
+       Для локальных — aggressive только если явно запрошено (quota fallback). */
+    var useAggressive = aggressive || !!proj._cloudId;
+    if (light.cards && light.cards.length > 0) {
+      light.cards = _shLightenCards(light.cards, useAggressive);
+    }
+    if (light.articles && light.articles.length > 0) {
+      light.articles = _shLightenArticles(light.articles);
+    }
+    toSave.push(light);
+  }
+  return toSave;
+}
+
+/**
+ * Облегчить карточки для localStorage.
+ * @param {Array} cards
+ * @param {boolean} aggressive — если true, убирает ВСЕ base64 (для облачных проектов)
+ * @returns {Array}
+ */
+function _shLightenCards(cards, aggressive) {
   var result = [];
   for (var c = 0; c < cards.length; c++) {
     var card = cards[c];
@@ -647,9 +689,15 @@ function _shLightenCards(cards) {
             if (!slot.hasOwnProperty(sk)) continue;
             ls[sk] = slot[sk];
           }
-          /* Сохраняем маленький thumb вместо большого preview */
-          if (ls.thumbUrl) {
-            ls.dataUrl = ls.thumbUrl;
+          /* aggressive: убрать ВСЕ base64 (data:image/...) — облако восстановит */
+          if (aggressive) {
+            if (ls.dataUrl && ls.dataUrl.indexOf('data:') === 0) delete ls.dataUrl;
+            if (ls.thumbUrl && ls.thumbUrl.indexOf('data:') === 0) delete ls.thumbUrl;
+          } else {
+            /* Сохраняем маленький thumb вместо большого preview */
+            if (ls.thumbUrl) {
+              ls.dataUrl = ls.thumbUrl;
+            }
           }
           delete ls.thumbUrl;
           copy.slots.push(ls);
