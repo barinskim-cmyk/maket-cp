@@ -947,9 +947,11 @@ function _pvLbToggleOC(add) {
     }
   }
 
-  /* Сохранить + синхронизировать */
+  /* Сохранить + синхронизировать + обновить галереи */
   if (typeof shAutoSave === 'function') shAutoSave();
   if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
+  if (typeof ocRenderField === 'function') ocRenderField();
+  if (typeof acRenderField === 'function') acRenderField();
 }
 
 /**
@@ -1274,7 +1276,8 @@ function acGetAllContent() {
         thumb: slot.thumbUrl || slot.dataUrl || '',
         preview: slot.dataUrl || slot.thumbUrl || '',
         source: 'card',
-        cardIdx: c
+        cardIdx: c,
+        orient: slot.orient || 'v'
       });
     }
   }
@@ -1297,6 +1300,7 @@ function acGetAllContent() {
 
 /**
  * Отрисовать плитку «Весь контент».
+ * На каждом фото: бейдж источника + кликабельная галочка «В отбор».
  */
 function acRenderField() {
   var gallery = document.getElementById('ac-gallery');
@@ -1320,21 +1324,71 @@ function acRenderField() {
   }
   if (empty) empty.style.display = 'none';
 
-  /* Ширина элемента по количеству колонок */
-  var gap = 6;
-  var w = 'calc((100% - ' + ((_acColumns - 1) * gap) + 'px) / ' + _acColumns + ')';
+  /* Устанавливаем grid с нужным количеством колонок */
+  gallery.style.gridTemplateColumns = 'repeat(' + _acColumns + ', 1fr)';
 
   var html = '';
   for (var i = 0; i < items.length; i++) {
     var it = items[i];
     var label = it.source === 'card' ? 'K' + (it.cardIdx + 1) : 'доп';
-    html += '<div class="oc-item" style="width:' + w + '" title="' + esc(it.name) + '">';
+    var isInOC = _pvIsInOtherContent(it.name);
+    var checkCls = isInOC ? ' ac-check-on' : '';
+    /* Горизонт занимает 2 колонки */
+    var isH = it.orient === 'h';
+    var spanStyle = isH ? ' style="grid-column: span 2"' : '';
+    html += '<div class="ac-tile' + (isH ? ' ac-tile-h' : '') + '"' + spanStyle + ' title="' + esc(it.name) + '">';
     html += '<img src="' + (it.preview || it.thumb) + '" loading="lazy">';
     html += '<span class="ac-badge">' + label + '</span>';
+    /* Кликабельная галочка «В отбор» */
+    html += '<button class="ac-check' + checkCls + '" onclick="acToggleOC(' + i + ',event)">';
+    html += '<span class="ac-check-icon"></span>';
+    html += '<span class="ac-check-label">' + (isInOC ? 'В отборе' : 'В отбор') + '</span>';
+    html += '</button>';
     html += '<span class="pv-name">' + esc(pvShortName(it.name)) + '</span>';
     html += '</div>';
   }
   gallery.innerHTML = html;
+}
+
+/**
+ * Переключить фото в/из доп. контента (клик на галочке в плитке).
+ * @param {number} itemIdx — индекс в acGetAllContent()
+ * @param {Event} e
+ */
+function acToggleOC(itemIdx, e) {
+  if (e) { e.stopPropagation(); e.preventDefault(); }
+  var items = acGetAllContent();
+  var it = items[itemIdx];
+  if (!it) return;
+
+  var proj = getActiveProject();
+  if (!proj) return;
+  if (!proj.otherContent) proj.otherContent = [];
+
+  var isInOC = _pvIsInOtherContent(it.name);
+  if (isInOC) {
+    /* Убрать из допконтента */
+    for (var j = proj.otherContent.length - 1; j >= 0; j--) {
+      if (proj.otherContent[j].name === it.name) {
+        proj.otherContent.splice(j, 1);
+      }
+    }
+  } else {
+    /* Добавить в допконтент */
+    proj.otherContent.push({
+      name: it.name,
+      path: '',
+      thumb: it.thumb || '',
+      preview: it.preview || ''
+    });
+  }
+
+  /* Сохранить + перерисовать */
+  if (typeof shAutoSave === 'function') shAutoSave();
+  if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
+  acRenderField();
+  /* Обновить допконтент если открыт */
+  if (typeof ocRenderField === 'function') ocRenderField();
 }
 
 /**
