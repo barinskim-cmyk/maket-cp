@@ -2067,7 +2067,7 @@ function cpMobileRenderSelect() {
     return '<div style="padding:40px 16px;text-align:center;color:#999">Нет фото в отборе</div>';
   }
 
-  var html = '<div class="mob-gallery">';
+  var html = '<div class="mob-select">';
 
   for (var i = 0; i < items.length; i++) {
     var it = items[i];
@@ -2075,18 +2075,11 @@ function cpMobileRenderSelect() {
     if (!src) continue;
 
     var orient = it.orient || 'v';
-    var itemClass = orient === 'h' ? 'mob-gallery-item-h' : 'mob-gallery-item-v';
+    /* Горизонталь — на всю ширину, вертикаль — по 2 в ряд */
+    var itemClass = orient === 'h' ? 'mob-select-item-h' : 'mob-select-item-v';
 
-    html += '<div class="mob-gallery-item ' + itemClass + '">';
+    html += '<div class="mob-select-item ' + itemClass + '">';
     html += '<img src="' + src + '" loading="lazy" onclick="cpMobileSelectFullscreen(' + i + ')">';
-
-    /* Метка источника */
-    if (it.source === 'card') {
-      html += '<div class="mob-gallery-check checked" style="pointer-events:none">K' + (it.cardIdx + 1) + '</div>';
-    } else {
-      html += '<div class="mob-gallery-check checked" style="pointer-events:none">+</div>';
-    }
-
     html += '</div>';
   }
 
@@ -2177,8 +2170,21 @@ function cpMobileAutoFillSlot(cardIdx, slotIdx) {
   cpMobileRender();
 }
 
+/** @type {number} Фильтр рейтинга для мобильной галереи Options (0 = все) */
+var _mobOptionsFilter = 0;
+
 /**
- * Рендер мобильной галереи с галочками.
+ * Установить фильтр рейтинга в мобильной галерее Options.
+ * @param {number} minRating
+ */
+function cpMobileSetOptionsFilter(minRating) {
+  if (_mobOptionsFilter === minRating) minRating = 0;
+  _mobOptionsFilter = minRating;
+  cpMobileRender();
+}
+
+/**
+ * Рендер мобильной галереи с галочками (Options — все превью).
  * @returns {string} HTML
  */
 function cpMobileRenderGallery() {
@@ -2187,17 +2193,40 @@ function cpMobileRenderGallery() {
     return '<div style="padding:40px 16px;text-align:center;color:#999">Нет фотографий</div>';
   }
 
-  /* Текущий список other_content */
+  /* Звёздочный фильтр */
+  var html = '<div class="mob-filter-bar">';
+  for (var s = 1; s <= 5; s++) {
+    html += '<button class="mob-filter-star' + (s <= _mobOptionsFilter ? ' mob-star-active' : '') + '" onclick="cpMobileSetOptionsFilter(' + s + ')">&#9733;</button>';
+  }
+  html += '<button class="mob-filter-reset' + (_mobOptionsFilter === 0 ? ' mob-star-active' : '') + '" onclick="cpMobileSetOptionsFilter(0)">Все</button>';
+  html += '</div>';
+
+  /* Собрать карту: что в отборе (карточки + допконтент) */
   var ocList = proj.otherContent || [];
   var ocMap = {};
   for (var o = 0; o < ocList.length; o++) {
     ocMap[ocList[o].name] = true;
   }
+  /* Что в карточках */
+  var cardMap = {};
+  var cards = proj.cards || [];
+  for (var c = 0; c < cards.length; c++) {
+    var slots = cards[c].slots || [];
+    for (var sl = 0; sl < slots.length; sl++) {
+      if (slots[sl].file) cardMap[slots[sl].file] = true;
+    }
+  }
 
-  var html = '<div class="mob-gallery">';
+  var minR = _mobOptionsFilter || 0;
+
+  html += '<div class="mob-gallery">';
 
   for (var i = 0; i < proj.previews.length; i++) {
     var pv = proj.previews[i];
+
+    /* Фильтр по рейтингу */
+    if (minR > 0 && (pv.rating || 0) < minR) continue;
+
     var src = pv.preview || pv.thumb || '';
     if (!src) continue;
 
@@ -2205,7 +2234,9 @@ function cpMobileRenderGallery() {
       (pv.orient || 'v');
     var itemClass = pvOrient === 'h' ? 'mob-gallery-item-h' : 'mob-gallery-item-v';
     var pvName = pv.name || pv.stem || '';
-    var isChecked = ocMap[pvName] ? ' checked' : '';
+    var inCard = cardMap[pvName];
+    var inOC = ocMap[pvName];
+    var isChecked = (inCard || inOC) ? ' checked' : '';
 
     html += '<div class="mob-gallery-item ' + itemClass + '">';
     html += '<img src="' + src + '" loading="lazy" onclick="cpMobileGalleryFullscreen(' + i + ')">';

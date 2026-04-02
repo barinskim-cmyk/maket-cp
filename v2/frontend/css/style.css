@@ -1220,6 +1220,39 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   background: #333; color: #fff; border-color: #333;
 }
 
+/* --- Мобильная галерея Select (отбор, без значков) --- */
+.mob-select {
+  display: flex; flex-wrap: wrap; gap: 2px; padding: 2px;
+}
+.mob-select-item {
+  position: relative; overflow: hidden;
+}
+.mob-select-item img {
+  width: 100%; height: auto; display: block; cursor: pointer;
+}
+.mob-select-item-v { width: calc(50% - 1px); }
+.mob-select-item-h { width: 100%; }
+
+/* --- Мобильный фильтр по звёздочкам (Options) --- */
+.mob-filter-bar {
+  display: flex; align-items: center; gap: 4px;
+  padding: 8px 12px; background: #f5f5f5;
+  border-bottom: 1px solid #e0e0e0;
+  position: sticky; top: 48px; z-index: 5;
+}
+.mob-filter-star {
+  background: none; border: none; color: #ccc;
+  font-size: 24px; cursor: pointer; padding: 0 2px; line-height: 1;
+}
+.mob-star-active { color: #ffc107; }
+.mob-filter-star:active { color: #ffc107; }
+.mob-filter-reset {
+  background: none; border: 1px solid #ccc;
+  color: #999; font-size: 13px; padding: 3px 8px;
+  border-radius: 4px; cursor: pointer; margin-left: 6px;
+}
+.mob-filter-reset.mob-star-active { color: #333; border-color: #333; }
+
 /* --- Адаптивные скрытия для мобильного клиента --- */
 @media (max-width: 767px) {
   /* Скрыть десктопный сайдбар карточек */
