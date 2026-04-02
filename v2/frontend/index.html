@@ -101,7 +101,7 @@
   <div class="subtabs">
     <button class="subtab active" id="subtab-cp" onclick="showSubpage('cp')">Карточки товара</button>
     <button class="subtab" id="subtab-other" onclick="showSubpage('other')">Доп. контент</button>
-    <button class="subtab" id="subtab-allcontent" onclick="showSubpage('allcontent')">Весь контент</button>
+    <button class="subtab" id="subtab-allcontent" onclick="showSubpage('allcontent')">Отбор</button>
   </div>
 
   <div id="subpage-cp" class="subpage active">
@@ -184,17 +184,17 @@
     <div class="oc-layout">
       <div class="oc-main">
         <div class="oc-header">
-          <div class="section-title">Весь контент</div>
+          <div class="section-title">Отбор</div>
           <div class="ac-toolbar" id="ac-toolbar" style="display:none">
             <span id="ac-count">0 фото</span>
             <span class="pv-filter-stars" id="ac-filter-stars"></span>
             <button class="pv-filter-reset active" id="ac-filter-reset" onclick="acSetRatingFilter(0)">Все</button>
-            <button class="ac-view-all-btn" onclick="acViewAll()">Посмотреть все</button>
+            <button class="ac-view-all-btn" onclick="acViewAll()">Посмотреть все опции</button>
             <input type="range" id="ac-thumb-slider" min="2" max="8" value="4" class="pv-slider" title="Размер миниатюр" oninput="acSetColumns(this.value)">
           </div>
         </div>
         <div class="oc-field" id="ac-field">
-          <div class="oc-field-empty" id="ac-field-empty">Нет фото в отборе. Добавьте фото в карточки или доп. контент.</div>
+          <div class="oc-field-empty" id="ac-field-empty">Нет фото в отборе.</div>
           <div class="oc-gallery" id="ac-gallery"></div>
         </div>
       </div>
