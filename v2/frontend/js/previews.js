@@ -837,7 +837,10 @@ function _pvLbOpen() {
   overlay.id = 'pv-lightbox';
   overlay.onclick = function(ev) { if (ev.target === overlay) pvCloseFullscreen(); };
 
-  /* Картинка */
+  /* Контейнер картинки (для позиционирования галочки относительно фото) */
+  var imgWrap = document.createElement('div');
+  imgWrap.className = 'pv-lb-img-wrap';
+
   var img = document.createElement('img');
   img.src = src;
   img.className = 'cp-fullscreen-img';
@@ -938,12 +941,13 @@ function _pvLbOpen() {
     filterBar.appendChild(ratingDisplay);
   }
 
-  overlay.appendChild(img);
+  imgWrap.appendChild(img);
+  imgWrap.appendChild(checkWrap);
+  overlay.appendChild(imgWrap);
   overlay.appendChild(closeBtn);
   overlay.appendChild(nameEl);
   overlay.appendChild(prevBtn);
   overlay.appendChild(nextBtn);
-  overlay.appendChild(checkWrap);
   overlay.appendChild(filterBar);
   document.body.appendChild(overlay);
 
