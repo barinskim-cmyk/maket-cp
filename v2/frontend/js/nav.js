@@ -35,6 +35,17 @@ function showSubpage(name) {
   var tab = document.getElementById('subtab-' + name);
   if (tab) tab.classList.add('active');
 
+  /* Мобильный клиент: переключение между мобильным режимом и десктопным */
+  if (typeof cpIsMobileClient === 'function' && cpIsMobileClient()) {
+    if (name === 'cp') {
+      /* На вкладке "Карточки товара" активируем мобильный режим */
+      if (typeof cpMobileInit === 'function') cpMobileInit();
+    } else {
+      /* На других вкладках (Отбор, Артикулы) показываем десктопный контент */
+      if (typeof cpMobileExitFeed === 'function') cpMobileExitFeed();
+    }
+  }
+
   if (name === 'cp') {
     if (typeof pvOnPageShow === 'function') pvOnPageShow();
     /* Перерисовать layout карточки после переключения подвкладки */

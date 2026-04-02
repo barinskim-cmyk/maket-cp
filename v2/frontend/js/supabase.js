@@ -828,10 +828,10 @@ function sbCreateShareLink(projectId, role, label, callback) {
 
     var link = res.data;
     /* Share-ссылки всегда через GitHub Pages (Netlify заблокирован в России).
-       Если сайт открыт на Netlify или localhost — подставляем GitHub Pages URL. */
+       Если сайт открыт на Netlify, localhost или file:// — подставляем GitHub Pages URL. */
     var origin = window.location.origin;
     var pathname = window.location.pathname;
-    if (origin.indexOf('netlify.app') !== -1 || origin.indexOf('localhost') !== -1 || origin.indexOf('127.0.0.1') !== -1) {
+    if (origin.indexOf('netlify.app') !== -1 || origin.indexOf('localhost') !== -1 || origin.indexOf('127.0.0.1') !== -1 || origin.indexOf('file://') !== -1 || origin === 'null') {
       origin = 'https://barinskim-cmyk.github.io';
       pathname = '/maket-cp/';
     }

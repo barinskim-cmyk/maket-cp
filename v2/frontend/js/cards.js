@@ -1663,6 +1663,25 @@ function cpMobileInit() {
 }
 
 /**
+ * Выход из мобильного режима (показать десктопный контент).
+ * Восстанавливает видимость всех скрытых элементов.
+ */
+function cpMobileExitFeed() {
+  var appMain = document.getElementById('app-main');
+  if (!appMain) return;
+
+  /* Показать все дочерние элементы кроме mob-wrap */
+  for (var i = 0; i < appMain.children.length; i++) {
+    var child = appMain.children[i];
+    if (child.id !== 'mob-wrap') {
+      child.style.display = '';
+    }
+  }
+
+  _mobViewCards = false;
+}
+
+/**
  * Отрисовать мобильный интерфейс (шапка + лента/галерея).
  */
 function cpMobileRender() {
@@ -2053,10 +2072,10 @@ function cpMobileRenderGallery() {
   }
 
   /* Текущий список other_content */
-  var ocList = proj._otherContent || [];
+  var ocList = proj.otherContent || [];
   var ocMap = {};
   for (var o = 0; o < ocList.length; o++) {
-    ocMap[ocList[o]] = true;
+    ocMap[ocList[o].name] = true;
   }
 
   var html = '<div class="mob-gallery">';
@@ -2093,15 +2112,39 @@ function cpMobileToggleOC(pvName, el) {
   var proj = getActiveProject();
   if (!proj) return;
 
-  if (!proj._otherContent) proj._otherContent = [];
+  if (!proj.otherContent) proj.otherContent = [];
 
-  var idx = proj._otherContent.indexOf(pvName);
+  /* Найти индекс по полю name */
+  var idx = -1;
+  for (var i = 0; i < proj.otherContent.length; i++) {
+    if (proj.otherContent[i].name === pvName) {
+      idx = i;
+      break;
+    }
+  }
+
   if (idx >= 0) {
-    proj._otherContent.splice(idx, 1);
+    proj.otherContent.splice(idx, 1);
     el.className = 'mob-gallery-check';
     el.innerHTML = '';
   } else {
-    proj._otherContent.push(pvName);
+    /* Найти объект превью с этим именем чтобы получить метаданные */
+    var pvObj = null;
+    for (var j = 0; j < proj.previews.length; j++) {
+      if ((proj.previews[j].name || proj.previews[j].stem) === pvName) {
+        pvObj = proj.previews[j];
+        break;
+      }
+    }
+
+    /* Добавить объект с preview/thumb/path если найдено */
+    var ocItem = { name: pvName };
+    if (pvObj) {
+      if (pvObj.preview) ocItem.preview = pvObj.preview;
+      if (pvObj.thumb) ocItem.thumb = pvObj.thumb;
+      if (pvObj.path) ocItem.path = pvObj.path;
+    }
+    proj.otherContent.push(ocItem);
     el.className = 'mob-gallery-check checked';
     el.innerHTML = '&#10003;';
   }
