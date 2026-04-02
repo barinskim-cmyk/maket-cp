@@ -1465,6 +1465,12 @@ function acGetAllContent() {
       source: 'other'
     });
   }
+
+  /* Сортировка по имени файла */
+  result.sort(function(a, b) {
+    return a.name.localeCompare(b.name);
+  });
+
   return result;
 }
 
@@ -1700,11 +1706,32 @@ function acOpenLightbox(idx, e) {
 }
 
 /**
- * Кнопка «Посмотреть все» — открывает лайтбокс с первого фото.
- * Если задан фильтр по рейтингу, покажет только отфильтрованные.
+ * Кнопка «Посмотреть все» — открывает лайтбокс со ВСЕМИ превью проекта
+ * (не только отбор, а полный пул). С фильтром по рейтингу если задан.
  */
 function acViewAll() {
-  acOpenLightbox(0, null);
+  var proj = getActiveProject();
+  if (!proj || !proj.previews || !proj.previews.length) return;
+
+  var all = proj.previews;
+  /* Применить рейтинговый фильтр если есть */
+  var minR = _acRatingFilter || 0;
+  var lbList = [];
+  for (var i = 0; i < all.length; i++) {
+    if (minR > 0 && (all[i].rating || 0) < minR) continue;
+    lbList.push({
+      name: all[i].name,
+      thumb: all[i].thumb || '',
+      preview: all[i].preview || '',
+      path: all[i].path || ''
+    });
+  }
+  if (!lbList.length) return;
+
+  _pvLbList = lbList;
+  _pvLbIdx = 0;
+  _pvLbRatingFilter = _acRatingFilter;
+  _pvLbOpen();
 }
 
 /**
