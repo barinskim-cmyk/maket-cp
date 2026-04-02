@@ -2084,6 +2084,14 @@ function cpMobileRenderSelect() {
   }
 
   html += '</div>';
+
+  /* Кнопки согласования */
+  html += '<div class="mob-approve-block">';
+  html += '<div class="mob-approve-title">Просмотр завершён</div>';
+  html += '<button class="mob-btn-approve" onclick="cpMobileApprove()">Согласовать отбор</button>';
+  html += '<button class="mob-btn-reject" onclick="cpMobileReject()">Вернуть на доработку</button>';
+  html += '</div>';
+
   return html;
 }
 
