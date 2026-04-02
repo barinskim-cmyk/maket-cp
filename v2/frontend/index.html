@@ -187,6 +187,9 @@
           <div class="section-title">Весь контент</div>
           <div class="ac-toolbar" id="ac-toolbar" style="display:none">
             <span id="ac-count">0 фото</span>
+            <span class="pv-filter-stars" id="ac-filter-stars"></span>
+            <button class="pv-filter-reset active" id="ac-filter-reset" onclick="acSetRatingFilter(0)">Все</button>
+            <button class="ac-view-all-btn" onclick="acViewAll()">Посмотреть все</button>
             <input type="range" id="ac-thumb-slider" min="2" max="8" value="4" class="pv-slider" title="Размер миниатюр" oninput="acSetColumns(this.value)">
           </div>
         </div>
