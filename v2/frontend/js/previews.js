@@ -896,12 +896,51 @@ function _pvLbOpen() {
   checkWrap.appendChild(circle);
   checkWrap.appendChild(labelEl);
 
+  /* Фильтр по рейтингу внутри лайтбокса */
+  var filterBar = document.createElement('div');
+  filterBar.className = 'pv-lb-filter-bar';
+  filterBar.id = 'pv-lb-filter-bar';
+
+  var filterLabel = document.createElement('span');
+  filterLabel.className = 'pv-lb-filter-label';
+  filterLabel.textContent = 'Фильтр: ';
+  filterBar.appendChild(filterLabel);
+
+  for (var st = 1; st <= 5; st++) {
+    var starBtn = document.createElement('button');
+    starBtn.className = 'pv-filter-star pv-lb-filter-star' + (st <= _pvLbRatingFilter ? ' active' : '');
+    starBtn.setAttribute('data-star', st);
+    starBtn.innerHTML = '&#9733;';
+    starBtn.onclick = (function(sv) {
+      return function(ev) { ev.stopPropagation(); _pvLbSetFilter(sv); };
+    })(st);
+    filterBar.appendChild(starBtn);
+  }
+
+  var resetBtn = document.createElement('button');
+  resetBtn.className = 'pv-lb-filter-reset' + (_pvLbRatingFilter === 0 ? ' active' : '');
+  resetBtn.textContent = 'Все';
+  resetBtn.onclick = function(ev) { ev.stopPropagation(); _pvLbSetFilter(0); };
+  filterBar.appendChild(resetBtn);
+
+  /* Показать текущий рейтинг фото */
+  var pvRating = _pvGetRating(pv.name);
+  if (pvRating > 0) {
+    var ratingDisplay = document.createElement('span');
+    ratingDisplay.className = 'pv-lb-rating-display';
+    var starsStr = '';
+    for (var rs = 0; rs < pvRating; rs++) starsStr += '\u2605';
+    ratingDisplay.textContent = '  ' + starsStr;
+    filterBar.appendChild(ratingDisplay);
+  }
+
   overlay.appendChild(img);
   overlay.appendChild(closeBtn);
   overlay.appendChild(nameEl);
   overlay.appendChild(prevBtn);
   overlay.appendChild(nextBtn);
   overlay.appendChild(checkWrap);
+  overlay.appendChild(filterBar);
   document.body.appendChild(overlay);
 
   document.addEventListener('keydown', _pvLbKeyHandler);
@@ -922,12 +961,47 @@ function _pvLbOpen() {
 
 /**
  * Навигация по лайтбоксу: +1 вперёд, -1 назад.
+ * Если включён фильтр по рейтингу — пропускает фото ниже порога.
  */
 function _pvLbNav(dir) {
-  var next = _pvLbIdx + dir;
-  if (next < 0) next = _pvLbList.length - 1;
-  if (next >= _pvLbList.length) next = 0;
-  _pvLbIdx = next;
+  var len = _pvLbList.length;
+  if (!len) return;
+  var minR = _pvLbRatingFilter || 0;
+  var next = _pvLbIdx;
+  /* Если нет фильтра — обычная навигация */
+  if (minR === 0) {
+    next += dir;
+    if (next < 0) next = len - 1;
+    if (next >= len) next = 0;
+    _pvLbIdx = next;
+    _pvLbOpen();
+    return;
+  }
+  /* С фильтром: ищем следующее подходящее */
+  for (var step = 0; step < len; step++) {
+    next += dir;
+    if (next < 0) next = len - 1;
+    if (next >= len) next = 0;
+    var r = _pvGetRating(_pvLbList[next].name);
+    if (r >= minR) { _pvLbIdx = next; _pvLbOpen(); return; }
+  }
+  /* Не нашли — остаёмся на месте */
+}
+
+/**
+ * Установить фильтр рейтинга в лайтбоксе и перейти к ближайшему подходящему.
+ */
+function _pvLbSetFilter(minRating) {
+  if (_pvLbRatingFilter === minRating) minRating = 0;
+  _pvLbRatingFilter = minRating;
+  /* Если текущее фото не проходит фильтр — ищем ближайшее */
+  if (minRating > 0) {
+    var cur = _pvLbList[_pvLbIdx];
+    if (cur && _pvGetRating(cur.name) < minRating) {
+      _pvLbNav(1);
+      return;
+    }
+  }
   _pvLbOpen();
 }
 
@@ -1359,8 +1433,7 @@ function acGetAllContent() {
 
 /**
  * Отрисовать плитку «Весь контент».
- * Фото из карточек: зелёная галочка (заблокирована, нельзя убрать).
- * Фото из допконтента (не в карточках): зелёная галочка (можно убрать).
+ * ВСЕ галочки отжимаемые: карточные = убрать из слота, допконтент = убрать из OC.
  */
 function acRenderField() {
   var gallery = document.getElementById('ac-gallery');
@@ -1370,6 +1443,24 @@ function acRenderField() {
   if (!gallery) return;
 
   var items = acGetAllContent();
+
+  /* Применить фильтр по рейтингу если задан */
+  var minRating = _acRatingFilter || 0;
+  if (minRating > 0) {
+    var proj = getActiveProject();
+    var pvMap = {};
+    if (proj && proj.previews) {
+      for (var p = 0; p < proj.previews.length; p++) {
+        pvMap[proj.previews[p].name] = proj.previews[p].rating || 0;
+      }
+    }
+    var filtered = [];
+    for (var f = 0; f < items.length; f++) {
+      var r = pvMap[items[f].name] || 0;
+      if (r >= minRating) filtered.push(items[f]);
+    }
+    items = filtered;
+  }
 
   if (items.length === 0) {
     gallery.innerHTML = '';
@@ -1398,8 +1489,8 @@ function acRenderField() {
     html += '<img src="' + (it.preview || it.thumb) + '" loading="lazy">';
 
     if (it.source === 'card') {
-      /* Фото из карточки — зелёная круглая галочка (заблокирована) */
-      html += '<div class="ac-check ac-check-on ac-check-locked"></div>';
+      /* Фото из карточки — зелёная галочка, можно отжать (убрать из карточки) */
+      html += '<button class="ac-check ac-check-on" onclick="acToggleCard(\'' + esc(it.name).replace(/'/g, "\\'") + '\',' + it.cardIdx + ',event)"></button>';
       html += '<span class="ac-check-label">К' + (it.cardIdx + 1) + '</span>';
     } else {
       /* Фото из допконтента — зелёная галочка, можно убрать */
@@ -1413,10 +1504,13 @@ function acRenderField() {
     html += '</div>';
   }
   gallery.innerHTML = html;
+
+  /* Обновить звёздочный фильтр */
+  acRenderFilterStars();
 }
 
 /**
- * Убрать фото из допконтента (только для фото НЕ из карточек).
+ * Убрать фото из допконтента (из галереи «Весь контент»).
  * @param {string} name — имя файла
  * @param {Event} e
  */
@@ -1438,11 +1532,96 @@ function acRemoveOC(name, e) {
 }
 
 /**
+ * Убрать фото из карточки (отжать галочку из галереи «Весь контент»).
+ * Фото остаётся в превью, но освобождает слот.
+ * @param {string} name — имя файла
+ * @param {number} cardIdx — индекс карточки
+ * @param {Event} e
+ */
+function acToggleCard(name, cardIdx, e) {
+  if (e) { e.stopPropagation(); e.preventDefault(); }
+  var proj = getActiveProject();
+  if (!proj || !proj.cards) return;
+
+  var card = proj.cards[cardIdx];
+  if (!card || !card.slots) return;
+
+  /* Найти и очистить слот с этим файлом */
+  for (var s = 0; s < card.slots.length; s++) {
+    if (card.slots[s].file === name) {
+      card.slots[s].file = null;
+      card.slots[s].dataUrl = '';
+      card.slots[s].thumbUrl = '';
+      card.slots[s].preview = '';
+      break;
+    }
+  }
+
+  if (typeof shAutoSave === 'function') shAutoSave();
+  if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
+  if (typeof cpRenderCard === 'function') cpRenderCard();
+  acRenderField();
+  if (typeof ocRenderField === 'function') ocRenderField();
+}
+
+/**
  * Изменить количество колонок в плитке «Весь контент».
  */
 function acSetColumns(val) {
   _acColumns = parseInt(val) || 4;
   acRenderField();
+}
+
+// ── «Весь контент»: фильтр по рейтингу ──
+
+/** @type {number} Минимальный рейтинг для фильтра «Весь контент» (0 = все) */
+var _acRatingFilter = 0;
+
+/**
+ * Отрисовать звёздочки фильтра в тулбаре «Весь контент».
+ */
+function acRenderFilterStars() {
+  var container = document.getElementById('ac-filter-stars');
+  if (!container) return;
+  var html = '';
+  for (var s = 1; s <= 5; s++) {
+    html += '<button class="pv-filter-star' + (s <= _acRatingFilter ? ' active' : '') + '" data-star="' + s + '" onclick="acSetRatingFilter(' + s + ')">&#9733;</button>';
+  }
+  container.innerHTML = html;
+
+  var resetBtn = document.getElementById('ac-filter-reset');
+  if (resetBtn) {
+    if (_acRatingFilter === 0) resetBtn.classList.add('active');
+    else resetBtn.classList.remove('active');
+  }
+}
+
+/**
+ * Установить фильтр по рейтингу для «Весь контент».
+ */
+function acSetRatingFilter(minRating) {
+  if (_acRatingFilter === minRating) minRating = 0;
+  _acRatingFilter = minRating;
+  acRenderField();
+}
+
+// ── «Весь контент»: лайтбокс с фильтром ──
+
+/** @type {number} Фильтр рейтинга в лайтбоксе (0 = все) */
+var _pvLbRatingFilter = 0;
+
+/**
+ * Получить рейтинг фото по имени из массива превью проекта.
+ * @param {string} name
+ * @returns {number} рейтинг 0-5
+ */
+function _pvGetRating(name) {
+  var proj = getActiveProject();
+  if (!proj || !proj.previews) return 0;
+  for (var i = 0; i < proj.previews.length; i++) {
+    if (proj.previews[i].name === name) return proj.previews[i].rating || 0;
+  }
+  return 0;
 }
 
 /**
@@ -1453,6 +1632,19 @@ function acOpenLightbox(idx, e) {
   if (e) e.stopPropagation();
   var items = acGetAllContent();
   if (!items[idx]) return;
+
+  /* Применить текущий рейтинговый фильтр Весь контент */
+  var minRating = _acRatingFilter || 0;
+  if (minRating > 0) {
+    var filtered = [];
+    for (var f = 0; f < items.length; f++) {
+      var r = _pvGetRating(items[f].name);
+      if (r >= minRating) filtered.push(items[f]);
+    }
+    items = filtered;
+  }
+  if (!items[idx]) idx = 0;
+  if (!items.length) return;
 
   /* Собираем массив в формате совместимом с _pvLbList */
   var lbList = [];
@@ -1466,7 +1658,16 @@ function acOpenLightbox(idx, e) {
   }
   _pvLbList = lbList;
   _pvLbIdx = idx;
+  _pvLbRatingFilter = _acRatingFilter;
   _pvLbOpen();
+}
+
+/**
+ * Кнопка «Посмотреть все» — открывает лайтбокс с первого фото.
+ * Если задан фильтр по рейтингу, покажет только отфильтрованные.
+ */
+function acViewAll() {
+  acOpenLightbox(0, null);
 }
 
 /**
