@@ -881,8 +881,12 @@ function _pvLbOpen() {
 
   var labelEl = document.createElement('span');
   if (isLocked) {
+    /* Карточечное фото — кликабельно, убирает из карточки */
     labelEl.textContent = 'В карточке К' + (inCardIdx + 1);
-    checkWrap.style.cursor = 'default';
+    checkWrap.style.cursor = 'pointer';
+    checkWrap.onclick = (function(photoName, cIdx) {
+      return function() { _pvLbRemoveFromCard(photoName, cIdx); };
+    })(pv.name, inCardIdx);
   } else if (isInOC) {
     labelEl.textContent = 'В доп. контенте';
     checkWrap.style.cursor = 'pointer';
@@ -1006,6 +1010,35 @@ function _pvLbSetFilter(minRating) {
 }
 
 /**
+ * Убрать фото из карточки через лайтбокс.
+ * @param {string} name — имя файла
+ * @param {number} cardIdx — индекс карточки (0-based)
+ */
+function _pvLbRemoveFromCard(name, cardIdx) {
+  var proj = getActiveProject();
+  if (!proj || !proj.cards) return;
+  var card = proj.cards[cardIdx];
+  if (!card || !card.slots) return;
+
+  for (var s = 0; s < card.slots.length; s++) {
+    if (card.slots[s].file === name) {
+      card.slots[s].file = null;
+      card.slots[s].dataUrl = '';
+      card.slots[s].thumbUrl = '';
+      card.slots[s].preview = '';
+      break;
+    }
+  }
+
+  if (typeof shAutoSave === 'function') shAutoSave();
+  if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
+  if (typeof cpRenderCard === 'function') cpRenderCard();
+  if (typeof acRenderField === 'function') acRenderField();
+  if (typeof ocRenderField === 'function') ocRenderField();
+  _pvLbOpen();
+}
+
+/**
  * Добавить/убрать текущую превью из доп. контента.
  */
 function _pvLbToggleOC(add) {
@@ -1078,11 +1111,15 @@ function _pvLbKeyHandler(e) {
   if (e.key === 'Escape') { pvCloseFullscreen(); return; }
   if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { _pvLbNav(1); return; }
   if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { _pvLbNav(-1); return; }
-  /* Пробел = переключить галочку (только для не-карточных фото) */
+  /* Пробел = переключить галочку (все фото: карточки и OC) */
   if (e.key === ' ') {
     e.preventDefault();
     var pv = _pvLbList[_pvLbIdx];
-    if (pv && _pvIsInCard(pv.name) < 0) {
+    if (!pv) return;
+    var cardIdx = _pvIsInCard(pv.name);
+    if (cardIdx >= 0) {
+      _pvLbRemoveFromCard(pv.name, cardIdx);
+    } else {
       var isIn = _pvIsInOtherContent(pv.name);
       _pvLbToggleOC(!isIn);
       _pvLbOpen();
