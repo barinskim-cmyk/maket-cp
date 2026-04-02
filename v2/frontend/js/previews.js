@@ -1541,9 +1541,8 @@ function acRenderField() {
       html += '<span class="ac-check-label">Доп.</span>';
     }
 
-    /* Кнопка zoom → открывает лайтбокс */
-    html += '<button class="ac-zoom" onclick="acOpenLightbox(' + i + ',event)" title="На весь экран">' + zoomSvg + '</button>';
-    html += '<span class="pv-name">' + esc(pvShortName(it.name)) + '</span>';
+    /* Кнопка «посмотреть опции» → лайтбокс со ВСЕМИ превью начиная с этого файла */
+    html += '<button class="ac-zoom" onclick="acViewFrom(\'' + esc(it.name).replace(/'/g, "\\'") + '\',event)" title="Посмотреть опции">' + zoomSvg + '</button>';
     html += '</div>';
   }
   gallery.innerHTML = html;
@@ -1706,7 +1705,41 @@ function acOpenLightbox(idx, e) {
 }
 
 /**
- * Кнопка «Посмотреть все» — открывает лайтбокс со ВСЕМИ превью проекта
+ * Кнопка на плитке отбора — открывает лайтбокс со ВСЕМИ превью проекта,
+ * начиная с фото по имени name.
+ * @param {string} name — имя файла от которого начать
+ * @param {Event} e
+ */
+function acViewFrom(name, e) {
+  if (e) e.stopPropagation();
+  var proj = getActiveProject();
+  if (!proj || !proj.previews || !proj.previews.length) return;
+
+  var all = proj.previews;
+  var minR = _acRatingFilter || 0;
+  var lbList = [];
+  var startIdx = 0;
+
+  for (var i = 0; i < all.length; i++) {
+    if (minR > 0 && (all[i].rating || 0) < minR) continue;
+    if (all[i].name === name) startIdx = lbList.length;
+    lbList.push({
+      name: all[i].name,
+      thumb: all[i].thumb || '',
+      preview: all[i].preview || '',
+      path: all[i].path || ''
+    });
+  }
+  if (!lbList.length) return;
+
+  _pvLbList = lbList;
+  _pvLbIdx = startIdx;
+  _pvLbRatingFilter = _acRatingFilter;
+  _pvLbOpen();
+}
+
+/**
+ * Кнопка «Посмотреть все опции» — открывает лайтбокс со ВСЕМИ превью проекта
  * (не только отбор, а полный пул). С фильтром по рейтингу если задан.
  */
 function acViewAll() {
