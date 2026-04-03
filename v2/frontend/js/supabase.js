@@ -1665,6 +1665,414 @@ function sbLoadStageHistory(projectId, callback) {
     });
 }
 
+// ══════════════════════════════════════════════
+//  Photo Versions (постпродакшн: ЦК, ретушь, грейдинг)
+// ══════════════════════════════════════════════
+
+/**
+ * Загрузить все версии фото для проекта.
+ * Сортировка: photo_name → stage → version_num.
+ *
+ * @param {string} projectId - UUID проекта
+ * @param {function} callback - function(err, versions)
+ *   versions: [{id, photo_name, stage, version_num, preview_path, cos_path, selected, created_at}]
+ */
+function sbLoadPhotoVersions(projectId, callback) {
+  if (!sbClient) { callback('Supabase не подключён'); return; }
+
+  sbClient.from('photo_versions')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('photo_name', { ascending: true })
+    .order('stage', { ascending: true })
+    .order('version_num', { ascending: true })
+    .then(function(res) {
+      if (res.error) {
+        console.warn('sbLoadPhotoVersions:', res.error.message);
+        callback(res.error.message);
+        return;
+      }
+      callback(null, res.data || []);
+    })['catch'](function(err) {
+      console.error('sbLoadPhotoVersions catch:', err);
+      callback(String(err));
+    });
+}
+
+/**
+ * Загрузить версии конкретного фото (все этапы).
+ *
+ * @param {string} projectId
+ * @param {string} photoName - имя файла (IMG_0001.CR3)
+ * @param {function} callback - function(err, versions)
+ */
+function sbLoadPhotoVersionsByPhoto(projectId, photoName, callback) {
+  if (!sbClient) { callback('Supabase не подключён'); return; }
+
+  sbClient.from('photo_versions')
+    .select('*')
+    .eq('project_id', projectId)
+    .eq('photo_name', photoName)
+    .order('stage', { ascending: true })
+    .order('version_num', { ascending: true })
+    .then(function(res) {
+      if (res.error) {
+        console.warn('sbLoadPhotoVersionsByPhoto:', res.error.message);
+        callback(res.error.message);
+        return;
+      }
+      callback(null, res.data || []);
+    })['catch'](function(err) {
+      console.error('sbLoadPhotoVersionsByPhoto catch:', err);
+      callback(String(err));
+    });
+}
+
+/**
+ * Загрузить версии для этапа (например, все CC-версии проекта).
+ *
+ * @param {string} projectId
+ * @param {string} stage - 'color_correction' | 'retouch' | 'grading'
+ * @param {function} callback - function(err, versions)
+ */
+function sbLoadPhotoVersionsByStage(projectId, stage, callback) {
+  if (!sbClient) { callback('Supabase не подключён'); return; }
+
+  sbClient.from('photo_versions')
+    .select('*')
+    .eq('project_id', projectId)
+    .eq('stage', stage)
+    .order('photo_name', { ascending: true })
+    .order('version_num', { ascending: true })
+    .then(function(res) {
+      if (res.error) {
+        console.warn('sbLoadPhotoVersionsByStage:', res.error.message);
+        callback(res.error.message);
+        return;
+      }
+      callback(null, res.data || []);
+    })['catch'](function(err) {
+      console.error('sbLoadPhotoVersionsByStage catch:', err);
+      callback(String(err));
+    });
+}
+
+/**
+ * Сохранить (insert) новую версию фото.
+ * Использует upsert по unique constraint (project_id, photo_name, stage, version_num).
+ *
+ * @param {object} version - {project_id, photo_name, stage, version_num, preview_path, cos_path}
+ * @param {function} callback - function(err, saved)
+ */
+function sbSavePhotoVersion(version, callback) {
+  if (!sbClient) { callback('Supabase не подключён'); return; }
+
+  var row = {
+    project_id:  version.project_id,
+    photo_name:  version.photo_name,
+    stage:       version.stage,
+    version_num: version.version_num,
+    preview_path: version.preview_path || '',
+    cos_path:    version.cos_path || '',
+    selected:    version.selected || false
+  };
+
+  sbClient.from('photo_versions')
+    .upsert(row, { onConflict: 'project_id,photo_name,stage,version_num' })
+    .select()
+    .then(function(res) {
+      if (res.error) {
+        console.warn('sbSavePhotoVersion:', res.error.message);
+        callback(res.error.message);
+        return;
+      }
+      callback(null, (res.data && res.data[0]) || null);
+    })['catch'](function(err) {
+      console.error('sbSavePhotoVersion catch:', err);
+      callback(String(err));
+    });
+}
+
+/**
+ * Обновить поле selected у версии (заказчик выбрал вариант).
+ * Сбрасывает selected у остальных версий того же фото+этапа.
+ *
+ * @param {string} versionId - UUID версии
+ * @param {string} projectId
+ * @param {string} photoName
+ * @param {string} stage
+ * @param {function} callback - function(err)
+ */
+function sbSelectPhotoVersion(versionId, projectId, photoName, stage, callback) {
+  if (!sbClient) { callback('Supabase не подключён'); return; }
+
+  /* Шаг 1: сбросить selected у всех версий этого фото на этом этапе */
+  sbClient.from('photo_versions')
+    .update({ selected: false })
+    .eq('project_id', projectId)
+    .eq('photo_name', photoName)
+    .eq('stage', stage)
+    .then(function(res1) {
+      if (res1.error) {
+        console.warn('sbSelectPhotoVersion reset:', res1.error.message);
+        callback(res1.error.message);
+        return;
+      }
+
+      /* Шаг 2: установить selected=true у выбранной */
+      sbClient.from('photo_versions')
+        .update({ selected: true })
+        .eq('id', versionId)
+        .then(function(res2) {
+          if (res2.error) {
+            console.warn('sbSelectPhotoVersion set:', res2.error.message);
+            callback(res2.error.message);
+            return;
+          }
+          callback(null);
+        })['catch'](function(err) {
+          callback(String(err));
+        });
+    })['catch'](function(err) {
+      callback(String(err));
+    });
+}
+
+/**
+ * Удалить версию фото (и файлы из Storage).
+ *
+ * @param {string} versionId - UUID версии
+ * @param {string} previewPath - путь превью в Storage (для удаления файла)
+ * @param {string} cosPath - путь COS в Storage (для удаления файла)
+ * @param {function} callback - function(err)
+ */
+function sbDeletePhotoVersion(versionId, previewPath, cosPath, callback) {
+  if (!sbClient) { callback('Supabase не подключён'); return; }
+
+  /* Удаляем файлы из Storage (игнорируем ошибки — файлов может не быть) */
+  var filesToRemove = [];
+  if (previewPath) filesToRemove.push(previewPath);
+  if (cosPath) filesToRemove.push(cosPath);
+
+  function deleteRow() {
+    sbClient.from('photo_versions')
+      .delete()
+      .eq('id', versionId)
+      .then(function(res) {
+        if (res.error) {
+          console.warn('sbDeletePhotoVersion:', res.error.message);
+          callback(res.error.message);
+          return;
+        }
+        callback(null);
+      })['catch'](function(err) {
+        callback(String(err));
+      });
+  }
+
+  if (filesToRemove.length > 0) {
+    sbClient.storage.from('postprod').remove(filesToRemove)
+      .then(function() { deleteRow(); })
+      ['catch'](function() { deleteRow(); }); /* удаляем запись даже если файл не удалился */
+  } else {
+    deleteRow();
+  }
+}
+
+
+// ══════════════════════════════════════════════
+//  Postprod Storage (загрузка/скачивание файлов)
+// ══════════════════════════════════════════════
+
+/**
+ * Загрузить файл в бакет postprod (превью JPEG или COS).
+ * Конвертирует base64 data URL в Blob.
+ *
+ * @param {string} storagePath - путь внутри бакета: {project_id}/{stem}/{stage}_{N}.jpg
+ * @param {string} base64Data  - data URL (data:image/jpeg;base64,...) или raw base64
+ * @param {string} contentType - MIME тип ('image/jpeg' или 'application/octet-stream')
+ * @param {function} callback  - function(err, publicUrl)
+ */
+function sbUploadPostprodFile(storagePath, base64Data, contentType, callback) {
+  if (!sbClient) { callback('Supabase не подключён'); return; }
+
+  /* Конвертируем base64 в Blob */
+  var raw;
+  if (base64Data.indexOf('data:') === 0) {
+    /* data URL: data:mime;base64,XXXXX */
+    var parts = base64Data.split(',');
+    raw = atob(parts[1]);
+  } else {
+    /* чистый base64 */
+    raw = atob(base64Data);
+  }
+  var array = new Uint8Array(raw.length);
+  for (var i = 0; i < raw.length; i++) array[i] = raw.charCodeAt(i);
+  var blob = new Blob([array], { type: contentType });
+
+  sbClient.storage.from('postprod').upload(storagePath, blob, {
+    contentType: contentType,
+    upsert: true
+  }).then(function(res) {
+    if (res.error) {
+      console.warn('sbUploadPostprodFile:', res.error.message);
+      callback(res.error.message);
+      return;
+    }
+    /* Получаем URL для скачивания (signed или public) */
+    var urlRes = sbClient.storage.from('postprod').getPublicUrl(storagePath);
+    callback(null, urlRes.data.publicUrl);
+  })['catch'](function(err) {
+    console.error('sbUploadPostprodFile catch:', err);
+    callback(String(err));
+  });
+}
+
+/**
+ * Скачать файл из бакета postprod как Blob.
+ * Используется для скачивания COS-файлов (клиент → Python → диск).
+ *
+ * @param {string} storagePath - путь внутри бакета
+ * @param {function} callback - function(err, base64)
+ */
+function sbDownloadPostprodFile(storagePath, callback) {
+  if (!sbClient) { callback('Supabase не подключён'); return; }
+
+  sbClient.storage.from('postprod').download(storagePath)
+    .then(function(res) {
+      if (res.error) {
+        console.warn('sbDownloadPostprodFile:', res.error.message);
+        callback(res.error.message);
+        return;
+      }
+
+      /* Blob → base64 через FileReader */
+      var reader = new FileReader();
+      reader.onload = function() {
+        /* result = data:...;base64,XXXX — извлекаем чистый base64 */
+        var dataUrl = reader.result;
+        var b64 = dataUrl.split(',')[1] || '';
+        callback(null, b64);
+      };
+      reader.onerror = function() {
+        callback('Ошибка чтения файла');
+      };
+      reader.readAsDataURL(res.data);
+    })['catch'](function(err) {
+      console.error('sbDownloadPostprodFile catch:', err);
+      callback(String(err));
+    });
+}
+
+/**
+ * Получить публичный URL для превью версии (JPEG в бакете postprod).
+ *
+ * @param {string} storagePath - путь внутри бакета
+ * @returns {string} публичный URL или ''
+ */
+function sbGetPostprodUrl(storagePath) {
+  if (!sbClient || !storagePath) return '';
+  var res = sbClient.storage.from('postprod').getPublicUrl(storagePath);
+  return (res.data && res.data.publicUrl) || '';
+}
+
+/**
+ * Загрузить версию ЦК с desktop: превью JPEG + COS файл → Storage + запись в БД.
+ * Высокоуровневая функция: объединяет upload файлов и insert записи.
+ *
+ * Используется из desktop (pywebview): Python читает файлы с диска,
+ * JS загружает в Supabase Storage и создаёт запись.
+ *
+ * @param {object} opts
+ *   opts.projectId   — UUID проекта
+ *   opts.photoName   — имя файла (IMG_0001.CR3)
+ *   opts.stage       — 'color_correction' | 'retouch' | 'grading'
+ *   opts.versionNum  — номер версии (1, 2, 3...)
+ *   opts.previewB64  — base64 превью JPEG (от Python version_read_preview)
+ *   opts.cosB64      — base64 COS файла (от Python version_collect_cos), может быть ''
+ * @param {function} callback — function(err, savedVersion)
+ */
+function sbUploadPhotoVersion(opts, callback) {
+  if (!sbClient) { callback('Supabase не подключён'); return; }
+
+  var stem = opts.photoName.replace(/\.[^.]+$/, ''); /* IMG_0001.CR3 → IMG_0001 */
+  var prefix = opts.projectId + '/' + stem + '/' + opts.stage + '_' + opts.versionNum;
+
+  var previewStoragePath = '';
+  var cosStoragePath = '';
+
+  /* Шаг 1: загрузить превью JPEG */
+  function uploadPreview(done) {
+    if (!opts.previewB64) { done(); return; }
+
+    previewStoragePath = prefix + '.jpg';
+    sbUploadPostprodFile(previewStoragePath, opts.previewB64, 'image/jpeg', function(err) {
+      if (err) console.warn('sbUploadPhotoVersion: ошибка загрузки превью —', err);
+      /* продолжаем даже при ошибке превью */
+      done();
+    });
+  }
+
+  /* Шаг 2: загрузить COS файл */
+  function uploadCos(done) {
+    if (!opts.cosB64) { done(); return; }
+
+    cosStoragePath = prefix + '.cos';
+    sbUploadPostprodFile(cosStoragePath, opts.cosB64, 'application/octet-stream', function(err) {
+      if (err) console.warn('sbUploadPhotoVersion: ошибка загрузки COS —', err);
+      done();
+    });
+  }
+
+  /* Шаг 3: создать запись в БД */
+  function saveRecord() {
+    sbSavePhotoVersion({
+      project_id:   opts.projectId,
+      photo_name:   opts.photoName,
+      stage:        opts.stage,
+      version_num:  opts.versionNum,
+      preview_path: previewStoragePath,
+      cos_path:     cosStoragePath
+    }, callback);
+  }
+
+  /* Выполняем последовательно: превью → COS → запись */
+  uploadPreview(function() {
+    uploadCos(function() {
+      saveRecord();
+    });
+  });
+}
+
+/**
+ * Скачать COS версии и восстановить на диск через Python API.
+ * Для desktop: JS скачивает из Storage, Python пишет на диск.
+ *
+ * @param {string} cosStoragePath - путь COS в бакете postprod
+ * @param {string} photoStem - имя фото без расширения (IMG_0001)
+ * @param {function} callback - function(err, localPath)
+ */
+function sbRestoreCosToDesktop(cosStoragePath, photoStem, callback) {
+  if (!sbClient) { callback('Supabase не подключён'); return; }
+  if (!window.pywebview || !window.pywebview.api) {
+    callback('Доступно только в desktop-режиме');
+    return;
+  }
+
+  sbDownloadPostprodFile(cosStoragePath, function(err, cosBase64) {
+    if (err) { callback(err); return; }
+
+    window.pywebview.api.version_restore_cos(photoStem, cosBase64)
+      .then(function(result) {
+        if (result.error) { callback(result.error); return; }
+        callback(null, result.path);
+      })['catch'](function(e) {
+        callback(String(e));
+      });
+  });
+}
+
+
 // Автоинициализация
 if (typeof window !== 'undefined') {
   // Вызовется после загрузки Supabase SDK

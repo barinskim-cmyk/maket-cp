@@ -16,6 +16,7 @@ from ..services.card_service import CardService
 from ..services.project_service import ProjectService
 from ..services.preview_service import PreviewService
 from ..services.article_service import ArticleService
+from ..services.version_service import VersionService
 from ..domain.project import Project
 from ..domain.card import CardTemplate
 
@@ -30,6 +31,7 @@ class AppAPI:
         self.project_service = ProjectService()
         self.preview_service = PreviewService()
         self.article_service = ArticleService()
+        self.version_service = VersionService()
         self._project: Project | None = None
 
     def set_window(self, window: webview.Window) -> None:
@@ -315,6 +317,89 @@ class AppAPI:
         import threading
         threading.Thread(target=task, args=(file_path,), daemon=True).start()
         return {"status": "started", "file": file_path}
+
+    # ── Версии фото (постпродакшн) ──
+
+    def version_set_session(self, session_dir: str) -> dict:
+        """Установить корень сессии Capture One для поиска COS-файлов.
+
+        Вызывается при открытии проекта или выборе папки сессии.
+        """
+        p = Path(session_dir)
+        if not p.exists():
+            return {"error": f"Папка не найдена: {session_dir}"}
+        self.version_service.set_session_root(p)
+        return {"ok": True, "path": session_dir}
+
+    def version_collect_cos(self, photo_stem: str) -> dict:
+        """Собрать COS-файл для фото (base64 + метаданные).
+
+        Используется при загрузке версии ЦК: фронт получает COS как base64,
+        потом загружает в Supabase Storage через JS SDK.
+
+        Returns:
+            {"cos_base64": str, "cos_filename": str, "cos_size_bytes": int}
+            или {"error": "..."}
+        """
+        result = self.version_service.collect_cos_for_photo(photo_stem)
+        if result:
+            return result
+        return {"error": f"COS не найден для {photo_stem}"}
+
+    def version_read_preview(self, jpeg_path: str) -> dict:
+        """Прочитать JPEG превью версии с диска (base64).
+
+        Пользователь экспортирует JPEG из Capture One,
+        фронт получает base64 и загружает в Supabase Storage.
+
+        Returns:
+            {"preview_base64": str, "filename": str, "size_bytes": int}
+            или {"error": "..."}
+        """
+        result = self.version_service.read_preview_jpeg(jpeg_path)
+        if result:
+            return result
+        return {"error": f"Файл не найден: {jpeg_path}"}
+
+    def version_select_preview(self) -> dict:
+        """Выбрать JPEG превью через нативный диалог и прочитать.
+
+        Объединяет select_file + read_preview для удобства фронта.
+        """
+        if not self._window:
+            return {"error": "Нет окна"}
+        result = self._window.create_file_dialog(
+            webview.OPEN_DIALOG,
+            directory="",
+            allow_multiple=False,
+            file_types=("JPEG images (*.jpg;*.jpeg)",),
+        )
+        if not result:
+            return {"cancelled": True}
+        file_path = result[0] if isinstance(result, (list, tuple)) else result
+        preview = self.version_service.read_preview_jpeg(file_path)
+        if preview:
+            return preview
+        return {"error": f"Не удалось прочитать: {file_path}"}
+
+    def version_restore_cos(self, photo_stem: str, cos_base64: str, target_dir: str = "") -> dict:
+        """Восстановить COS-файл на диск из base64 (скачанного из Storage).
+
+        Capture One подхватит файл автоматически.
+        Перед перезаписью создаёт .bak если его нет.
+
+        Returns:
+            {"ok": True, "path": str} или {"error": "..."}
+        """
+        try:
+            path = self.version_service.restore_cos_to_disk(
+                photo_stem, cos_base64, target_dir or None
+            )
+            if path:
+                return {"ok": True, "path": path}
+            return {"error": "Не удалось определить папку для COS"}
+        except Exception as e:
+            return {"error": str(e)}
 
     def pdf_pages_to_images(self, file_path: str) -> dict:
         """Конвертировать страницы PDF в base64 JPEG (для AI Vision).
