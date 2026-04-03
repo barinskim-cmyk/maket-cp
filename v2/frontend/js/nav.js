@@ -25,6 +25,10 @@ function showPage(name) {
   if (name === 'articles') {
     if (typeof arOnPageShow === 'function') arOnPageShow();
   }
+  if (name === 'sync') {
+    /* Автозаполнить Rate Setter из текущего проекта */
+    if (typeof rsAutoFillFromProject === 'function') rsAutoFillFromProject();
+  }
 }
 
 function showSubpage(name) {

@@ -263,8 +263,13 @@
 
           <div id="rs-text-mode">
             <div class="sync-field">
-              <label>Вставьте список имён файлов (по одному на строку)</label>
+              <label>Список имён файлов (по одному на строку)</label>
+              <div id="rs-auto-info" style="display:none;font-size:12px;color:#666;margin-bottom:4px"></div>
               <textarea id="rs-text" placeholder="IMG_0001&#10;IMG_0002&#10;IMG_0003"></textarea>
+              <div style="margin-top:4px;display:flex;gap:8px">
+                <button class="btn btn-sm" onclick="rsAutoFillFromProject()">Загрузить из проекта</button>
+                <button class="btn btn-sm" onclick="rsClearAutoFill()" style="border-color:#999;color:#999">Очистить</button>
+              </div>
             </div>
           </div>
 

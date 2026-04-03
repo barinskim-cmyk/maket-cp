@@ -1372,6 +1372,181 @@ function sbForceSyncCards() {
 }
 
 // ══════════════════════════════════════════════
+// Pull: подтянуть свежие данные из облака в локальный проект
+// ══════════════════════════════════════════════
+
+/** @type {boolean} Блокировка: не запускать параллельные pull */
+var _sbPullRunning = false;
+
+/** @type {number|null} Таймер периодического pull */
+var _sbPullTimer = null;
+
+/** @type {number} Интервал авто-pull (мс) */
+var SB_PULL_INTERVAL = 30000; /* 30 сек */
+
+/**
+ * Подтянуть свежее состояние проекта из Supabase в локальный объект.
+ * Обновляет: cards, slots, otherContent, stage, stageHistory.
+ * НЕ перезагружает превью (они тяжёлые и уже загружены).
+ *
+ * @param {function} [callback] — callback(error)
+ */
+function sbPullProject(callback) {
+  if (!callback) callback = function() {};
+  var proj = getActiveProject();
+  if (!proj || !proj._cloudId) { callback('Нет облачного проекта'); return; }
+  if (!sbClient) { callback('Supabase не подключён'); return; }
+  if (_sbPullRunning) { callback('Pull уже идёт'); return; }
+
+  var isOwner = sbIsLoggedIn();
+  var isClient = !!window._shareToken;
+  if (!isOwner && !isClient) { callback('Не авторизован'); return; }
+
+  _sbPullRunning = true;
+  var cloudId = proj._cloudId;
+  console.log('sbPullProject: подтягиваем данные из облака...');
+
+  /* 1. Загрузить проект (stage, other_content) */
+  sbClient.from('projects').select('stage, other_content, updated_at').eq('id', cloudId).single().then(function(projRes) {
+    if (projRes.error) { _sbPullRunning = false; callback(projRes.error.message); return; }
+
+    var remote = projRes.data;
+
+    /* 2. Загрузить карточки + слоты параллельно */
+    sbClient.from('cards').select('*').eq('project_id', cloudId).order('position').then(function(cardRes) {
+      if (cardRes.error) { _sbPullRunning = false; callback(cardRes.error.message); return; }
+
+      sbClient.from('slots').select('*').eq('project_id', cloudId).order('position').then(function(slotRes) {
+        if (slotRes.error) { _sbPullRunning = false; callback(slotRes.error.message); return; }
+
+        /* Группировка слотов по card_id */
+        var slotsByCard = {};
+        (slotRes.data || []).forEach(function(sl) {
+          if (!slotsByCard[sl.card_id]) slotsByCard[sl.card_id] = [];
+          slotsByCard[sl.card_id].push(sl);
+        });
+
+        /* Карта локальных превью по имени (для dataUrl/thumbUrl) */
+        var pvByName = {};
+        if (proj.previews) {
+          for (var pi = 0; pi < proj.previews.length; pi++) {
+            pvByName[proj.previews[pi].name] = proj.previews[pi];
+          }
+        }
+
+        /* Собираем карточки */
+        var newCards = [];
+        var remoteCards = cardRes.data || [];
+        for (var c = 0; c < remoteCards.length; c++) {
+          var rc = remoteCards[c];
+          var card = {
+            id: rc.id,
+            status: rc.status || 'draft',
+            _hasHero: rc.has_hero,
+            _hAspect: rc.h_aspect || '3/2',
+            _vAspect: rc.v_aspect || '2/3',
+            _lockRows: rc.lock_rows || false,
+            slots: []
+          };
+
+          var cardSlots = slotsByCard[rc.id] || [];
+          for (var j = 0; j < cardSlots.length; j++) {
+            var rs = cardSlots[j];
+            var fileName = rs.file_name;
+            var pv = fileName ? pvByName[fileName] : null;
+
+            var imgUrl = null;
+            if (pv) imgUrl = pv.preview || pv.thumb || null;
+            if (!imgUrl && rs.thumb_path) imgUrl = rs.thumb_path;
+
+            card.slots.push({
+              orient: rs.orient || 'v',
+              weight: rs.weight || 1,
+              row: rs.row_num,
+              rotation: rs.rotation || 0,
+              file: fileName,
+              dataUrl: imgUrl,
+              thumbUrl: pv ? (pv.thumb || null) : (rs.thumb_path || null),
+              path: null
+            });
+          }
+          newCards.push(card);
+        }
+
+        /* Восстановить otherContent из имён */
+        var ocRaw = remote.other_content || '[]';
+        var ocNames = (typeof ocRaw === 'string') ? JSON.parse(ocRaw) : (ocRaw || []);
+        var newOC = [];
+        for (var oi = 0; oi < ocNames.length; oi++) {
+          var ocPv = pvByName[ocNames[oi]];
+          if (ocPv) {
+            newOC.push({ name: ocPv.name, path: '', thumb: ocPv.thumb, preview: ocPv.preview || '' });
+          }
+        }
+
+        /* Применить обновления к локальному проекту */
+        proj.cards = newCards;
+        proj.otherContent = newOC;
+        proj._stage = remote.stage || 0;
+
+        /* Загрузить историю этапов */
+        sbLoadStageHistory(cloudId, function(history) {
+          proj._stageHistory = history;
+          _sbPullRunning = false;
+
+          /* Обновить UI */
+          if (typeof renderPipeline === 'function') renderPipeline();
+          if (typeof cpRenderList === 'function') cpRenderList();
+          if (typeof acRenderField === 'function') acRenderField();
+          if (typeof ocRenderField === 'function') ocRenderField();
+          if (typeof pvRenderAll === 'function') pvRenderAll();
+
+          /* Сохранить в localStorage */
+          if (typeof shAutoSave === 'function') shAutoSave();
+
+          console.log('sbPullProject: данные обновлены (' + newCards.length + ' карт., ' + newOC.length + ' OC, stage=' + proj._stage + ')');
+          callback(null);
+        });
+      });
+    });
+  });
+}
+
+/**
+ * Запустить периодический авто-pull из облака.
+ * Вызывается при выборе облачного проекта.
+ */
+function sbStartAutoPull() {
+  sbStopAutoPull();
+  var proj = getActiveProject();
+  if (!proj || !proj._cloudId) return;
+
+  /* Первый pull — сразу */
+  sbPullProject(function(err) {
+    if (err) console.warn('sbStartAutoPull: первый pull:', err);
+  });
+
+  /* Далее — каждые SB_PULL_INTERVAL мс */
+  _sbPullTimer = setInterval(function() {
+    var p = getActiveProject();
+    if (!p || !p._cloudId) { sbStopAutoPull(); return; }
+    sbPullProject(function(err) {
+      if (err) console.warn('sbAutoPull:', err);
+    });
+  }, SB_PULL_INTERVAL);
+}
+
+/**
+ * Остановить периодический авто-pull.
+ */
+function sbStopAutoPull() {
+  if (_sbPullTimer) {
+    clearInterval(_sbPullTimer);
+    _sbPullTimer = null;
+  }
+}
+
+// ══════════════════════════════════════════════
 // Синхронизация этапов пайплайна (stage + stage_events)
 // ══════════════════════════════════════════════
 

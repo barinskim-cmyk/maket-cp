@@ -230,6 +230,9 @@ function selectProject(idx) {
   App.selectedProject = idx;
   App.currentCardIdx = -1;
   renderProjects();
+
+  /* Запустить авто-синхронизацию из облака для облачного проекта */
+  if (typeof sbStartAutoPull === 'function') sbStartAutoPull();
 }
 
 /**
@@ -280,7 +283,16 @@ function renderPipeline() {
   var proj = App.projects[App.selectedProject];
   var stage = proj._stage || 0;
 
-  var html = '<div class="pipeline-steps">';
+  /* Кнопка синхронизации (если проект в облаке) */
+  var html = '';
+  if (proj._cloudId) {
+    html += '<div class="pipeline-sync-bar">';
+    html += '<span id="pipeline-sync-status" style="font-size:11px;color:#999">Облако</span>';
+    html += ' <button class="btn btn-sm" onclick="sbPullProject(function(e){var s=document.getElementById(\'pipeline-sync-status\');if(s)s.textContent=e?\'Ошибка\':\'Обновлено\';setTimeout(function(){if(s)s.textContent=\'Облако\'},2000)})" style="font-size:11px;padding:2px 8px">Синхронизировать</button>';
+    html += '</div>';
+  }
+
+  html += '<div class="pipeline-steps">';
   for (var i = 0; i < PIPELINE_STAGES.length; i++) {
     var s = PIPELINE_STAGES[i];
     var cls = '';
