@@ -1962,15 +1962,27 @@ function cpMobileSlotFullscreen(cardIdx, slotIdx, e) {
   var slot = proj.cards[cardIdx].slots[slotIdx];
   if (!slot || !slot.file) return;
 
-  /* Найти индекс в previews по имени файла */
-  var pvIdx = 0;
+  /* Найти превью по имени файла */
+  var pv = null;
   if (proj.previews) {
     for (var i = 0; i < proj.previews.length; i++) {
-      if (proj.previews[i].name === slot.file) { pvIdx = i; break; }
+      if (proj.previews[i].name === slot.file) { pv = proj.previews[i]; break; }
     }
   }
-  if (typeof pvShowFullscreen === 'function') {
-    pvShowFullscreen(pvIdx);
+  if (!pv) {
+    pv = {
+      name: slot.file,
+      thumb: slot.thumbUrl || slot.dataUrl || '',
+      preview: slot.dataUrl || slot.thumbUrl || '',
+      orient: slot.orient || 'v'
+    };
+  }
+
+  /* Одно фото — без листания */
+  if (typeof _pvLbList !== 'undefined') {
+    _pvLbList = [pv];
+    _pvLbIdx = 0;
+    if (typeof _pvLbOpen === 'function') _pvLbOpen();
   }
 }
 
