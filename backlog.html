@@ -716,6 +716,60 @@ tr:hover td { background: #fafafa; }
   <td contenteditable="true" class="my-comment"></td>
 </tr>
 
+<tr class="section-row"><td colspan="10">Постпродакшн (ЦК / ретушь / грейдинг)</td></tr>
+
+<tr data-row="s3-pp1">
+  <td>3.P1</td>
+  <td contenteditable="true"><strong>Supabase: миграция photo_versions + бакет postprod</strong></td>
+  <td><span class="who-both">Вместе</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Инфра</td>
+  <td>Запустить SQL миграцию 001_photo_versions.sql в Supabase Dashboard. Создать Storage бакет "postprod" (private). Проверить RLS-политики (owner, member, anon).</td>
+  <td class="files">001_photo_versions.sql</td>
+  <td>2.7</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="s3-pp2">
+  <td>3.P2</td>
+  <td contenteditable="true"><strong>Desktop UI: загрузка ЦК-превью + COS в облако</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Постпродакшн</td>
+  <td>UI для фотографа: выбрать превью JPEG, собрать COS с диска, загрузить в Supabase Storage + запись в photo_versions. Пакетная загрузка.</td>
+  <td class="files">supabase.js, app_api.py, новый модуль</td>
+  <td>3.P1</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="s3-pp3">
+  <td>3.P3</td>
+  <td contenteditable="true"><strong>CC 1/CC 2 переключатель в лайтбоксе и карточках</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Постпродакшн</td>
+  <td>Переключатель вариантов ЦК на каждом фото (не глобальный). В лайтбоксе: кнопки CC 1 / CC 2. В карточке: индикатор. Заказчик выбирает вариант. Не у всех фото есть CC2.</td>
+  <td class="files">previews.js, cards.js, style.css</td>
+  <td>3.P2</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="s3-pp4">
+  <td>3.P4</td>
+  <td contenteditable="true"><strong>Восстановление COS на desktop</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Постпродакшн</td>
+  <td>Скачать выбранный COS из облака и восстановить на диск (с .bak бэкапом). Capture One подхватывает автоматически. Для ретушёра: получить утверждённый вариант ЦК.</td>
+  <td class="files">supabase.js, version_service.py</td>
+  <td>3.P3</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
 <tr class="section-row"><td colspan="10">Комментарии на ретушь</td></tr>
 
 <tr data-row="s3-04">
