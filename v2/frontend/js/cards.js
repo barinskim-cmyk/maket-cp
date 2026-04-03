@@ -1707,6 +1707,7 @@ function cpMobileRender() {
   html += '<div class="mob-header-tabs">';
   html += '<button class="mob-tab-btn' + (_mobViewMode === 'cards' ? ' mob-tab-active' : '') + '" onclick="cpMobileSetView(\'cards\')">Cards</button>';
   html += '<button class="mob-tab-btn' + (_mobViewMode === 'select' ? ' mob-tab-active' : '') + '" onclick="cpMobileSetView(\'select\')">Select</button>';
+  html += '<button class="mob-tab-btn' + (_mobViewMode === 'other' ? ' mob-tab-active' : '') + '" onclick="cpMobileSetView(\'other\')">Other</button>';
   html += '<button class="mob-tab-btn' + (_mobViewMode === 'options' ? ' mob-tab-active' : '') + '" onclick="cpMobileSetView(\'options\')">Options</button>';
   html += '</div>';
   html += '</div>';
@@ -1715,6 +1716,8 @@ function cpMobileRender() {
     html += cpMobileRenderFeed();
   } else if (_mobViewMode === 'select') {
     html += cpMobileRenderSelect();
+  } else if (_mobViewMode === 'other') {
+    html += cpMobileRenderOther();
   } else {
     html += cpMobileRenderGallery();
   }
@@ -2115,6 +2118,78 @@ function cpMobileSelectFullscreen(idx) {
   if (typeof acOpenLightbox === 'function') {
     acOpenLightbox(idx, null);
   }
+}
+
+/**
+ * Рендер вкладки Other — только доп. контент (без карточек).
+ * Плитка как в Select: горизонты на всю ширину, вертикали по 2.
+ * Тап по фото открывает лайтбокс только по OC-списку.
+ * @returns {string} HTML
+ */
+function cpMobileRenderOther() {
+  var proj = getActiveProject();
+  var store = (proj && proj.otherContent) ? proj.otherContent : [];
+
+  if (store.length === 0) {
+    return '<div style="padding:40px 16px;text-align:center;color:#999">Нет доп. контента</div>';
+  }
+
+  /* Найти ориентацию через превью, если есть */
+  var pvMap = {};
+  if (proj && proj.previews) {
+    for (var p = 0; p < proj.previews.length; p++) {
+      pvMap[proj.previews[p].name] = proj.previews[p];
+    }
+  }
+
+  var html = '<div class="mob-other-header">' + store.length + ' фото</div>';
+  html += '<div class="mob-select">';
+
+  for (var i = 0; i < store.length; i++) {
+    var item = store[i];
+    var src = item.preview || item.thumb || '';
+    if (!src) continue;
+
+    /* Определить ориентацию */
+    var pv = pvMap[item.name];
+    var orient = 'v';
+    if (pv) {
+      orient = (pv.width && pv.height) ? (pv.width > pv.height ? 'h' : 'v') : (pv.orient || 'v');
+    }
+    var itemClass = orient === 'h' ? 'mob-select-item-h' : 'mob-select-item-v';
+
+    html += '<div class="mob-select-item ' + itemClass + '">';
+    html += '<img src="' + src + '" loading="lazy" onclick="cpMobileOtherFullscreen(' + i + ')">';
+    html += '<button class="mob-oc-remove" onclick="cpMobileOtherRemove(' + i + ',event)">&times;</button>';
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+/**
+ * Открыть лайтбокс из мобильной вкладки Other.
+ * Показывает только OC-фото (не все превью).
+ * @param {number} idx — индекс в otherContent
+ */
+function cpMobileOtherFullscreen(idx) {
+  if (typeof ocOpenLightbox === 'function') {
+    ocOpenLightbox(idx, null);
+  }
+}
+
+/**
+ * Удалить фото из доп. контента через мобильную вкладку Other.
+ * @param {number} idx — индекс в otherContent
+ * @param {Event} e
+ */
+function cpMobileOtherRemove(idx, e) {
+  if (e) { e.stopPropagation(); e.preventDefault(); }
+  if (typeof ocRemoveItem === 'function') {
+    ocRemoveItem(idx);
+  }
+  cpMobileRender();
 }
 
 /**
