@@ -326,6 +326,9 @@ function advanceStage() {
   proj._stage++;
   renderPipeline();
   shAutoSave();
+
+  /* Синхронизация этапа с облаком */
+  if (typeof sbSyncStage === 'function') sbSyncStage('manual_advance', timeStr);
 }
 
 /**
@@ -363,6 +366,9 @@ function shSendClientLink() {
       proj._stage = 2; /* client */
       renderPipeline();
       shAutoSave();
+
+      /* Синхронизация этапа с облаком */
+      if (typeof sbSyncStage === 'function') sbSyncStage('send_client_link', timeStr);
 
       /* Показать ссылку */
       var url = data.url;
@@ -897,6 +903,9 @@ function shClientRequestExtra() {
   /* Вернуть на этап 1 (Отбор фотографа) */
   proj._stage = 1;
 
+  /* Синхронизировать этап с облаком */
+  if (typeof sbSyncStage === 'function') sbSyncStage('client_extra_request', timeStr);
+
   /* Синхронизировать изменения в облако */
   if (proj._cloudId && typeof sbUploadProject === 'function') {
     sbUploadProject(App.selectedProject, function(err) {
@@ -927,6 +936,9 @@ function shClientApprove() {
 
   /* Перейти на этап 3 (Цветокоррекция) */
   proj._stage = 3;
+
+  /* Синхронизировать этап с облаком */
+  if (typeof sbSyncStage === 'function') sbSyncStage('client_approved', timeStr);
 
   /* Синхронизировать в облако */
   if (proj._cloudId && typeof sbUploadProject === 'function') {

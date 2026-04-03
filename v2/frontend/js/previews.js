@@ -1362,6 +1362,10 @@ function pvAutoAdvancePreselect() {
   proj._stage = 1;
   if (typeof renderPipeline === 'function') renderPipeline();
   if (typeof shAutoSave === 'function') shAutoSave();
+
+  /* Синхронизация этапа с облаком */
+  if (typeof sbSyncStage === 'function') sbSyncStage('preview_loaded', timeStr);
+
   console.log('Авто-фиксация: Преотбор и превью завершён, переход на этап 1');
 }
 
