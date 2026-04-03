@@ -1129,6 +1129,18 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   padding: 20px;
 }
 
+/* Кнопка увеличить на мобильном слоте */
+.mob-slot-zoom {
+  position: absolute; top: 6px; right: 6px;
+  width: 28px; height: 28px;
+  background: rgba(0,0,0,0.5); color: #fff;
+  border: none; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; z-index: 4;
+}
+.mob-slot-zoom:active { background: rgba(0,0,0,0.7); }
+.mob-controls-hidden .mob-slot-zoom { pointer-events: none; }
+
 /* Кнопка удаления на мобильном слоте */
 .mob-slot-remove {
   position: absolute; top: 6px; left: 6px;
