@@ -778,7 +778,11 @@ function sbDownloadProject(cloudId, callback) {
           }
           delete proj._ocNames;
 
-          callback(null, proj);
+          /* Загрузить историю этапов из stage_events */
+          sbLoadStageHistory(cloudId, function(history) {
+            proj._stageHistory = history;
+            callback(null, proj);
+          });
         });
       });
     });
@@ -1024,22 +1028,27 @@ function _sbDoLoadByToken(token) {
       }
       delete proj._ocNames;
 
-      /* Share-ссылка: заменяем все проекты, чтобы гарантировать правильный выбор */
-      App.projects = [proj];
-      App.selectedProject = 0;
-      if (typeof renderProjects === 'function') renderProjects();
+      /* Загрузить историю этапов из stage_events */
+      sbLoadStageHistory(data.project_id, function(history) {
+        proj._stageHistory = history;
 
-      /* Клиентский режим */
-      if (proj._role === 'client' && typeof shEnterClientMode === 'function') {
-        shEnterClientMode();
-      }
+        /* Share-ссылка: заменяем все проекты, чтобы гарантировать правильный выбор */
+        App.projects = [proj];
+        App.selectedProject = 0;
+        if (typeof renderProjects === 'function') renderProjects();
 
-      /* Отрисовать превью */
-      if (typeof pvRenderGallery === 'function') {
-        setTimeout(function() { pvRenderGallery(); }, 200);
-      }
+        /* Клиентский режим */
+        if (proj._role === 'client' && typeof shEnterClientMode === 'function') {
+          shEnterClientMode();
+        }
 
-      console.log('Проект загружен по share-ссылке:', proj.brand, 'роль:', proj._role);
+        /* Отрисовать превью */
+        if (typeof pvRenderGallery === 'function') {
+          setTimeout(function() { pvRenderGallery(); }, 200);
+        }
+
+        console.log('Проект загружен по share-ссылке:', proj.brand, 'роль:', proj._role);
+      });
     });
   });
 }
@@ -1231,12 +1240,13 @@ var SB_CARD_SYNC_DELAY = 3000; // 3 секунды после последнег
 function sbSyncCardsLight(projectId, cards, callback) {
   if (!sbClient) { callback('Supabase не подключён'); return; }
 
-  /* Обновить other_content в проекте */
+  /* Обновить other_content + stage в проекте */
   var proj = getActiveProject();
   if (proj) {
     var ocNames = (proj.otherContent || []).map(function(oc) { return oc.name; });
     sbClient.from('projects').update({
       other_content: JSON.stringify(ocNames),
+      stage: proj._stage || 0,
       updated_at: new Date().toISOString()
     }).eq('id', projectId).then(function() {});
   }
@@ -1358,6 +1368,103 @@ function sbForceSyncCards() {
     if (err) console.error('Ошибка синхронизации:', err);
     else console.log('Синхронизация завершена успешно!');
   });
+}
+
+// ══════════════════════════════════════════════
+// Синхронизация этапов пайплайна (stage + stage_events)
+// ══════════════════════════════════════════════
+
+/**
+ * Синхронизировать текущий этап проекта с облаком.
+ * 1. Обновляет projects.stage
+ * 2. Вставляет запись в stage_events (история)
+ *
+ * @param {string} [triggerDesc] — описание триггера ("preview_loaded", "client_approved", etc.)
+ * @param {string} [note] — доп. заметка (например время из _stageHistory)
+ */
+function sbSyncStage(triggerDesc, note) {
+  var proj = getActiveProject();
+  if (!proj || !proj._cloudId) return;
+  if (!sbIsLoggedIn()) return;
+
+  var stage = proj._stage || 0;
+  var cloudId = proj._cloudId;
+
+  /* 1. Обновить stage в projects */
+  sbClient.from('projects').update({
+    stage: stage,
+    updated_at: new Date().toISOString()
+  }).eq('id', cloudId).then(function(res) {
+    if (res.error) console.warn('sbSyncStage: ошибка обновления stage:', res.error.message);
+    else console.log('sbSyncStage: stage=' + stage + ' сохранён');
+  });
+
+  /* 2. Вставить запись в stage_events */
+  var stageIds = ['preselect', 'selection', 'client', 'color', 'retouch_task', 'retouch', 'retouch_ok', 'adaptation'];
+  /* Записываем событие о завершённом этапе (stage - 1) если stage > 0,
+     иначе записываем установку на этап 0 */
+  var completedIdx = stage > 0 ? stage - 1 : 0;
+  var stageId = stageIds[completedIdx] || ('stage_' + completedIdx);
+
+  sbClient.from('stage_events').insert({
+    project_id: cloudId,
+    stage_id: stageId,
+    trigger_desc: triggerDesc || null,
+    note: note || null
+  }).then(function(res) {
+    if (res.error) console.warn('sbSyncStage: ошибка записи stage_event:', res.error.message);
+    else console.log('sbSyncStage: stage_event записан для "' + stageId + '"');
+  });
+}
+
+/**
+ * Загрузить историю этапов (stage_events) из Supabase и восстановить _stageHistory.
+ * Вызывается при открытии проекта из облака.
+ *
+ * @param {string} projectId — UUID проекта
+ * @param {function} callback — callback(stageHistory) — объект {stageIdx: timeStr}
+ */
+function sbLoadStageHistory(projectId, callback) {
+  if (!sbClient) { callback({}); return; }
+
+  sbClient.from('stage_events')
+    .select('stage_id, created_at, trigger_desc, note')
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: true })
+    .then(function(res) {
+      if (res.error) {
+        console.warn('sbLoadStageHistory:', res.error.message);
+        callback({});
+        return;
+      }
+
+      var stageIds = ['preselect', 'selection', 'client', 'color', 'retouch_task', 'retouch', 'retouch_ok', 'adaptation'];
+      var history = {};
+
+      (res.data || []).forEach(function(ev) {
+        var idx = stageIds.indexOf(ev.stage_id);
+        if (idx < 0) return;
+
+        /* Используем note (если есть, это локальное время фотографа),
+           иначе форматируем created_at из базы */
+        if (ev.note) {
+          history[idx] = ev.note;
+        } else {
+          var d = new Date(ev.created_at);
+          history[idx] = d.toLocaleDateString('ru-RU') + ' ' + d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        /* Спец. ключи: client_approved, client_extra_request */
+        if (ev.trigger_desc === 'client_approved') {
+          history['client_approved'] = history[idx];
+        }
+        if (ev.trigger_desc === 'client_extra_request') {
+          history['client_extra_request'] = history[idx];
+        }
+      });
+
+      callback(history);
+    });
 }
 
 // Автоинициализация
