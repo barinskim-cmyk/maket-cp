@@ -774,7 +774,7 @@ function pvBuildHTML(store, used, from, to) {
     var rating = pv.rating || 0;
     /* orient может не быть у старых данных — фолбэк по thumb (img.src) */
     var orientCls = (pv.orient === 'h') ? ' pv-h' : '';
-    html += '<div class="pv-thumb' + orientCls + (inCard ? ' pv-in-card' : '') + '" draggable="true" data-pv-name="' + esc(pv.name) + '" data-pv-idx="' + i + '" title="' + esc(pv.name) + '">';
+    html += '<div class="pv-thumb' + orientCls + (inCard ? ' pv-in-card' : '') + '" draggable="true" data-pv-name="' + esc(pv.name) + '" data-pv-idx="' + i + '" title="' + esc(pv.name) + '" onclick="pvShowFullscreen(' + i + ',event)">';
     html += '<img src="' + pv.thumb + '" loading="lazy">';
     if (inCard) html += '<span class="pv-check"></span>';
     html += '<button class="pv-zoom" onclick="pvShowFullscreen(' + i + ',event)" title="На весь экран"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>';
@@ -908,12 +908,16 @@ function _pvLbOpenDesktop() {
   }
 }
 
+/** Флаг блокировки snap-обработчика при программной прокрутке */
+var _pvLbMobLocked = false;
+
 /**
  * Мобильный лайтбокс: горизонтальный snap-scroll как в iPhone Photos.
  * 3-панельный скроллер (prev, current, next) с пересборкой при snap.
  */
 function _pvLbOpenMobile() {
   pvCloseFullscreen();
+  _pvLbMobLocked = true;
 
   var pv = _pvLbList[_pvLbIdx];
   if (!pv) return;
@@ -934,10 +938,13 @@ function _pvLbOpenMobile() {
   nameEl.id = 'pv-lb-mob-name';
   nameEl.textContent = (_pvLbIdx + 1) + ' / ' + _pvLbList.length;
 
-  /* Горизонтальный скроллер: 3 панели */
+  /* Горизонтальный скроллер */
   var scroller = document.createElement('div');
   scroller.className = 'pv-lb-scroller';
   scroller.id = 'pv-lb-scroller';
+
+  /* Отключить snap пока выставляем позицию — иначе браузер дёргает панели */
+  scroller.style.scrollSnapType = 'none';
 
   _pvLbMobBuildPanels(scroller);
 
@@ -951,18 +958,27 @@ function _pvLbOpenMobile() {
   overlay.appendChild(nameEl);
   document.body.appendChild(overlay);
 
-  /* Прокрутить к текущей панели:
+  /* Прокрутить к текущей панели ПОСЛЕ layout (requestAnimationFrame).
      1 фото → панель 0, 2 фото → панель 0 (current), 3+ → панель 1 (центральная) */
-  var panelW = scroller.offsetWidth;
-  scroller.scrollLeft = (_pvLbList.length >= 3) ? panelW : 0;
+  requestAnimationFrame(function() {
+    var panelW = scroller.offsetWidth;
+    scroller.scrollLeft = (_pvLbList.length >= 3) ? panelW : 0;
+
+    /* Включить snap обратно после позиционирования */
+    requestAnimationFrame(function() {
+      scroller.style.scrollSnapType = 'x mandatory';
+      _pvLbMobLocked = false;
+    });
+  });
 
   /* Слушать окончание прокрутки (snap) */
   var scrollTimer = null;
   scroller.addEventListener('scroll', function() {
+    if (_pvLbMobLocked) return;
     clearTimeout(scrollTimer);
     scrollTimer = setTimeout(function() {
       _pvLbMobOnSnap(scroller);
-    }, 120);
+    }, 150);
   }, { passive: true });
 
   document.addEventListener('keydown', _pvLbKeyHandler);
@@ -1010,6 +1026,8 @@ function _pvLbMobBuildPanels(scroller) {
  * Обработка snap: определить куда прокрутили, обновить индекс и пересобрать.
  */
 function _pvLbMobOnSnap(scroller) {
+  if (_pvLbMobLocked) return;
+
   var panelW = scroller.offsetWidth;
   if (panelW === 0) return;
 
@@ -1033,13 +1051,25 @@ function _pvLbMobOnSnap(scroller) {
       _pvLbIdx = (_pvLbIdx + 1) % len;
     }
   } else {
-    /* 2-панельный режим: свайп вправо → следующее фото */
-    _pvLbIdx = (_pvLbIdx + 1) % len;
+    /* 2-панельный режим */
+    if (snappedPanel === 1) {
+      _pvLbIdx = (_pvLbIdx + 1) % len;
+    } else {
+      _pvLbIdx = (_pvLbIdx - 1 + len) % len;
+    }
   }
 
-  /* Пересобрать панели и обновить UI */
+  /* Заблокировать snap, пересобрать панели, центрировать мгновенно */
+  _pvLbMobLocked = true;
+  scroller.style.scrollSnapType = 'none';
+
   _pvLbMobBuildPanels(scroller);
-  scroller.scrollLeft = (len >= 3) ? panelW : 0; /* мгновенно центрировать */
+  scroller.scrollLeft = (len >= 3) ? panelW : 0;
+
+  requestAnimationFrame(function() {
+    scroller.style.scrollSnapType = 'x mandatory';
+    _pvLbMobLocked = false;
+  });
 
   /* Обновить счётчик и галочку */
   _pvLbMobUpdateUI();
@@ -1489,7 +1519,7 @@ function ocRenderField() {
   var html = '';
   for (var i = 0; i < store.length; i++) {
     var item = store[i];
-    html += '<div class="oc-item" title="' + esc(item.name) + '">';
+    html += '<div class="oc-item" title="' + esc(item.name) + '" onclick="ocOpenLightbox(' + i + ',event)">';
     html += '<img src="' + (item.preview || item.thumb) + '" loading="lazy">';
     html += '<button class="oc-zoom" onclick="ocOpenLightbox(' + i + ',event)" title="На весь экран">' + zoomSvg + '</button>';
     html += '<button class="pv-remove" onclick="ocRemoveItem(' + i + ',event)">&times;</button>';
@@ -1651,7 +1681,7 @@ function acRenderField() {
     var isH = it.orient === 'h';
     var spanStyle = isH ? ' style="grid-column: span 2"' : '';
 
-    html += '<div class="ac-tile' + (isH ? ' ac-tile-h' : '') + '"' + spanStyle + ' title="' + esc(it.name) + '">';
+    html += '<div class="ac-tile' + (isH ? ' ac-tile-h' : '') + '"' + spanStyle + ' title="' + esc(it.name) + '" onclick="acViewFrom(\'' + esc(it.name).replace(/'/g, "\\'") + '\',event)">';
     html += '<img src="' + (it.preview || it.thumb) + '" loading="lazy">';
 
     if (it.source === 'card') {
