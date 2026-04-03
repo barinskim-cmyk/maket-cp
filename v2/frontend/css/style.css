@@ -216,6 +216,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .pipeline-panel { background: #fff; border-radius: 10px; padding: 20px; }
 .pipeline-panel .section-title { font-size: 16px; margin-bottom: 16px; }
 
+.pipeline-sync-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .pipeline-steps { display: flex; flex-direction: column; gap: 0; }
 .pipeline-step {
   display: flex; align-items: flex-start; gap: 14px; padding: 10px 0;

@@ -2,24 +2,108 @@
    sync.js — Синхронизация / Rate Setter
    ══════════════════════════════════════════════ */
 
+/**
+ * Переключить режим ввода: текст / папка.
+ */
 function toggleRsMode() {
   var mode = document.querySelector('input[name="rs-mode"]:checked').value;
   document.getElementById('rs-text-mode').style.display = mode === 'text' ? '' : 'none';
   document.getElementById('rs-folder-mode').style.display = mode === 'folder' ? '' : 'none';
 }
 
-async function pickFolder(inputId) {
+/**
+ * Выбрать папку через нативный диалог (desktop only).
+ * @param {string} inputId — id текстового поля для пути
+ */
+function pickFolder(inputId) {
+  if (!window.pywebview || !window.pywebview.api) {
+    alert('Выбор папки доступен только в приложении');
+    return;
+  }
   try {
-    if (window.pywebview && window.pywebview.api) {
-      var path = await window.pywebview.api.select_folder();
-      if (path) document.getElementById(inputId).value = path;
-    } else {
-      alert('Выбор папки доступен только в приложении');
+    var result = window.pywebview.api.select_folder();
+    if (result && typeof result.then === 'function') {
+      result.then(function(path) {
+        if (path) document.getElementById(inputId).value = path;
+      })['catch'](function() {});
+    } else if (result) {
+      document.getElementById(inputId).value = result;
     }
   } catch(e) {}
 }
 
-async function runRateSetter(dryRun) {
+/**
+ * Автозаполнить список Rate Setter из текущего проекта.
+ * Берёт имена файлов из: карточки (slots) + otherContent.
+ * Вызывается при открытии вкладки синхронизации.
+ */
+function rsAutoFillFromProject() {
+  var proj = (typeof getActiveProject === 'function') ? getActiveProject() : null;
+  if (!proj) return;
+
+  var names = {};
+
+  /* Из карточек: все заполненные слоты */
+  if (proj.cards) {
+    for (var c = 0; c < proj.cards.length; c++) {
+      var card = proj.cards[c];
+      if (!card.slots) continue;
+      for (var s = 0; s < card.slots.length; s++) {
+        var f = card.slots[s].file;
+        if (f) names[f] = true;
+      }
+    }
+  }
+
+  /* Из otherContent */
+  if (proj.otherContent) {
+    for (var i = 0; i < proj.otherContent.length; i++) {
+      if (proj.otherContent[i].name) names[proj.otherContent[i].name] = true;
+    }
+  }
+
+  var list = Object.keys(names);
+  if (list.length === 0) return;
+
+  /* Убираем расширение (.jpg, .jpeg, .tif и т.д.) — Rate Setter работает со stems */
+  var stems = list.map(function(n) {
+    return n.replace(/\.(jpe?g|tiff?|png|cr[23w]|nef|arw|raf|dng)$/i, '');
+  });
+
+  var textEl = document.getElementById('rs-text');
+  if (textEl) {
+    textEl.value = stems.join('\n');
+    /* Переключить на текстовый режим */
+    var radioText = document.querySelector('input[name="rs-mode"][value="text"]');
+    if (radioText) {
+      radioText.checked = true;
+      toggleRsMode();
+    }
+  }
+
+  /* Показать откуда загружено */
+  var infoEl = document.getElementById('rs-auto-info');
+  if (infoEl) {
+    infoEl.textContent = 'Загружено из проекта "' + (proj.brand || '') + '": ' + stems.length + ' файлов';
+    infoEl.style.display = '';
+  }
+}
+
+/**
+ * Очистить список и переключить в ручной режим.
+ */
+function rsClearAutoFill() {
+  var textEl = document.getElementById('rs-text');
+  if (textEl) textEl.value = '';
+  var infoEl = document.getElementById('rs-auto-info');
+  if (infoEl) infoEl.style.display = 'none';
+}
+
+/**
+ * Запустить Rate Setter.
+ * @param {boolean} dryRun — тестовый прогон (без записи .cos)
+ */
+function runRateSetter(dryRun) {
   var mode = document.querySelector('input[name="rs-mode"]:checked').value;
   var sessionDir = document.getElementById('rs-session-dir').value;
   if (!sessionDir) { alert('Выберите папку сессии Capture One'); return; }
@@ -47,23 +131,29 @@ async function runRateSetter(dryRun) {
 
   document.getElementById('rs-run-btn').disabled = true;
 
-  try {
-    if (window.pywebview && window.pywebview.api) {
-      await window.pywebview.api.rate_setter_run(payload);
-    } else {
-      // Демо-режим
-      logEl.innerHTML = '<span class="log-ok">DEMO OK   IMG_0001 -> IMG_0001.cos</span>\n' +
-        '<span class="log-ok">DEMO OK   IMG_0002 -> IMG_0002.cos</span>\n' +
-        '<span class="log-miss">DEMO MISS IMG_0003 -- .cos не найден</span>';
+  if (window.pywebview && window.pywebview.api) {
+    try {
+      var result = window.pywebview.api.rate_setter_run(payload);
+      if (result && typeof result.then === 'function') {
+        result['catch'](function(e) {
+          logEl.innerHTML += '\n<span class="log-err">Ошибка: ' + esc(String(e)) + '</span>';
+          document.getElementById('rs-run-btn').disabled = false;
+        });
+      }
+    } catch(e) {
+      logEl.innerHTML += '\n<span class="log-err">Ошибка: ' + esc(String(e)) + '</span>';
       document.getElementById('rs-run-btn').disabled = false;
     }
-  } catch(e) {
-    logEl.innerHTML += '\n<span class="log-err">Ошибка: ' + esc(String(e)) + '</span>';
+  } else {
+    /* Демо-режим (браузер) */
+    logEl.innerHTML = '<span class="log-ok">DEMO OK   IMG_0001 -> IMG_0001.cos</span>\n' +
+      '<span class="log-ok">DEMO OK   IMG_0002 -> IMG_0002.cos</span>\n' +
+      '<span class="log-miss">DEMO MISS IMG_0003 -- .cos не найден</span>';
     document.getElementById('rs-run-btn').disabled = false;
   }
 }
 
-// Push-события от бэкенда
+/* Push-события от бэкенда */
 window.onRateSetterLog = function(msg) {
   var logEl = document.getElementById('rs-log');
   var cls = 'log-ok';
