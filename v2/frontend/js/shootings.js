@@ -137,7 +137,7 @@ function renderTemplatePreview(templateId) {
  * В desktop-режиме вызывает Python API new_project().
  * В браузерном фолбэке создаёт объект локально.
  */
-async function createProject() {
+function createProject() {
   var brand = document.getElementById('inp-brand').value.trim();
   var date = document.getElementById('inp-date').value;
   var templateId = document.getElementById('inp-template').value; /* '' = без шаблона */
@@ -145,50 +145,45 @@ async function createProject() {
 
   closeModal('modal-new-project');
 
-  try {
-    if (window.pywebview && window.pywebview.api) {
-      var data = await window.pywebview.api.new_project(brand, date, templateId);
-      if (data) {
-        data._stage = 0;
-        data.templateId = templateId;
-        /* Сохранить полную копию шаблона в проект */
-        if (templateId) {
-          var tmpl = getUserTemplate(templateId);
-          if (tmpl) {
-            data._template = templateToProjFormat(tmpl);
-          }
-        }
-        App.projects.push(data);
-        App.selectedProject = App.projects.length - 1;
-        renderProjects();
-        shAutoSave(); /* Авто-сохранение + синхронизация с облаком */
-      }
-    } else {
-      /* Браузерный фолбэк */
-      var proj = {
-        brand: brand,
-        shoot_date: date,
-        templateId: templateId,
-        categories: [],
-        channels: [],
-        cards: [],
-        _stage: 0,
-        _stageHistory: []
-      };
-      /* Сохранить полную копию шаблона в проект */
-      if (templateId) {
-        var tmpl2 = getUserTemplate(templateId);
-        if (tmpl2) {
-          proj._template = templateToProjFormat(tmpl2);
-        }
-      }
-      App.projects.push(proj);
-      App.selectedProject = App.projects.length - 1;
-      renderProjects();
-      shAutoSave(); /* Авто-сохранение + синхронизация с облаком */
+  /**
+   * Общая логика после получения данных проекта.
+   * @param {Object} data — данные проекта (из Python или браузерный фолбэк)
+   */
+  function onProjectData(data) {
+    data._stage = 0;
+    data.templateId = templateId;
+    if (templateId) {
+      var tmpl = getUserTemplate(templateId);
+      if (tmpl) data._template = templateToProjFormat(tmpl);
     }
-  } catch(e) {
-    alert('Ошибка: ' + e);
+    App.projects.push(data);
+    App.selectedProject = App.projects.length - 1;
+    renderProjects();
+    shAutoSave();
+  }
+
+  if (window.pywebview && window.pywebview.api) {
+    /* Desktop: вызов Python API (возвращает Promise) */
+    try {
+      var result = window.pywebview.api.new_project(brand, date, templateId);
+      if (result && typeof result.then === 'function') {
+        result.then(function(data) {
+          if (data) onProjectData(data);
+        })['catch'](function(e) { alert('Ошибка: ' + e); });
+      } else if (result) {
+        onProjectData(result);
+      }
+    } catch(e) { alert('Ошибка: ' + e); }
+  } else {
+    /* Браузерный фолбэк */
+    onProjectData({
+      brand: brand,
+      shoot_date: date,
+      categories: [],
+      channels: [],
+      cards: [],
+      _stageHistory: {}
+    });
   }
 }
 
@@ -196,20 +191,31 @@ async function createProject() {
  * Загрузить существующий проект из файла (desktop only).
  * Вызывает Python API load_project(), который показывает диалог выбора файла.
  */
-async function loadProject() {
+function loadProject() {
+  if (!window.pywebview || !window.pywebview.api) return;
+
   try {
-    if (window.pywebview && window.pywebview.api) {
-      var data = await window.pywebview.api.load_project();
-      if (data && !data.cancelled) {
-        data._stage = data._stage || 0;
-        /* Обратная совместимость: старый формат template → templateId */
-        if (data.template && typeof data.template === 'object' && !data.templateId) {
-          data.templateId = data.template.id || '';
+    var result = window.pywebview.api.load_project();
+    if (result && typeof result.then === 'function') {
+      result.then(function(data) {
+        if (data && !data.cancelled) {
+          data._stage = data._stage || 0;
+          if (data.template && typeof data.template === 'object' && !data.templateId) {
+            data.templateId = data.template.id || '';
+          }
+          App.projects.push(data);
+          App.selectedProject = App.projects.length - 1;
+          renderProjects();
         }
-        App.projects.push(data);
-        App.selectedProject = App.projects.length - 1;
-        renderProjects();
+      })['catch'](function(e) { alert('Ошибка: ' + e); });
+    } else if (result && !result.cancelled) {
+      result._stage = result._stage || 0;
+      if (result.template && typeof result.template === 'object' && !result.templateId) {
+        result.templateId = result.template.id || '';
       }
+      App.projects.push(result);
+      App.selectedProject = App.projects.length - 1;
+      renderProjects();
     }
   } catch(e) {
     alert('Ошибка: ' + e);

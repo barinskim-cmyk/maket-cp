@@ -351,8 +351,12 @@ window.onPreviewDone = function(data) {
   /* Авто-синхронизация превью с облаком (инкрементально, без дублей) */
   if (proj._cloudId && typeof sbUploadPreviews === 'function') {
     sbUploadPreviews(proj._cloudId, proj.previews, function(err) {
-      if (err) console.warn('Авто-синхронизация превью:', err);
-      else console.log('Превью синхронизированы с облаком');
+      if (err) {
+        console.warn('Авто-синхронизация превью:', err);
+        proj._pendingSync = true; /* пометить для повторной попытки */
+      } else {
+        console.log('Превью синхронизированы с облаком');
+      }
     });
   }
 
@@ -553,8 +557,12 @@ function pvLoadFilesWithProgress(files, store, dzId, folderName) {
       /* Авто-синхронизация превью с облаком */
       if (proj && proj._cloudId && typeof sbUploadPreviews === 'function') {
         sbUploadPreviews(proj._cloudId, proj.previews, function(err) {
-          if (err) console.warn('Авто-синхронизация превью:', err);
-          else console.log('Превью синхронизированы с облаком');
+          if (err) {
+            console.warn('Авто-синхронизация превью:', err);
+            if (proj) proj._pendingSync = true;
+          } else {
+            console.log('Превью синхронизированы с облаком');
+          }
         });
       }
       /* Авто-фиксация этапа 0 ("Преотбор и превью") при завершении загрузки */
@@ -943,9 +951,10 @@ function _pvLbOpenMobile() {
   overlay.appendChild(nameEl);
   document.body.appendChild(overlay);
 
-  /* Прокрутить к центральной (текущей) панели */
+  /* Прокрутить к текущей панели:
+     1 фото → панель 0, 2 фото → панель 0 (current), 3+ → панель 1 (центральная) */
   var panelW = scroller.offsetWidth;
-  scroller.scrollLeft = panelW;
+  scroller.scrollLeft = (_pvLbList.length >= 3) ? panelW : 0;
 
   /* Слушать окончание прокрутки (snap) */
   var scrollTimer = null;
@@ -960,17 +969,30 @@ function _pvLbOpenMobile() {
 }
 
 /**
- * Собрать 3 панели (prev, current, next) в скроллере.
+ * Собрать панели в скроллере.
+ * Если фото одно — одна панель (без скролла).
+ * Если два — 2 панели (current, next).
+ * Иначе — 3 панели (prev, current, next).
  */
 function _pvLbMobBuildPanels(scroller) {
   scroller.innerHTML = '';
 
   var len = _pvLbList.length;
-  var prevIdx = (_pvLbIdx - 1 + len) % len;
-  var nextIdx = (_pvLbIdx + 1) % len;
-  var indices = [prevIdx, _pvLbIdx, nextIdx];
+  if (len === 0) return;
 
-  for (var i = 0; i < 3; i++) {
+  var indices;
+  if (len === 1) {
+    indices = [_pvLbIdx];
+  } else if (len === 2) {
+    var nextIdx2 = (_pvLbIdx + 1) % len;
+    indices = [_pvLbIdx, nextIdx2];
+  } else {
+    var prevIdx = (_pvLbIdx - 1 + len) % len;
+    var nextIdx = (_pvLbIdx + 1) % len;
+    indices = [prevIdx, _pvLbIdx, nextIdx];
+  }
+
+  for (var i = 0; i < indices.length; i++) {
     var p = _pvLbList[indices[i]];
     var panel = document.createElement('div');
     panel.className = 'pv-lb-panel';
@@ -991,23 +1013,33 @@ function _pvLbMobOnSnap(scroller) {
   var panelW = scroller.offsetWidth;
   if (panelW === 0) return;
 
+  var len = _pvLbList.length;
+  /* При 1 фото скролл не нужен */
+  if (len <= 1) return;
+
   var scrollPos = scroller.scrollLeft;
   var snappedPanel = Math.round(scrollPos / panelW);
 
-  if (snappedPanel === 1) return; /* остались на центральной — ничего не делать */
+  /* При 2 фото: панели [current, next], "не двигались" = панель 0 */
+  /* При 3+ фото: панели [prev, current, next], "не двигались" = панель 1 */
+  var centerPanel = (len >= 3) ? 1 : 0;
+  if (snappedPanel === centerPanel) return;
 
-  var len = _pvLbList.length;
-  if (snappedPanel === 0) {
-    /* Свайп вправо → предыдущее фото */
-    _pvLbIdx = (_pvLbIdx - 1 + len) % len;
+  if (len >= 3) {
+    /* 3-панельный режим */
+    if (snappedPanel === 0) {
+      _pvLbIdx = (_pvLbIdx - 1 + len) % len;
+    } else {
+      _pvLbIdx = (_pvLbIdx + 1) % len;
+    }
   } else {
-    /* Свайп влево → следующее фото */
+    /* 2-панельный режим: свайп вправо → следующее фото */
     _pvLbIdx = (_pvLbIdx + 1) % len;
   }
 
   /* Пересобрать панели и обновить UI */
   _pvLbMobBuildPanels(scroller);
-  scroller.scrollLeft = panelW; /* мгновенно центрировать */
+  scroller.scrollLeft = (len >= 3) ? panelW : 0; /* мгновенно центрировать */
 
   /* Обновить счётчик и галочку */
   _pvLbMobUpdateUI();
