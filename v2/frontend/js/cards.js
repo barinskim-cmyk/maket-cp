@@ -1793,6 +1793,7 @@ function cpMobileRenderFeed() {
         html += '<button class="mob-carousel-arrow" onclick="cpMobileCarousel(' + ci + ',' + si + ',-1,event)">&lsaquo;</button>';
         html += '<button class="mob-carousel-arrow" onclick="cpMobileCarousel(' + ci + ',' + si + ',1,event)">&rsaquo;</button>';
         html += '</div>';
+        html += '<button class="mob-slot-zoom" onclick="cpMobileSlotFullscreen(' + ci + ',' + si + ',event)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>';
         html += '<button class="mob-slot-remove" onclick="cpMobileClearSlot(' + ci + ',' + si + ')">&times;</button>';
         html += '</div>';
         html += '</div>';
@@ -1945,6 +1946,32 @@ function cpMobileClearSlot(cardIdx, slotIdx) {
   if (typeof shAutoSave === 'function') shAutoSave();
 
   cpMobileRender();
+}
+
+/**
+ * Открыть лайтбокс из мобильной карточки — показывает фото текущего слота
+ * в контексте всех превью проекта (можно листать).
+ * @param {number} cardIdx
+ * @param {number} slotIdx
+ * @param {Event} e
+ */
+function cpMobileSlotFullscreen(cardIdx, slotIdx, e) {
+  if (e) { e.stopPropagation(); e.preventDefault(); }
+  var proj = getActiveProject();
+  if (!proj || !proj.cards || !proj.cards[cardIdx]) return;
+  var slot = proj.cards[cardIdx].slots[slotIdx];
+  if (!slot || !slot.file) return;
+
+  /* Найти индекс в previews по имени файла */
+  var pvIdx = 0;
+  if (proj.previews) {
+    for (var i = 0; i < proj.previews.length; i++) {
+      if (proj.previews[i].name === slot.file) { pvIdx = i; break; }
+    }
+  }
+  if (typeof pvShowFullscreen === 'function') {
+    pvShowFullscreen(pvIdx);
+  }
 }
 
 /**
