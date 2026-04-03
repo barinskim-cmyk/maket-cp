@@ -1554,13 +1554,26 @@ function ocOpenLightbox(idx, e) {
   if (e) e.stopPropagation();
   var store = ocGetStore();
   if (!store[idx]) return;
+
+  /* Обогащаем orient из превью проекта */
+  var proj = getActiveProject();
+  var pvOrientMap = {};
+  if (proj && proj.previews) {
+    for (var pm = 0; pm < proj.previews.length; pm++) {
+      pvOrientMap[proj.previews[pm].name] = proj.previews[pm];
+    }
+  }
   var lbList = [];
   for (var i = 0; i < store.length; i++) {
+    var srcPv = pvOrientMap[store[i].name];
     lbList.push({
       name: store[i].name,
       thumb: store[i].thumb || '',
       preview: store[i].preview || store[i].thumb || '',
-      path: ''
+      path: '',
+      orient: srcPv ? srcPv.orient : 'v',
+      width: srcPv ? srcPv.width : 0,
+      height: srcPv ? srcPv.height : 0
     });
   }
   _pvLbList = lbList;
@@ -1971,14 +1984,26 @@ function acOpenLightbox(idx, e) {
   if (!items[idx]) idx = 0;
   if (!items.length) return;
 
-  /* Собираем массив в формате совместимом с _pvLbList */
+  /* Собираем массив в формате совместимом с _pvLbList.
+     Обогащаем orient из превью проекта для корректного разворота горизонтов */
+  var proj = getActiveProject();
+  var pvOrientMap = {};
+  if (proj && proj.previews) {
+    for (var pm = 0; pm < proj.previews.length; pm++) {
+      pvOrientMap[proj.previews[pm].name] = proj.previews[pm];
+    }
+  }
   var lbList = [];
   for (var i = 0; i < items.length; i++) {
+    var srcPv = pvOrientMap[items[i].name];
     lbList.push({
       name: items[i].name,
       thumb: items[i].thumb || '',
       preview: items[i].preview || '',
-      path: ''
+      path: '',
+      orient: srcPv ? srcPv.orient : (items[i].orient || 'v'),
+      width: srcPv ? srcPv.width : 0,
+      height: srcPv ? srcPv.height : 0
     });
   }
   _pvLbList = lbList;
@@ -2010,7 +2035,10 @@ function acViewFrom(name, e) {
       name: all[i].name,
       thumb: all[i].thumb || '',
       preview: all[i].preview || '',
-      path: all[i].path || ''
+      path: all[i].path || '',
+      orient: all[i].orient || 'v',
+      width: all[i].width || 0,
+      height: all[i].height || 0
     });
   }
   if (!lbList.length) return;
@@ -2039,7 +2067,10 @@ function acViewAll() {
       name: all[i].name,
       thumb: all[i].thumb || '',
       preview: all[i].preview || '',
-      path: all[i].path || ''
+      path: all[i].path || '',
+      orient: all[i].orient || 'v',
+      width: all[i].width || 0,
+      height: all[i].height || 0
     });
   }
   if (!lbList.length) return;

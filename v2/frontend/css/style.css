@@ -935,17 +935,19 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 }
 .pv-lb-scroller {
   width: 100%; height: 75vh;
-  display: flex; overflow-x: auto;
+  display: flex; overflow-x: auto; overflow-y: hidden;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
 }
 .pv-lb-scroller::-webkit-scrollbar { display: none; }
 .pv-lb-panel {
-  min-width: 100%; height: 100%;
+  min-width: 100%; width: 100%; height: 100%;
   scroll-snap-align: center;
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
+  overflow: hidden;
+  position: relative;
 }
 .pv-lb-panel-img {
   max-width: 100%; max-height: 100%;
