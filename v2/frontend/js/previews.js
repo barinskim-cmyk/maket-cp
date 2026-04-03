@@ -1674,19 +1674,90 @@ function acRenderField() {
   acRenderFilterStars();
 }
 
+/* ── Хелперы для pvToggleSelection ── */
+
+/**
+ * Очистить слот в карточке по имени файла.
+ * Находит слот, содержащий указанный файл, и обнуляет все его поля.
+ *
+ * @param {Object} proj — активный проект
+ * @param {number} cardIdx — индекс карточки (0-based)
+ * @param {string} name — имя файла
+ */
+function _pvClearSlotByName(proj, cardIdx, name) {
+  if (!proj.cards || !proj.cards[cardIdx]) return;
+  var slots = proj.cards[cardIdx].slots || [];
+  for (var s = 0; s < slots.length; s++) {
+    if (slots[s].file === name) {
+      slots[s].file = null;
+      slots[s].dataUrl = null;
+      slots[s].thumbUrl = null;
+      slots[s].path = '';
+      break;
+    }
+  }
+}
+
+/**
+ * Удалить фото из массива otherContent проекта.
+ *
+ * @param {Object} proj — активный проект
+ * @param {string} name — имя файла
+ */
+function _pvRemoveFromOC(proj, name) {
+  if (!proj.otherContent) return;
+  for (var i = proj.otherContent.length - 1; i >= 0; i--) {
+    if (proj.otherContent[i].name === name) {
+      proj.otherContent.splice(i, 1);
+    }
+  }
+}
+
+/**
+ * Добавить фото в otherContent проекта (из загруженных превью).
+ * Если фото уже есть в OC — ничего не делает.
+ *
+ * @param {Object} proj — активный проект
+ * @param {string} name — имя файла
+ */
+function _pvAddToOC(proj, name) {
+  if (!proj.otherContent) proj.otherContent = [];
+  /* Проверка дубликата */
+  for (var i = 0; i < proj.otherContent.length; i++) {
+    if (proj.otherContent[i].name === name) return;
+  }
+  /* Найти превью по имени */
+  var pv = null;
+  if (proj.previews) {
+    for (var p = 0; p < proj.previews.length; p++) {
+      if (proj.previews[p].name === name) { pv = proj.previews[p]; break; }
+    }
+  }
+  proj.otherContent.push({
+    name: name,
+    path: pv ? (pv.path || '') : '',
+    thumb: pv ? (pv.thumb || '') : '',
+    preview: pv ? (pv.preview || '') : ''
+  });
+}
+
 /**
  * Единая функция переключения отбора: карточки, допконтент, добавление.
- * Работает из галереи «Отбор», Select, Options, лайтбокса — везде одинаково.
  *
- * - Если фото в карточке → подтверждение → убрать из слота
- * - Если фото в допконтенте → убрать из OC
- * - Если фото нигде → добавить в OC
+ * Поведение зависит от source:
+ * - 'card'    → удаляет из карточки молча (без подтверждения)
+ * - 'oc'      → удаляет из допконтента молча
+ * - undefined → из галереи/селекта/лайтбокса:
+ *               если фото в карточке — спрашивает подтверждение
+ *               если фото в допконтенте — убирает молча
+ *               если нигде — добавляет в допконтент
  *
  * @param {string} name — имя файла
  * @param {Event} [e] — событие клика
+ * @param {string} [source] — откуда вызвано: 'card', 'oc', или undefined (галерея)
  * @returns {boolean} true если выполнено, false если отменено
  */
-function pvToggleSelection(name, e) {
+function pvToggleSelection(name, e, source) {
   if (e) { e.stopPropagation(); e.preventDefault(); }
   var proj = getActiveProject();
   if (!proj) return false;
@@ -1694,47 +1765,29 @@ function pvToggleSelection(name, e) {
   var inCardIdx = _pvIsInCard(name);
   var inOC = _pvIsInOtherContent(name);
 
-  if (inCardIdx >= 0) {
-    /* Фото привязано к карточке — нужно подтверждение */
-    if (!confirm('Убрать из отбора? Это фото есть в карточке ' + (inCardIdx + 1) + ' — оно будет удалено из карточки.')) return false;
-
-    var card = proj.cards[inCardIdx];
-    if (card && card.slots) {
-      for (var s = 0; s < card.slots.length; s++) {
-        if (card.slots[s].file === name) {
-          card.slots[s].file = null;
-          card.slots[s].dataUrl = '';
-          card.slots[s].thumbUrl = '';
-          card.slots[s].preview = '';
-          break;
-        }
-      }
+  if (source === 'card') {
+    /* Вызвано из редактора карточки — удалить из карточки молча */
+    if (inCardIdx >= 0) {
+      _pvClearSlotByName(proj, inCardIdx, name);
+      if (typeof cpRenderCard === 'function') cpRenderCard();
     }
-    if (typeof cpRenderCard === 'function') cpRenderCard();
-  } else if (inOC) {
-    /* В допконтенте — убрать */
-    if (!proj.otherContent) return false;
-    for (var j = proj.otherContent.length - 1; j >= 0; j--) {
-      if (proj.otherContent[j].name === name) {
-        proj.otherContent.splice(j, 1);
-      }
-    }
+  } else if (source === 'oc') {
+    /* Вызвано из панели допконтента — удалить из OC молча */
+    _pvRemoveFromOC(proj, name);
   } else {
-    /* Нигде нет — добавить в допконтент */
-    if (!proj.otherContent) proj.otherContent = [];
-    var pvObj = null;
-    if (proj.previews) {
-      for (var p = 0; p < proj.previews.length; p++) {
-        if (proj.previews[p].name === name) { pvObj = proj.previews[p]; break; }
-      }
+    /* Вызвано из галереи / селекта / лайтбокса */
+    if (inCardIdx >= 0) {
+      /* Фото в карточке — спросить подтверждение */
+      if (!confirm('Убрать из отбора? Это фото есть в карточке ' + (inCardIdx + 1) + ' — оно будет удалено из карточки.')) return false;
+      _pvClearSlotByName(proj, inCardIdx, name);
+      if (typeof cpRenderCard === 'function') cpRenderCard();
+    } else if (inOC) {
+      /* В допконтенте — убрать молча */
+      _pvRemoveFromOC(proj, name);
+    } else {
+      /* Нигде нет — добавить в допконтент */
+      _pvAddToOC(proj, name);
     }
-    var ocItem = { name: name };
-    if (pvObj) {
-      if (pvObj.preview) ocItem.preview = pvObj.preview;
-      if (pvObj.thumb) ocItem.thumb = pvObj.thumb;
-      if (pvObj.path) ocItem.path = pvObj.path;
-    }
-    proj.otherContent.push(ocItem);
   }
 
   /* Сохранить и обновить все галереи */
@@ -1746,8 +1799,8 @@ function pvToggleSelection(name, e) {
 }
 
 /* Обратная совместимость: старые вызовы → единая функция */
-function acRemoveOC(name, e) { pvToggleSelection(name, e); }
-function acToggleCard(name, cardIdx, e) { pvToggleSelection(name, e); }
+function acRemoveOC(name, e) { pvToggleSelection(name, e, 'oc'); }
+function acToggleCard(name, cardIdx, e) { pvToggleSelection(name, e, 'card'); }
 
 /**
  * Изменить количество колонок в плитке «Весь контент».
