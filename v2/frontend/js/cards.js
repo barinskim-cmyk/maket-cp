@@ -2157,8 +2157,18 @@ function cpMobileRenderOther() {
   var proj = getActiveProject();
   var store = (proj && proj.otherContent) ? proj.otherContent : [];
 
+  /* Кнопка "Все опции" — всегда показывается, ведёт на Options */
+  var html = '<div class="mob-other-toolbar">';
+  html += '<span class="mob-other-count">' + store.length + ' фото</span>';
+  html += '<button class="mob-other-options-btn" onclick="cpMobileSetView(\'options\')">Все опции</button>';
+  html += '</div>';
+
   if (store.length === 0) {
-    return '<div style="padding:40px 16px;text-align:center;color:#999">Нет доп. контента</div>';
+    html += '<div style="padding:40px 16px;text-align:center;color:#999">';
+    html += 'Нет доп. контента.<br>';
+    html += '<button class="mob-other-go-options" onclick="cpMobileSetView(\'options\')">Перейти в Options для отбора</button>';
+    html += '</div>';
+    return html;
   }
 
   /* Найти ориентацию через превью, если есть */
@@ -2169,7 +2179,6 @@ function cpMobileRenderOther() {
     }
   }
 
-  var html = '<div class="mob-other-header">' + store.length + ' фото</div>';
   html += '<div class="mob-select">';
 
   for (var i = 0; i < store.length; i++) {

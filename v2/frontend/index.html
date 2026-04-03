@@ -187,6 +187,11 @@
           <div class="section-title">Отбор</div>
           <div class="ac-toolbar" id="ac-toolbar" style="display:none">
             <span id="ac-count">0 фото</span>
+            <span class="ac-source-filter" id="ac-source-filter">
+              <button class="ac-src-btn ac-src-active" onclick="acSetSourceFilter('all')">Все</button>
+              <button class="ac-src-btn" onclick="acSetSourceFilter('card')">Карточки</button>
+              <button class="ac-src-btn" onclick="acSetSourceFilter('other')">Other</button>
+            </span>
             <span class="pv-filter-stars" id="ac-filter-stars"></span>
             <button class="pv-filter-reset active" id="ac-filter-reset" onclick="acSetRatingFilter(0)">Все</button>
             <button class="ac-view-all-btn" onclick="acViewAll()">Посмотреть все опции</button>

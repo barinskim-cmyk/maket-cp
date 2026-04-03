@@ -1640,6 +1640,21 @@ function acRenderField() {
 
   var items = acGetAllContent();
 
+  /* Применить фильтр по источнику если задан */
+  if (_acSourceFilter === 'card') {
+    var srcFiltered = [];
+    for (var sf = 0; sf < items.length; sf++) {
+      if (items[sf].source === 'card') srcFiltered.push(items[sf]);
+    }
+    items = srcFiltered;
+  } else if (_acSourceFilter === 'other') {
+    var srcFiltered2 = [];
+    for (var sf2 = 0; sf2 < items.length; sf2++) {
+      if (items[sf2].source === 'other') srcFiltered2.push(items[sf2]);
+    }
+    items = srcFiltered2;
+  }
+
   /* Применить фильтр по рейтингу если задан */
   var minRating = _acRatingFilter || 0;
   if (minRating > 0) {
@@ -1838,6 +1853,30 @@ function acToggleCard(name, cardIdx, e) { pvToggleSelection(name, e, 'card'); }
 function acSetColumns(val) {
   _acColumns = parseInt(val) || 4;
   acRenderField();
+}
+
+// ── «Весь контент»: фильтр по источнику (all / card / other) ──
+
+/** @type {string} Фильтр по источнику: 'all', 'card', 'other' */
+var _acSourceFilter = 'all';
+
+/**
+ * Установить фильтр по источнику для «Весь контент».
+ * @param {string} src — 'all', 'card', 'other'
+ */
+function acSetSourceFilter(src) {
+  _acSourceFilter = src || 'all';
+  acRenderField();
+  /* Обновить кнопки */
+  var wrap = document.getElementById('ac-source-filter');
+  if (wrap) {
+    var btns = wrap.querySelectorAll('.ac-src-btn');
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].classList.remove('ac-src-active');
+    }
+    var active = wrap.querySelector('[onclick*="' + _acSourceFilter + '"]');
+    if (active) active.classList.add('ac-src-active');
+  }
 }
 
 // ── «Весь контент»: фильтр по рейтингу ──
