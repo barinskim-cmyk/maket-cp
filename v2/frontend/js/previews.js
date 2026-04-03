@@ -919,6 +919,13 @@ function _pvLbOpenMobile() {
   pvCloseFullscreen();
   _pvLbMobLocked = true;
 
+  /* Заблокировать поворот экрана в портрет */
+  try {
+    if (screen.orientation && screen.orientation.lock) {
+      screen.orientation.lock('portrait').catch(function() {});
+    }
+  } catch(e) {}
+
   var pv = _pvLbList[_pvLbIdx];
   if (!pv) return;
 
@@ -1015,9 +1022,13 @@ function _pvLbMobBuildPanels(scroller) {
 
     var img = document.createElement('img');
     img.src = p ? (p.preview || p.thumb || p.dataUrl || '') : '';
-    img.className = 'pv-lb-panel-img';
-    panel.appendChild(img);
 
+    /* Горизонт → развернуть на 90° в вертикаль */
+    var isLandscape = p && (p.orient === 'h' ||
+      (p.width && p.height && p.width > p.height));
+    img.className = 'pv-lb-panel-img' + (isLandscape ? ' pv-lb-rotated' : '');
+
+    panel.appendChild(img);
     scroller.appendChild(panel);
   }
 }
@@ -1280,6 +1291,13 @@ function pvCloseFullscreen() {
   var overlay = document.getElementById('pv-lightbox');
   if (overlay) overlay.remove();
   document.removeEventListener('keydown', _pvLbKeyHandler);
+
+  /* Разблокировать поворот экрана */
+  try {
+    if (screen.orientation && screen.orientation.unlock) {
+      screen.orientation.unlock();
+    }
+  } catch(e) {}
 }
 
 /* Обратная совместимость */
