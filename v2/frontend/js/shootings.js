@@ -852,6 +852,9 @@ function shEnterClientMode() {
   showPage('content');
   if (typeof showSubpage === 'function') showSubpage('cp');
 
+  /* Убрать лоадер share-ссылки */
+  if (typeof _hideShareLoader === 'function') _hideShareLoader();
+
   /* Мобильный режим клиента: если viewport < 768px, активировать ленту */
   if (typeof cpMobileInit === 'function') {
     cpMobileInit();

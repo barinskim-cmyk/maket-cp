@@ -660,6 +660,9 @@ function sbDownloadPreviews(projectId, callback) {
         });
       }
       callback(null, previews);
+    })['catch'](function(err) {
+      console.error('sbDownloadPreviews catch:', err);
+      callback(err.message || 'Network error', []);
     });
 }
 
@@ -908,16 +911,22 @@ function sbJoinByToken(token, callback) {
  * @param {string} token — share-токен из URL (?share=TOKEN)
  */
 function sbLoadByShareToken(token) {
-  /* Ждём пока Supabase SDK загрузится */
+  /* Ждём пока Supabase SDK загрузится.
+     Пробуем инициализировать при каждой попытке на случай если SDK загрузился позже. */
   var attempts = 0;
   var interval = setInterval(function() {
     attempts++;
+    /* Повторная попытка инициализации если sbClient ещё не создан */
+    if (!sbClient && typeof sbInit === 'function') {
+      try { sbInit(); } catch(e) {}
+    }
     if (sbClient) {
       clearInterval(interval);
       _sbDoLoadByToken(token);
-    } else if (attempts > 50) {
+    } else if (attempts > 100) {
       clearInterval(interval);
-      alert('Не удалось подключиться к серверу');
+      alert('Не удалось подключиться к серверу. Попробуйте обновить страницу.');
+      if (typeof _hideShareLoader === 'function') _hideShareLoader();
     }
   }, 100);
 }
@@ -1051,6 +1060,10 @@ function _sbDoLoadByToken(token) {
         console.log('Проект загружен по share-ссылке:', proj.brand, 'роль:', proj._role);
       });
     });
+  })['catch'](function(err) {
+    console.error('_sbDoLoadByToken catch:', err);
+    alert('Ошибка загрузки: ' + (err.message || 'сетевая ошибка'));
+    if (typeof _hideShareLoader === 'function') _hideShareLoader();
   });
 }
 
@@ -1646,6 +1659,9 @@ function sbLoadStageHistory(projectId, callback) {
       });
 
       callback(history);
+    })['catch'](function(err) {
+      console.error('sbLoadStageHistory catch:', err);
+      callback({});
     });
 }
 

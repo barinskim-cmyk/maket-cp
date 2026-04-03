@@ -499,14 +499,26 @@ function authLock() {
  * Share link (?share=TOKEN): пропускаем auth gate, грузим проект по токену.
  */
 function authCheckOnLoad() {
-  /* Share link: пропускаем auth gate, загружаем проект по токену */
+  /* Share link: пропускаем auth gate, показываем лоадер, грузим проект */
   var params = new URLSearchParams(window.location.search);
   var shareToken = params.get('share');
   if (shareToken) {
     window._isShareLink = true;  /* флаг: не грузить все проекты */
     window._shareToken = shareToken; /* сохраняем для записи клиента */
     authUnlock();
+    /* Скрыть пайплайн и показать лоадер пока проект грузится */
+    _showShareLoader();
     sbLoadByShareToken(shareToken);
+    /* Safety: если через 20 сек проект не загрузился — показать ошибку */
+    window._shareLoadTimeout = setTimeout(function() {
+      var loader = document.getElementById('share-loader');
+      if (loader) {
+        loader.innerHTML = 'Не удалось загрузить проект.<br><br>' +
+          '<button onclick="location.reload()" style="padding:10px 24px;font-size:15px;' +
+          'background:#333;color:#fff;border:none;border-radius:8px;cursor:pointer">' +
+          'Попробовать снова</button>';
+      }
+    }, 20000);
     return;
   }
 
@@ -517,6 +529,44 @@ function authCheckOnLoad() {
     authUnlock();
   } else {
     authLock();
+  }
+}
+
+/**
+ * Показать лоадер для share-ссылки: скрыть весь контент, показать индикатор.
+ * Убирается автоматически когда shEnterClientMode отрисует мобильный UI.
+ */
+function _showShareLoader() {
+  var appMain = document.getElementById('app-main');
+  if (!appMain) return;
+  /* Скрыть всё содержимое */
+  for (var i = 0; i < appMain.children.length; i++) {
+    appMain.children[i].style.display = 'none';
+  }
+  /* Показать лоадер */
+  var loader = document.createElement('div');
+  loader.id = 'share-loader';
+  loader.style.cssText = 'display:flex;align-items:center;justify-content:center;height:100vh;font-size:16px;color:#888;';
+  loader.textContent = 'Загрузка...';
+  appMain.appendChild(loader);
+}
+
+/** Убрать лоадер share-ссылки и восстановить видимость дочерних элементов.
+ *  Вызывается из shEnterClientMode перед переключением страницы. */
+function _hideShareLoader() {
+  /* Отменить safety-таймаут */
+  if (window._shareLoadTimeout) {
+    clearTimeout(window._shareLoadTimeout);
+    window._shareLoadTimeout = null;
+  }
+  var loader = document.getElementById('share-loader');
+  if (loader) loader.remove();
+  /* Восстановить display у всех детей app-main (были скрыты в _showShareLoader) */
+  var appMain = document.getElementById('app-main');
+  if (appMain) {
+    for (var i = 0; i < appMain.children.length; i++) {
+      appMain.children[i].style.display = '';
+    }
   }
 }
 
