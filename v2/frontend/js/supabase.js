@@ -831,6 +831,7 @@ function sbCreateShareLink(projectId, role, label, callback) {
     if (res.error) { callback(res.error.message); return; }
 
     var link = res.data;
+    if (!link || !link.token) { callback('Сервер не вернул токен ссылки'); return; }
     /* Share-ссылки всегда через GitHub Pages (Netlify заблокирован в России).
        Если сайт открыт на Netlify, localhost или file:// — подставляем GitHub Pages URL. */
     var origin = window.location.origin;
@@ -1385,19 +1386,25 @@ function sbForceSyncCards() {
 function sbSyncStage(triggerDesc, note) {
   var proj = getActiveProject();
   if (!proj || !proj._cloudId) return;
-  if (!sbIsLoggedIn()) return;
+  if (!sbClient) return;
+
+  var isClient = !!window._shareToken;
+  var isOwner = sbIsLoggedIn();
+  if (!isClient && !isOwner) return;
 
   var stage = proj._stage || 0;
   var cloudId = proj._cloudId;
 
-  /* 1. Обновить stage в projects */
-  sbClient.from('projects').update({
-    stage: stage,
-    updated_at: new Date().toISOString()
-  }).eq('id', cloudId).then(function(res) {
-    if (res.error) console.warn('sbSyncStage: ошибка обновления stage:', res.error.message);
-    else console.log('sbSyncStage: stage=' + stage + ' сохранён');
-  });
+  /* 1. Обновить stage в projects (только владелец; клиент обновляет через sbUploadProject) */
+  if (isOwner) {
+    sbClient.from('projects').update({
+      stage: stage,
+      updated_at: new Date().toISOString()
+    }).eq('id', cloudId).then(function(res) {
+      if (res.error) console.warn('sbSyncStage: ошибка обновления stage:', res.error.message);
+      else console.log('sbSyncStage: stage=' + stage + ' сохранён');
+    });
+  }
 
   /* 2. Вставить запись в stage_events */
   var stageIds = ['preselect', 'selection', 'client', 'color', 'retouch_task', 'retouch', 'retouch_ok', 'adaptation'];

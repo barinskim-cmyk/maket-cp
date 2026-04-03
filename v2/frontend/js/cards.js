@@ -178,7 +178,7 @@ function cpAddCard() {
  */
 function cpDeleteCard(idx) {
   var proj = getActiveProject();
-  if (!proj || proj.cards.length <= 0) return;
+  if (!proj || !proj.cards || proj.cards.length <= 0) return;
   if (!confirm('Удалить карточку ' + (idx + 1) + '?')) return;
 
   proj.cards.splice(idx, 1);
@@ -1331,7 +1331,9 @@ document.addEventListener('drop', function(e) { e.preventDefault(); });
  * Вызывается перед любым изменением слотов.
  */
 function cpSaveHistory() {
-  var card = getActiveProject().cards[App.currentCardIdx];
+  var proj = getActiveProject();
+  if (!proj || !proj.cards || !proj.cards[App.currentCardIdx]) return;
+  var card = proj.cards[App.currentCardIdx];
   if (!card._history) card._history = [];
   var snap = {
     category: card.category,
@@ -1347,6 +1349,7 @@ function cpSaveHistory() {
         aspect: s.aspect || null,
         file: s.file,
         dataUrl: s.dataUrl,
+        thumbUrl: s.thumbUrl || null,
         path: s.path
       };
     })
@@ -1362,9 +1365,13 @@ function cpSaveHistory() {
  * Откатить последнее изменение (Ctrl+Z).
  */
 function cpUndo() {
-  var card = getActiveProject().cards[App.currentCardIdx];
+  var proj = getActiveProject();
+  if (!proj || !proj.cards || !proj.cards[App.currentCardIdx]) return;
+  var card = proj.cards[App.currentCardIdx];
   if (!card._history || !card._history.length) return;
-  var snap = JSON.parse(card._history.pop());
+  try {
+    var snap = JSON.parse(card._history.pop());
+  } catch(e) { console.error('cpUndo: corrupted history entry'); return; }
   card.slots = snap.slots;
   if (snap.category !== undefined) card.category = snap.category;
   /* Восстановить параметры шаблона карточки */
@@ -1374,6 +1381,7 @@ function cpUndo() {
   if (snap._vAspect !== undefined) card._vAspect = snap._vAspect;
   cpSyncFiles(card);
   cpRenderList();
+  cpRenderCard(); /* Обновить редактор карточки после undo */
 }
 
 
@@ -1866,6 +1874,7 @@ function cpMobileCarousel(cardIdx, slotIdx, dir, e) {
   if (!proj || !proj.cards || !proj.cards[cardIdx]) return;
 
   var card = proj.cards[cardIdx];
+  if (!card.slots || slotIdx < 0 || slotIdx >= card.slots.length) return;
   var slot = card.slots[slotIdx];
   if (!slot) return;
 
@@ -1918,12 +1927,15 @@ function cpMobileCarousel(cardIdx, slotIdx, dir, e) {
 function cpMobileClearSlot(cardIdx, slotIdx) {
   var proj = getActiveProject();
   if (!proj || !proj.cards || !proj.cards[cardIdx]) return;
+  var card = proj.cards[cardIdx];
+  if (!card.slots || slotIdx < 0 || slotIdx >= card.slots.length) return;
 
-  var slot = proj.cards[cardIdx].slots[slotIdx];
+  var slot = card.slots[slotIdx];
   if (!slot) return;
 
   slot.file = null;
   slot.dataUrl = null;
+  slot.thumbUrl = null;
   slot.path = null;
 
   if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
