@@ -348,6 +348,7 @@ function sbUploadCards(projectId, cards, callback) {
           id: cardId,
           project_id: projectId,
           position: c,
+          name: card.name || null,
           status: card.status || 'draft',
           has_hero: card._hasHero !== undefined ? card._hasHero : true,
           h_aspect: card._hAspect || '3/2',
@@ -733,6 +734,7 @@ function sbDownloadProject(cloudId, callback) {
             var rc = remoteCards[c];
             var card = {
               id: rc.id,
+              name: rc.name || '',
               status: rc.status,
               _hasHero: rc.has_hero,
               _hAspect: rc.h_aspect,
@@ -1327,6 +1329,7 @@ function sbSyncCardsLight(projectId, cards, callback) {
           id: cardId,
           project_id: projectId,
           position: c,
+          name: card.name || null,
           status: card.status || 'draft',
           has_hero: card._hasHero !== undefined ? card._hasHero : true,
           h_aspect: card._hAspect || '3/2',
