@@ -566,8 +566,19 @@ var SH_AUTOSAVE_DELAY = 2000;
  * Запланировать автосохранение (debounce 2 сек).
  * Вызывается после значимых действий: drop фото, удаление, смена этапа и т.д.
  * Сохраняет в localStorage + автоматически синхронизирует с облаком.
+ *
+ * ВАЖНО: при вызове помечает активный проект как "грязный" (_cloudClean = false),
+ * что разрешает облачную синхронизацию. Проекты, только что загруженные из облака,
+ * имеют _cloudClean = true и НЕ синхронизируются обратно, пока пользователь
+ * не внесёт реальное изменение.
  */
 function shAutoSave() {
+  /* Пометить проект как изменённый пользователем */
+  var proj = getActiveProject();
+  if (proj && proj._cloudClean) {
+    proj._cloudClean = false;
+  }
+
   if (_shAutoSaveTimer) clearTimeout(_shAutoSaveTimer);
   _shAutoSaveTimer = setTimeout(function() {
     _shAutoSaveTimer = null;
@@ -602,12 +613,15 @@ var _shCloudSyncRunning = false;
 function shAutoCloudSync() {
   if (_shCloudSyncRunning) return;
   if (typeof sbIsLoggedIn !== 'function' || !sbIsLoggedIn()) return;
-  /* Не синхронизировать сразу после загрузки из облака —
-     иначе локальная копия (без картинок) перезапишет облако */
-  if (window._cloudJustLoaded) return;
 
   var proj = getActiveProject();
   if (!proj) return;
+
+  /* Облако = источник правды. Не перезаписывать облачные данные,
+     пока пользователь не внёс реальные изменения в проект.
+     _cloudClean устанавливается при загрузке из облака,
+     сбрасывается в shAutoSave() при пользовательском действии. */
+  if (proj._cloudClean) return;
 
   /* Проект ещё не в облаке — загружаем впервые */
   if (!proj._cloudId) {
@@ -814,6 +828,7 @@ function _shBuildSavePayload(aggressive) {
       if (!proj.hasOwnProperty(key)) continue;
       if (key === 'previews' || key === 'otherContent') continue;
       if (key === '_history') continue;
+      if (key === '_cloudClean') continue; /* не сохранять — при рестарте грузим из облака заново */
       light[key] = proj[key];
     }
     /* Для облачных проектов ВСЕГДА aggressive (base64 не нужен — есть URL).
