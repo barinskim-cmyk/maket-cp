@@ -13,6 +13,23 @@
 */
 
 /**
+ * Сформировать отображаемое имя проекта: Brand_YYYY_MM_DD.
+ * @param {object} proj - проект с полями brand, shoot_date
+ * @returns {string} отформатированное имя
+ */
+function shProjectDisplayName(proj) {
+  if (!proj) return '';
+  var brand = (proj.brand || '').trim();
+  var date = (proj.shoot_date || '').trim();
+  if (!brand && !date) return 'Без названия';
+  if (!date) return brand;
+  /* date приходит как YYYY-MM-DD, преобразуем в YYYY_MM_DD */
+  var formatted = date.replace(/-/g, '_');
+  if (!brand) return formatted;
+  return brand + '_' + formatted;
+}
+
+/**
  * Открыть модалку создания нового проекта.
  * Устанавливает дефолтную дату и заполняет селектор шаблонов.
  */
@@ -253,8 +270,7 @@ function renderProjects() {
     var sel = i === App.selectedProject ? ' selected' : '';
     var cardsCount = p.cards ? p.cards.length : 0;
     html += '<div class="project-item' + sel + '" onclick="selectProject(' + i + ')">';
-    html += '<span class="project-brand">' + esc(p.brand) + '</span>';
-    html += '<span class="project-date">' + esc(p.shoot_date) + '</span>';
+    html += '<span class="project-brand">' + esc(shProjectDisplayName(p)) + '</span>';
     html += '<span class="project-stats">' + cardsCount + ' карт.</span>';
     html += '</div>';
   }
