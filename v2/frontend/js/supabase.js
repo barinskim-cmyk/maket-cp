@@ -1373,45 +1373,13 @@ function sbSyncCardsLight(projectId, cards, callback) {
 }
 
 /**
- * Вызывается из cpSaveHistory после каждого изменения карточки.
- * Debounce: синхронизирует карточки через 2 сек после последнего изменения.
- * Использует sbSyncCardsLight (без перезаливки картинок).
- * Для клиента: sbSaveCardsByToken через RPC.
+ * ОТКЛЮЧЕНА. Раньше вызывалась из cpSaveHistory и других мест.
+ * Проблема: DELETE + INSERT pattern уничтожал облачные данные при race condition.
+ * Теперь облако обновляется ТОЛЬКО через shCloudSyncExplicit() в shootings.js.
+ * Все прямые вызовы sbAutoSyncCards() по коду стали no-op.
  */
 function sbAutoSyncCards() {
-  var proj = getActiveProject();
-  if (!proj || !proj._cloudId) return;
-
-  /* Не запускать если предыдущая синхронизация ещё идёт */
-  if (_sbCardSyncRunning) return;
-
-  /* Облако = источник правды. Не перезаписывать пока пользователь не изменил данные */
-  if (proj._cloudClean) return;
-
-  /* Клиент по share-ссылке (не авторизован, есть токен) */
-  var isClient = !!window._shareToken;
-  /* Фотограф (авторизован) */
-  var isOwner = sbIsLoggedIn();
-
-  if (!isClient && !isOwner) return;
-
-  if (_sbCardSyncTimer) clearTimeout(_sbCardSyncTimer);
-  _sbCardSyncTimer = setTimeout(function() {
-    _sbCardSyncTimer = null;
-    _sbCardSyncRunning = true;
-
-    function onDone(err) {
-      _sbCardSyncRunning = false;
-      if (err) console.warn('Авто-синхронизация карточек:', err);
-      else console.log('supabase.js: карточки синхронизированы');
-    }
-
-    if (isClient) {
-      sbSaveCardsByToken(window._shareToken, proj.cards || [], onDone);
-    } else {
-      sbSyncCardsLight(proj._cloudId, proj.cards || [], onDone);
-    }
-  }, SB_CARD_SYNC_DELAY);
+  /* No-op. Облако синхронизируется только через shCloudSyncExplicit(). */
 }
 
 /**

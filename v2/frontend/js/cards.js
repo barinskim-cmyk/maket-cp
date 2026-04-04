@@ -171,6 +171,7 @@ function cpAddCard() {
   proj.cards.push(card);
   App.currentCardIdx = proj.cards.length - 1;
   cpRenderList();
+  if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
 }
 
 /**
@@ -187,6 +188,7 @@ function cpDeleteCard(idx) {
     App.currentCardIdx = proj.cards.length - 1;
   }
   cpRenderList();
+  if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
 }
 
 
@@ -1456,6 +1458,8 @@ function cpUndo() {
  */
 function cpSyncFiles(card) {
   card.files = card.slots.map(function(s) { return s ? s.file : null; }).filter(Boolean);
+  /* Явная синхронизация с облаком при изменении файлов в карточке */
+  if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
 }
 
 
