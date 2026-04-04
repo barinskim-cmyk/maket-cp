@@ -567,25 +567,24 @@ var SH_AUTOSAVE_DELAY = 2000;
  * Вызывается после значимых действий: drop фото, удаление, смена этапа и т.д.
  * Сохраняет в localStorage + автоматически синхронизирует с облаком.
  *
- * ВАЖНО: при вызове помечает активный проект как "грязный" (_cloudClean = false),
- * что разрешает облачную синхронизацию. Проекты, только что загруженные из облака,
- * имеют _cloudClean = true и НЕ синхронизируются обратно, пока пользователь
- * не внесёт реальное изменение.
+ * ВАЖНО: автосинхронизация с облаком ОТКЛЮЧЕНА.
+ * Облако = источник правды. Запись в облако только при явных действиях
+ * пользователя (кнопка "Поделиться", drop фото и т.д.).
+ * Автосохранение работает только в localStorage.
  */
 function shAutoSave() {
-  /* Пометить проект как изменённый пользователем */
-  var proj = getActiveProject();
-  if (proj && proj._cloudClean) {
-    proj._cloudClean = false;
-  }
-
   if (_shAutoSaveTimer) clearTimeout(_shAutoSaveTimer);
   _shAutoSaveTimer = setTimeout(function() {
     _shAutoSaveTimer = null;
     _shDoAutoSave();
 
-    /* Авто-синхронизация с облаком (desktop + browser) */
-    shAutoCloudSync();
+    /* Авто-синхронизация с облаком ОТКЛЮЧЕНА.
+       Облако обновляется только при явных действиях пользователя:
+       - drop фото в слот
+       - удаление/добавление карточки
+       - смена этапа пайплайна
+       Это предотвращает перезапись облачных данных пустой локальной копией. */
+    // shAutoCloudSync();  -- ОТКЛЮЧЕНО, см. shCloudSyncExplicit()
   }, SH_AUTOSAVE_DELAY);
 
   /* Показать индикатор "не сохранено" */
@@ -607,23 +606,44 @@ function shAutoSave() {
 var _shCloudSyncRunning = false;
 
 /**
- * Автоматическая синхронизация активного проекта с облаком.
- * Вызывается после каждого автосохранения в localStorage.
+ * ОТКЛЮЧЕНА. Автосинхронизация вызывала перезапись облачных данных.
+ * Оставлена как заглушка — вызовы из старого кода не сломаются.
  */
 function shAutoCloudSync() {
+  /* Отключена. Облако обновляется только через shCloudSyncExplicit(). */
+}
+
+/**
+ * Явная синхронизация с облаком — вызывать ТОЛЬКО из действий пользователя:
+ * - drop фото в слот карточки
+ * - добавление/удаление карточки
+ * - смена этапа пайплайна
+ * - soft delete / restore проекта
+ *
+ * НЕ вызывать из: автосохранения, рендера, загрузки из облака.
+ */
+function shCloudSyncExplicit() {
   if (_shCloudSyncRunning) return;
-  if (typeof sbIsLoggedIn !== 'function' || !sbIsLoggedIn()) return;
+
+  var isOwner = (typeof sbIsLoggedIn === 'function') && sbIsLoggedIn();
+  var isClient = !!window._shareToken;
+  if (!isOwner && !isClient) return;
 
   var proj = getActiveProject();
   if (!proj) return;
 
-  /* Облако = источник правды. Не перезаписывать облачные данные,
-     пока пользователь не внёс реальные изменения в проект.
-     _cloudClean устанавливается при загрузке из облака,
-     сбрасывается в shAutoSave() при пользовательском действии. */
-  if (proj._cloudClean) return;
+  /* Клиент по share-ссылке — синхронизация через RPC */
+  if (isClient && proj._cloudId) {
+    _shCloudSyncRunning = true;
+    sbSaveCardsByToken(window._shareToken, proj.cards || [], function(err) {
+      _shCloudSyncRunning = false;
+      if (err) console.warn('cloud-sync (client): ошибка:', err);
+      else console.log('cloud-sync (client): карточки синхронизированы');
+    });
+    return;
+  }
 
-  /* Проект ещё не в облаке — загружаем впервые */
+  /* Фотограф: проект ещё не в облаке — загружаем впервые */
   if (!proj._cloudId) {
     _shCloudSyncRunning = true;
     console.log('cloud-sync: первичная загрузка "' + proj.brand + '" в облако...');
@@ -631,19 +651,21 @@ function shAutoCloudSync() {
       _shCloudSyncRunning = false;
       if (err) {
         console.warn('cloud-sync: ошибка загрузки:', err);
-        proj._pendingSync = true; /* пометить для повторной попытки */
       } else {
-        proj._pendingSync = false;
         console.log('cloud-sync: проект загружен, cloudId:', cloudId);
       }
     });
     return;
   }
 
-  /* Проект уже в облаке — лёгкая синхронизация карточек */
-  if (typeof sbAutoSyncCards === 'function') {
-    sbAutoSyncCards();
-  }
+  /* Фотограф: проект уже в облаке — лёгкая синхронизация карточек напрямую.
+     НЕ через sbAutoSyncCards (он отключён) — вызываем sbSyncCardsLight. */
+  _shCloudSyncRunning = true;
+  sbSyncCardsLight(proj._cloudId, proj.cards || [], function(err) {
+    _shCloudSyncRunning = false;
+    if (err) console.warn('cloud-sync: ошибка синхронизации карточек:', err);
+    else console.log('cloud-sync: карточки синхронизированы');
+  });
 }
 
 /**
