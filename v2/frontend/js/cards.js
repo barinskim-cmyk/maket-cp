@@ -306,6 +306,9 @@ function cpRenderCard() {
     if (needAutoRow) {
       var autoRows = layAutoRows(card.slots, layTmpl.hAspect, layTmpl.vAspect);
       if (typeof layAssignRows === 'function') layAssignRows(card.slots, autoRows);
+      /* Rows назначены — сохранить в облако, чтобы при следующей загрузке
+         раскладка не пересчитывалась заново */
+      if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
     }
   }
 
