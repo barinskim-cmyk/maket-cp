@@ -1627,3 +1627,34 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   font-family: monospace; max-width: 200px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+
+/* ══════════════════════════════════════════════
+   Библиотека шаблонов
+   ══════════════════════════════════════════════ */
+
+.tmpl-lib-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px; border-bottom: 1px solid #eee;
+}
+.tmpl-lib-item:last-child { border-bottom: none; }
+.tmpl-lib-active { background: #f0f7ff; }
+.tmpl-lib-preview { flex-shrink: 0; width: 80px; }
+.tmpl-lib-info { flex: 1; min-width: 0; }
+.tmpl-lib-name { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tmpl-lib-meta { font-size: 12px; color: #888; margin-top: 2px; }
+.tmpl-lib-actions { display: flex; gap: 4px; flex-shrink: 0; flex-wrap: wrap; }
+.tmpl-lib-actions .btn-sm { padding: 2px 6px; font-size: 11px; }
+.tmpl-lib-empty { padding: 24px; text-align: center; color: #aaa; }
+
+/* Мини-превью шаблона */
+.tmpl-mini-grid { display: flex; flex-direction: column; gap: 2px; }
+.tmpl-mini-row { display: flex; gap: 2px; }
+.tmpl-mini-slot { border-radius: 2px; background: #d0d0d0; }
+.tmpl-mini-v { width: 14px; height: 20px; }
+.tmpl-mini-h { width: 20px; height: 14px; }
+
+/* Dropdown шаблонов в тулбаре карточки */
+.cp-tmpl-select {
+  font-size: 12px; padding: 3px 6px; border: 1px solid #ccc;
+  border-radius: 4px; background: #fff; max-width: 160px;
+}

@@ -260,8 +260,12 @@ function cpRenderCard() {
   html += '<span class="num cp-card-name" onclick="cpEditCardName()" title="Нажмите чтобы переименовать">' + esc(cardLabel) + '</span>';
   html += '<div class="cp-toolbar">';
 
-  /* Редактор шаблона — основной способ настройки */
-  html += '<button class="btn btn-sm" onclick="cpOpenTemplateEditor()">Редактировать шаблон</button>';
+  /* Выбор шаблона из библиотеки — dropdown прямо в карточке */
+  html += _cpTemplateSelectHTML();
+
+  /* Редактор шаблона и библиотека */
+  html += '<button class="btn btn-sm" onclick="cpOpenTemplateEditor()">Редактор</button>';
+  html += '<button class="btn btn-sm" onclick="cpOpenTemplateLibrary()">Библиотека</button>';
 
   /* Быстрые кнопки +V/+H */
   html += '<div class="cp-slot-controls">';
@@ -1238,10 +1242,11 @@ function teSaveAsNew() {
 
   var hAspect = document.getElementById('te-h-aspect').value;
   var vAspect = document.getElementById('te-v-aspect').value;
-  var tmpl = addUserTemplate(name, teSlots, hAspect, vAspect, true, teHasHero);
+  var proj = getActiveProject();
+  var brand = (proj && proj.brand) ? proj.brand : '';
+  var tmpl = addUserTemplate(name, teSlots, hAspect, vAspect, true, teHasHero, brand);
 
   /* Также сохранить в proj._template для персистенции при save/load */
-  var proj = getActiveProject();
   if (proj) {
     proj._template = templateToProjFormat(tmpl);
   }
@@ -1264,7 +1269,8 @@ function cpSaveAsTemplate() {
 
   var hAspect = card._hAspect || '3/2';
   var vAspect = card._vAspect || '2/3';
-  var tmpl = addUserTemplate(name.trim(), config, hAspect, vAspect);
+  var brand = proj.brand || '';
+  var tmpl = addUserTemplate(name.trim(), config, hAspect, vAspect, card._lockRows, card._hasHero, brand);
 
   /* Также сохранить в proj._template для персистенции при save/load */
   if (proj) {
@@ -1272,6 +1278,286 @@ function cpSaveAsTemplate() {
   }
 
   alert('Шаблон "' + tmpl.name + '" сохранён (' + tmpl.slots.length + ' слотов)');
+}
+
+
+// ══════════════════════════════════════════════
+//  Библиотека шаблонов (1.6d)
+// ══════════════════════════════════════════════
+
+/**
+ * Открыть модалку библиотеки шаблонов.
+ * Показывает список UserTemplates с превью, переименованием, удалением.
+ */
+function cpOpenTemplateLibrary() {
+  var container = document.getElementById('tmpl-lib-list');
+  if (!container) return;
+  _cpRenderLibraryList();
+  openModal('modal-tmpl-library');
+}
+
+/**
+ * Отрисовать список шаблонов в библиотеке.
+ * Вызывается при открытии и после любых изменений (удаление, переименование).
+ */
+function _cpRenderLibraryList() {
+  var container = document.getElementById('tmpl-lib-list');
+  if (!container) return;
+  var proj = getActiveProject();
+
+  if (UserTemplates.length === 0) {
+    container.innerHTML = '<div class="tmpl-lib-empty">Нет сохранённых шаблонов</div>';
+    return;
+  }
+
+  var html = '';
+  for (var i = 0; i < UserTemplates.length; i++) {
+    var t = UserTemplates[i];
+    var slotSummary = _cpTemplateSlotSummary(t);
+    var brandLabel = t.brand ? ' [' + esc(t.brand) + ']' : '';
+    var isActive = proj && proj._template && proj._template.id === t.id;
+
+    html += '<div class="tmpl-lib-item' + (isActive ? ' tmpl-lib-active' : '') + '" data-tmpl-id="' + t.id + '">';
+    html += '<div class="tmpl-lib-preview">' + _cpTemplateMiniPreview(t) + '</div>';
+    html += '<div class="tmpl-lib-info">';
+    html += '<div class="tmpl-lib-name">' + esc(t.name) + brandLabel + '</div>';
+    html += '<div class="tmpl-lib-meta">' + slotSummary + '</div>';
+    html += '</div>';
+    html += '<div class="tmpl-lib-actions">';
+    html += '<button class="btn btn-sm" onclick="cpLibApplyTemplate(\'' + t.id + '\')">Применить</button>';
+    html += '<button class="btn btn-sm" onclick="cpLibApplyToAll(\'' + t.id + '\')">Ко всем</button>';
+    html += '<button class="btn btn-sm" onclick="cpLibRenameTemplate(\'' + t.id + '\')">Имя</button>';
+    html += '<button class="btn btn-sm" onclick="cpLibEditBrand(\'' + t.id + '\')">Бренд</button>';
+    html += '<button class="btn btn-sm" onclick="cpLibDuplicateTemplate(\'' + t.id + '\')">Копия</button>';
+    html += '<button class="btn btn-sm delete-card-btn" onclick="cpLibDeleteTemplate(\'' + t.id + '\')">X</button>';
+    html += '</div>';
+    html += '</div>';
+  }
+  container.innerHTML = html;
+}
+
+/**
+ * Мини-описание слотов шаблона: "3V + 1H (4 фото)"
+ * @param {Object} t — шаблон
+ * @returns {string}
+ */
+function _cpTemplateSlotSummary(t) {
+  var v = 0, h = 0;
+  (t.slots || []).forEach(function(s) {
+    if (s.orient === 'h') h++;
+    else v++;
+  });
+  var parts = [];
+  if (v > 0) parts.push(v + 'V');
+  if (h > 0) parts.push(h + 'H');
+  return parts.join(' + ') + ' (' + (t.slots || []).length + ' фото)';
+}
+
+/**
+ * Мини-превью шаблона: маленькая раскладка из серых прямоугольников.
+ * @param {Object} t — шаблон
+ * @returns {string} HTML
+ */
+function _cpTemplateMiniPreview(t) {
+  if (!t.slots || t.slots.length === 0) return '';
+  /* Группируем слоты по рядам через layAutoRows (если доступна) */
+  var rows;
+  if (typeof layAutoRows === 'function') {
+    rows = layAutoRows(t.slots, t.hAspect || '3/2', t.vAspect || '2/3');
+  } else {
+    /* фолбэк: все в один ряд */
+    rows = [t.slots.map(function(_, i) { return i; })];
+  }
+  var html = '<div class="tmpl-mini-grid">';
+  for (var r = 0; r < rows.length; r++) {
+    html += '<div class="tmpl-mini-row">';
+    for (var c = 0; c < rows[r].length; c++) {
+      var si = rows[r][c];
+      var s = t.slots[si] || {};
+      var cls = (s.orient === 'h') ? 'tmpl-mini-h' : 'tmpl-mini-v';
+      html += '<div class="tmpl-mini-slot ' + cls + '"></div>';
+    }
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+/**
+ * Применить шаблон из библиотеки к текущей карточке.
+ * @param {string} tmplId
+ */
+function cpLibApplyTemplate(tmplId) {
+  var tmpl = getUserTemplate(tmplId);
+  if (!tmpl) return;
+  _cpApplyTemplateToCard(tmpl, App.currentCardIdx);
+  closeModal('modal-tmpl-library');
+  cpRenderList();
+}
+
+/**
+ * Применить шаблон ко всем карточкам проекта (1.6e).
+ * @param {string} tmplId
+ */
+function cpLibApplyToAll(tmplId) {
+  var tmpl = getUserTemplate(tmplId);
+  if (!tmpl) return;
+  var proj = getActiveProject();
+  if (!proj || !proj.cards || proj.cards.length === 0) {
+    alert('Нет карточек');
+    return;
+  }
+  if (!confirm('Применить шаблон "' + tmpl.name + '" ко всем ' + proj.cards.length + ' карточкам? Фото сохранятся по позициям.')) return;
+
+  cpSaveHistory();
+  for (var i = 0; i < proj.cards.length; i++) {
+    _cpApplyTemplateToCard(tmpl, i);
+  }
+  closeModal('modal-tmpl-library');
+  cpRenderList();
+  if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
+}
+
+/**
+ * Общая логика применения шаблона к одной карточке по индексу.
+ * Сохраняет фото по позициям из старых слотов.
+ * @param {Object} tmpl — шаблон из UserTemplates
+ * @param {number} cardIdx — индекс карточки
+ */
+function _cpApplyTemplateToCard(tmpl, cardIdx) {
+  var proj = getActiveProject();
+  if (!proj || !proj.cards || cardIdx < 0 || cardIdx >= proj.cards.length) return;
+
+  var card = proj.cards[cardIdx];
+  var hAspect = tmpl.hAspect || '3/2';
+  var vAspect = tmpl.vAspect || '2/3';
+  var oldSlots = card.slots || [];
+
+  /* Создать новые слоты, сохраняя файлы по позициям */
+  var newSlots = [];
+  for (var i = 0; i < (tmpl.slots || []).length; i++) {
+    var s = tmpl.slots[i];
+    var aspect = (s.orient === 'h') ? hAspect : vAspect;
+    var old = oldSlots[i] || {};
+    newSlots.push({
+      orient: s.orient,
+      weight: s.weight || 1,
+      row: 0,
+      aspect: aspect,
+      file: old.file || null,
+      dataUrl: old.dataUrl || null,
+      path: old.path || null
+    });
+  }
+
+  card.slots = newSlots;
+  card._hAspect = hAspect;
+  card._vAspect = vAspect;
+  card._lockRows = true;
+  card._hasHero = (tmpl.hasHero !== undefined) ? tmpl.hasHero : true;
+  card.files = card.slots.map(function(sl) { return sl ? sl.file : null; }).filter(Boolean);
+
+  /* Авто-раскладка рядов */
+  if (card.slots.length > 1 && typeof layAutoRows === 'function') {
+    var autoRows = layAutoRows(card.slots, hAspect, vAspect);
+    if (typeof layAssignRows === 'function') layAssignRows(card.slots, autoRows);
+  }
+
+  /* Обновить proj._template */
+  proj._template = templateToProjFormat(tmpl);
+  proj.templateId = tmpl.id;
+}
+
+/**
+ * Переименовать шаблон в библиотеке.
+ * @param {string} tmplId
+ */
+function cpLibRenameTemplate(tmplId) {
+  var tmpl = getUserTemplate(tmplId);
+  if (!tmpl) return;
+  var name = prompt('Новое имя:', tmpl.name);
+  if (!name || !name.trim()) return;
+  updateUserTemplate(tmplId, { name: name.trim() });
+  _cpRenderLibraryList();
+}
+
+/**
+ * Изменить бренд шаблона.
+ * @param {string} tmplId
+ */
+function cpLibEditBrand(tmplId) {
+  var tmpl = getUserTemplate(tmplId);
+  if (!tmpl) return;
+  var brand = prompt('Бренд:', tmpl.brand || '');
+  if (brand === null) return;
+  updateUserTemplate(tmplId, { brand: brand.trim() });
+  _cpRenderLibraryList();
+}
+
+/**
+ * Дублировать шаблон.
+ * @param {string} tmplId
+ */
+function cpLibDuplicateTemplate(tmplId) {
+  var tmpl = getUserTemplate(tmplId);
+  if (!tmpl) return;
+  addUserTemplate(
+    tmpl.name + ' (копия)',
+    tmpl.slots || [],
+    tmpl.hAspect, tmpl.vAspect, tmpl.lockRows, tmpl.hasHero, tmpl.brand
+  );
+  _cpRenderLibraryList();
+}
+
+/**
+ * Удалить шаблон.
+ * @param {string} tmplId
+ */
+function cpLibDeleteTemplate(tmplId) {
+  var tmpl = getUserTemplate(tmplId);
+  if (!tmpl) return;
+  if (!confirm('Удалить шаблон "' + tmpl.name + '"?')) return;
+  deleteUserTemplate(tmplId);
+  _cpRenderLibraryList();
+}
+
+
+// ══════════════════════════════════════════════
+//  Выбор шаблона прямо в карточке (dropdown)
+// ══════════════════════════════════════════════
+
+/**
+ * Построить HTML выпадающего списка шаблонов для тулбара карточки.
+ * @returns {string} HTML <select> с опциями
+ */
+function _cpTemplateSelectHTML() {
+  var proj = getActiveProject();
+  var activeId = (proj && proj._template) ? proj._template.id : (proj ? proj.templateId : '');
+
+  var html = '<select class="cp-tmpl-select" onchange="cpQuickApplyTemplate(this.value)">';
+  html += '<option value="">-- Шаблон --</option>';
+  for (var i = 0; i < UserTemplates.length; i++) {
+    var t = UserTemplates[i];
+    var brandTag = t.brand ? ' [' + esc(t.brand) + ']' : '';
+    var sel = (t.id === activeId) ? ' selected' : '';
+    html += '<option value="' + t.id + '"' + sel + '>' + esc(t.name) + brandTag + '</option>';
+  }
+  html += '</select>';
+  return html;
+}
+
+/**
+ * Быстрое применение шаблона из dropdown в карточке.
+ * @param {string} tmplId
+ */
+function cpQuickApplyTemplate(tmplId) {
+  if (!tmplId) return;
+  var tmpl = getUserTemplate(tmplId);
+  if (!tmpl) return;
+  cpSaveHistory();
+  _cpApplyTemplateToCard(tmpl, App.currentCardIdx);
+  cpRenderList();
+  if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
 }
 
 

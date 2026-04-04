@@ -152,12 +152,16 @@ function saveUserTemplates() {
  * @param {Array<{orient: string, main: boolean}>} slots — конфигурация слотов
  * @param {string} [hAspect='3/2'] — пропорции горизонтов
  * @param {string} [vAspect='2/3'] — пропорции вертикалей
+ * @param {boolean} [lockRows=false]
+ * @param {boolean} [hasHero=true]
+ * @param {string} [brand=''] — бренд (атрибут для фильтрации)
  * @returns {Object} созданный шаблон
  */
-function addUserTemplate(name, slots, hAspect, vAspect, lockRows, hasHero) {
+function addUserTemplate(name, slots, hAspect, vAspect, lockRows, hasHero, brand) {
   var tmpl = {
     id: 'tmpl_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
     name: name,
+    brand: brand || '',
     hAspect: hAspect || '3/2',
     vAspect: vAspect || '2/3',
     lockRows: !!lockRows,
@@ -179,6 +183,7 @@ function updateUserTemplate(id, updates) {
   var tmpl = getUserTemplate(id);
   if (!tmpl) return null;
   if (updates.name !== undefined)     tmpl.name     = updates.name;
+  if (updates.brand !== undefined)    tmpl.brand    = updates.brand;
   if (updates.hAspect !== undefined)  tmpl.hAspect  = updates.hAspect;
   if (updates.vAspect !== undefined)  tmpl.vAspect  = updates.vAspect;
   if (updates.lockRows !== undefined) tmpl.lockRows = updates.lockRows;
@@ -222,6 +227,7 @@ function templateToProjFormat(tmpl) {
   return {
     id: tmpl.id || ('tmpl_' + Date.now()),
     name: tmpl.name || 'Template',
+    brand: tmpl.brand || '',
     hAspect: tmpl.hAspect || '3/2',
     vAspect: tmpl.vAspect || '2/3',
     lockRows: !!tmpl.lockRows,
