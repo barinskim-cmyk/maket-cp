@@ -349,20 +349,30 @@ function statusLabel(s) {
  * Проверяет доступность Python-бэкенда через pywebview bridge.
  * Обновляет индикатор в status-bar.
  */
-async function checkBackend() {
+function checkBackend() {
   var el = document.getElementById('backend-status');
-  try {
-    if (window.pywebview && window.pywebview.api) {
-      var result = await window.pywebview.api.ping();
-      if (result === 'pong') {
-        el.textContent = 'подключён';
-        el.className = 'connected';
-        return;
-      }
+  if (window.pywebview && window.pywebview.api) {
+    try {
+      window.pywebview.api.ping().then(function(result) {
+        if (result === 'pong') {
+          el.textContent = 'подключён';
+          el.className = 'connected';
+        } else {
+          el.textContent = 'не подключён';
+          el.className = 'disconnected';
+        }
+      }).catch(function() {
+        el.textContent = 'не подключён';
+        el.className = 'disconnected';
+      });
+    } catch(e) {
+      el.textContent = 'не подключён';
+      el.className = 'disconnected';
     }
-  } catch(e) {}
-  el.textContent = 'не подключён';
-  el.className = 'disconnected';
+  } else {
+    el.textContent = 'не подключён';
+    el.className = 'disconnected';
+  }
 }
 
 window.addEventListener('pywebviewready', function() { checkBackend(); });

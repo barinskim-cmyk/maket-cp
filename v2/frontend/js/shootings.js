@@ -690,10 +690,19 @@ function shSyncPendingProjects() {
         });
       })(i);
     } else {
-      /* Синхронизация карточек */
+      /* Синхронизация карточек + превью (b02: retry при ошибке) */
       (function(p) {
         sbSyncCardsLight(p._cloudId, p.cards || [], function(err) {
-          if (!err) {
+          if (err) return;
+          /* Также дозагрузить превью, если есть незагруженные */
+          if (typeof sbUploadPreviews === 'function' && p.previews && p.previews.length > 0) {
+            sbUploadPreviews(p._cloudId, p.previews, function(pvErr) {
+              if (!pvErr) {
+                p._pendingSync = false;
+                console.log('cloud-sync: pending карточки + превью синхронизированы:', p.brand);
+              }
+            });
+          } else {
             p._pendingSync = false;
             console.log('cloud-sync: pending карточки синхронизированы:', p.brand);
           }
