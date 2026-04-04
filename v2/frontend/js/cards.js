@@ -101,22 +101,20 @@ function cpAddCard() {
 
   var slotsConfig;
 
-  /* 1. Копировать конфигурацию предыдущей карточки */
-  if (proj.cards && proj.cards.length > 0) {
-    var prevCard = proj.cards[proj.cards.length - 1];
-    slotsConfig = slotsConfigFromCard(prevCard);
+  /* Приоритет конфигурации:
+     1. proj._template (активный шаблон проекта — выбран пользователем)
+     2. proj.templateId → UserTemplates (шаблон при создании проекта)
+     3. Копия предыдущей карточки (если шаблона нет)
+     4. Фолбэк: 4 вертикали */
+
+  /* 1. proj._template (установленный через редактор/библиотеку/dropdown) */
+  if (proj._template && proj._template.slots && proj._template.slots.length > 0) {
+    slotsConfig = proj._template.slots.map(function(s) {
+      return { orient: s.orient || 'v', weight: s.weight || 1, main: false };
+    });
   }
 
-  /* 2. proj._template (установленный через редактор шаблона) */
-  if (!slotsConfig || slotsConfig.length === 0) {
-    if (proj._template && proj._template.slots && proj._template.slots.length > 0) {
-      slotsConfig = proj._template.slots.map(function(s) {
-        return { orient: s.orient || 'v', weight: s.weight || 1, main: false };
-      });
-    }
-  }
-
-  /* 3. Шаблон проекта (UserTemplates) */
+  /* 2. Шаблон проекта (UserTemplates) */
   if (!slotsConfig || slotsConfig.length === 0) {
     if (proj.templateId) {
       var tmpl = getUserTemplate(proj.templateId);
@@ -125,6 +123,14 @@ function cpAddCard() {
           return { orient: s.orient || 'v', main: !!s.main };
         });
       }
+    }
+  }
+
+  /* 3. Копировать конфигурацию предыдущей карточки */
+  if (!slotsConfig || slotsConfig.length === 0) {
+    if (proj.cards && proj.cards.length > 0) {
+      var prevCard = proj.cards[proj.cards.length - 1];
+      slotsConfig = slotsConfigFromCard(prevCard);
     }
   }
 
@@ -155,17 +161,17 @@ function cpAddCard() {
     slots: slots
   };
 
-  /* Копировать параметры шаблона в карточку: prev card > proj._template > proj.templateId */
-  var prevCard = (proj.cards && proj.cards.length > 0) ? proj.cards[proj.cards.length - 1] : null;
+  /* Параметры карточки: proj._template > proj.templateId > prevCard */
   var projTmpl = proj._template || null;
   var userTmpl = proj.templateId ? getUserTemplate(proj.templateId) : null;
+  var prevCard = (proj.cards && proj.cards.length > 1) ? proj.cards[proj.cards.length - 2] : null;
 
-  card._hAspect = (prevCard && prevCard._hAspect) || (projTmpl && projTmpl.hAspect) || (userTmpl && userTmpl.hAspect) || null;
-  card._vAspect = (prevCard && prevCard._vAspect) || (projTmpl && projTmpl.vAspect) || (userTmpl && userTmpl.vAspect) || null;
-  card._lockRows = (prevCard && prevCard._lockRows) || (projTmpl && projTmpl.lockRows) || (userTmpl && userTmpl.lockRows) || false;
-  if (prevCard && prevCard._hasHero !== undefined) card._hasHero = prevCard._hasHero;
-  else if (projTmpl && projTmpl.hasHero !== undefined) card._hasHero = projTmpl.hasHero;
+  card._hAspect = (projTmpl && projTmpl.hAspect) || (userTmpl && userTmpl.hAspect) || (prevCard && prevCard._hAspect) || null;
+  card._vAspect = (projTmpl && projTmpl.vAspect) || (userTmpl && userTmpl.vAspect) || (prevCard && prevCard._vAspect) || null;
+  card._lockRows = (projTmpl && projTmpl.lockRows) || (userTmpl && userTmpl.lockRows) || (prevCard && prevCard._lockRows) || false;
+  if (projTmpl && projTmpl.hasHero !== undefined) card._hasHero = projTmpl.hasHero;
   else if (userTmpl && userTmpl.hasHero !== undefined) card._hasHero = userTmpl.hasHero;
+  else if (prevCard && prevCard._hasHero !== undefined) card._hasHero = prevCard._hasHero;
 
   if (!proj.cards) proj.cards = [];
   proj.cards.push(card);
@@ -297,17 +303,20 @@ function cpRenderCard() {
     hasHero: cardHasHero
   };
 
-  /* Авто-применение раскладки: если у слотов нет row (загружены из облака),
-     прогоняем layAutoRows и назначаем row — раскладка будет красивой сразу */
-  if (card.slots && card.slots.length > 1 && typeof layAutoRows === 'function') {
-    var needAutoRow = true;
+  /* Авто-применение раскладки: если у слотов нет row (загружены из облака без рядов).
+     НЕ пересчитывать если:
+     - _lockRows=true (ряды зафиксированы шаблоном)
+     - хотя бы один слот имеет row !== undefined && row !== null
+       (row=0 — это валидный первый ряд, не путать с "нет ряда") */
+  if (card.slots && card.slots.length > 1 && !layTmpl.lockRows && typeof layAutoRows === 'function') {
+    var hasAnyRow = false;
     for (var ri = 0; ri < card.slots.length; ri++) {
-      if (card.slots[ri].row !== undefined && card.slots[ri].row !== null && card.slots[ri].row > 0) {
-        needAutoRow = false;
+      if (card.slots[ri].row !== undefined && card.slots[ri].row !== null) {
+        hasAnyRow = true;
         break;
       }
     }
-    if (needAutoRow) {
+    if (!hasAnyRow) {
       var autoRows = layAutoRows(card.slots, layTmpl.hAspect, layTmpl.vAspect);
       if (typeof layAssignRows === 'function') layAssignRows(card.slots, autoRows);
       /* Rows назначены — сохранить в облако, чтобы при следующей загрузке
