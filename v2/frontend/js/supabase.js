@@ -248,6 +248,7 @@ function sbUploadProject(projIdx, callback) {
     brand: proj.brand || '',
     shoot_date: proj.shoot_date || proj.shootDate || '',
     template_id: proj.templateId || '',
+    template_config: proj._template || null,
     stage: proj._stage || proj.stage || 0,
     channels: JSON.stringify(proj.channels || []),
     other_content: JSON.stringify(ocNames),
@@ -688,6 +689,7 @@ function sbDownloadProject(cloudId, callback) {
       brand: remote.brand,
       shoot_date: remote.shoot_date,
       templateId: remote.template_id,
+      _template: remote.template_config || null,
       _stage: remote.stage || 0,
       _stageHistory: {},
       _deletedAt: remote.deleted_at || null,
@@ -996,6 +998,7 @@ function _sbDoLoadByToken(token) {
       brand: data.brand || '',
       shoot_date: data.shoot_date || '',
       templateId: data.template_id || '',
+      _template: data.template_config || null,
       _stage: data.stage || 0,
       _stageHistory: {},
       _role: data.role || 'client',
@@ -1303,6 +1306,7 @@ function sbSyncCardsLight(projectId, cards, callback) {
     var ocNames = (proj.otherContent || []).map(function(oc) { return oc.name; });
     sbClient.from('projects').update({
       other_content: JSON.stringify(ocNames),
+      template_config: proj._template || null,
       stage: proj._stage || 0,
       updated_at: new Date().toISOString()
     }).eq('id', projectId).then(function() {});
