@@ -255,23 +255,129 @@ function selectProject(idx) {
 /**
  * Отрисовать список проектов и обновить пайплайн + карточки.
  */
+/** @type {boolean} Показывать ли скрытые (удалённые) проекты */
+var shShowHidden = false;
+
+/**
+ * Переключить видимость скрытых проектов.
+ */
+function shToggleHidden() {
+  shShowHidden = !shShowHidden;
+  var cb = document.getElementById('sh-show-hidden');
+  if (cb) cb.checked = shShowHidden;
+  renderProjects();
+}
+
+/**
+ * Получить отфильтрованный список проектов (без удалённых, если не включён фильтр).
+ * Возвращает массив объектов { project, originalIndex }.
+ */
+function shFilteredProjects() {
+  var result = [];
+  for (var i = 0; i < App.projects.length; i++) {
+    var p = App.projects[i];
+    if (p._deletedAt && !shShowHidden) continue;
+    result.push({ project: p, originalIndex: i });
+  }
+  return result;
+}
+
+/**
+ * Soft-удаление проекта: помечаем _deletedAt, синхронизируем с облаком.
+ * Проект не удаляется из массива — только скрывается.
+ * @param {number} originalIdx — индекс в App.projects
+ */
+function shDeleteProject(originalIdx) {
+  var proj = App.projects[originalIdx];
+  if (!proj) return;
+
+  var name = shProjectDisplayName(proj);
+  if (!confirm('Скрыть проект "' + name + '"?\nПроект можно восстановить через фильтр "Показать скрытые".')) return;
+
+  proj._deletedAt = new Date().toISOString();
+
+  /* Если удалённый проект был выбранным — сбросить выделение */
+  if (App.selectedProject === originalIdx) {
+    App.selectedProject = -1;
+    App.currentCardIdx = -1;
+    /* Выбрать первый видимый проект */
+    var visible = shFilteredProjects();
+    if (visible.length > 0) {
+      App.selectedProject = visible[0].originalIndex;
+    }
+  }
+
+  /* Синхронизация soft delete с облаком */
+  if (proj._cloudId && typeof sbSoftDeleteProject === 'function') {
+    sbSoftDeleteProject(proj._cloudId, function(err) {
+      if (err) console.warn('shDeleteProject: cloud sync error:', err);
+    });
+  }
+
+  shAutoSave();
+  renderProjects();
+}
+
+/**
+ * Восстановить soft-удалённый проект.
+ * @param {number} originalIdx — индекс в App.projects
+ */
+function shRestoreProject(originalIdx) {
+  var proj = App.projects[originalIdx];
+  if (!proj) return;
+
+  delete proj._deletedAt;
+
+  /* Восстановить в облаке */
+  if (proj._cloudId && typeof sbRestoreProject === 'function') {
+    sbRestoreProject(proj._cloudId, function(err) {
+      if (err) console.warn('shRestoreProject: cloud sync error:', err);
+    });
+  }
+
+  shAutoSave();
+  renderProjects();
+}
+
 function renderProjects() {
   var list = document.getElementById('project-list');
-  if (App.projects.length === 0) {
-    list.innerHTML = '<div class="empty-state">Нет открытых проектов</div>';
+  var filtered = shFilteredProjects();
+
+  /* Обновить счётчик скрытых */
+  var hiddenCount = 0;
+  for (var h = 0; h < App.projects.length; h++) {
+    if (App.projects[h]._deletedAt) hiddenCount++;
+  }
+  var hiddenLabel = document.getElementById('sh-hidden-label');
+  if (hiddenLabel) {
+    hiddenLabel.textContent = 'Показать скрытые (' + hiddenCount + ')';
+    var hiddenWrap = document.getElementById('sh-hidden-wrap');
+    if (hiddenWrap) hiddenWrap.style.display = hiddenCount > 0 ? '' : 'none';
+  }
+
+  if (filtered.length === 0) {
+    list.innerHTML = '<div class="empty-state">' +
+      (hiddenCount > 0 ? 'Все проекты скрыты' : 'Нет открытых проектов') + '</div>';
     document.getElementById('pipeline-container').innerHTML =
       '<div class="empty-state">Выберите съёмку</div>';
     return;
   }
 
   var html = '';
-  for (var i = 0; i < App.projects.length; i++) {
-    var p = App.projects[i];
-    var sel = i === App.selectedProject ? ' selected' : '';
+  for (var i = 0; i < filtered.length; i++) {
+    var entry = filtered[i];
+    var p = entry.project;
+    var sel = entry.originalIndex === App.selectedProject ? ' selected' : '';
+    var isDeleted = !!p._deletedAt;
     var cardsCount = p.cards ? p.cards.length : 0;
-    html += '<div class="project-item' + sel + '" onclick="selectProject(' + i + ')">';
+    html += '<div class="project-item' + sel + (isDeleted ? ' project-deleted' : '') + '" onclick="selectProject(' + entry.originalIndex + ')">';
     html += '<span class="project-brand">' + esc(shProjectDisplayName(p)) + '</span>';
     html += '<span class="project-stats">' + cardsCount + ' карт.</span>';
+    if (isDeleted) {
+      html += '<button class="btn btn-sm project-restore-btn" onclick="event.stopPropagation(); shRestoreProject(' + entry.originalIndex + ')" title="Восстановить">Восстановить</button>';
+    } else {
+      html += '<button class="btn btn-sm project-delete-btn" onclick="event.stopPropagation(); shDeleteProject(' + entry.originalIndex + ')" title="Скрыть проект">X</button>';
+    }
     html += '</div>';
   }
   list.innerHTML = html;
