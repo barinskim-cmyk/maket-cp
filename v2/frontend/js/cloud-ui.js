@@ -468,7 +468,14 @@ function sbLoadAllFromCloud() {
           }
           loaded++;
           if (loaded >= list.length) {
-            /* Все проекты загружены — обновляем приложение */
+            /* Все проекты загружены — обновляем приложение.
+               Помечаем каждый проект как _cloudClean = true:
+               облако = источник правды, не перезаписывать обратно
+               пока пользователь не внесёт реальные изменения. */
+            for (var ci = 0; ci < projects.length; ci++) {
+              projects[ci]._cloudClean = true;
+            }
+
             App.projects = projects;
             if (projects.length > 0) App.selectedProject = 0;
 
@@ -486,11 +493,6 @@ function sbLoadAllFromCloud() {
                 });
               }
             }
-
-            /* Заблокировать автосинхронизацию на 10 сек после загрузки,
-               чтобы не перезаписать облако локальной копией без картинок */
-            window._cloudJustLoaded = true;
-            setTimeout(function() { window._cloudJustLoaded = false; }, 10000);
 
             if (statusEl) statusEl.textContent = 'Загружено ' + projects.length + ' проектов';
             console.log('cloud-ui: загружено', projects.length, 'проектов из облака');

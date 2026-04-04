@@ -1083,7 +1083,9 @@ function _sbDoLoadByToken(token) {
       sbLoadStageHistory(data.project_id, function(history) {
         proj._stageHistory = history;
 
-        /* Share-ссылка: заменяем все проекты, чтобы гарантировать правильный выбор */
+        /* Share-ссылка: заменяем все проекты, чтобы гарантировать правильный выбор.
+           Помечаем как _cloudClean — не перезаписывать облако. */
+        proj._cloudClean = true;
         App.projects = [proj];
         App.selectedProject = 0;
         if (typeof renderProjects === 'function') renderProjects();
@@ -1383,8 +1385,8 @@ function sbAutoSyncCards() {
   /* Не запускать если предыдущая синхронизация ещё идёт */
   if (_sbCardSyncRunning) return;
 
-  /* Не перезаписывать облако сразу после загрузки из него */
-  if (window._cloudJustLoaded) return;
+  /* Облако = источник правды. Не перезаписывать пока пользователь не изменил данные */
+  if (proj._cloudClean) return;
 
   /* Клиент по share-ссылке (не авторизован, есть токен) */
   var isClient = !!window._shareToken;
