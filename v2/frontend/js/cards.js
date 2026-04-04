@@ -58,8 +58,9 @@ function cpRenderList() {
         if (c.slots[j] && (c.slots[j].file || c.slots[j].dataUrl)) fileCount++;
       }
     }
+    var cardLabel = (c.name && c.name.trim()) ? c.name.trim() : ('Карточка ' + (i + 1));
     html += '<div class="cp-card-item' + active + '" onclick="cpShowCard(' + i + ')">';
-    html += 'Карточка ' + (i + 1);
+    html += esc(cardLabel);
     html += ' <span class="count">(' + fileCount + '/' + (c.slots ? c.slots.length : 0) + ')</span>';
     html += '</div>';
   }
@@ -252,8 +253,9 @@ function cpRenderCard() {
   var html = '';
 
   /* ── Мета + тулбар ── */
+  var cardLabel = (card.name && card.name.trim()) ? card.name.trim() : ('Карточка ' + (idx + 1));
   html += '<div class="cp-meta">';
-  html += '<span class="num">Карточка ' + (idx + 1) + '</span>';
+  html += '<span class="num cp-card-name" onclick="cpEditCardName()" title="Нажмите чтобы переименовать">' + esc(cardLabel) + '</span>';
   html += '<div class="cp-toolbar">';
 
   /* Редактор шаблона — основной способ настройки */
@@ -382,6 +384,48 @@ function cpSlotHTML(slotIdx, span, hasHero) {
     '<div class="ph-text">' + (isHero ? 'Заглавное' : 'Перетащите фото') + '</div>' +
     toolbar +
     '</div>';
+}
+
+/**
+ * Редактирование имени карточки inline.
+ * Заменяет заголовок на input, по Enter/blur сохраняет.
+ */
+function cpEditCardName() {
+  var proj = getActiveProject();
+  if (!proj) return;
+  var card = proj.cards[App.currentCardIdx];
+  if (!card) return;
+
+  var el = document.querySelector('.cp-card-name');
+  if (!el) return;
+
+  var currentName = (card.name && card.name.trim()) ? card.name.trim() : '';
+  var placeholder = 'Карточка ' + (App.currentCardIdx + 1);
+  var input = document.createElement('input');
+  input.type = 'text';
+  input.value = currentName;
+  input.placeholder = placeholder;
+  input.className = 'cp-card-name-input';
+  input.style.cssText = 'font-size:inherit; font-weight:inherit; border:1px solid #ccc; border-radius:4px; padding:2px 6px; width:180px; outline:none;';
+
+  function save() {
+    var val = input.value.trim();
+    card.name = val || '';
+    cpRenderCard();
+    cpRenderList();
+    if (typeof shAutoSave === 'function') shAutoSave();
+  }
+
+  input.addEventListener('blur', save);
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); save(); }
+    if (e.key === 'Escape') { e.preventDefault(); input.value = currentName; save(); }
+  });
+
+  el.textContent = '';
+  el.appendChild(input);
+  input.focus();
+  input.select();
 }
 
 /**
