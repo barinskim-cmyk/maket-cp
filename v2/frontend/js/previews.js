@@ -634,6 +634,10 @@ function pvMakeThumbnail(file, callback) {
         pCanvas.getContext('2d').drawImage(img, 0, 0, pw, ph);
         var previewUrl = pCanvas.toDataURL('image/jpeg', PV_PREVIEW_QUALITY);
 
+        /* Освободить canvas-память (b11: canvas memory leak) */
+        canvas.width = 0; canvas.height = 0;
+        pCanvas.width = 0; pCanvas.height = 0;
+
         callback({
           name: file.name, path: '', thumb: thumbUrl,
           preview: previewUrl, rating: rating, orient: orient
@@ -642,6 +646,7 @@ function pvMakeThumbnail(file, callback) {
       img.onerror = function() { callback(null); };
       img.src = ev.target.result;
     };
+    reader.onerror = function() { callback(null); };
     reader.readAsDataURL(file);
   });
 }
