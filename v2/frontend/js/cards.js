@@ -290,6 +290,23 @@ function cpRenderCard() {
     lockRows: card._lockRows || (projTmpl && projTmpl.lockRows) || (tmpl && tmpl.lockRows) || false,
     hasHero: cardHasHero
   };
+
+  /* Авто-применение раскладки: если у слотов нет row (загружены из облака),
+     прогоняем layAutoRows и назначаем row — раскладка будет красивой сразу */
+  if (card.slots && card.slots.length > 1 && typeof layAutoRows === 'function') {
+    var needAutoRow = true;
+    for (var ri = 0; ri < card.slots.length; ri++) {
+      if (card.slots[ri].row !== undefined && card.slots[ri].row !== null && card.slots[ri].row > 0) {
+        needAutoRow = false;
+        break;
+      }
+    }
+    if (needAutoRow) {
+      var autoRows = layAutoRows(card.slots, layTmpl.hAspect, layTmpl.vAspect);
+      if (typeof layAssignRows === 'function') layAssignRows(card.slots, autoRows);
+    }
+  }
+
   html += layBuildLayout(card, layTmpl, function(si) { return cpSlotHTML(si, undefined, cardHasHero); });
 
   /* ── Имена файлов ── */
