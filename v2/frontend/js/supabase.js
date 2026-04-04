@@ -1383,6 +1383,9 @@ function sbAutoSyncCards() {
   /* Не запускать если предыдущая синхронизация ещё идёт */
   if (_sbCardSyncRunning) return;
 
+  /* Не перезаписывать облако сразу после загрузки из него */
+  if (window._cloudJustLoaded) return;
+
   /* Клиент по share-ссылке (не авторизован, есть токен) */
   var isClient = !!window._shareToken;
   /* Фотограф (авторизован) */
