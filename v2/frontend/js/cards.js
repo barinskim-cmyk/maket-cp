@@ -102,19 +102,27 @@ function cpAddCard() {
   var slotsConfig;
 
   /* Приоритет конфигурации:
-     1. proj._template (активный шаблон проекта — выбран пользователем)
-     2. proj.templateId → UserTemplates (шаблон при создании проекта)
-     3. Копия предыдущей карточки (если шаблона нет)
+     1. Копия предыдущей карточки (если есть)
+     2. proj._template (активный шаблон проекта)
+     3. proj.templateId → UserTemplates
      4. Фолбэк: 4 вертикали */
 
-  /* 1. proj._template (установленный через редактор/библиотеку/dropdown) */
-  if (proj._template && proj._template.slots && proj._template.slots.length > 0) {
-    slotsConfig = proj._template.slots.map(function(s) {
-      return { orient: s.orient || 'v', weight: s.weight || 1, main: false };
-    });
+  /* 1. Копировать конфигурацию предыдущей карточки */
+  if (proj.cards && proj.cards.length > 0) {
+    var prevCard = proj.cards[proj.cards.length - 1];
+    slotsConfig = slotsConfigFromCard(prevCard);
   }
 
-  /* 2. Шаблон проекта (UserTemplates) */
+  /* 2. proj._template (установленный через редактор/библиотеку/dropdown) */
+  if (!slotsConfig || slotsConfig.length === 0) {
+    if (proj._template && proj._template.slots && proj._template.slots.length > 0) {
+      slotsConfig = proj._template.slots.map(function(s) {
+        return { orient: s.orient || 'v', weight: s.weight || 1, main: false };
+      });
+    }
+  }
+
+  /* 3. Шаблон проекта (UserTemplates) */
   if (!slotsConfig || slotsConfig.length === 0) {
     if (proj.templateId) {
       var tmpl = getUserTemplate(proj.templateId);
@@ -123,14 +131,6 @@ function cpAddCard() {
           return { orient: s.orient || 'v', main: !!s.main };
         });
       }
-    }
-  }
-
-  /* 3. Копировать конфигурацию предыдущей карточки */
-  if (!slotsConfig || slotsConfig.length === 0) {
-    if (proj.cards && proj.cards.length > 0) {
-      var prevCard = proj.cards[proj.cards.length - 1];
-      slotsConfig = slotsConfigFromCard(prevCard);
     }
   }
 
@@ -161,17 +161,17 @@ function cpAddCard() {
     slots: slots
   };
 
-  /* Параметры карточки: proj._template > proj.templateId > prevCard */
+  /* Параметры карточки: prevCard > proj._template > proj.templateId */
+  var prevCard = (proj.cards && proj.cards.length > 1) ? proj.cards[proj.cards.length - 2] : null;
   var projTmpl = proj._template || null;
   var userTmpl = proj.templateId ? getUserTemplate(proj.templateId) : null;
-  var prevCard = (proj.cards && proj.cards.length > 1) ? proj.cards[proj.cards.length - 2] : null;
 
-  card._hAspect = (projTmpl && projTmpl.hAspect) || (userTmpl && userTmpl.hAspect) || (prevCard && prevCard._hAspect) || null;
-  card._vAspect = (projTmpl && projTmpl.vAspect) || (userTmpl && userTmpl.vAspect) || (prevCard && prevCard._vAspect) || null;
-  card._lockRows = (projTmpl && projTmpl.lockRows) || (userTmpl && userTmpl.lockRows) || (prevCard && prevCard._lockRows) || false;
-  if (projTmpl && projTmpl.hasHero !== undefined) card._hasHero = projTmpl.hasHero;
+  card._hAspect = (prevCard && prevCard._hAspect) || (projTmpl && projTmpl.hAspect) || (userTmpl && userTmpl.hAspect) || null;
+  card._vAspect = (prevCard && prevCard._vAspect) || (projTmpl && projTmpl.vAspect) || (userTmpl && userTmpl.vAspect) || null;
+  card._lockRows = (prevCard && prevCard._lockRows) || (projTmpl && projTmpl.lockRows) || (userTmpl && userTmpl.lockRows) || false;
+  if (prevCard && prevCard._hasHero !== undefined) card._hasHero = prevCard._hasHero;
+  else if (projTmpl && projTmpl.hasHero !== undefined) card._hasHero = projTmpl.hasHero;
   else if (userTmpl && userTmpl.hasHero !== undefined) card._hasHero = userTmpl.hasHero;
-  else if (prevCard && prevCard._hasHero !== undefined) card._hasHero = prevCard._hasHero;
 
   if (!proj.cards) proj.cards = [];
   proj.cards.push(card);
