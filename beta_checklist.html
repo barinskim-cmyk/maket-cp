@@ -398,7 +398,7 @@ tr.section-row td { background: #f0f0f0; font-weight: 600; font-size: 13px; padd
 </table>
 </div>
 
-<!-- ═══════ TAB: BUGS ═══════ -->
+<!-- ═══════ TAB: BUGS / ДОРАБОТКИ ═══════ -->
 <div id="tab-bugs" class="hidden">
 <table id="tbl-bugs">
 <thead>
@@ -414,14 +414,160 @@ tr.section-row td { background: #f0f0f0; font-weight: 600; font-size: 13px; padd
 </thead>
 <tbody>
 
-<tr class="section-row"><td colspan="7">Критичные (аудит preview loading)</td></tr>
+<tr class="section-row"><td colspan="7">UX: проекты и навигация (из комментариев Masha)</td></tr>
+
+<tr data-id="b20">
+  <td><input type="checkbox" class="beta-toggle" data-id="b20"></td>
+  <td><span class="pri-high">Высокий</span></td>
+  <td><strong>Формат имён съёмок</strong></td>
+  <td>Съёмки</td>
+  <td>Названия съёмок должны быть в формате Бренд_YYYY_MM_DD. Сейчас свободный текст.</td>
+  <td>Автоформат из полей бренд + дата</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="b21">
+  <td><input type="checkbox" class="beta-toggle" data-id="b21"></td>
+  <td><span class="pri-high">Высокий</span></td>
+  <td><strong>Soft delete проектов</strong></td>
+  <td>Съёмки</td>
+  <td>Нет кнопки удаления проекта. Проекты накапливаются. Нужен soft delete (в базе остаётся, из списка пропадает).</td>
+  <td>Кнопка удаления + поле deleted_at в БД + фильтр "Скрытые"</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="b22">
+  <td><input type="checkbox" class="beta-toggle" data-id="b22"></td>
+  <td><span class="pri-high">Высокий</span></td>
+  <td><strong>Убрать ручную загрузку/выгрузку из облака</strong></td>
+  <td>Съёмки</td>
+  <td>Кнопки "Из облака" не нужны -- всё должно синхронизироваться автоматически. Скрыть завершённые проекты.</td>
+  <td>Убрать кнопки, добавить фильтр "Скрыть завершённые"</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="b23">
+  <td><input type="checkbox" class="beta-toggle" data-id="b23"></td>
+  <td><span class="pri-high">Высокий</span></td>
+  <td><strong>Командный доступ к проектам</strong></td>
+  <td>Съёмки</td>
+  <td>Нет обмена съёмками между участниками команды (стилист, фотограф). Один создаёт проект -- у другого он не отображается.</td>
+  <td>Роль "team member" + проект виден всем участникам</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="b24">
+  <td><input type="checkbox" class="beta-toggle" data-id="b24"></td>
+  <td><span class="pri-med">Средний</span></td>
+  <td><strong>Почистить этапы пайплайна</strong></td>
+  <td>Съёмки</td>
+  <td>Сейчас 8 этапов, но часть пока не покрываем. Оставить: от преотбора до "передано на ретушь".</td>
+  <td>Скрыть/деактивировать неготовые этапы</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr class="section-row"><td colspan="7">UX: карточки и превью (из комментариев Masha)</td></tr>
+
+<tr data-id="b30">
+  <td><input type="checkbox" class="beta-toggle" data-id="b30"></td>
+  <td><span class="pri-high">Высокий</span></td>
+  <td><strong>Шаблоны: нет меню выбора и управления</strong></td>
+  <td>Контент</td>
+  <td>Шаблоны сохраняются непонятно куда. Нет окна просмотра шаблонов, нет меню выбора из сохранённых. Нужно сохранить реальные шаблоны из проектов.</td>
+  <td>Окно управления шаблонами + меню выбора</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="b31">
+  <td><input type="checkbox" class="beta-toggle" data-id="b31"></td>
+  <td><span class="pri-high">Высокий</span></td>
+  <td><strong>Drop zone: drag в любую область экрана</strong></td>
+  <td>Превью</td>
+  <td>Когда нет фотографий, перетаскивание должно работать на весь экран. Сейчас маленький контейнер -- неудобно.</td>
+  <td>Fullscreen drop overlay при пустой галерее</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="b32">
+  <td><input type="checkbox" class="beta-toggle" data-id="b32"></td>
+  <td><span class="pri-med">Средний</span></td>
+  <td><strong>Режим карусели в desktop (как в мобилке)</strong></td>
+  <td>Контент</td>
+  <td>В мобилке есть пролистывание внутри карточки -- круто. Хочется так же в desktop как альтернативный режим.</td>
+  <td>Переключатель grid/carousel в desktop</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="b33">
+  <td><input type="checkbox" class="beta-toggle" data-id="b33"></td>
+  <td><span class="pri-med">Средний</span></td>
+  <td><strong>Редактирование имени карточки</strong></td>
+  <td>Контент</td>
+  <td>Нет возможности вручную редактировать имя карточки. Должно поддерживать автопереименование из чек-листа артикулов.</td>
+  <td>Редактируемое поле имени + авто из артикулов</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="b34">
+  <td><input type="checkbox" class="beta-toggle" data-id="b34"></td>
+  <td><span class="pri-med">Средний</span></td>
+  <td><strong>Глюк layout в раскладке карточек</strong></td>
+  <td>Контент</td>
+  <td>Layout engine работает в редакторе, но глючит в общем раскладе карточек (список всех карточек).</td>
+  <td>Отладить рендер карточек в списке</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="b35">
+  <td><input type="checkbox" class="beta-toggle" data-id="b35"></td>
+  <td><span class="pri-med">Средний</span></td>
+  <td><strong>Фильтр по рейтингу в карточках</strong></td>
+  <td>Контент</td>
+  <td>Фильтрация по рейтингу есть в превью, но не в карточках. Должна быть доступна в desktop.</td>
+  <td>Добавить pv-filter в карточки</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="b36">
+  <td><input type="checkbox" class="beta-toggle" data-id="b36"></td>
+  <td><span class="pri-low">Низкий</span></td>
+  <td><strong>PDF экспорт на все экраны</strong></td>
+  <td>Контент</td>
+  <td>PDF экспорт работает для карточек. Хочется экспорт всего селекта (не только карточки).</td>
+  <td>Расширить PDF на allcontent</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="b37">
+  <td><input type="checkbox" class="beta-toggle" data-id="b37"></td>
+  <td><span class="pri-low">Низкий</span></td>
+  <td><strong>Убрать "Экспорт списка" и названия в сайдбаре</strong></td>
+  <td>Контент</td>
+  <td>Кнопка "Экспорт списка" в сайдбаре лишняя. Названия карточек в списке -- тоже лишнее.</td>
+  <td>Убрать кнопку + упростить сайдбар</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr class="section-row"><td colspan="7">UX: доступ и роли (из комментариев Masha)</td></tr>
+
+<tr data-id="b40">
+  <td><input type="checkbox" class="beta-toggle" data-id="b40"></td>
+  <td><span class="pri-high">Высокий</span></td>
+  <td><strong>Роли в share-ссылках: права и отображение</strong></td>
+  <td>Share</td>
+  <td>Непонятно где отображаются метки ссылок. Изменения должны фиксироваться по роли. Согласовать может только заказчик. Нет разграничения прав.</td>
+  <td>UI меток + role-based permissions (только client approve)</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr class="section-row"><td colspan="7">Технические (аудит preview loading)</td></tr>
 
 <tr data-id="b01">
   <td><input type="checkbox" class="beta-toggle" data-id="b01"></td>
   <td><span class="pri-high">Высокий</span></td>
   <td><strong>Race condition: параллельные sync</strong></td>
   <td>Cloud sync</td>
-  <td>sbUploadPreviews() и sbUploadProject() могут запускаться одновременно. Риск: частичные загрузки, повреждение данных в облаке.</td>
+  <td>sbUploadPreviews() и sbUploadProject() могут запускаться одновременно. Риск: частичные загрузки, повреждение данных.</td>
   <td>Добавить sync queue</td>
   <td contenteditable="true" class="note-cell"></td>
 </tr>
@@ -431,62 +577,28 @@ tr.section-row td { background: #f0f0f0; font-weight: 600; font-size: 13px; padd
   <td><span class="pri-high">Высокий</span></td>
   <td><strong>Тихий провал загрузки превью</strong></td>
   <td>Cloud sync</td>
-  <td>Если загрузка превью падает, _pendingSync не устанавливается. Пользователь думает что данные в облаке.</td>
+  <td>Если загрузка падает, _pendingSync не устанавливается. Пользователь думает что данные в облаке.</td>
   <td>Добавить _previewsPendingSync + retry</td>
   <td contenteditable="true" class="note-cell"></td>
 </tr>
 
 <tr data-id="b03">
   <td><input type="checkbox" class="beta-toggle" data-id="b03"></td>
-  <td><span class="pri-high">Высокий</span></td>
+  <td><span class="pri-med">Средний</span></td>
   <td><strong>async/await в ES5 коде</strong></td>
   <td>shootings.js</td>
-  <td>Строки 140, 199 используют async/await. Ломает ES5-браузеры (IE11, старый Safari). Должно быть .then()/.catch().</td>
+  <td>Строки 140, 199 используют async/await. Может сломать старые браузеры.</td>
   <td>Заменить на .then()</td>
   <td contenteditable="true" class="note-cell"></td>
 </tr>
 
-<tr class="section-row"><td colspan="7">Средние</td></tr>
-
 <tr data-id="b04">
   <td><input type="checkbox" class="beta-toggle" data-id="b04"></td>
-  <td><span class="pri-med">Средний</span></td>
+  <td><span class="pri-low">Низкий</span></td>
   <td><strong>FileReader ошибки не ловятся</strong></td>
   <td>Превью</td>
-  <td>previews.js:603-639 -- ошибки чтения файлов пропускаются без уведомления.</td>
+  <td>Ошибки чтения файлов пропускаются без уведомления.</td>
   <td>Добавить onerror обработчик</td>
-  <td contenteditable="true" class="note-cell"></td>
-</tr>
-
-<tr data-id="b05">
-  <td><input type="checkbox" class="beta-toggle" data-id="b05"></td>
-  <td><span class="pri-med">Средний</span></td>
-  <td><strong>IndexedDB quota exceeded</strong></td>
-  <td>Превью</td>
-  <td>Если IndexedDB переполнена -- ошибка пропускается без уведомления пользователя.</td>
-  <td>Показать предупреждение</td>
-  <td contenteditable="true" class="note-cell"></td>
-</tr>
-
-<tr data-id="b06">
-  <td><input type="checkbox" class="beta-toggle" data-id="b06"></td>
-  <td><span class="pri-med">Средний</span></td>
-  <td><strong>Дедупликация непоследовательна</strong></td>
-  <td>Превью</td>
-  <td>Разная логика дедупликации в desktop и browser режимах.</td>
-  <td>Унифицировать</td>
-  <td contenteditable="true" class="note-cell"></td>
-</tr>
-
-<tr class="section-row"><td colspan="7">UX / polish</td></tr>
-
-<tr data-id="b10">
-  <td><input type="checkbox" class="beta-toggle" data-id="b10"></td>
-  <td><span class="pri-low">Низкий</span></td>
-  <td><strong>Нет удаления проекта из списка</strong></td>
-  <td>Съёмки</td>
-  <td>Нельзя убрать проект из списка, только закрыть. Накапливаются.</td>
-  <td>Кнопка удаления</td>
   <td contenteditable="true" class="note-cell"></td>
 </tr>
 
@@ -496,7 +608,7 @@ tr.section-row td { background: #f0f0f0; font-weight: 600; font-size: 13px; padd
   <td><strong>Canvas memory leak</strong></td>
   <td>Превью</td>
   <td>Canvas не освобождается при перезагрузке галереи. При 1000+ фото может замедлить.</td>
-  <td>Cleanup при rerander</td>
+  <td>Cleanup при rerender</td>
   <td contenteditable="true" class="note-cell"></td>
 </tr>
 
@@ -519,72 +631,88 @@ tr.section-row td { background: #f0f0f0; font-weight: 600; font-size: 13px; padd
 </thead>
 <tbody>
 
-<tr data-id="c01">
-  <td><input type="checkbox" class="beta-toggle" data-id="c01"></td>
-  <td><strong>Вкладка "Артикулы"</strong></td>
-  <td>Навигация</td>
-  <td>Сырая фича, запутает бета-тестеров. Не нужна для базового отбора.</td>
-  <td>Скрыть nav-btn + page</td>
-  <td contenteditable="true" class="note-cell"></td>
-</tr>
-
-<tr data-id="c02">
-  <td><input type="checkbox" class="beta-toggle" data-id="c02"></td>
-  <td><strong>Вкладка "Доп. контент"</strong></td>
-  <td>Контент subtabs</td>
-  <td>Бета-тестерам не нужно. Запутает. Достаточно карточек + превью.</td>
-  <td>Скрыть subtab + subpage</td>
-  <td contenteditable="true" class="note-cell"></td>
-</tr>
-
-<tr data-id="c03">
-  <td><input type="checkbox" class="beta-toggle" data-id="c03"></td>
-  <td><strong>Вкладка "Отбор" (allcontent)</strong></td>
-  <td>Контент subtabs</td>
-  <td>Дублирует превью-панель. Для бета достаточно базового потока.</td>
-  <td>Скрыть subtab + subpage</td>
-  <td contenteditable="true" class="note-cell"></td>
-</tr>
+<tr class="section-row"><td colspan="6">Убрать из всех версий</td></tr>
 
 <tr data-id="c04">
-  <td><input type="checkbox" class="beta-toggle" data-id="c04"></td>
+  <td><input type="checkbox" class="beta-toggle" checked data-id="c04"></td>
   <td><strong>Модалка "Настройка облака"</strong></td>
   <td>Съёмки</td>
-  <td>Supabase уже захардкожен. Бета-тестерам не нужно менять.</td>
-  <td>Убрать кнопку</td>
-  <td contenteditable="true" class="note-cell"></td>
+  <td>Атавизм. Supabase захардкожен, бета-тестерам не нужно.</td>
+  <td>Убрать кнопку + модалку</td>
+  <td contenteditable="true" class="note-cell">Masha: "атавизм, убирай"</td>
 </tr>
 
 <tr data-id="c05">
-  <td><input type="checkbox" class="beta-toggle" data-id="c05"></td>
-  <td><strong>Кнопка "Импорт" (legacy)</strong></td>
+  <td><input type="checkbox" class="beta-toggle" checked data-id="c05"></td>
+  <td><strong>Кнопка "Импорт" (legacy JSON)</strong></td>
   <td>Съёмки</td>
-  <td>Только для миграции с MVP v0.1. Бета-тестеры не имеют старых проектов.</td>
+  <td>Только для миграции с MVP v0.1. Вся синхронизация облачная.</td>
   <td>Убрать кнопку</td>
-  <td contenteditable="true" class="note-cell"></td>
+  <td contenteditable="true" class="note-cell">Masha: "убрать, вся синхронизация облачная"</td>
 </tr>
+
+<tr data-id="c08">
+  <td><input type="checkbox" class="beta-toggle" checked data-id="c08"></td>
+  <td><strong>Кнопки "Из облака" / "Открыть"</strong></td>
+  <td>Съёмки</td>
+  <td>Всё должно синхронизироваться автоматически. Ручная загрузка из облака не нужна.</td>
+  <td>Убрать кнопки, проекты подтягиваются сами</td>
+  <td contenteditable="true" class="note-cell">Masha: "никакой выгрузки и загрузки"</td>
+</tr>
+
+<tr data-id="c09">
+  <td><input type="checkbox" class="beta-toggle" checked data-id="c09"></td>
+  <td><strong>"Экспорт списка" в сайдбаре карточек</strong></td>
+  <td>Контент</td>
+  <td>Лишняя кнопка в сайдбаре, никто не пользуется.</td>
+  <td>Убрать кнопку</td>
+  <td contenteditable="true" class="note-cell">Masha: "можно убрать"</td>
+</tr>
+
+<tr class="section-row"><td colspan="6">Убрать из web (оставить в desktop)</td></tr>
+
+<tr data-id="c10">
+  <td><input type="checkbox" class="beta-toggle" checked data-id="c10"></td>
+  <td><strong>Rate Setter в web-версии</strong></td>
+  <td>Синхронизация</td>
+  <td>Rate Setter пишет COS -- работает только с desktop и Capture One. В web бесполезен.</td>
+  <td>Скрыть вкладку "Синхронизация" в web</td>
+  <td contenteditable="true" class="note-cell">Masha: "убрать из web"</td>
+</tr>
+
+<tr data-id="c11">
+  <td><input type="checkbox" class="beta-toggle" checked data-id="c11"></td>
+  <td><strong>Артикулы в web-версии</strong></td>
+  <td>Артикулы</td>
+  <td>Артикулы -- функция фотографа на desktop. Клиент в web не работает с чек-листом.</td>
+  <td>Скрыть вкладку "Артикулы" в web</td>
+  <td contenteditable="true" class="note-cell">Masha: "убрать из web, оставить в desktop"</td>
+</tr>
+
+<tr class="section-row"><td colspan="6">Упростить</td></tr>
 
 <tr data-id="c06">
-  <td><input type="checkbox" class="beta-toggle" data-id="c06"></td>
-  <td><strong>Status bar "Бэкенд: ..."</strong></td>
+  <td><input type="checkbox" class="beta-toggle" checked data-id="c06"></td>
+  <td><strong>Status bar</strong></td>
   <td>Внизу</td>
-  <td>Технические детали (backend status, cloud status) -- не для пользователей.</td>
-  <td>Упростить или скрыть</td>
+  <td>Технические детали (backend, cloud status) не для пользователей.</td>
+  <td>Оставить только статус sync + user</td>
   <td contenteditable="true" class="note-cell"></td>
 </tr>
 
-<tr data-id="c07">
-  <td><input type="checkbox" class="beta-toggle" data-id="c07"></td>
-  <td><strong>Subtab "Карточки товара" (если один subtab)</strong></td>
-  <td>Контент</td>
-  <td>Если убрали "Доп. контент" и "Отбор" -- subtabs вообще не нужны, остаётся один экран.</td>
-  <td>Убрать subtabs, показывать карточки напрямую</td>
-  <td contenteditable="true" class="note-cell"></td>
+<tr data-id="c12">
+  <td><input type="checkbox" class="beta-toggle" checked data-id="c12"></td>
+  <td><strong>Переименовать "Доп. контент" в "Other"</strong></td>
+  <td>Контент subtabs</td>
+  <td>Masha хочет название "Other" вместо "Доп. контент".</td>
+  <td>Поменять текст subtab</td>
+  <td contenteditable="true" class="note-cell">Masha: "пусть будет Other"</td>
 </tr>
 
 </tbody>
 </table>
 </div>
+
 
 <script>
 // ── State ──
