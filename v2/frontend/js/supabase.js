@@ -1088,8 +1088,8 @@ function _sbDoLoadByToken(token) {
         App.selectedProject = 0;
         if (typeof renderProjects === 'function') renderProjects();
 
-        /* Клиентский режим */
-        if (proj._role === 'client' && typeof shEnterClientMode === 'function') {
+        /* Клиентский/гостевой режим (все роли кроме owner) */
+        if (proj._role && proj._role !== 'owner' && typeof shEnterClientMode === 'function') {
           shEnterClientMode();
         }
 

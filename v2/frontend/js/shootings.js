@@ -1012,15 +1012,29 @@ function shRenderClientBar() {
   var bar = document.createElement('div');
   bar.id = 'client-action-bar';
   bar.className = 'client-action-bar';
+  var role = proj ? (proj._role || 'client') : 'client';
+  var subtitle = role === 'viewer' ? 'Режим просмотра' : 'Просмотрите карточки и примите решение';
+  var buttonsHtml = '';
+  if (role === 'client') {
+    buttonsHtml =
+      '<div class="client-bar-buttons">' +
+        '<button class="btn client-btn-extra" onclick="shClientRequestExtra()">Запросить доп. кадры</button>' +
+        '<button class="btn btn-primary client-btn-approve" onclick="shClientApprove()">Согласовать отбор</button>' +
+      '</div>';
+  } else if (role === 'retoucher') {
+    buttonsHtml =
+      '<div class="client-bar-buttons">' +
+        '<span style="color:#888;font-size:12px">Ретушёр</span>' +
+      '</div>';
+  }
+  /* viewer: no buttons */
+
   bar.innerHTML =
     '<div class="client-bar-info">' +
       '<div class="client-bar-title">' + (brandName || 'Преотбор') + '</div>' +
-      '<div class="client-bar-subtitle">Просмотрите карточки и примите решение</div>' +
+      '<div class="client-bar-subtitle">' + subtitle + '</div>' +
     '</div>' +
-    '<div class="client-bar-buttons">' +
-      '<button class="btn client-btn-extra" onclick="shClientRequestExtra()">Запросить доп. кадры</button>' +
-      '<button class="btn btn-primary client-btn-approve" onclick="shClientApprove()">Согласовать отбор</button>' +
-    '</div>';
+    buttonsHtml;
 
   /* Вставить перед основным контентом */
   var appMain = document.getElementById('app-main');
