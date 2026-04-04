@@ -286,14 +286,14 @@ loadUserTemplates();
  * @type {Array<{id: string, name: string}>}
  */
 var PIPELINE_STAGES = [
-  { id: 'preselect',    name: 'Преотбор и превью' },
-  { id: 'selection',    name: 'Отбор фотографа' },
-  { id: 'client',       name: 'Отбор клиента' },
-  { id: 'color',        name: 'Цветокоррекция' },
-  { id: 'retouch_task', name: 'Комментарии на ретушь' },
-  { id: 'retouch',      name: 'Ретушь' },
-  { id: 'retouch_ok',   name: 'Согласование ретуши' },
-  { id: 'adaptation',   name: 'Адаптация к каналам' },
+  { id: 'preselect',    name: 'Преотбор и превью',    beta: true },
+  { id: 'selection',    name: 'Отбор фотографа',      beta: true },
+  { id: 'client',       name: 'Отбор клиента',        beta: true },
+  { id: 'color',        name: 'Цветокоррекция',       beta: false },
+  { id: 'retouch_task', name: 'Комментарии на ретушь', beta: false },
+  { id: 'retouch',      name: 'Ретушь',               beta: false },
+  { id: 'retouch_ok',   name: 'Согласование ретуши',  beta: false },
+  { id: 'adaptation',   name: 'Адаптация к каналам',  beta: false },
 ];
 
 
