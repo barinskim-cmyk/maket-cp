@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Maket CP — Beta Release Checklist</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #333; padding: 24px; max-width: 1200px; margin: 0 auto; }
+h1 { font-size: 22px; margin-bottom: 4px; }
+.subtitle { font-size: 13px; color: #888; margin-bottom: 20px; }
+
+/* Summary bar */
+.summary { background: #fff; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px; display: flex; gap: 24px; align-items: center; flex-wrap: wrap; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.summary-item { text-align: center; }
+.summary-num { font-size: 28px; font-weight: 700; }
+.summary-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.3px; }
+.s-green { color: #4caf50; }
+.s-orange { color: #ff9800; }
+.s-red { color: #e53935; }
+.s-blue { color: #1976d2; }
+.s-gray { color: #90a4ae; }
+.summary-bar { flex: 1; min-width: 200px; height: 8px; background: #eee; border-radius: 4px; overflow: hidden; }
+.summary-bar-fill { height: 100%; background: #4caf50; border-radius: 4px; transition: width 0.3s; }
+
+/* Tabs */
+.tabs { display: flex; gap: 0; margin-bottom: 20px; }
+.tab { padding: 10px 20px; background: #e0e0e0; border: none; cursor: pointer; font-size: 13px; font-weight: 500; }
+.tab:first-child { border-radius: 6px 0 0 6px; }
+.tab:last-child { border-radius: 0 6px 6px 0; }
+.tab.active { background: #333; color: #fff; }
+
+/* Table */
+table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; font-size: 13px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+thead { background: #333; color: #fff; }
+th { padding: 10px 8px; text-align: left; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px; }
+td { padding: 10px 8px; border-bottom: 1px solid #eee; vertical-align: top; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #fafafa; }
+tr.section-row td { background: #f0f0f0; font-weight: 600; font-size: 13px; padding: 10px 8px; }
+
+/* Status badges */
+.badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; }
+.b-done { background: #e8f5e9; color: #2e7d32; }
+.b-partial { background: #fff3e0; color: #e65100; }
+.b-bug { background: #fce4ec; color: #c62828; }
+.b-new { background: #e3f2fd; color: #1565c0; }
+.b-plan { background: #eceff1; color: #546e7a; }
+.b-skip { background: #f5f5f5; color: #bbb; text-decoration: line-through; }
+
+/* Beta toggle */
+.beta-toggle { width: 20px; height: 20px; cursor: pointer; accent-color: #4caf50; }
+
+/* Priority */
+.pri-high { color: #c62828; font-weight: 600; }
+.pri-med { color: #e65100; }
+.pri-low { color: #90a4ae; }
+
+/* Notes */
+.note-cell { min-height: 32px; font-size: 12px; color: #555; }
+.note-cell:empty::before { content: 'Кликни...'; color: #ccc; font-style: italic; }
+
+/* Toolbar */
+.toolbar { display: flex; gap: 10px; margin-bottom: 16px; align-items: center; }
+.toolbar button { padding: 6px 16px; border: none; border-radius: 4px; font-size: 13px; cursor: pointer; font-weight: 500; }
+.btn-export { background: #4caf50; color: #fff; }
+.btn-import { background: #2196f3; color: #fff; }
+.btn-reset { background: #eee; color: #666; }
+.save-hint { font-size: 11px; color: #aaa; margin-left: auto; }
+
+.hidden { display: none; }
+</style>
+</head>
+<body>
+
+<h1>Maket CP — Beta Release Checklist</h1>
+<p class="subtitle">v0.9-beta | Snapshot 2026-04-04 | Цель: продукт для отбора + синхронизация с C1</p>
+
+<div class="summary" id="summary">
+  <div class="summary-item"><div class="summary-num s-green" id="sum-in">0</div><div class="summary-label">В бету</div></div>
+  <div class="summary-item"><div class="summary-num s-orange" id="sum-fix">0</div><div class="summary-label">Доработать</div></div>
+  <div class="summary-item"><div class="summary-num s-red" id="sum-bug">0</div><div class="summary-label">Баги</div></div>
+  <div class="summary-item"><div class="summary-num s-gray" id="sum-skip">0</div><div class="summary-label">Убрать</div></div>
+  <div class="summary-bar"><div class="summary-bar-fill" id="sum-bar"></div></div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="showTab('features')">Фичи</button>
+  <button class="tab" onclick="showTab('bugs')">Баги / доработки</button>
+  <button class="tab" onclick="showTab('cleanup')">Что убрать</button>
+</div>
+
+<div class="toolbar">
+  <button class="btn-export" onclick="exportJSON()">Экспорт JSON</button>
+  <button class="btn-import" onclick="document.getElementById('imp').click()">Импорт JSON</button>
+  <input type="file" id="imp" accept=".json" style="display:none" onchange="importJSON(this)">
+  <button class="btn-reset" onclick="if(confirm('Сбросить все галочки?')){localStorage.removeItem('beta_cl');location.reload()}">Сброс</button>
+  <span class="save-hint">Автосохранение в localStorage</span>
+</div>
+
+<!-- ═══════ TAB: FEATURES ═══════ -->
+<div id="tab-features">
+<table id="tbl-features">
+<thead>
+<tr>
+  <th style="width:4%">Beta</th>
+  <th style="width:18%">Фича</th>
+  <th style="width:8%">Статус</th>
+  <th style="width:8%">Экран</th>
+  <th style="width:30%">Что есть</th>
+  <th style="width:12%">Что нужно для беты</th>
+  <th style="width:20%">Заметки Masha</th>
+</tr>
+</thead>
+<tbody>
+
+<!-- ПРОЕКТЫ -->
+<tr class="section-row"><td colspan="7">Проекты и навигация</td></tr>
+
+<tr data-id="f01">
+  <td><input type="checkbox" class="beta-toggle" checked data-id="f01"></td>
+  <td><strong>Создание съёмки</strong></td>
+  <td><span class="badge b-done">Готово</span></td>
+  <td>Съёмки</td>
+  <td>Модалка: бренд, дата, шаблон. Выбор из сохранённых шаблонов. Шаблон с превью.</td>
+  <td>--</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="f02">
+  <td><input type="checkbox" class="beta-toggle" checked data-id="f02"></td>
+  <td><strong>Список проектов</strong></td>
+  <td><span class="badge b-done">Готово</span></td>
+  <td>Съёмки</td>
+  <td>Список с брендом, датой, кол-вом карточек. Переключение между проектами. Открытие из файла (JSON).</td>
+  <td>--</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="f03">
+  <td><input type="checkbox" class="beta-toggle" checked data-id="f03"></td>
+  <td><strong>Пайплайн</strong></td>
+  <td><span class="badge b-done">Готово</span></td>
+  <td>Съёмки</td>
+  <td>8 этапов, визуальный прогресс, кнопка "Завершить этап", история переходов в Supabase (stage_events), авто-синхронизация.</td>
+  <td>--</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="f04">
+  <td><input type="checkbox" class="beta-toggle" checked data-id="f04"></td>
+  <td><strong>Сохранение проекта</strong></td>
+  <td><span class="badge b-done">Готово</span></td>
+  <td>Съёмки</td>
+  <td>Desktop: save/load JSON через Python. Браузер: автосохранение в localStorage, восстановление при перезагрузке. Облако: автосинхронизация с Supabase.</td>
+  <td>--</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="f05">
+  <td><input type="checkbox" class="beta-toggle" checked data-id="f05"></td>
+  <td><strong>Облачные проекты</strong></td>
+  <td><span class="badge b-done">Готово</span></td>
+  <td>Съёмки</td>
+  <td>Кнопка "Из облака" -- загрузка списка проектов из Supabase. Скачивание проекта с карточками, слотами, превью.</td>
+  <td>--</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<!-- КАРТОЧКИ -->
+<tr class="section-row"><td colspan="7">Карточки товара</td></tr>
+
+<tr data-id="f10">
+  <td><input type="checkbox" class="beta-toggle" checked data-id="f10"></td>
+  <td><strong>Сайдбар карточек</strong></td>
+  <td><span class="badge b-done">Готово</span></td>
+  <td>Контент</td>
+  <td>Список карточек с номерами. Добавление/удаление. Экспорт списка (.txt). Навигация кликом.</td>
+  <td>--</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="f11">
+  <td><input type="checkbox" class="beta-toggle" checked data-id="f11"></td>
+  <td><strong>Редактор карточки</strong></td>
+  <td><span class="badge b-done">Готово</span></td>
+  <td>Контент</td>
+  <td>Раскладка: hero + вертикали/горизонтали. Drag-drop из ОС, из превью, между слотами (swap). Удаление фото. +/- слот, переключение H/V. Undo (Cmd+Z). Стрелки между карточками. Zoom на фото.</td>
+  <td>--</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="f12">
+  <td><input type="checkbox" class="beta-toggle" checked data-id="f12"></td>
+  <td><strong>Шаблоны карточек</strong></td>
+  <td><span class="badge b-done">Готово</span></td>
+  <td>Контент</td>
+  <td>Редактор шаблона (V/H кол-во, пропорции, ряды, hero). Сохранение шаблона. Применение к карточке. Создание проекта с шаблоном.</td>
+  <td>--</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="f13">
+  <td><input type="checkbox" class="beta-toggle" checked data-id="f13"></td>
+  <td><strong>Авто-раскладка (layout engine)</strong></td>
+  <td><span class="badge b-done">Готово</span></td>
+  <td>Контент</td>
+  <td>Авто-ряды по весу слотов. Hero сверху (H) или слева (V). Constraint-based sizing. lockRows режим.</td>
+  <td>--</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="f14">
+  <td><input type="checkbox" class="beta-toggle" checked data-id="f14"></td>
+  <td><strong>Экспорт PDF</strong></td>
+  <td><span class="badge b-done">Готово</span></td>
+  <td>Контент</td>
+  <td>Экспорт карточек в PDF (jsPDF). Карточка = страница.</td>
+  <td>Проверить качество</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<!-- ПРЕВЬЮ -->
+<tr class="section-row"><td colspan="7">Превью-панель</td></tr>
+
+<tr data-id="f20">
+  <td><input type="checkbox" class="beta-toggle" checked data-id="f20"></td>
+  <td><strong>Загрузка фото</strong></td>
+  <td><span class="badge b-done">Готово</span></td>
+  <td>Контент</td>
+  <td>Drag-drop папки/файлов. Кнопка "Выбрать папку" (desktop). Прогресс загрузки. Дедупликация по имени.</td>
+  <td>--</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="f21">
+  <td><input type="checkbox" class="beta-toggle" checked data-id="f21"></td>
+  <td><strong>Миниатюры + лайтбокс</strong></td>
+  <td><span class="badge b-done">Готово</span></td>
+  <td>Контент</td>
+  <td>Canvas thumbnails (браузер) / Pillow (desktop). Lazy loading. Клик = лайтбокс. Стрелки. Зелёная галочка на использованных фото. Slider размера. Ротация landscape 90.</td>
+  <td>--</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="f22">
+  <td><input type="checkbox" class="beta-toggle" checked data-id="f22"></td>
+  <td><strong>Фильтры</strong></td>
+  <td><span class="badge b-done">Готово</span></td>
+  <td>Контент</td>
+  <td>По рейтингу (XMP из Capture One). По папке. По источнику (Все/Карточки/Other).</td>
+  <td>--</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="f23">
+  <td><input type="checkbox" class="beta-toggle" checked data-id="f23"></td>
+  <td><strong>Облачные превью</strong></td>
+  <td><span class="badge b-done">Готово</span></td>
+  <td>Контент</td>
+  <td>Авто-загрузка превью в Supabase Storage (thumbnails bucket). Пакетная загрузка по 5. Дедупликация (не перезаливает существующие).</td>
+  <td>--</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<!-- СИНХРОНИЗАЦИЯ -->
+<tr class="section-row"><td colspan="7">Синхронизация с Capture One</td></tr>
+
+<tr data-id="f30">
+  <td><input type="checkbox" class="beta-toggle" checked data-id="f30"></td>
+  <td><strong>Rate Setter</strong></td>
+  <td><span class="badge b-done">Готово</span></td>
+  <td>Синхронизация</td>
+  <td>Два режима: список имён / папка. Автозаполнение из проекта (select-фото из карточек). COS-запись рейтинга + ключевых слов. Пробный запуск. Лог. Суффикс-резалка.</td>
+  <td>--</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<!-- SHARE / КЛИЕНТ -->
+<tr class="section-row"><td colspan="7">Доступ клиента (web)</td></tr>
+
+<tr data-id="f40">
+  <td><input type="checkbox" class="beta-toggle" checked data-id="f40"></td>
+  <td><strong>Auth (вход/регистрация)</strong></td>
+  <td><span class="badge b-done">Готово</span></td>
+  <td>Auth gate</td>
+  <td>Email + пароль. Magic link. Регистрация с именем. Auth gate при загрузке.</td>
+  <td>--</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="f41">
+  <td><input type="checkbox" class="beta-toggle" checked data-id="f41"></td>
+  <td><strong>Share-ссылки</strong></td>
+  <td><span class="badge b-done">Готово</span></td>
+  <td>Съёмки</td>
+  <td>Создание ссылки (роль: клиент/ретушёр, метка). Копирование. Деактивация. Анонимный доступ без регистрации.</td>
+  <td>--</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="f42">
+  <td><input type="checkbox" class="beta-toggle" checked data-id="f42"></td>
+  <td><strong>Клиентский просмотр</strong></td>
+  <td><span class="badge b-done">Готово</span></td>
+  <td>Web (share)</td>
+  <td>Анонимный клиент видит карточки, превью, лайтбокс. Пайплайн показывает текущий этап. Мобильная версия (адаптивная).</td>
+  <td>--</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="f43">
+  <td><input type="checkbox" class="beta-toggle" checked data-id="f43"></td>
+  <td><strong>Клиентский отбор</strong></td>
+  <td><span class="badge b-done">Готово</span></td>
+  <td>Web (share)</td>
+  <td>Галочка/крестик на фото в карточке. Комментарии к карточке. Имя клиента (cookie). Фотограф видит выбор клиента в desktop.</td>
+  <td>--</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="f44">
+  <td><input type="checkbox" class="beta-toggle" checked data-id="f44"></td>
+  <td><strong>Авто-синхронизация карточек</strong></td>
+  <td><span class="badge b-done">Готово</span></td>
+  <td>--</td>
+  <td>Debounce 3 сек. Лёгкий sync (только метаданные, без перезаливки thumb). Авто-pull каждые 30 сек. Фотограф видит изменения клиента.</td>
+  <td>--</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<!-- MOBILE -->
+<tr class="section-row"><td colspan="7">Мобильная версия</td></tr>
+
+<tr data-id="f50">
+  <td><input type="checkbox" class="beta-toggle" checked data-id="f50"></td>
+  <td><strong>Мобильный клиент</strong></td>
+  <td><span class="badge b-done">Готово</span></td>
+  <td>Web (mobile)</td>
+  <td>Адаптивный layout. Карточки в виде карусели слотов. Zoom на слот. Лайтбокс с ротацией landscape. Вкладка "Other" для доп. контента.</td>
+  <td>--</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<!-- ПОД ВОПРОСОМ -->
+<tr class="section-row"><td colspan="7">Под вопросом (оставить/убрать?)</td></tr>
+
+<tr data-id="q01">
+  <td><input type="checkbox" class="beta-toggle" data-id="q01"></td>
+  <td><strong>Вкладка "Доп. контент"</strong></td>
+  <td><span class="badge b-done">Готово</span></td>
+  <td>Контент</td>
+  <td>Отдельная зона для фото, не попавших в карточки. Drag из превью. Своя превью-панель.</td>
+  <td>Нужен бета-тестерам?</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="q02">
+  <td><input type="checkbox" class="beta-toggle" data-id="q02"></td>
+  <td><strong>Вкладка "Отбор" (allcontent)</strong></td>
+  <td><span class="badge b-done">Готово</span></td>
+  <td>Контент</td>
+  <td>Все фото из карточек + other в одной галерее. Фильтр по источнику. Фильтр по рейтингу. "Посмотреть все опции".</td>
+  <td>Нужен бета-тестерам?</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="q03">
+  <td><input type="checkbox" class="beta-toggle" data-id="q03"></td>
+  <td><strong>Вкладка "Артикулы"</strong></td>
+  <td><span class="badge b-done">Готово</span></td>
+  <td>Артикулы</td>
+  <td>Чек-лист артикулов (загрузка PDF/Excel/CSV). Сопоставление артикулов с карточками (ручное + AI). Верификация. Импорт legacy.</td>
+  <td>Нужен бета-тестерам?</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="q04">
+  <td><input type="checkbox" class="beta-toggle" data-id="q04"></td>
+  <td><strong>Модалка "Настройка облака"</strong></td>
+  <td><span class="badge b-done">Готово</span></td>
+  <td>--</td>
+  <td>Ввод Supabase URL / anon key. Сохранение в localStorage. Для самостоятельного подключения.</td>
+  <td>Убрать -- хардкод?</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="q05">
+  <td><input type="checkbox" class="beta-toggle" data-id="q05"></td>
+  <td><strong>Кнопка "Импорт" (legacy JSON)</strong></td>
+  <td><span class="badge b-done">Готово</span></td>
+  <td>Съёмки</td>
+  <td>Импорт проектов из старого формата (MVP v0.1).</td>
+  <td>Убрать для беты?</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+</tbody>
+</table>
+</div>
+
+<!-- ═══════ TAB: BUGS ═══════ -->
+<div id="tab-bugs" class="hidden">
+<table id="tbl-bugs">
+<thead>
+<tr>
+  <th style="width:4%">Fix</th>
+  <th style="width:8%">Приоритет</th>
+  <th style="width:18%">Проблема</th>
+  <th style="width:8%">Экран</th>
+  <th style="width:30%">Описание</th>
+  <th style="width:12%">Решение</th>
+  <th style="width:20%">Заметки Masha</th>
+</tr>
+</thead>
+<tbody>
+
+<tr class="section-row"><td colspan="7">Критичные (аудит preview loading)</td></tr>
+
+<tr data-id="b01">
+  <td><input type="checkbox" class="beta-toggle" data-id="b01"></td>
+  <td><span class="pri-high">Высокий</span></td>
+  <td><strong>Race condition: параллельные sync</strong></td>
+  <td>Cloud sync</td>
+  <td>sbUploadPreviews() и sbUploadProject() могут запускаться одновременно. Риск: частичные загрузки, повреждение данных в облаке.</td>
+  <td>Добавить sync queue</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="b02">
+  <td><input type="checkbox" class="beta-toggle" data-id="b02"></td>
+  <td><span class="pri-high">Высокий</span></td>
+  <td><strong>Тихий провал загрузки превью</strong></td>
+  <td>Cloud sync</td>
+  <td>Если загрузка превью падает, _pendingSync не устанавливается. Пользователь думает что данные в облаке.</td>
+  <td>Добавить _previewsPendingSync + retry</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="b03">
+  <td><input type="checkbox" class="beta-toggle" data-id="b03"></td>
+  <td><span class="pri-high">Высокий</span></td>
+  <td><strong>async/await в ES5 коде</strong></td>
+  <td>shootings.js</td>
+  <td>Строки 140, 199 используют async/await. Ломает ES5-браузеры (IE11, старый Safari). Должно быть .then()/.catch().</td>
+  <td>Заменить на .then()</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr class="section-row"><td colspan="7">Средние</td></tr>
+
+<tr data-id="b04">
+  <td><input type="checkbox" class="beta-toggle" data-id="b04"></td>
+  <td><span class="pri-med">Средний</span></td>
+  <td><strong>FileReader ошибки не ловятся</strong></td>
+  <td>Превью</td>
+  <td>previews.js:603-639 -- ошибки чтения файлов пропускаются без уведомления.</td>
+  <td>Добавить onerror обработчик</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="b05">
+  <td><input type="checkbox" class="beta-toggle" data-id="b05"></td>
+  <td><span class="pri-med">Средний</span></td>
+  <td><strong>IndexedDB quota exceeded</strong></td>
+  <td>Превью</td>
+  <td>Если IndexedDB переполнена -- ошибка пропускается без уведомления пользователя.</td>
+  <td>Показать предупреждение</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="b06">
+  <td><input type="checkbox" class="beta-toggle" data-id="b06"></td>
+  <td><span class="pri-med">Средний</span></td>
+  <td><strong>Дедупликация непоследовательна</strong></td>
+  <td>Превью</td>
+  <td>Разная логика дедупликации в desktop и browser режимах.</td>
+  <td>Унифицировать</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr class="section-row"><td colspan="7">UX / polish</td></tr>
+
+<tr data-id="b10">
+  <td><input type="checkbox" class="beta-toggle" data-id="b10"></td>
+  <td><span class="pri-low">Низкий</span></td>
+  <td><strong>Нет удаления проекта из списка</strong></td>
+  <td>Съёмки</td>
+  <td>Нельзя убрать проект из списка, только закрыть. Накапливаются.</td>
+  <td>Кнопка удаления</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="b11">
+  <td><input type="checkbox" class="beta-toggle" data-id="b11"></td>
+  <td><span class="pri-low">Низкий</span></td>
+  <td><strong>Canvas memory leak</strong></td>
+  <td>Превью</td>
+  <td>Canvas не освобождается при перезагрузке галереи. При 1000+ фото может замедлить.</td>
+  <td>Cleanup при rerander</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+</tbody>
+</table>
+</div>
+
+<!-- ═══════ TAB: CLEANUP ═══════ -->
+<div id="tab-cleanup" class="hidden">
+<table id="tbl-cleanup">
+<thead>
+<tr>
+  <th style="width:4%">Убрать</th>
+  <th style="width:18%">Элемент</th>
+  <th style="width:10%">Где</th>
+  <th style="width:30%">Зачем убирать</th>
+  <th style="width:18%">Как убрать</th>
+  <th style="width:20%">Заметки Masha</th>
+</tr>
+</thead>
+<tbody>
+
+<tr data-id="c01">
+  <td><input type="checkbox" class="beta-toggle" data-id="c01"></td>
+  <td><strong>Вкладка "Артикулы"</strong></td>
+  <td>Навигация</td>
+  <td>Сырая фича, запутает бета-тестеров. Не нужна для базового отбора.</td>
+  <td>Скрыть nav-btn + page</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="c02">
+  <td><input type="checkbox" class="beta-toggle" data-id="c02"></td>
+  <td><strong>Вкладка "Доп. контент"</strong></td>
+  <td>Контент subtabs</td>
+  <td>Бета-тестерам не нужно. Запутает. Достаточно карточек + превью.</td>
+  <td>Скрыть subtab + subpage</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="c03">
+  <td><input type="checkbox" class="beta-toggle" data-id="c03"></td>
+  <td><strong>Вкладка "Отбор" (allcontent)</strong></td>
+  <td>Контент subtabs</td>
+  <td>Дублирует превью-панель. Для бета достаточно базового потока.</td>
+  <td>Скрыть subtab + subpage</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="c04">
+  <td><input type="checkbox" class="beta-toggle" data-id="c04"></td>
+  <td><strong>Модалка "Настройка облака"</strong></td>
+  <td>Съёмки</td>
+  <td>Supabase уже захардкожен. Бета-тестерам не нужно менять.</td>
+  <td>Убрать кнопку</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="c05">
+  <td><input type="checkbox" class="beta-toggle" data-id="c05"></td>
+  <td><strong>Кнопка "Импорт" (legacy)</strong></td>
+  <td>Съёмки</td>
+  <td>Только для миграции с MVP v0.1. Бета-тестеры не имеют старых проектов.</td>
+  <td>Убрать кнопку</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="c06">
+  <td><input type="checkbox" class="beta-toggle" data-id="c06"></td>
+  <td><strong>Status bar "Бэкенд: ..."</strong></td>
+  <td>Внизу</td>
+  <td>Технические детали (backend status, cloud status) -- не для пользователей.</td>
+  <td>Упростить или скрыть</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+<tr data-id="c07">
+  <td><input type="checkbox" class="beta-toggle" data-id="c07"></td>
+  <td><strong>Subtab "Карточки товара" (если один subtab)</strong></td>
+  <td>Контент</td>
+  <td>Если убрали "Доп. контент" и "Отбор" -- subtabs вообще не нужны, остаётся один экран.</td>
+  <td>Убрать subtabs, показывать карточки напрямую</td>
+  <td contenteditable="true" class="note-cell"></td>
+</tr>
+
+</tbody>
+</table>
+</div>
+
+<script>
+// ── State ──
+var STATE_KEY = 'beta_cl';
+var state = {};
+
+function loadState() {
+  try { state = JSON.parse(localStorage.getItem(STATE_KEY)) || {}; } catch(e) { state = {}; }
+  // Apply checkboxes
+  var cbs = document.querySelectorAll('.beta-toggle');
+  for (var i = 0; i < cbs.length; i++) {
+    var id = cbs[i].getAttribute('data-id');
+    if (state[id] !== undefined) cbs[i].checked = state[id];
+  }
+  // Apply notes
+  var notes = document.querySelectorAll('.note-cell');
+  for (var j = 0; j < notes.length; j++) {
+    var tr = notes[j].closest('tr');
+    if (tr && tr.getAttribute('data-id') && state['note_' + tr.getAttribute('data-id')]) {
+      notes[j].innerHTML = state['note_' + tr.getAttribute('data-id')];
+    }
+  }
+  updateSummary();
+}
+
+function saveState() {
+  var cbs = document.querySelectorAll('.beta-toggle');
+  for (var i = 0; i < cbs.length; i++) {
+    state[cbs[i].getAttribute('data-id')] = cbs[i].checked;
+  }
+  var notes = document.querySelectorAll('.note-cell');
+  for (var j = 0; j < notes.length; j++) {
+    var tr = notes[j].closest('tr');
+    if (tr && tr.getAttribute('data-id')) {
+      var val = notes[j].innerHTML.trim();
+      if (val) state['note_' + tr.getAttribute('data-id')] = val;
+    }
+  }
+  localStorage.setItem(STATE_KEY, JSON.stringify(state));
+  updateSummary();
+}
+
+function updateSummary() {
+  var featureChecks = document.querySelectorAll('#tbl-features .beta-toggle');
+  var bugChecks = document.querySelectorAll('#tbl-bugs .beta-toggle');
+  var cleanChecks = document.querySelectorAll('#tbl-cleanup .beta-toggle');
+  var inBeta = 0, toFix = 0, bugs = 0, toSkip = 0;
+  for (var i = 0; i < featureChecks.length; i++) { if (featureChecks[i].checked) inBeta++; }
+  for (var j = 0; j < bugChecks.length; j++) { if (bugChecks[j].checked) toFix++; }
+  bugs = toFix;
+  for (var k = 0; k < cleanChecks.length; k++) { if (cleanChecks[k].checked) toSkip++; }
+
+  document.getElementById('sum-in').textContent = inBeta;
+  document.getElementById('sum-fix').textContent = toFix;
+  document.getElementById('sum-bug').textContent = bugs;
+  document.getElementById('sum-skip').textContent = toSkip;
+
+  var total = featureChecks.length;
+  var pct = total > 0 ? Math.round(inBeta / total * 100) : 0;
+  document.getElementById('sum-bar').style.width = pct + '%';
+}
+
+// ── Tabs ──
+function showTab(name) {
+  var tabs = document.querySelectorAll('.tab');
+  for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('active');
+  document.getElementById('tab-features').classList.add('hidden');
+  document.getElementById('tab-bugs').classList.add('hidden');
+  document.getElementById('tab-cleanup').classList.add('hidden');
+  if (name === 'features') { tabs[0].classList.add('active'); document.getElementById('tab-features').classList.remove('hidden'); }
+  if (name === 'bugs') { tabs[1].classList.add('active'); document.getElementById('tab-bugs').classList.remove('hidden'); }
+  if (name === 'cleanup') { tabs[2].classList.add('active'); document.getElementById('tab-cleanup').classList.remove('hidden'); }
+}
+
+// ── Export/Import ──
+function exportJSON() {
+  saveState();
+  var blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'beta_checklist_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+}
+
+function importJSON(input) {
+  if (!input.files[0]) return;
+  var reader = new FileReader();
+  reader.onload = function() {
+    try {
+      state = JSON.parse(reader.result);
+      localStorage.setItem(STATE_KEY, JSON.stringify(state));
+      loadState();
+    } catch(e) { alert('Ошибка чтения файла'); }
+  };
+  reader.readAsText(input.files[0]);
+}
+
+// ── Event listeners ──
+document.addEventListener('change', function(e) {
+  if (e.target.classList.contains('beta-toggle')) saveState();
+});
+document.addEventListener('input', function(e) {
+  if (e.target.classList.contains('note-cell')) {
+    clearTimeout(e.target._saveTimer);
+    e.target._saveTimer = setTimeout(saveState, 500);
+  }
+});
+
+// ── Init ──
+loadState();
+</script>
+
+</body>
+</html>
