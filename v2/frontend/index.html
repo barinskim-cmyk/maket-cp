@@ -69,10 +69,7 @@
     <div class="projects-header">
       <div class="section-title">Съёмки</div>
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        <button class="btn" onclick="loadProject()">Открыть</button>
         <button class="btn btn-primary" onclick="openNewProjectModal()">Новая съёмка</button>
-        <button class="btn" onclick="shImportLegacyJson()" title="Импорт старого проекта (JSON)">Импорт</button>
-        <button class="btn" onclick="sbShowCloudProjects()" title="Скачать из облака">Из облака</button>
         <button class="btn" onclick="sbOpenShareModal()" title="Поделиться ссылкой">Поделиться</button>
       </div>
     </div>
@@ -100,7 +97,7 @@
 <div id="page-content" class="page">
   <div class="subtabs">
     <button class="subtab active" id="subtab-cp" onclick="showSubpage('cp')">Карточки товара</button>
-    <button class="subtab" id="subtab-other" onclick="showSubpage('other')">Доп. контент</button>
+    <button class="subtab" id="subtab-other" onclick="showSubpage('other')">Other</button>
     <button class="subtab" id="subtab-allcontent" onclick="showSubpage('allcontent')">Отбор</button>
   </div>
 
@@ -110,7 +107,6 @@
         <h3>Карточки</h3>
         <div id="cp-cards-list"></div>
         <button class="cp-add-card-btn" onclick="cpAddCard()">+ Новая карточка</button>
-        <button class="btn btn-sm" style="width:100%;margin-top:6px" onclick="cpExportList()">Экспорт списка</button>
         <button class="btn btn-sm" style="width:100%;margin-top:6px" onclick="cpExportPDF()">Экспорт PDF</button>
       </div>
       <div class="cp-view" id="cp-view">
@@ -146,7 +142,7 @@
     <div class="oc-layout">
       <div class="oc-main">
         <div class="oc-header">
-          <div class="section-title">Доп. контент</div>
+          <div class="section-title">Other</div>
           <div class="oc-toolbar" id="oc-toolbar" style="display:none">
             <span id="oc-count">0 фото</span>
             <button class="btn btn-sm" onclick="ocClearAll()">Очистить</button>
@@ -412,24 +408,7 @@
   </div>
 </div>
 
-<!-- ══════════════ Модалка: облачная настройка ══════════════ -->
-<div class="modal-overlay" id="modal-cloud-setup">
-  <div class="modal" style="width:420px">
-    <h3>Настройка облака</h3>
-    <div class="modal-field">
-      <label>Supabase Project URL</label>
-      <input type="text" id="inp-sb-url" placeholder="https://xxxxx.supabase.co">
-    </div>
-    <div class="modal-field">
-      <label>Supabase anon key</label>
-      <input type="text" id="inp-sb-anon" placeholder="eyJhbGciOiJIUzI1NiIs...">
-    </div>
-    <div class="modal-buttons">
-      <button class="btn" onclick="closeModal('modal-cloud-setup')">Отмена</button>
-      <button class="btn btn-primary" onclick="sbApplySetup()">Подключить</button>
-    </div>
-  </div>
-</div>
+<!-- modal-cloud-setup removed (beta cleanup c04) -->
 
 <!-- ══════════════ Модалка: вход ══════════════ -->
 <div class="modal-overlay" id="modal-login">
@@ -508,10 +487,11 @@
 
 <!-- ══════════════ Статус ══════════════ -->
 <div class="status-bar" id="status-bar">
-  <span id="save-status" style="color:#999">--</span>
-  Бэкенд: <span id="backend-status" class="disconnected">проверяю...</span>
-  <span id="cloud-status" style="margin-left:12px"></span>
-  <span id="user-status" style="margin-left:12px"></span>
+  <span id="save-status" style="color:#999"></span>
+  <span id="cloud-status"></span>
+  <span id="user-status" style="margin-left:auto"></span>
+  <!-- backend-status hidden, kept for JS compat -->
+  <span id="backend-status" style="display:none"></span>
 </div>
 
 </div><!-- /app-main -->

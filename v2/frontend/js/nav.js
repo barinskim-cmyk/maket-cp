@@ -79,3 +79,29 @@ document.addEventListener('click', function(e) {
     e.target.classList.remove('open');
   }
 });
+
+// ── Скрытие вкладок для web-версии (beta cleanup c10, c11) ──
+
+/**
+ * Скрыть вкладки, доступные только в desktop (pywebview).
+ * Rate Setter (Синхронизация) и Артикулы не нужны в web.
+ * Вызывается при загрузке; повторно при pywebviewready (чтобы показать если desktop).
+ */
+function navUpdateTabVisibility() {
+  var isDesktop = !!(window.pywebview && window.pywebview.api);
+  var syncBtn = document.getElementById('nav-sync');
+  var articlesBtn = document.getElementById('nav-articles');
+
+  if (syncBtn) syncBtn.style.display = isDesktop ? '' : 'none';
+  if (articlesBtn) articlesBtn.style.display = isDesktop ? '' : 'none';
+}
+
+/* Запуск при DOMContentLoaded: скрыть для web */
+window.addEventListener('DOMContentLoaded', function() {
+  navUpdateTabVisibility();
+});
+
+/* Desktop: pywebview API инжектится позже — показать вкладки обратно */
+window.addEventListener('pywebviewready', function() {
+  navUpdateTabVisibility();
+});
