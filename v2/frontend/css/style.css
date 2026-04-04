@@ -206,7 +206,17 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .project-item.selected { border-color: #333; }
 .project-brand { font-weight: 600; font-size: 15px; min-width: 140px; }
 .project-date { color: #888; font-size: 13px; min-width: 100px; }
-.project-stats { color: #aaa; font-size: 12px; }
+.project-stats { color: #aaa; font-size: 12px; flex: 1; }
+.project-delete-btn {
+  opacity: 0; font-size: 11px; padding: 2px 8px; color: #999;
+  border: 1px solid #ddd; background: transparent; cursor: pointer;
+  transition: opacity 0.15s;
+}
+.project-item:hover .project-delete-btn { opacity: 1; }
+.project-delete-btn:hover { color: #c00; border-color: #c00; }
+.project-item.project-deleted { opacity: 0.5; }
+.project-restore-btn { font-size: 11px; padding: 2px 8px; color: #666; border: 1px solid #ccc; background: transparent; cursor: pointer; }
+.project-restore-btn:hover { color: #333; border-color: #333; }
 
 .shootings-layout { display: flex; gap: 24px; }
 .shootings-left { flex: 1; min-width: 0; }

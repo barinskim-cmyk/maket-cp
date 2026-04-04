@@ -689,6 +689,7 @@ function sbDownloadProject(cloudId, callback) {
       templateId: remote.template_id,
       _stage: remote.stage || 0,
       _stageHistory: {},
+      _deletedAt: remote.deleted_at || null,
       channels: (typeof remote.channels === 'string') ? JSON.parse(remote.channels || '[]') : (remote.channels || []),
       _ocNames: (typeof remote.other_content === 'string') ? JSON.parse(remote.other_content || '[]') : (remote.other_content || []),
       cards: [],
@@ -800,12 +801,50 @@ function sbListProjects(callback) {
   if (!sbIsLoggedIn()) { callback('Не авторизован'); return; }
 
   sbClient.from('projects')
-    .select('id, brand, shoot_date, stage, updated_at')
+    .select('id, brand, shoot_date, stage, updated_at, deleted_at')
     .eq('owner_id', sbUser.id)
     .order('updated_at', { ascending: false })
     .then(function(res) {
       if (res.error) callback(res.error.message, []);
       else callback(null, res.data || []);
+    });
+}
+
+
+/**
+ * Soft delete проекта: установить deleted_at в текущее время.
+ * Проект не удаляется из БД — только помечается.
+ * @param {string} projectId — UUID проекта в Supabase
+ * @param {function} callback — callback(error)
+ */
+function sbSoftDeleteProject(projectId, callback) {
+  if (!sbIsLoggedIn()) { callback('Не авторизован'); return; }
+
+  sbClient.from('projects')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', projectId)
+    .eq('owner_id', sbUser.id)
+    .then(function(res) {
+      if (res.error) callback(res.error.message);
+      else callback(null);
+    });
+}
+
+/**
+ * Восстановить soft-удалённый проект: обнулить deleted_at.
+ * @param {string} projectId — UUID проекта в Supabase
+ * @param {function} callback — callback(error)
+ */
+function sbRestoreProject(projectId, callback) {
+  if (!sbIsLoggedIn()) { callback('Не авторизован'); return; }
+
+  sbClient.from('projects')
+    .update({ deleted_at: null })
+    .eq('id', projectId)
+    .eq('owner_id', sbUser.id)
+    .then(function(res) {
+      if (res.error) callback(res.error.message);
+      else callback(null);
     });
 }
 
