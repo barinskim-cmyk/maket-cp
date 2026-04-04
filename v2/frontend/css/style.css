@@ -650,6 +650,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   font-size: 13px; color: #bbb; cursor: default;
   transition: all 0.2s; line-height: 1.4;
 }
+/* Полноразмерная зона когда нет фото (не compact) */
+.pv-dropzone:not(.pv-compact):not(.pv-loading) {
+  min-height: 200px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 12px;
+  font-size: 15px; padding: 40px 20px;
+}
 .pv-dropzone.pv-drag-over {
   border-color: #333; background: #f0f0f0; color: #666;
 }
