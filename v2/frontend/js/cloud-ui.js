@@ -210,6 +210,57 @@ function sbOpenShareModal() {
   document.getElementById('share-result').style.display = 'none';
   document.getElementById('inp-share-label').value = '';
   openModal('modal-share');
+
+  /* Загрузить список активных ссылок */
+  _sbRenderShareLinks(proj._cloudId);
+}
+
+/** Названия ролей для UI */
+var _shareRoleLabels = {
+  client: 'Клиент',
+  viewer: 'Зритель',
+  retoucher: 'Ретушёр'
+};
+
+/**
+ * Отрисовать список активных share-ссылок в модалке.
+ * @param {string} projectId
+ */
+function _sbRenderShareLinks(projectId) {
+  var listEl = document.getElementById('share-links-list');
+  if (!listEl) return;
+  listEl.innerHTML = '<div style="color:#999;font-size:12px">Загрузка ссылок...</div>';
+
+  sbListShareLinks(projectId, function(err, links) {
+    if (err || !links || links.length === 0) {
+      listEl.innerHTML = '';
+      return;
+    }
+
+    var html = '<div style="font-size:12px;color:#888;margin-bottom:6px">Активные ссылки:</div>';
+    for (var i = 0; i < links.length; i++) {
+      var l = links[i];
+      var roleLabel = _shareRoleLabels[l.role] || l.role;
+      var label = l.label ? (' -- ' + esc(l.label)) : '';
+      var date = l.created_at ? new Date(l.created_at).toLocaleDateString('ru-RU') : '';
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px;border-bottom:1px solid #f0f0f0">';
+      html += '<span style="font-weight:500">' + esc(roleLabel) + '</span>';
+      html += '<span style="color:#999;flex:1">' + label + ' ' + date + '</span>';
+      html += '<button class="btn btn-sm" onclick="_sbDeactivateShareLink(\'' + l.id + '\',\'' + projectId + '\')" style="font-size:10px;padding:1px 6px;color:#c00;border-color:#c00">X</button>';
+      html += '</div>';
+    }
+    listEl.innerHTML = html;
+  });
+}
+
+/**
+ * Деактивировать ссылку и обновить список.
+ */
+function _sbDeactivateShareLink(linkId, projectId) {
+  sbDeactivateLink(linkId, function(err) {
+    if (err) { alert('Ошибка: ' + err); return; }
+    _sbRenderShareLinks(projectId);
+  });
 }
 
 /**

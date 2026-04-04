@@ -472,6 +472,7 @@
       <label>Роль</label>
       <select id="inp-share-role">
         <option value="client">Клиент (просмотр + комментарии)</option>
+        <option value="viewer">Зритель (только просмотр)</option>
         <option value="retoucher">Ретушёр (редактирование)</option>
       </select>
     </div>
@@ -484,6 +485,7 @@
       <input type="text" id="share-url" readonly style="width:100%;padding:8px;font-size:12px;background:#f5f5f5;border:1px solid #ddd;border-radius:5px;margin-top:4px">
       <button class="btn btn-sm" onclick="sbCopyShareUrl()" style="margin-top:6px">Скопировать</button>
     </div>
+    <div id="share-links-list" style="margin-top:12px"></div>
     <div class="modal-buttons">
       <button class="btn" onclick="closeModal('modal-share')">Закрыть</button>
       <button class="btn btn-primary" id="btn-create-share" onclick="sbDoCreateShare()">Создать ссылку</button>
