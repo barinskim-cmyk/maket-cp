@@ -487,6 +487,11 @@ function sbLoadAllFromCloud() {
               }
             }
 
+            /* Заблокировать автосинхронизацию на 10 сек после загрузки,
+               чтобы не перезаписать облако локальной копией без картинок */
+            window._cloudJustLoaded = true;
+            setTimeout(function() { window._cloudJustLoaded = false; }, 10000);
+
             if (statusEl) statusEl.textContent = 'Загружено ' + projects.length + ' проектов';
             console.log('cloud-ui: загружено', projects.length, 'проектов из облака');
           }

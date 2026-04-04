@@ -602,6 +602,9 @@ var _shCloudSyncRunning = false;
 function shAutoCloudSync() {
   if (_shCloudSyncRunning) return;
   if (typeof sbIsLoggedIn !== 'function' || !sbIsLoggedIn()) return;
+  /* Не синхронизировать сразу после загрузки из облака —
+     иначе локальная копия (без картинок) перезапишет облако */
+  if (window._cloudJustLoaded) return;
 
   var proj = getActiveProject();
   if (!proj) return;
