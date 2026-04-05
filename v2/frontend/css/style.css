@@ -496,6 +496,43 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .slot-expand:hover { background: rgba(0,0,0,0.75); }
 .photo-slot:hover .slot-expand { display: flex; }
 
+/* ── Desktop-карусель: стрелки на слоте ── */
+.slot-carousel-arrows {
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  display: none; align-items: center; justify-content: space-between;
+  pointer-events: none; z-index: 2; padding: 0 4px;
+}
+.photo-slot:hover .slot-carousel-arrows { display: flex; }
+.slot-carousel-arrow {
+  pointer-events: auto;
+  width: 28px; height: 40px;
+  background: rgba(0,0,0,0.35); color: #fff;
+  border: none; border-radius: 4px;
+  font-size: 22px; line-height: 40px; text-align: center;
+  cursor: pointer; transition: background 0.15s;
+  padding: 0;
+}
+.slot-carousel-arrow:hover { background: rgba(0,0,0,0.7); }
+
+/* ── Фильтр по рейтингу в тулбаре карточки ── */
+.cp-filter-bar {
+  display: inline-flex; align-items: center; gap: 2px;
+  margin-left: 8px; border-left: 1px solid #ddd; padding-left: 8px;
+}
+.cp-filter-star {
+  background: none; border: none; cursor: pointer;
+  font-size: 16px; color: #ccc; padding: 2px; line-height: 1;
+  transition: color 0.15s;
+}
+.cp-filter-star:hover { color: #ffc107; }
+.cp-filter-star.cp-star-active { color: #ffa000; }
+.cp-filter-reset {
+  background: none; border: none; cursor: pointer;
+  font-size: 11px; color: #999; padding: 2px 6px; line-height: 1;
+}
+.cp-filter-reset:hover { color: #333; }
+.cp-filter-reset.cp-star-active { color: #333; font-weight: 600; }
+
 /* Управление слотами (+/- кнопки) */
 .cp-slot-controls { display: flex; gap: 4px; }
 

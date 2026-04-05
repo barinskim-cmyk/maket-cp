@@ -59,3 +59,4 @@ v2/frontend/config.json
 # Large legacy HTML files with embedded images
 EKONIKA_карточки товара.html
 EKONIKA_карточки_товара_v2.html
+_snapshots/
