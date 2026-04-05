@@ -1484,9 +1484,13 @@ function shClientApprove() {
 
 /**
  * Клиент: внести изменения в отбор после согласования.
- * Создаёт новый снимок текущего состояния, синхронизирует с облаком,
- * уведомляет команду. Клиент при этом свободно редактирует всё время —
- * эта кнопка лишь фиксирует "вот мои правки, посмотрите".
+ *
+ * 1. Сравнивает текущее состояние с последним снимком согласования
+ * 2. Если есть удалённые фото — спрашивает: убрать из работы или оставить?
+ * 3. Создаёт снимок + синхронизирует с облаком
+ *
+ * Клиент свободно редактирует всё время — эта кнопка фиксирует
+ * "вот мои правки, посмотрите" и защищает от случайных удалений.
  */
 function shClientSubmitChanges() {
   var proj = getActiveProject();
@@ -1504,6 +1508,144 @@ function shClientSubmitChanges() {
     if (!confirm('Отправить изменения команде?')) return;
   }
 
+  /* Загрузить снимки и сравнить с согласованием */
+  if (typeof snLoadSnapshots === 'function' && typeof snCompareSnapshots === 'function') {
+    snLoadSnapshots(function(err, snaps) {
+      if (err || !snaps || !snaps.length) {
+        /* Нет снимков — просто отправить */
+        _shDoSubmitChanges(proj, []);
+        return;
+      }
+      _snCachedSnapshots = snaps;
+
+      /* Найти последний client_approved снимок */
+      var approvedSnap = null;
+      for (var i = snaps.length - 1; i >= 0; i--) {
+        if (snaps[i].trigger === 'client_approved') { approvedSnap = snaps[i]; break; }
+      }
+
+      if (!approvedSnap) {
+        _shDoSubmitChanges(proj, []);
+        return;
+      }
+
+      /* Сравнить */
+      var currentData = snBuildSnapshotData();
+      var diff = snCompareSnapshots(approvedSnap.data, currentData);
+
+      if (diff.removed.length > 0) {
+        /* Есть удалённые фото — спросить клиента */
+        _shShowRemovalDialog(proj, diff, approvedSnap);
+      } else {
+        /* Нет удалений — просто отправить */
+        _shDoSubmitChanges(proj, []);
+      }
+    });
+  } else {
+    /* Нет функций снимков — просто отправить */
+    _shDoSubmitChanges(proj, []);
+  }
+}
+
+/**
+ * Показать диалог подтверждения удалений.
+ * Клиент видит какие фото он убрал из согласованного отбора
+ * и решает: убрать из работы или оставить.
+ *
+ * @param {object} proj
+ * @param {object} diff — результат snCompareSnapshots
+ * @param {object} approvedSnap — снимок согласования
+ * @private
+ */
+function _shShowRemovalDialog(proj, diff, approvedSnap) {
+  /* Создать модалку */
+  var modal = document.getElementById('modal-removals');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'modal-removals';
+    modal.className = 'modal';
+    modal.innerHTML = '<div class="modal-content" style="max-width:520px">' +
+      '<div class="modal-header"><h3>Удалённые фото</h3>' +
+      '<button class="modal-close" onclick="closeModal(\'modal-removals\')">&times;</button></div>' +
+      '<div id="removals-content"></div></div>';
+    document.body.appendChild(modal);
+  }
+
+  var contentEl = document.getElementById('removals-content');
+  var html = '<div style="padding:16px">';
+  html += '<p style="margin:0 0 12px;font-size:13px;color:#666">' +
+    'Вы убрали ' + diff.removed.length + ' фото из согласованного отбора. ' +
+    'Эти фото могут уже быть в работе (цветокоррекция, ретушь).</p>';
+
+  html += '<div style="margin-bottom:16px;max-height:200px;overflow-y:auto">';
+  for (var i = 0; i < diff.removed.length; i++) {
+    html += '<div style="padding:4px 8px;margin-bottom:2px;background:#fde8e8;border-radius:4px;font-size:12px">' +
+      esc(diff.removed[i]) + '</div>';
+  }
+  html += '</div>';
+
+  html += '<p style="margin:0 0 16px;font-size:13px;font-weight:600">Что сделать с этими фото?</p>';
+
+  html += '<div style="display:flex;flex-direction:column;gap:8px">';
+  html += '<button class="btn btn-primary" onclick="_shSubmitWithRemovals(\'keep\')" style="text-align:left;padding:10px 16px">' +
+    '<div>Оставить в работе</div>' +
+    '<div style="font-size:11px;font-weight:400;color:rgba(255,255,255,0.8);margin-top:2px">' +
+    'Фото останутся в текущем цикле (ЦК, ретушь). Вы просто убрали их из своего отбора.</div></button>';
+
+  html += '<button class="btn" onclick="_shSubmitWithRemovals(\'kill\')" style="text-align:left;padding:10px 16px;border-color:#c23030;color:#c23030">' +
+    '<div>Убрать из работы</div>' +
+    '<div style="font-size:11px;font-weight:400;color:#999;margin-top:2px">' +
+    'Эти фото будут исключены из всех этапов. Команда прекратит работу над ними.</div></button>';
+
+  html += '<button class="btn" onclick="closeModal(\'modal-removals\')" style="text-align:left;padding:10px 16px">' +
+    '<div>Отмена</div>' +
+    '<div style="font-size:11px;font-weight:400;color:#999;margin-top:2px">' +
+    'Вернуться к редактированию, ничего не отправлять.</div></button>';
+
+  html += '</div></div>';
+
+  contentEl.innerHTML = html;
+
+  /* Сохранить данные для _shSubmitWithRemovals */
+  window._shPendingRemovals = diff.removed;
+  window._shPendingDiff = diff;
+
+  if (typeof openModal === 'function') openModal('modal-removals');
+}
+
+/**
+ * Обработать решение клиента об удалённых фото и отправить изменения.
+ * @param {string} decision — 'keep' (оставить в работе) или 'kill' (убрать)
+ * @private
+ */
+function _shSubmitWithRemovals(decision) {
+  var proj = getActiveProject();
+  if (typeof closeModal === 'function') closeModal('modal-removals');
+
+  var removals = window._shPendingRemovals || [];
+  var diff = window._shPendingDiff || {};
+
+  /* Записать решение: какие фото удалены и что с ними делать */
+  var removalRecords = removals.map(function(file) {
+    return { file: file, decision: decision, timestamp: new Date().toISOString() };
+  });
+
+  /* Сохранить в проект для аудита */
+  if (!proj._removalLog) proj._removalLog = [];
+  for (var i = 0; i < removalRecords.length; i++) {
+    proj._removalLog.push(removalRecords[i]);
+  }
+
+  _shDoSubmitChanges(proj, removalRecords);
+}
+
+/**
+ * Финальная отправка изменений клиента: снимок + синхронизация.
+ * @param {object} proj
+ * @param {Array} removalRecords — записи о решениях по удалённым фото
+ * @private
+ */
+function _shDoSubmitChanges(proj, removalRecords) {
   var now = new Date();
   var timeStr = now.toLocaleDateString('ru-RU') + ' ' + now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 
@@ -1511,11 +1653,32 @@ function shClientSubmitChanges() {
   if (!proj._stageHistory) proj._stageHistory = {};
   proj._stageHistory['client_changes'] = timeStr;
 
+  /* Описание снимка: включить инфу об удалениях */
+  var note = 'Изменения клиента ' + timeStr;
+  if (removalRecords.length > 0) {
+    var decision = removalRecords[0].decision;
+    note += '. Удалено ' + removalRecords.length + ' фото (' +
+      (decision === 'kill' ? 'убраны из работы' : 'оставлены в работе') + ')';
+  }
+
   /* Создать снимок изменений — новая закладка */
   if (typeof snCreateSnapshot === 'function') {
-    snCreateSnapshot('client', 'client_changes', 'Изменения клиента ' + timeStr, function(err, snapId) {
-      if (err) console.warn('Ошибка снимка client_changes:', err);
-      else console.log('shClientSubmitChanges: снимок изменений создан, id=' + snapId);
+    /* Включить записи удалений в data снимка */
+    var snapshotData = snBuildSnapshotData();
+    snapshotData._removalRecords = removalRecords;
+
+    sbClient.rpc('create_snapshot', {
+      p_project_id: proj._cloudId,
+      p_stage_id: 'client',
+      p_trigger: 'client_changes',
+      p_actor_id: (typeof sbGetActor === 'function' ? sbGetActor() : {}).id || null,
+      p_actor_token: (typeof sbGetActor === 'function' ? sbGetActor() : {}).token || null,
+      p_actor_name: (typeof sbGetActor === 'function' ? sbGetActor() : {}).name || null,
+      p_data: snapshotData,
+      p_note: note
+    }).then(function(res) {
+      if (res.error) console.warn('Ошибка снимка client_changes:', res.error);
+      else console.log('shClientSubmitChanges: снимок изменений создан, id=' + res.data);
     });
   }
 
