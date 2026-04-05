@@ -804,13 +804,26 @@ function sbDownloadProject(cloudId, callback) {
 function sbListProjects(callback) {
   if (!sbIsLoggedIn()) { callback('Не авторизован'); return; }
 
+  /* Загружаем ВСЕ проекты, доступные пользователю (RLS обеспечивает фильтрацию):
+     - owner_id = auth.uid() (свои)
+     - project_members (приглашённые)
+     - team_members через team_id (командные)
+     Поэтому не фильтруем по owner_id — полагаемся на RLS. */
   sbClient.from('projects')
-    .select('id, brand, shoot_date, stage, updated_at, deleted_at')
-    .eq('owner_id', sbUser.id)
+    .select('id, brand, shoot_date, stage, updated_at, deleted_at, owner_id, team_id')
     .order('updated_at', { ascending: false })
     .then(function(res) {
       if (res.error) callback(res.error.message, []);
-      else callback(null, res.data || []);
+      else {
+        /* Отметить чужие проекты флагом _shared */
+        var data = res.data || [];
+        for (var i = 0; i < data.length; i++) {
+          if (data[i].owner_id !== sbUser.id) {
+            data[i]._shared = true;
+          }
+        }
+        callback(null, data);
+      }
     });
 }
 
@@ -2089,6 +2102,210 @@ function sbRestoreCosToDesktop(cosStoragePath, photoStem, callback) {
         callback(String(e));
       });
   });
+}
+
+
+// ══════════════════════════════════════════════
+//  Команды и участники проекта (b23)
+// ══════════════════════════════════════════════
+
+/**
+ * Загрузить команду текущего пользователя.
+ * Пользователь может быть владельцем одной команды и участником нескольких.
+ * @param {function(err, {owned: object|null, memberOf: Array})} callback
+ */
+function sbLoadTeams(callback) {
+  if (!_sb) { callback('SDK not initialized'); return; }
+
+  var result = { owned: null, memberOf: [] };
+
+  /* Команда, которой я владею (одна) */
+  _sb.from('teams').select('*').eq('owner_id', sbCurrentUserId())
+    .then(function(res) {
+      if (res.error) { callback(res.error.message); return; }
+      result.owned = (res.data && res.data.length > 0) ? res.data[0] : null;
+
+      /* Команды, в которых я участник */
+      _sb.from('team_members').select('team_id, role, teams(id, name, owner_id, profiles!teams_owner_id_fkey(email, name))')
+        .eq('user_id', sbCurrentUserId())
+        .then(function(res2) {
+          if (res2.error) { callback(res2.error.message); return; }
+          result.memberOf = res2.data || [];
+          callback(null, result);
+        });
+    });
+}
+
+/**
+ * Создать команду (одна на пользователя).
+ * @param {string} name - название команды (студия, агентство)
+ * @param {function(err, team)} callback
+ */
+function sbCreateTeam(name, callback) {
+  if (!_sb) { callback('SDK not initialized'); return; }
+
+  _sb.from('teams').insert({ name: name, owner_id: sbCurrentUserId() })
+    .select().single()
+    .then(function(res) {
+      if (res.error) { callback(res.error.message); return; }
+      callback(null, res.data);
+    });
+}
+
+/**
+ * Переименовать команду.
+ * @param {string} teamId
+ * @param {string} newName
+ * @param {function(err)} callback
+ */
+function sbRenameTeam(teamId, newName, callback) {
+  if (!_sb) { callback('SDK not initialized'); return; }
+
+  _sb.from('teams').update({ name: newName }).eq('id', teamId)
+    .then(function(res) {
+      callback(res.error ? res.error.message : null);
+    });
+}
+
+/**
+ * Загрузить участников команды.
+ * @param {string} teamId
+ * @param {function(err, Array)} callback
+ */
+function sbLoadTeamMembers(teamId, callback) {
+  if (!_sb) { callback('SDK not initialized'); return; }
+
+  _sb.from('team_members')
+    .select('user_id, role, joined_at, profiles(email, name)')
+    .eq('team_id', teamId)
+    .then(function(res) {
+      if (res.error) { callback(res.error.message); return; }
+      callback(null, res.data || []);
+    });
+}
+
+/**
+ * Пригласить в команду по email (RPC).
+ * @param {string} teamId
+ * @param {string} email
+ * @param {string} role - 'admin' | 'member'
+ * @param {function(err, result)} callback - result: {status, user_id, email, name}
+ */
+function sbInviteToTeam(teamId, email, role, callback) {
+  if (!_sb) { callback('SDK not initialized'); return; }
+
+  _sb.rpc('invite_to_team', {
+    p_team_id: teamId,
+    p_email: email.trim().toLowerCase(),
+    p_role: role || 'member'
+  }).then(function(res) {
+    if (res.error) { callback(res.error.message); return; }
+    callback(null, res.data);
+  });
+}
+
+/**
+ * Удалить участника из команды.
+ * @param {string} teamId
+ * @param {string} userId
+ * @param {function(err)} callback
+ */
+function sbRemoveTeamMember(teamId, userId, callback) {
+  if (!_sb) { callback('SDK not initialized'); return; }
+
+  _sb.from('team_members')
+    .delete()
+    .eq('team_id', teamId)
+    .eq('user_id', userId)
+    .then(function(res) {
+      callback(res.error ? res.error.message : null);
+    });
+}
+
+/**
+ * Привязать проект к команде (все участники увидят).
+ * @param {string} projectCloudId
+ * @param {string|null} teamId - null = открепить от команды
+ * @param {function(err)} callback
+ */
+function sbSetProjectTeam(projectCloudId, teamId, callback) {
+  if (!_sb) { callback('SDK not initialized'); return; }
+
+  _sb.from('projects').update({ team_id: teamId }).eq('id', projectCloudId)
+    .then(function(res) {
+      callback(res.error ? res.error.message : null);
+    });
+}
+
+/**
+ * Пригласить в проект по email (RPC).
+ * @param {string} projectCloudId
+ * @param {string} email
+ * @param {string} role - 'editor' | 'viewer'
+ * @param {function(err, result)} callback
+ */
+function sbInviteToProject(projectCloudId, email, role, callback) {
+  if (!_sb) { callback('SDK not initialized'); return; }
+
+  _sb.rpc('invite_to_project', {
+    p_project_id: projectCloudId,
+    p_email: email.trim().toLowerCase(),
+    p_role: role || 'editor'
+  }).then(function(res) {
+    if (res.error) { callback(res.error.message); return; }
+    callback(null, res.data);
+  });
+}
+
+/**
+ * Загрузить участников конкретного проекта.
+ * @param {string} projectCloudId
+ * @param {function(err, Array)} callback
+ */
+function sbLoadProjectMembers(projectCloudId, callback) {
+  if (!_sb) { callback('SDK not initialized'); return; }
+
+  _sb.from('project_members')
+    .select('user_id, role, joined_at, profiles(email, name)')
+    .eq('project_id', projectCloudId)
+    .then(function(res) {
+      if (res.error) { callback(res.error.message); return; }
+      callback(null, res.data || []);
+    });
+}
+
+/**
+ * Удалить участника из проекта.
+ * @param {string} projectCloudId
+ * @param {string} userId
+ * @param {function(err)} callback
+ */
+function sbRemoveProjectMember(projectCloudId, userId, callback) {
+  if (!_sb) { callback('SDK not initialized'); return; }
+
+  _sb.from('project_members')
+    .delete()
+    .eq('project_id', projectCloudId)
+    .eq('user_id', userId)
+    .then(function(res) {
+      callback(res.error ? res.error.message : null);
+    });
+}
+
+/**
+ * Получить ID текущего пользователя.
+ * @returns {string|null}
+ */
+function sbCurrentUserId() {
+  if (!_sb) return null;
+  var session = _sb.auth.getSession && _sb.auth.getSession();
+  /* getSession() может вернуть promise в новых версиях SDK */
+  if (session && session.data && session.data.session) {
+    return session.data.session.user.id;
+  }
+  /* fallback: проверяем _sbUser (может быть установлен при логине) */
+  if (typeof _sbUser !== 'undefined' && _sbUser && _sbUser.id) return _sbUser.id;
+  return null;
 }
 
 

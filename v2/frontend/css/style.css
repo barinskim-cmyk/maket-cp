@@ -217,6 +217,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .project-item.project-deleted { opacity: 0.5; }
 .project-restore-btn { font-size: 11px; padding: 2px 8px; color: #666; border: 1px solid #ccc; background: transparent; cursor: pointer; }
 .project-restore-btn:hover { color: #333; border-color: #333; }
+.project-shared-tag { font-size: 10px; color: #1565c0; background: #e3f2fd; padding: 1px 6px; border-radius: 3px; font-weight: 500; }
 
 .shootings-layout { display: flex; gap: 24px; }
 .shootings-left { flex: 1; min-width: 0; }
