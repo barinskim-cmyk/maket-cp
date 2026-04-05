@@ -45,28 +45,27 @@ ALTER TABLE team_members ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "teams_owner_all" ON teams FOR ALL
   USING (owner_id = auth.uid());
 
--- Участник команды: читать
+-- Участник команды: читать (без рекурсии -- subquery вместо EXISTS на team_members)
 CREATE POLICY "teams_member_select" ON teams FOR SELECT
   USING (
-    EXISTS (
-      SELECT 1 FROM team_members tm
-      WHERE tm.team_id = teams.id AND tm.user_id = auth.uid()
+    owner_id = auth.uid()
+    OR id IN (
+      SELECT team_id FROM team_members WHERE user_id = auth.uid()
     )
   );
 
 -- Team members: участник видит свои записи, владелец команды управляет всеми
-CREATE POLICY "team_members_self_select" ON team_members FOR SELECT
+-- (без рекурсии -- subquery на teams вместо EXISTS через team_members)
+CREATE POLICY "team_members_select" ON team_members FOR SELECT
   USING (
     user_id = auth.uid()
-    OR EXISTS (
-      SELECT 1 FROM teams t WHERE t.id = team_members.team_id AND t.owner_id = auth.uid()
-    )
+    OR invited_by = auth.uid()
   );
 
-CREATE POLICY "team_members_owner_manage" ON team_members FOR ALL
+CREATE POLICY "team_members_manage" ON team_members FOR ALL
   USING (
-    EXISTS (
-      SELECT 1 FROM teams t WHERE t.id = team_members.team_id AND t.owner_id = auth.uid()
+    team_id IN (
+      SELECT id FROM teams WHERE owner_id = auth.uid()
     )
   );
 
