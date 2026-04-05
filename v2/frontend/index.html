@@ -71,6 +71,7 @@
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
         <button class="btn btn-primary" onclick="openNewProjectModal()">Новая съёмка</button>
         <button class="btn" onclick="sbOpenShareModal()" title="Поделиться ссылкой">Поделиться</button>
+        <button class="btn" onclick="shOpenTeamModal()" title="Управление командой">Команда</button>
       </div>
     </div>
 
@@ -500,6 +501,32 @@
     <div class="modal-buttons">
       <button class="btn" onclick="closeModal('modal-share')">Закрыть</button>
       <button class="btn btn-primary" id="btn-create-share" onclick="sbDoCreateShare()">Создать ссылку</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ Модалка: команда ══════════════ -->
+<div class="modal-overlay" id="modal-team">
+  <div class="modal" style="width:480px;max-height:80vh">
+    <h3>Моя команда</h3>
+    <div id="team-content" style="overflow-y:auto;max-height:60vh">
+      <div class="empty-state">Загрузка...</div>
+    </div>
+    <div class="modal-buttons" style="margin-top:12px">
+      <button class="btn" onclick="closeModal('modal-team')">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ Модалка: участники проекта ══════════════ -->
+<div class="modal-overlay" id="modal-project-members">
+  <div class="modal" style="width:440px;max-height:70vh">
+    <h3>Участники проекта</h3>
+    <div id="project-members-content" style="overflow-y:auto;max-height:50vh">
+      <div class="empty-state">Загрузка...</div>
+    </div>
+    <div class="modal-buttons" style="margin-top:12px">
+      <button class="btn" onclick="closeModal('modal-project-members')">Закрыть</button>
     </div>
   </div>
 </div>

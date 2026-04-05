@@ -372,6 +372,7 @@ function renderProjects() {
     var cardsCount = p.cards ? p.cards.length : 0;
     html += '<div class="project-item' + sel + (isDeleted ? ' project-deleted' : '') + '" onclick="selectProject(' + entry.originalIndex + ')">';
     html += '<span class="project-brand">' + esc(shProjectDisplayName(p)) + '</span>';
+    if (p._shared) html += '<span class="project-shared-tag">общий</span>';
     html += '<span class="project-stats">' + cardsCount + ' карт.</span>';
     if (isDeleted) {
       html += '<button class="btn btn-sm project-restore-btn" onclick="event.stopPropagation(); shRestoreProject(' + entry.originalIndex + ')" title="Восстановить">Восстановить</button>';
@@ -411,6 +412,7 @@ function renderPipeline() {
     html += '<div class="pipeline-sync-bar">';
     html += '<span id="pipeline-sync-status" style="font-size:11px;color:#999">Облако</span>';
     html += ' <button class="btn btn-sm" onclick="sbPullProject(function(e){var s=document.getElementById(\'pipeline-sync-status\');if(s)s.textContent=e?\'Ошибка\':\'Обновлено\';setTimeout(function(){if(s)s.textContent=\'Облако\'},2000)})" style="font-size:11px;padding:2px 8px">Синхронизировать</button>';
+    html += ' <button class="btn btn-sm" onclick="shOpenProjectMembersModal()" style="font-size:11px;padding:2px 8px">Участники</button>';
     html += '</div>';
   }
 
@@ -1179,4 +1181,317 @@ function shClientApprove() {
         '<div class="client-bar-subtitle">Спасибо! Фотограф начнёт цветокоррекцию.</div>' +
       '</div>';
   }
+}
+
+
+// ══════════════════════════════════════════════
+//  Команда (b23)
+// ══════════════════════════════════════════════
+
+/**
+ * Открыть модалку управления командой.
+ * Если команда ещё не создана — предлагает создать.
+ */
+function shOpenTeamModal() {
+  if (!sbIsLoggedIn()) { openModal('modal-login'); return; }
+
+  openModal('modal-team');
+  var el = document.getElementById('team-content');
+  el.innerHTML = '<div class="empty-state">Загрузка...</div>';
+
+  sbLoadTeams(function(err, data) {
+    if (err) { el.innerHTML = '<div class="empty-state">Ошибка: ' + esc(err) + '</div>'; return; }
+
+    if (!data.owned) {
+      /* Нет команды — предложить создать */
+      el.innerHTML = _shTeamCreateHTML();
+      return;
+    }
+
+    /* Загрузить участников команды */
+    _shTeamId = data.owned.id;
+    sbLoadTeamMembers(data.owned.id, function(err2, members) {
+      if (err2) { el.innerHTML = '<div class="empty-state">Ошибка: ' + esc(err2) + '</div>'; return; }
+      el.innerHTML = _shTeamHTML(data.owned, members);
+    });
+  });
+}
+
+/** @type {string|null} ID текущей команды (для вызовов из inline onclick) */
+var _shTeamId = null;
+
+/**
+ * HTML формы создания команды.
+ * @returns {string}
+ */
+function _shTeamCreateHTML() {
+  var html = '<div style="text-align:center;padding:20px 0">';
+  html += '<div style="font-size:14px;color:#666;margin-bottom:16px">У вас ещё нет команды.</div>';
+  html += '<div style="margin-bottom:12px">';
+  html += '<input type="text" id="inp-team-name" placeholder="Название студии / агентства" style="padding:8px 12px;border:1px solid #ccc;border-radius:5px;width:260px;font-size:13px">';
+  html += '</div>';
+  html += '<button class="btn btn-primary" onclick="shCreateTeam()">Создать команду</button>';
+  html += '</div>';
+  return html;
+}
+
+/**
+ * Создать команду.
+ */
+function shCreateTeam() {
+  var nameEl = document.getElementById('inp-team-name');
+  var name = nameEl ? nameEl.value.trim() : '';
+  if (!name) { alert('Введите название команды'); return; }
+
+  sbCreateTeam(name, function(err, team) {
+    if (err) { alert('Ошибка: ' + err); return; }
+    _shTeamId = team.id;
+    /* Перезагрузить модалку */
+    shOpenTeamModal();
+  });
+}
+
+/**
+ * HTML страницы команды (название + список участников + форма приглашения).
+ * @param {object} team - {id, name, owner_id}
+ * @param {Array} members - [{user_id, role, profiles: {email, name}}]
+ * @returns {string}
+ */
+function _shTeamHTML(team, members) {
+  var html = '';
+
+  /* Название команды */
+  html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">';
+  html += '<span style="font-size:16px;font-weight:600">' + esc(team.name) + '</span>';
+  html += '<button class="btn btn-sm" onclick="shRenameTeam()" style="font-size:11px">Переименовать</button>';
+  html += '</div>';
+
+  /* Список участников */
+  html += '<div style="margin-bottom:16px">';
+  if (members.length === 0) {
+    html += '<div style="color:#999;font-size:13px;padding:8px 0">Пока никого нет. Пригласите коллег по email.</div>';
+  } else {
+    for (var i = 0; i < members.length; i++) {
+      var m = members[i];
+      var profile = m.profiles || {};
+      var displayName = profile.name || profile.email || 'Без имени';
+      var displayEmail = profile.email || '';
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f0f0">';
+      html += '<div>';
+      html += '<span style="font-size:13px;font-weight:500">' + esc(displayName) + '</span>';
+      if (displayEmail) html += ' <span style="font-size:11px;color:#999">' + esc(displayEmail) + '</span>';
+      html += ' <span style="font-size:10px;color:#888;background:#f5f5f5;padding:1px 6px;border-radius:3px">' + esc(m.role) + '</span>';
+      html += '</div>';
+      html += '<button class="btn btn-sm" onclick="shRemoveTeamMember(\'' + m.user_id + '\')" style="font-size:10px;color:#c62828;padding:2px 8px">Удалить</button>';
+      html += '</div>';
+    }
+  }
+  html += '</div>';
+
+  /* Форма приглашения */
+  html += '<div style="border-top:1px solid #eee;padding-top:12px">';
+  html += '<div style="font-size:12px;font-weight:600;margin-bottom:8px">Пригласить в команду</div>';
+  html += '<div style="display:flex;gap:6px;align-items:center">';
+  html += '<input type="email" id="inp-team-invite-email" placeholder="email@example.com" style="flex:1;padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:12px">';
+  html += '<select id="inp-team-invite-role" style="padding:6px;border:1px solid #ccc;border-radius:4px;font-size:12px">';
+  html += '<option value="member">Участник</option>';
+  html += '<option value="admin">Админ</option>';
+  html += '</select>';
+  html += '<button class="btn btn-primary btn-sm" onclick="shInviteToTeam()">Пригласить</button>';
+  html += '</div>';
+  html += '<div id="team-invite-status" style="font-size:11px;margin-top:6px;display:none"></div>';
+  html += '</div>';
+
+  return html;
+}
+
+/**
+ * Переименовать команду (prompt).
+ */
+function shRenameTeam() {
+  if (!_shTeamId) return;
+  var newName = prompt('Новое название команды:');
+  if (!newName || !newName.trim()) return;
+
+  sbRenameTeam(_shTeamId, newName.trim(), function(err) {
+    if (err) { alert('Ошибка: ' + err); return; }
+    shOpenTeamModal();
+  });
+}
+
+/**
+ * Пригласить в команду по email.
+ */
+function shInviteToTeam() {
+  if (!_shTeamId) return;
+  var emailEl = document.getElementById('inp-team-invite-email');
+  var roleEl = document.getElementById('inp-team-invite-role');
+  var email = emailEl ? emailEl.value.trim() : '';
+  var role = roleEl ? roleEl.value : 'member';
+
+  if (!email) { alert('Введите email'); return; }
+
+  var statusEl = document.getElementById('team-invite-status');
+
+  sbInviteToTeam(_shTeamId, email, role, function(err, result) {
+    if (err) {
+      if (statusEl) { statusEl.style.display = ''; statusEl.style.color = '#c62828'; statusEl.textContent = 'Ошибка: ' + err; }
+      return;
+    }
+
+    if (result.status === 'not_found') {
+      if (statusEl) { statusEl.style.display = ''; statusEl.style.color = '#e65100'; statusEl.textContent = 'Пользователь с email ' + email + ' не найден. Он должен сначала зарегистрироваться.'; }
+      return;
+    }
+
+    if (result.status === 'self') {
+      if (statusEl) { statusEl.style.display = ''; statusEl.style.color = '#e65100'; statusEl.textContent = 'Нельзя пригласить самого себя.'; }
+      return;
+    }
+
+    /* Успех — перезагрузить список */
+    if (emailEl) emailEl.value = '';
+    if (statusEl) { statusEl.style.display = ''; statusEl.style.color = '#2e7d32'; statusEl.textContent = 'Приглашён: ' + (result.name || result.email); }
+    /* Обновить список через секунду */
+    setTimeout(function() { shOpenTeamModal(); }, 1000);
+  });
+}
+
+/**
+ * Удалить участника из команды.
+ * @param {string} userId
+ */
+function shRemoveTeamMember(userId) {
+  if (!_shTeamId) return;
+  if (!confirm('Удалить участника из команды?')) return;
+
+  sbRemoveTeamMember(_shTeamId, userId, function(err) {
+    if (err) { alert('Ошибка: ' + err); return; }
+    shOpenTeamModal();
+  });
+}
+
+
+// ══════════════════════════════════════════════
+//  Участники проекта (per-project invite)
+// ══════════════════════════════════════════════
+
+/**
+ * Открыть модалку участников текущего проекта.
+ */
+function shOpenProjectMembersModal() {
+  if (!sbIsLoggedIn()) { openModal('modal-login'); return; }
+  var proj = getActiveProject();
+  if (!proj || !proj._cloudId) { alert('Сначала загрузите проект в облако'); return; }
+
+  openModal('modal-project-members');
+  var el = document.getElementById('project-members-content');
+  el.innerHTML = '<div class="empty-state">Загрузка...</div>';
+
+  sbLoadProjectMembers(proj._cloudId, function(err, members) {
+    if (err) { el.innerHTML = '<div class="empty-state">Ошибка: ' + esc(err) + '</div>'; return; }
+    el.innerHTML = _shProjectMembersHTML(proj, members);
+  });
+}
+
+/**
+ * HTML списка участников проекта + форма приглашения.
+ * @param {object} proj
+ * @param {Array} members
+ * @returns {string}
+ */
+function _shProjectMembersHTML(proj, members) {
+  var html = '';
+  var projName = shProjectDisplayName(proj);
+  html += '<div style="font-size:13px;color:#666;margin-bottom:12px">Проект: <strong>' + esc(projName) + '</strong></div>';
+
+  /* Список */
+  if (members.length === 0) {
+    html += '<div style="color:#999;font-size:13px;padding:8px 0">Нет дополнительных участников.</div>';
+  } else {
+    for (var i = 0; i < members.length; i++) {
+      var m = members[i];
+      var profile = m.profiles || {};
+      var displayName = profile.name || profile.email || 'Без имени';
+      var displayEmail = profile.email || '';
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f0f0">';
+      html += '<div>';
+      html += '<span style="font-size:13px;font-weight:500">' + esc(displayName) + '</span>';
+      if (displayEmail) html += ' <span style="font-size:11px;color:#999">' + esc(displayEmail) + '</span>';
+      html += ' <span style="font-size:10px;color:#888;background:#f5f5f5;padding:1px 6px;border-radius:3px">' + esc(m.role) + '</span>';
+      html += '</div>';
+      html += '<button class="btn btn-sm" onclick="shRemoveProjectMember(\'' + m.user_id + '\')" style="font-size:10px;color:#c62828;padding:2px 8px">Удалить</button>';
+      html += '</div>';
+    }
+  }
+
+  /* Форма приглашения */
+  html += '<div style="border-top:1px solid #eee;padding-top:12px;margin-top:12px">';
+  html += '<div style="font-size:12px;font-weight:600;margin-bottom:8px">Пригласить в проект</div>';
+  html += '<div style="display:flex;gap:6px;align-items:center">';
+  html += '<input type="email" id="inp-proj-invite-email" placeholder="email@example.com" style="flex:1;padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:12px">';
+  html += '<select id="inp-proj-invite-role" style="padding:6px;border:1px solid #ccc;border-radius:4px;font-size:12px">';
+  html += '<option value="editor">Редактор</option>';
+  html += '<option value="viewer">Зритель</option>';
+  html += '</select>';
+  html += '<button class="btn btn-primary btn-sm" onclick="shInviteToProject()">Пригласить</button>';
+  html += '</div>';
+  html += '<div id="proj-invite-status" style="font-size:11px;margin-top:6px;display:none"></div>';
+  html += '</div>';
+
+  return html;
+}
+
+/**
+ * Пригласить в проект по email.
+ */
+function shInviteToProject() {
+  var proj = getActiveProject();
+  if (!proj || !proj._cloudId) return;
+
+  var emailEl = document.getElementById('inp-proj-invite-email');
+  var roleEl = document.getElementById('inp-proj-invite-role');
+  var email = emailEl ? emailEl.value.trim() : '';
+  var role = roleEl ? roleEl.value : 'editor';
+
+  if (!email) { alert('Введите email'); return; }
+
+  var statusEl = document.getElementById('proj-invite-status');
+
+  sbInviteToProject(proj._cloudId, email, role, function(err, result) {
+    if (err) {
+      if (statusEl) { statusEl.style.display = ''; statusEl.style.color = '#c62828'; statusEl.textContent = 'Ошибка: ' + err; }
+      return;
+    }
+
+    if (result.status === 'not_found') {
+      if (statusEl) { statusEl.style.display = ''; statusEl.style.color = '#e65100'; statusEl.textContent = 'Пользователь ' + email + ' не найден. Нужна регистрация.'; }
+      return;
+    }
+
+    if (result.status === 'self') {
+      if (statusEl) { statusEl.style.display = ''; statusEl.style.color = '#e65100'; statusEl.textContent = 'Вы уже владелец проекта.'; }
+      return;
+    }
+
+    /* Успех */
+    if (emailEl) emailEl.value = '';
+    if (statusEl) { statusEl.style.display = ''; statusEl.style.color = '#2e7d32'; statusEl.textContent = 'Приглашён: ' + (result.name || result.email); }
+    setTimeout(function() { shOpenProjectMembersModal(); }, 1000);
+  });
+}
+
+/**
+ * Удалить участника из проекта.
+ * @param {string} userId
+ */
+function shRemoveProjectMember(userId) {
+  var proj = getActiveProject();
+  if (!proj || !proj._cloudId) return;
+  if (!confirm('Удалить участника из проекта?')) return;
+
+  sbRemoveProjectMember(proj._cloudId, userId, function(err) {
+    if (err) { alert('Ошибка: ' + err); return; }
+    shOpenProjectMembersModal();
+  });
 }
