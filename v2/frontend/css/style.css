@@ -880,6 +880,89 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .oc-item:hover .pv-remove { display: block; }
 .oc-item:hover .pv-name { display: block; }
 
+/* ── Контейнеры в Other ── */
+
+.oc-container-block {
+  background: #fff; border-radius: 12px; padding: 16px;
+  margin-bottom: 16px; border: 2px solid transparent;
+  transition: border-color 0.2s;
+}
+.oc-cnt-header {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 10px;
+}
+.oc-cnt-name {
+  font-size: 14px; font-weight: 600; color: #333;
+  cursor: pointer; padding: 2px 6px; border-radius: 4px;
+  transition: background 0.15s;
+}
+.oc-cnt-name:hover { background: #f0f0f0; }
+.oc-cnt-name-input {
+  font-size: 14px; font-weight: 600; border: 1px solid #ccc;
+  border-radius: 4px; padding: 2px 6px; outline: none;
+  width: 200px;
+}
+.oc-cnt-name-input:focus { border-color: #333; }
+.oc-cnt-count {
+  font-size: 12px; color: #999;
+}
+.oc-cnt-del {
+  margin-left: auto; width: 24px; height: 24px;
+  border: none; background: none; cursor: pointer;
+  font-size: 16px; color: #bbb; border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+.oc-cnt-del:hover { color: #e57373; background: #fef0f0; }
+
+.oc-cnt-gallery {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  min-height: 60px; border-radius: 8px;
+  border: 2px dashed transparent; transition: border-color 0.2s;
+}
+.oc-cnt-gallery.oc-drag-over { border-color: #333; background: #fafafa; }
+.oc-cnt-gallery .oc-item {
+  width: calc((100% - 18px) / 4);
+}
+.oc-cnt-empty {
+  width: 100%; text-align: center; padding: 20px;
+  color: #ccc; font-size: 13px;
+}
+
+/* Свободные фото */
+.oc-free-block { margin-top: 8px; }
+.oc-free-header {
+  font-size: 12px; color: #999; text-transform: uppercase;
+  letter-spacing: 0.5px; margin-bottom: 8px; padding-left: 4px;
+}
+.oc-free-field {
+  background: #fff; border-radius: 12px; padding: 20px;
+  min-height: 120px; border: 2px dashed transparent;
+  display: flex; flex-wrap: wrap; gap: 6px;
+  transition: border-color 0.2s;
+}
+.oc-free-field.oc-drag-over { border-color: #333; background: #fafafa; }
+.oc-free-field .oc-item {
+  width: calc((100% - 18px) / 4);
+}
+
+/* Мультивыбор — выделение */
+.oc-item.oc-selected {
+  border-color: #1976d2;
+  box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.3);
+}
+
+/* Панель группировки */
+.oc-group-bar {
+  display: flex; align-items: center; gap: 8px;
+  background: #e3f2fd; border-radius: 8px;
+  padding: 8px 14px; margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.oc-group-count {
+  font-size: 13px; font-weight: 600; color: #1565c0;
+  margin-right: 4px;
+}
+
 /* Бейдж источника для «Весь контент» */
 .ac-badge {
   position: absolute; top: 4px; left: 4px;
@@ -1402,9 +1485,35 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
 /* Мобильная вкладка Other: тулбар + кнопка удаления */
 .mob-other-toolbar {
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex; align-items: center; gap: 8px;
   padding: 10px 16px; background: #f5f5f5;
 }
+.mob-other-toolbar .mob-other-count { flex: 1; }
+
+/* Мобильные контейнеры в Other */
+.mob-oc-cnt-block {
+  margin: 8px 0; background: #fff;
+  border-radius: 8px; overflow: hidden;
+}
+.mob-oc-cnt-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px; background: #fafafa;
+  border-bottom: 1px solid #eee;
+}
+.mob-oc-cnt-name {
+  font-size: 14px; font-weight: 600; color: #333;
+  flex: 1; cursor: pointer;
+}
+.mob-oc-cnt-count {
+  font-size: 12px; color: #999; background: #eee;
+  padding: 1px 7px; border-radius: 10px;
+}
+.mob-oc-cnt-del {
+  width: 28px; height: 28px; border: none;
+  background: none; color: #bbb; font-size: 18px;
+  cursor: pointer; border-radius: 4px;
+}
+.mob-oc-cnt-del:active { color: #e57373; background: #fef0f0; }
 .mob-other-count {
   font-size: 13px; font-weight: 600; color: #888;
 }

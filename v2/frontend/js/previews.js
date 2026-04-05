@@ -1251,9 +1251,21 @@ function _pvLbToggleOC(add) {
  */
 function _pvIsInOtherContent(name) {
   var proj = getActiveProject();
-  if (!proj || !proj.otherContent) return false;
-  for (var i = 0; i < proj.otherContent.length; i++) {
-    if (proj.otherContent[i].name === name) return true;
+  if (!proj) return false;
+  /* Проверяем свободные фото */
+  if (proj.otherContent) {
+    for (var i = 0; i < proj.otherContent.length; i++) {
+      if (proj.otherContent[i].name === name) return true;
+    }
+  }
+  /* Проверяем контейнеры */
+  if (proj.ocContainers) {
+    for (var c = 0; c < proj.ocContainers.length; c++) {
+      var items = proj.ocContainers[c].items || [];
+      for (var j = 0; j < items.length; j++) {
+        if (items[j].name === name) return true;
+      }
+    }
   }
   return false;
 }
@@ -1470,27 +1482,135 @@ function pvShortName(name) {
 }
 
 // ══════════════════════════════════════════════
-//  Доп. контент — свободное поле
+//  Доп. контент — контейнеры + свободные фото
+//
+//  Модель данных:
+//    proj.ocContainers = [{id, name, items: [{name, path, thumb, preview}]}]
+//    proj.otherContent = [{name, path, thumb, preview}]  — свободные фото (без контейнера)
 // ══════════════════════════════════════════════
 
-function ocInitField() {
-  var field = document.getElementById('oc-field');
-  if (!field || field._ocBound) return;
-  field._ocBound = true;
+/**
+ * Получить массив контейнеров (lazy-init).
+ */
+function ocGetContainers() {
+  var proj = getActiveProject();
+  if (!proj) return [];
+  if (!proj.ocContainers) proj.ocContainers = [];
+  return proj.ocContainers;
+}
 
-  field.addEventListener('dragover', function(e) {
+/**
+ * Создать новый контейнер.
+ */
+function ocAddContainer() {
+  var proj = getActiveProject();
+  if (!proj) return;
+  if (!proj.ocContainers) proj.ocContainers = [];
+  var idx = proj.ocContainers.length + 1;
+  proj.ocContainers.push({
+    id: 'oc_' + Math.random().toString(36).substr(2, 8),
+    name: 'Контейнер ' + idx,
+    items: []
+  });
+  ocRenderField();
+  if (typeof shAutoSave === 'function') shAutoSave();
+  if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
+}
+
+/**
+ * Удалить контейнер — фото перемещаются в свободную зону.
+ */
+function ocDeleteContainer(idx) {
+  var containers = ocGetContainers();
+  if (idx < 0 || idx >= containers.length) return;
+  if (!confirm('Удалить "' + containers[idx].name + '"? Фото переместятся в свободную зону.')) return;
+  var proj = getActiveProject();
+  if (!proj) return;
+  if (!proj.otherContent) proj.otherContent = [];
+  /* Перенести фото в свободную зону */
+  var items = containers[idx].items || [];
+  for (var i = 0; i < items.length; i++) {
+    var dup = false;
+    for (var j = 0; j < proj.otherContent.length; j++) {
+      if (proj.otherContent[j].name === items[i].name) { dup = true; break; }
+    }
+    if (!dup) proj.otherContent.push(items[i]);
+  }
+  containers.splice(idx, 1);
+  ocRenderField();
+  if (typeof shAutoSave === 'function') shAutoSave();
+  if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
+}
+
+/**
+ * Inline-редактирование имени контейнера.
+ */
+function ocEditContainerName(idx) {
+  var label = document.getElementById('oc-cnt-name-' + idx);
+  if (!label) return;
+  var containers = ocGetContainers();
+  if (!containers[idx]) return;
+  var curName = containers[idx].name || '';
+
+  var input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'oc-cnt-name-input';
+  input.value = curName;
+  label.innerHTML = '';
+  label.appendChild(input);
+  input.focus();
+  input.select();
+
+  var save = function() {
+    var val = input.value.trim();
+    if (val) containers[idx].name = val;
+    ocRenderField();
+    if (typeof shAutoSave === 'function') shAutoSave();
+    if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
+  };
+  input.addEventListener('blur', save);
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+    if (e.key === 'Escape') { input.value = curName; input.blur(); }
+  });
+}
+
+/**
+ * Удалить фото из контейнера.
+ */
+function ocRemoveFromContainer(cntIdx, itemIdx, e) {
+  if (e) { e.stopPropagation(); e.preventDefault(); }
+  var containers = ocGetContainers();
+  if (!containers[cntIdx]) return;
+  var items = containers[cntIdx].items;
+  if (itemIdx >= 0 && itemIdx < items.length) items.splice(itemIdx, 1);
+  ocRenderField();
+  if (typeof shAutoSave === 'function') shAutoSave();
+  if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
+}
+
+/**
+ * Инициализация drag-drop для зоны (контейнер или свободная).
+ * targetType: 'container' | 'free'
+ * targetIdx: индекс контейнера (для 'container') или -1
+ */
+function _ocBindDropZone(el, targetType, targetIdx) {
+  if (!el || el._ocDropBound) return;
+  el._ocDropBound = true;
+
+  el.addEventListener('dragover', function(e) {
     e.preventDefault();
     e.stopPropagation();
     e.dataTransfer.dropEffect = 'copy';
     this.classList.add('oc-drag-over');
   });
 
-  field.addEventListener('dragleave', function(e) {
+  el.addEventListener('dragleave', function(e) {
     e.preventDefault();
     this.classList.remove('oc-drag-over');
   });
 
-  field.addEventListener('drop', function(e) {
+  el.addEventListener('drop', function(e) {
     e.preventDefault();
     e.stopPropagation();
     this.classList.remove('oc-drag-over');
@@ -1500,67 +1620,164 @@ function ocInitField() {
 
     var proj = getActiveProject();
     if (!proj) return;
-    if (!proj.otherContent) proj.otherContent = [];
 
     try {
       var pv = JSON.parse(pvData);
-      for (var k = 0; k < proj.otherContent.length; k++) {
-        if (proj.otherContent[k].name === pv.name) return;
+      var item = { name: pv.name, path: pv.path || '', thumb: pv.thumb, preview: pv.preview || '' };
+
+      if (targetType === 'container') {
+        var containers = ocGetContainers();
+        if (!containers[targetIdx]) return;
+        var cntItems = containers[targetIdx].items;
+        /* Дубликат внутри одного контейнера не добавляем,
+           но между разными контейнерами — разрешено */
+        for (var k = 0; k < cntItems.length; k++) {
+          if (cntItems[k].name === pv.name) return;
+        }
+        cntItems.push(item);
+      } else {
+        /* Свободная зона */
+        if (!proj.otherContent) proj.otherContent = [];
+        for (var f = 0; f < proj.otherContent.length; f++) {
+          if (proj.otherContent[f].name === pv.name) return;
+        }
+        proj.otherContent.push(item);
       }
-      proj.otherContent.push({ name: pv.name, path: pv.path || '', thumb: pv.thumb, preview: pv.preview || '' });
+
       ocRenderField();
-      /* Авто-синхронизация доп. контента */
+      if (typeof shAutoSave === 'function') shAutoSave();
       if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
     } catch(err) {}
   });
 }
 
-function ocRenderField() {
-  var gallery = document.getElementById('oc-gallery');
-  var toolbar = document.getElementById('oc-toolbar');
-  var countEl = document.getElementById('oc-count');
-  var empty = document.getElementById('oc-field-empty');
-  var store = ocGetStore();
-
-  if (!gallery) return;
-
-  if (store.length === 0) {
-    gallery.innerHTML = '';
-    if (toolbar) toolbar.style.display = 'none';
-    if (empty) empty.style.display = '';
-    return;
+/**
+ * Инициализация всех drop-зон на странице Other.
+ */
+function ocInitField() {
+  /* Биндим drop-зоны после рендера */
+  var containers = ocGetContainers();
+  for (var c = 0; c < containers.length; c++) {
+    var cntGallery = document.getElementById('oc-cnt-gallery-' + c);
+    if (cntGallery) _ocBindDropZone(cntGallery, 'container', c);
   }
-
-  if (toolbar) {
-    toolbar.style.display = 'flex';
-    countEl.textContent = store.length + ' фото';
-  }
-  if (empty) empty.style.display = 'none';
-
-  var zoomSvg = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
-
-  var html = '';
-  for (var i = 0; i < store.length; i++) {
-    var item = store[i];
-    html += '<div class="oc-item" title="' + esc(item.name) + '" onclick="ocOpenLightbox(' + i + ',event)">';
-    html += '<img src="' + (item.preview || item.thumb) + '" loading="lazy">';
-    html += '<button class="oc-zoom" onclick="ocOpenLightbox(' + i + ',event)" title="На весь экран">' + zoomSvg + '</button>';
-    html += '<button class="pv-remove" onclick="ocRemoveItem(' + i + ',event)">&times;</button>';
-    html += '<span class="pv-name">' + esc(pvShortName(item.name)) + '</span>';
-    html += '</div>';
-  }
-  gallery.innerHTML = html;
+  var freeField = document.getElementById('oc-free-field');
+  if (freeField) _ocBindDropZone(freeField, 'free', -1);
 }
 
 /**
- * Открыть лайтбокс из допконтента.
+ * Полная перерисовка секции Other: контейнеры + свободные фото.
+ */
+function ocRenderField() {
+  var mainEl = document.querySelector('.oc-main');
+  if (!mainEl) return;
+
+  var proj = getActiveProject();
+  if (!proj) return;
+
+  var containers = ocGetContainers();
+  var freeStore = ocGetStore();
+  var totalPhotos = freeStore.length;
+  for (var tc = 0; tc < containers.length; tc++) totalPhotos += (containers[tc].items || []).length;
+
+  /* Тулбар — показываем всегда (можно создавать контейнеры без фото) */
+  var toolbar = document.getElementById('oc-toolbar');
+  var countEl = document.getElementById('oc-count');
+  if (toolbar) {
+    toolbar.style.display = 'flex';
+    if (countEl) countEl.textContent = totalPhotos + ' фото';
+  }
+
+  var zoomSvg = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
+
+  /* Рендер динамической части (контейнеры + свободная зона) */
+  var target = document.getElementById('oc-dynamic-area');
+  if (!target) return;
+
+  var html = '';
+
+  /* ── Контейнеры ── */
+  for (var c = 0; c < containers.length; c++) {
+    var cnt = containers[c];
+    var items = cnt.items || [];
+    html += '<div class="oc-container-block">';
+    html += '<div class="oc-cnt-header">';
+    html += '<span class="oc-cnt-name" id="oc-cnt-name-' + c + '" onclick="ocEditContainerName(' + c + ')">' + esc(cnt.name) + '</span>';
+    html += '<span class="oc-cnt-count">' + items.length + ' фото</span>';
+    html += '<button class="oc-cnt-del" onclick="ocDeleteContainer(' + c + ')" title="Удалить контейнер">&times;</button>';
+    html += '</div>';
+    html += '<div class="oc-cnt-gallery" id="oc-cnt-gallery-' + c + '">';
+    if (items.length === 0) {
+      html += '<div class="oc-cnt-empty">Перетащите фото сюда</div>';
+    }
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+      var cSel = _ocSelected['cnt:' + c + ':' + i] ? ' oc-selected' : '';
+      html += '<div class="oc-item' + cSel + '" data-oc-idx="' + i + '" title="' + esc(item.name) + '" onclick="ocItemClick(\'cnt\',' + c + ',' + i + ',event)">';
+      html += '<img src="' + (item.preview || item.thumb) + '" loading="lazy">';
+      html += '<button class="oc-zoom" onclick="ocOpenContainerLightbox(' + c + ',' + i + ',event)" title="На весь экран">' + zoomSvg + '</button>';
+      html += '<button class="pv-remove" onclick="ocRemoveFromContainer(' + c + ',' + i + ',event)">&times;</button>';
+      html += '<span class="pv-name">' + esc(pvShortName(item.name)) + '</span>';
+      html += '</div>';
+    }
+    html += '</div>';
+    html += '</div>';
+  }
+
+  /* ── Свободные фото ── */
+  html += '<div class="oc-free-block">';
+  if (containers.length > 0) {
+    html += '<div class="oc-free-header">Свободные фото</div>';
+  }
+  html += '<div class="oc-free-field" id="oc-free-field">';
+  if (freeStore.length === 0) {
+    html += '<div class="oc-cnt-empty">' + (containers.length > 0 ? 'Перетащите фото сюда' : 'Перетащите сюда фото из превью') + '</div>';
+  }
+  for (var f = 0; f < freeStore.length; f++) {
+    var fItem = freeStore[f];
+    var fSel = _ocSelected['free:' + f] ? ' oc-selected' : '';
+    html += '<div class="oc-item' + fSel + '" data-oc-idx="' + f + '" title="' + esc(fItem.name) + '" onclick="ocItemClick(\'free\',-1,' + f + ',event)">';
+    html += '<img src="' + (fItem.preview || fItem.thumb) + '" loading="lazy">';
+    html += '<button class="oc-zoom" onclick="ocOpenLightbox(' + f + ',event)" title="На весь экран">' + zoomSvg + '</button>';
+    html += '<button class="pv-remove" onclick="ocRemoveItem(' + f + ',event)">&times;</button>';
+    html += '<span class="pv-name">' + esc(pvShortName(fItem.name)) + '</span>';
+    html += '</div>';
+  }
+  html += '</div>';
+  html += '</div>';
+
+  target.innerHTML = html;
+
+  /* Привязать drop-зоны */
+  ocInitField();
+}
+
+/**
+ * Открыть лайтбокс из свободных фото.
  */
 function ocOpenLightbox(idx, e) {
   if (e) e.stopPropagation();
   var store = ocGetStore();
   if (!store[idx]) return;
+  _ocOpenLb(store, idx);
+}
 
-  /* Обогащаем orient из превью проекта */
+/**
+ * Открыть лайтбокс из контейнера.
+ */
+function ocOpenContainerLightbox(cntIdx, itemIdx, e) {
+  if (e) e.stopPropagation();
+  var containers = ocGetContainers();
+  if (!containers[cntIdx]) return;
+  var items = containers[cntIdx].items || [];
+  if (!items[itemIdx]) return;
+  _ocOpenLb(items, itemIdx);
+}
+
+/**
+ * Общий хелпер для лайтбокса OC.
+ */
+function _ocOpenLb(store, idx) {
   var proj = getActiveProject();
   var pvOrientMap = {};
   if (proj && proj.previews) {
@@ -1591,6 +1808,7 @@ function ocRemoveItem(idx, e) {
   var store = ocGetStore();
   if (idx >= 0 && idx < store.length) store.splice(idx, 1);
   ocRenderField();
+  if (typeof shAutoSave === 'function') shAutoSave();
   if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
 }
 
@@ -1599,7 +1817,180 @@ function ocClearAll() {
   if (!proj) return;
   if (!confirm('Очистить весь доп. контент?')) return;
   proj.otherContent = [];
+  proj.ocContainers = [];
   ocRenderField();
+  if (typeof shAutoSave === 'function') shAutoSave();
+  if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
+}
+
+// ── Мультивыбор фото (Cmd/Ctrl + клик) ──
+
+/** @type {Object.<string, boolean>} Выделенные фото: ключ = "free:idx" или "cnt:cntIdx:itemIdx" */
+var _ocSelected = {};
+
+/**
+ * Обработка клика по фото в OC с учётом мультивыбора.
+ * При зажатом Cmd/Ctrl — переключает выделение вместо открытия лайтбокса.
+ * source: 'free' | 'cnt', cntIdx: индекс контейнера (-1 для free), itemIdx: индекс фото
+ */
+function ocItemClick(source, cntIdx, itemIdx, e) {
+  if (!e) return;
+  e.stopPropagation();
+
+  if (e.metaKey || e.ctrlKey) {
+    /* Мультивыбор */
+    var key = source === 'free' ? ('free:' + itemIdx) : ('cnt:' + cntIdx + ':' + itemIdx);
+    if (_ocSelected[key]) {
+      delete _ocSelected[key];
+    } else {
+      _ocSelected[key] = true;
+    }
+    _ocUpdateSelection();
+    _ocUpdateGroupBar();
+    return;
+  }
+
+  /* Обычный клик — сбросить выделение и открыть лайтбокс */
+  _ocSelected = {};
+  _ocUpdateSelection();
+  _ocUpdateGroupBar();
+  if (source === 'free') {
+    ocOpenLightbox(itemIdx, e);
+  } else {
+    ocOpenContainerLightbox(cntIdx, itemIdx, e);
+  }
+}
+
+/**
+ * Обновить визуальное выделение в DOM.
+ */
+function _ocUpdateSelection() {
+  /* Снять все выделения */
+  var all = document.querySelectorAll('.oc-item.oc-selected');
+  for (var i = 0; i < all.length; i++) all[i].classList.remove('oc-selected');
+
+  /* Поставить выделение */
+  var keys = Object.keys(_ocSelected);
+  for (var k = 0; k < keys.length; k++) {
+    var parts = keys[k].split(':');
+    var el;
+    if (parts[0] === 'free') {
+      el = document.querySelector('#oc-free-field .oc-item[data-oc-idx="' + parts[1] + '"]');
+    } else {
+      el = document.querySelector('#oc-cnt-gallery-' + parts[1] + ' .oc-item[data-oc-idx="' + parts[2] + '"]');
+    }
+    if (el) el.classList.add('oc-selected');
+  }
+}
+
+/**
+ * Показать/скрыть панель группировки.
+ */
+function _ocUpdateGroupBar() {
+  var bar = document.getElementById('oc-group-bar');
+  var count = Object.keys(_ocSelected).length;
+  if (count > 0) {
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'oc-group-bar';
+      bar.className = 'oc-group-bar';
+      var mainEl = document.querySelector('.oc-main');
+      if (mainEl) mainEl.insertBefore(bar, mainEl.firstChild);
+    }
+    var containers = ocGetContainers();
+    var html = '<span class="oc-group-count">Выбрано: ' + count + '</span>';
+    html += '<button class="btn btn-sm" onclick="ocGroupSelected(-1)">Новый контейнер</button>';
+    for (var c = 0; c < containers.length; c++) {
+      html += '<button class="btn btn-sm" onclick="ocGroupSelected(' + c + ')">' + esc(containers[c].name) + '</button>';
+    }
+    html += '<button class="btn btn-sm" onclick="ocClearSelection()">Отмена</button>';
+    bar.innerHTML = html;
+    bar.style.display = 'flex';
+  } else {
+    if (bar) bar.style.display = 'none';
+  }
+}
+
+/**
+ * Сбросить выделение.
+ */
+function ocClearSelection() {
+  _ocSelected = {};
+  _ocUpdateSelection();
+  _ocUpdateGroupBar();
+}
+
+/**
+ * Переместить/скопировать выделенные фото в контейнер.
+ * targetIdx = -1 → создать новый контейнер.
+ * Одно фото может быть в нескольких контейнерах одновременно.
+ */
+function ocGroupSelected(targetIdx) {
+  var proj = getActiveProject();
+  if (!proj) return;
+
+  var containers = ocGetContainers();
+  var freeStore = ocGetStore();
+
+  /* Собрать выделенные фото */
+  var photos = [];
+  var keys = Object.keys(_ocSelected);
+  for (var k = 0; k < keys.length; k++) {
+    var parts = keys[k].split(':');
+    var photo;
+    if (parts[0] === 'free') {
+      photo = freeStore[parseInt(parts[1])];
+    } else {
+      var cnt = containers[parseInt(parts[1])];
+      if (cnt) photo = (cnt.items || [])[parseInt(parts[2])];
+    }
+    if (photo) photos.push({ name: photo.name, path: photo.path || '', thumb: photo.thumb || '', preview: photo.preview || '' });
+  }
+
+  if (photos.length === 0) return;
+
+  /* Создать контейнер или выбрать существующий */
+  var target;
+  if (targetIdx === -1) {
+    var idx = containers.length + 1;
+    target = {
+      id: 'oc_' + Math.random().toString(36).substr(2, 8),
+      name: 'Контейнер ' + idx,
+      items: []
+    };
+    containers.push(target);
+  } else {
+    target = containers[targetIdx];
+    if (!target) return;
+  }
+
+  /* Добавить фото в контейнер (дубликаты между контейнерами разрешены) */
+  for (var p = 0; p < photos.length; p++) {
+    /* Проверяем дубликат только внутри этого же контейнера */
+    var dup = false;
+    for (var d = 0; d < target.items.length; d++) {
+      if (target.items[d].name === photos[p].name) { dup = true; break; }
+    }
+    if (!dup) target.items.push(photos[p]);
+  }
+
+  /* Убрать из свободных, если были из free */
+  for (var k2 = 0; k2 < keys.length; k2++) {
+    var p2 = keys[k2].split(':');
+    if (p2[0] === 'free') {
+      var freeIdx = parseInt(p2[1]);
+      /* Маркируем для удаления (не удаляем сразу, т.к. индексы сдвинутся) */
+      if (freeStore[freeIdx]) freeStore[freeIdx]._toRemove = true;
+    }
+  }
+  /* Удалить маркированные из свободных */
+  for (var r = freeStore.length - 1; r >= 0; r--) {
+    if (freeStore[r]._toRemove) freeStore.splice(r, 1);
+  }
+
+  _ocSelected = {};
+  ocRenderField();
+  if (typeof shAutoSave === 'function') shAutoSave();
   if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
 }
 
@@ -1641,7 +2032,24 @@ function acGetAllContent() {
     }
   }
 
-  /* 2. Доп. контент */
+  /* 2. Доп. контент: контейнеры */
+  var ocCnt = proj.ocContainers || [];
+  for (var ci = 0; ci < ocCnt.length; ci++) {
+    var cntItems = ocCnt[ci].items || [];
+    for (var cj = 0; cj < cntItems.length; cj++) {
+      var cItem = cntItems[cj];
+      if (seen[cItem.name]) continue;
+      seen[cItem.name] = true;
+      result.push({
+        name: cItem.name,
+        thumb: cItem.thumb || '',
+        preview: cItem.preview || cItem.thumb || '',
+        source: 'other'
+      });
+    }
+  }
+
+  /* 3. Доп. контент: свободные фото */
   var oc = proj.otherContent || [];
   for (var i = 0; i < oc.length; i++) {
     var item = oc[i];
@@ -2105,7 +2513,7 @@ function pvOnPageShow() {
 
 function ocOnPageShow() {
   pvInitDropzone('oc-pv-dropzone');
-  ocInitField();
+  ocRenderField();  /* Рендерит контейнеры + свободные, затем биндит drop-зоны */
   pvRenderAll();
 }
 

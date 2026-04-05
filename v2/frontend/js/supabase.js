@@ -242,6 +242,10 @@ function sbUploadProject(projIdx, callback) {
   // Формируем данные проекта
   /* Собрать имена файлов доп. контента (без base64) */
   var ocNames = (proj.otherContent || []).map(function(oc) { return oc.name; });
+  /* Контейнеры: сохраняем id, name и имена файлов (без base64) */
+  var ocContainersData = (proj.ocContainers || []).map(function(cnt) {
+    return { id: cnt.id, name: cnt.name, items: (cnt.items || []).map(function(it) { return it.name; }) };
+  });
 
   var projData = {
     owner_id: sbUser.id,
@@ -252,6 +256,7 @@ function sbUploadProject(projIdx, callback) {
     stage: proj._stage || proj.stage || 0,
     channels: JSON.stringify(proj.channels || []),
     other_content: JSON.stringify(ocNames),
+    oc_containers: JSON.stringify(ocContainersData),
     updated_at: new Date().toISOString()
   };
 
@@ -695,9 +700,11 @@ function sbDownloadProject(cloudId, callback) {
       _deletedAt: remote.deleted_at || null,
       channels: (typeof remote.channels === 'string') ? JSON.parse(remote.channels || '[]') : (remote.channels || []),
       _ocNames: (typeof remote.other_content === 'string') ? JSON.parse(remote.other_content || '[]') : (remote.other_content || []),
+      _ocContainersRaw: (typeof remote.oc_containers === 'string') ? JSON.parse(remote.oc_containers || '[]') : (remote.oc_containers || []),
       cards: [],
       previews: [],
-      otherContent: []
+      otherContent: [],
+      ocContainers: []
     };
 
     // Загружаем карточки + слоты
@@ -785,6 +792,23 @@ function sbDownloadProject(cloudId, callback) {
             }
           }
           delete proj._ocNames;
+
+          /* Восстановить ocContainers из raw данных + превью */
+          if (proj._ocContainersRaw && proj._ocContainersRaw.length > 0) {
+            for (var ci2 = 0; ci2 < proj._ocContainersRaw.length; ci2++) {
+              var rawCnt = proj._ocContainersRaw[ci2];
+              var cnt = { id: rawCnt.id, name: rawCnt.name, items: [] };
+              var rawItems = rawCnt.items || [];
+              for (var ri = 0; ri < rawItems.length; ri++) {
+                var cntPv = pvByName[rawItems[ri]];
+                if (cntPv) {
+                  cnt.items.push({ name: cntPv.name, path: '', thumb: cntPv.thumb, preview: cntPv.preview || '' });
+                }
+              }
+              proj.ocContainers.push(cnt);
+            }
+          }
+          delete proj._ocContainersRaw;
 
           /* Загрузить историю этапов из stage_events */
           sbLoadStageHistory(cloudId, function(history) {
@@ -1006,9 +1030,11 @@ function _sbDoLoadByToken(token) {
       _role: data.role || 'client',
       channels: [],
       _ocNames: (typeof ocRaw === 'string') ? JSON.parse(ocRaw) : (ocRaw || []),
+      _ocContainersRaw: (function() { var raw = data.oc_containers || '[]'; return (typeof raw === 'string') ? JSON.parse(raw) : (raw || []); })(),
       cards: [],
       previews: [],
-      otherContent: []
+      otherContent: [],
+      ocContainers: []
     };
 
     /* Временно сохраняем карточки из RPC — соберём после загрузки превью */
@@ -1083,6 +1109,23 @@ function _sbDoLoadByToken(token) {
         }
       }
       delete proj._ocNames;
+
+      /* Восстановить ocContainers из raw данных + превью */
+      if (proj._ocContainersRaw && proj._ocContainersRaw.length > 0) {
+        for (var ci3 = 0; ci3 < proj._ocContainersRaw.length; ci3++) {
+          var rawCnt2 = proj._ocContainersRaw[ci3];
+          var cnt2 = { id: rawCnt2.id, name: rawCnt2.name, items: [] };
+          var rawItems2 = rawCnt2.items || [];
+          for (var ri2 = 0; ri2 < rawItems2.length; ri2++) {
+            var cntPv2 = pvByName[rawItems2[ri2]];
+            if (cntPv2) {
+              cnt2.items.push({ name: cntPv2.name, path: '', thumb: cntPv2.thumb, preview: cntPv2.preview || '' });
+            }
+          }
+          proj.ocContainers.push(cnt2);
+        }
+      }
+      delete proj._ocContainersRaw;
 
       /* Загрузить историю этапов из stage_events */
       sbLoadStageHistory(data.project_id, function(history) {
@@ -1302,12 +1345,16 @@ var SB_CARD_SYNC_DELAY = 3000; // 3 секунды после последнег
 function sbSyncCardsLight(projectId, cards, callback) {
   if (!sbClient) { callback('Supabase не подключён'); return; }
 
-  /* Обновить other_content + stage в проекте */
+  /* Обновить other_content + oc_containers + stage в проекте */
   var proj = getActiveProject();
   if (proj) {
     var ocNames = (proj.otherContent || []).map(function(oc) { return oc.name; });
+    var ocCntData = (proj.ocContainers || []).map(function(cnt) {
+      return { id: cnt.id, name: cnt.name, items: (cnt.items || []).map(function(it) { return it.name; }) };
+    });
     sbClient.from('projects').update({
       other_content: JSON.stringify(ocNames),
+      oc_containers: JSON.stringify(ocCntData),
       template_config: proj._template || null,
       stage: proj._stage || 0,
       updated_at: new Date().toISOString()
@@ -1441,7 +1488,7 @@ function sbPullProject(callback) {
   console.log('sbPullProject: подтягиваем данные из облака...');
 
   /* 1. Загрузить проект (stage, other_content) */
-  sbClient.from('projects').select('stage, other_content, updated_at').eq('id', cloudId).single().then(function(projRes) {
+  sbClient.from('projects').select('stage, other_content, oc_containers, updated_at').eq('id', cloudId).single().then(function(projRes) {
     if (projRes.error) { _sbPullRunning = false; callback(projRes.error.message); return; }
 
     var remote = projRes.data;
@@ -1518,9 +1565,27 @@ function sbPullProject(callback) {
           }
         }
 
+        /* Восстановить ocContainers из облака */
+        var cntRaw = remote.oc_containers || '[]';
+        var cntParsed = (typeof cntRaw === 'string') ? JSON.parse(cntRaw) : (cntRaw || []);
+        var newContainers = [];
+        for (var ci4 = 0; ci4 < cntParsed.length; ci4++) {
+          var rawC = cntParsed[ci4];
+          var newCnt = { id: rawC.id, name: rawC.name, items: [] };
+          var rawI = rawC.items || [];
+          for (var ri4 = 0; ri4 < rawI.length; ri4++) {
+            var cPv = pvByName[rawI[ri4]];
+            if (cPv) {
+              newCnt.items.push({ name: cPv.name, path: '', thumb: cPv.thumb, preview: cPv.preview || '' });
+            }
+          }
+          newContainers.push(newCnt);
+        }
+
         /* Применить обновления к локальному проекту */
         proj.cards = newCards;
         proj.otherContent = newOC;
+        proj.ocContainers = newContainers;
         proj._stage = remote.stage || 0;
 
         /* Загрузить историю этапов */
