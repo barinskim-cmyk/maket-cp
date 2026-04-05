@@ -25,8 +25,8 @@ var cpDragSourceSlot = null;
 /** @type {number} Максимальная глубина undo-истории */
 var CP_MAX_HISTORY = 10;
 
-/** @type {number} Минимальный рейтинг для фильтрации в карусели (0 = без фильтра) */
-var _cpCardFilter = 0;
+/* Рейтинг-фильтр для десктопной карусели берётся из превью-панели (PV_FILTER['pv']).
+   Отдельная переменная _cpCardFilter больше не нужна. */
 
 
 // ══════════════════════════════════════════════
@@ -288,11 +288,9 @@ function cpRenderCard() {
   /* Быстрое сохранение как шаблон */
   html += '<button class="btn btn-sm" onclick="cpSaveAsTemplate()">Сохранить шаблон</button>';
 
-  /* Фильтр по рейтингу для карусели */
-  html += '<span class="cp-filter-bar">' + _cpFilterStarsHTML() + '</span>';
-
-  /* Удалить карточку */
-  html += '<button class="delete-card-btn" onclick="cpDeleteCard(' + idx + ')">Удалить</button>';
+  /* Кнопка "Удалить карточку" убрана из тулбара — удаление доступно
+     через сайдбар (правый клик или отдельная кнопка в списке карточек).
+     Фильтр по рейтингу: в десктопе берётся из превью-панели (PV_FILTER['pv']). */
   html += '</div></div>';
 
   /* ── Layout карточки ── */
@@ -435,7 +433,7 @@ function cpSlotHTML(slotIdx, span, hasHero) {
 /**
  * Desktop-карусель: заменить фото в слоте на следующее/предыдущее.
  * Работает аналогично cpMobileCarousel, но для текущей карточки в редакторе.
- * Учитывает _cpCardFilter (минимальный рейтинг).
+ * Учитывает фильтр превью-панели (PV_FILTER['pv']) как минимальный рейтинг.
  * @param {number} slotIdx - индекс слота в текущей карточке
  * @param {number} dir - направление (-1 = назад, 1 = вперёд)
  * @param {Event} [e] - событие клика
@@ -453,12 +451,13 @@ function cpDesktopCarousel(slotIdx, dir, e) {
   var orient = slot.orient || 'v';
   var currentFile = slot.file || '';
 
-  /* Получить ближайшие по ориентации с учётом рейтинг-фильтра */
+  /* Получить ближайшие по ориентации с учётом рейтинг-фильтра из превью-панели */
   var nearby = cpGetNearbyPreviews(currentFile, orient, 15);
-  if (_cpCardFilter > 0) {
+  var minRating = (typeof PV_FILTER !== 'undefined') ? (PV_FILTER['pv'] || 0) : 0;
+  if (minRating > 0) {
     var filtered = [];
     for (var f = 0; f < nearby.length; f++) {
-      if ((nearby[f].rating || 0) >= _cpCardFilter) filtered.push(nearby[f]);
+      if ((nearby[f].rating || 0) >= minRating) filtered.push(nearby[f]);
     }
     /* Если фильтр отсёк всё — показать все без фильтра */
     if (filtered.length > 0) nearby = filtered;
@@ -503,38 +502,9 @@ function cpDesktopCarousel(slotIdx, dir, e) {
   if (typeof shAutoSave === 'function') shAutoSave();
 }
 
-/**
- * Установить фильтр по рейтингу для карусели в карточках.
- * Повторный клик на тот же рейтинг — снять фильтр.
- * @param {number} minRating - минимальный рейтинг (1-5), 0 = снять фильтр
- */
-function cpSetCardFilter(minRating) {
-  if (_cpCardFilter === minRating) {
-    _cpCardFilter = 0;
-  } else {
-    _cpCardFilter = minRating;
-  }
-  /* Перерисовать тулбар для обновления звёздочек */
-  var bar = document.querySelector('.cp-filter-bar');
-  if (bar) {
-    bar.innerHTML = _cpFilterStarsHTML();
-  }
-}
-
-/**
- * Генерирует HTML звёздочек фильтра для тулбара карточки.
- * @returns {string} HTML строка
- */
-function _cpFilterStarsHTML() {
-  var html = '';
-  for (var s = 1; s <= 5; s++) {
-    html += '<button class="cp-filter-star' + (s <= _cpCardFilter ? ' cp-star-active' : '') +
-      '" onclick="cpSetCardFilter(' + s + ')">&#9733;</button>';
-  }
-  html += '<button class="cp-filter-reset' + (_cpCardFilter === 0 ? ' cp-star-active' : '') +
-    '" onclick="cpSetCardFilter(0)">Все</button>';
-  return html;
-}
+/* cpSetCardFilter / _cpFilterStarsHTML — удалены.
+   Десктопная карусель использует PV_FILTER['pv'] из превью-панели.
+   Мобильная версия использует cpMobileSetOptionsFilter / _mobOptionsFilter. */
 
 /**
  * Редактирование имени карточки inline.
