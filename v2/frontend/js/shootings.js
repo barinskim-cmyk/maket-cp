@@ -1548,9 +1548,9 @@ function shClientSubmitChanges() {
 }
 
 /**
- * Показать диалог подтверждения удалений.
- * Клиент видит какие фото он убрал из согласованного отбора
- * и решает: убрать из работы или оставить.
+ * Показать галерею удалённых фото.
+ * Клиент видит превьюшки, может выбрать что оставить, а что убрать.
+ * Это как повторный отбор, только из "мусорки".
  *
  * @param {object} proj
  * @param {object} diff — результат snCompareSnapshots
@@ -1558,13 +1558,21 @@ function shClientSubmitChanges() {
  * @private
  */
 function _shShowRemovalDialog(proj, diff, approvedSnap) {
+  /* Собрать карту превью по имени файла */
+  var pvMap = {};
+  if (proj.previews) {
+    for (var p = 0; p < proj.previews.length; p++) {
+      pvMap[proj.previews[p].name] = proj.previews[p];
+    }
+  }
+
   /* Создать модалку */
   var modal = document.getElementById('modal-removals');
   if (!modal) {
     modal = document.createElement('div');
     modal.id = 'modal-removals';
     modal.className = 'modal';
-    modal.innerHTML = '<div class="modal-content" style="max-width:520px">' +
+    modal.innerHTML = '<div class="modal-content" style="max-width:640px">' +
       '<div class="modal-header"><h3>Удалённые фото</h3>' +
       '<button class="modal-close" onclick="closeModal(\'modal-removals\')">&times;</button></div>' +
       '<div id="removals-content"></div></div>';
@@ -1573,40 +1581,62 @@ function _shShowRemovalDialog(proj, diff, approvedSnap) {
 
   var contentEl = document.getElementById('removals-content');
   var html = '<div style="padding:16px">';
-  html += '<p style="margin:0 0 12px;font-size:13px;color:#666">' +
-    'Вы убрали ' + diff.removed.length + ' фото из согласованного отбора. ' +
-    'Эти фото могут уже быть в работе (цветокоррекция, ретушь).</p>';
+  html += '<p style="margin:0 0 4px;font-size:13px;color:#666">' +
+    'Вы убрали ' + diff.removed.length + ' фото из согласованного отбора.</p>';
+  html += '<p style="margin:0 0 16px;font-size:13px;color:#666">' +
+    'Выберите, какие фото оставить в работе.</p>';
 
-  html += '<div style="margin-bottom:16px;max-height:200px;overflow-y:auto">';
+  /* Галерея превью с чекбоксами */
+  html += '<div class="rm-gallery">';
   for (var i = 0; i < diff.removed.length; i++) {
-    html += '<div style="padding:4px 8px;margin-bottom:2px;background:#fde8e8;border-radius:4px;font-size:12px">' +
-      esc(diff.removed[i]) + '</div>';
+    var fileName = diff.removed[i];
+    var pv = pvMap[fileName];
+    var thumbSrc = '';
+    if (pv) {
+      thumbSrc = pv.thumb || pv.preview || pv.thumbUrl || '';
+    }
+    /* Если thumb это Supabase URL — используем. Если base64 — тоже ок. Если нет — placeholder. */
+
+    html += '<div class="rm-item" data-file="' + esc(fileName) + '" onclick="_shToggleRemovalItem(this)">';
+    if (thumbSrc) {
+      html += '<img class="rm-thumb" src="' + thumbSrc + '" alt="' + esc(fileName) + '">';
+    } else {
+      html += '<div class="rm-thumb rm-thumb-empty">' + esc(fileName.replace(/\.[^.]+$/, '')) + '</div>';
+    }
+    html += '<div class="rm-check">&#10003;</div>';
+    html += '<div class="rm-name">' + esc(fileName.replace(/\.[^.]+$/, '')) + '</div>';
+    html += '</div>';
   }
   html += '</div>';
 
-  html += '<p style="margin:0 0 16px;font-size:13px;font-weight:600">Что сделать с этими фото?</p>';
+  /* Подпись-легенда */
+  html += '<p style="margin:12px 0 0;font-size:11px;color:#999">' +
+    'Выделенные фото останутся в работе. Остальные будут исключены.</p>';
 
-  html += '<div style="display:flex;flex-direction:column;gap:8px">';
-  html += '<button class="btn btn-primary" onclick="_shSubmitWithRemovals(\'keep\')" style="text-align:left;padding:10px 16px">' +
-    '<div>Оставить в работе</div>' +
-    '<div style="font-size:11px;font-weight:400;color:rgba(255,255,255,0.8);margin-top:2px">' +
-    'Фото останутся в текущем цикле (ЦК, ретушь). Вы просто убрали их из своего отбора.</div></button>';
+  /* Кнопки */
+  html += '<div class="rm-actions">';
+  html += '<div class="rm-bulk">';
+  html += '<button class="btn btn-sm" onclick="_shSelectAllRemovals(true)">Выбрать все</button>';
+  html += '<button class="btn btn-sm" onclick="_shSelectAllRemovals(false)">Снять все</button>';
+  html += '<span class="rm-counter" id="rm-counter">' + diff.removed.length + ' из ' + diff.removed.length + ' останутся</span>';
+  html += '</div>';
+  html += '<div class="rm-confirm">';
+  html += '<button class="btn" onclick="closeModal(\'modal-removals\')">Отмена</button>';
+  html += '<button class="btn btn-primary" onclick="_shConfirmRemovals()">Отправить изменения</button>';
+  html += '</div>';
+  html += '</div>';
 
-  html += '<button class="btn" onclick="_shSubmitWithRemovals(\'kill\')" style="text-align:left;padding:10px 16px;border-color:#c23030;color:#c23030">' +
-    '<div>Убрать из работы</div>' +
-    '<div style="font-size:11px;font-weight:400;color:#999;margin-top:2px">' +
-    'Эти фото будут исключены из всех этапов. Команда прекратит работу над ними.</div></button>';
-
-  html += '<button class="btn" onclick="closeModal(\'modal-removals\')" style="text-align:left;padding:10px 16px">' +
-    '<div>Отмена</div>' +
-    '<div style="font-size:11px;font-weight:400;color:#999;margin-top:2px">' +
-    'Вернуться к редактированию, ничего не отправлять.</div></button>';
-
-  html += '</div></div>';
+  html += '</div>';
 
   contentEl.innerHTML = html;
 
-  /* Сохранить данные для _shSubmitWithRemovals */
+  /* По умолчанию все фото выделены (оставить) */
+  var items = contentEl.querySelectorAll('.rm-item');
+  for (var j = 0; j < items.length; j++) {
+    items[j].classList.add('rm-selected');
+  }
+
+  /* Сохранить данные */
   window._shPendingRemovals = diff.removed;
   window._shPendingDiff = diff;
 
@@ -1614,26 +1644,67 @@ function _shShowRemovalDialog(proj, diff, approvedSnap) {
 }
 
 /**
- * Обработать решение клиента об удалённых фото и отправить изменения.
- * @param {string} decision — 'keep' (оставить в работе) или 'kill' (убрать)
+ * Переключить выделение одного фото в галерее удалений.
+ * @param {HTMLElement} el
+ */
+function _shToggleRemovalItem(el) {
+  el.classList.toggle('rm-selected');
+  _shUpdateRemovalCounter();
+}
+
+/**
+ * Выбрать или снять все фото в галерее удалений.
+ * @param {boolean} selectAll
+ */
+function _shSelectAllRemovals(selectAll) {
+  var items = document.querySelectorAll('#removals-content .rm-item');
+  for (var i = 0; i < items.length; i++) {
+    if (selectAll) items[i].classList.add('rm-selected');
+    else items[i].classList.remove('rm-selected');
+  }
+  _shUpdateRemovalCounter();
+}
+
+/**
+ * Обновить счётчик выбранных фото.
  * @private
  */
-function _shSubmitWithRemovals(decision) {
+function _shUpdateRemovalCounter() {
+  var total = document.querySelectorAll('#removals-content .rm-item').length;
+  var selected = document.querySelectorAll('#removals-content .rm-item.rm-selected').length;
+  var counter = document.getElementById('rm-counter');
+  if (counter) {
+    counter.textContent = selected + ' из ' + total + ' останутся';
+  }
+}
+
+/**
+ * Подтвердить решения по удалённым фото и отправить изменения.
+ * Выделенные = оставить в работе (keep). Не выделенные = убрать (kill).
+ * @private
+ */
+function _shConfirmRemovals() {
   var proj = getActiveProject();
   if (typeof closeModal === 'function') closeModal('modal-removals');
 
-  var removals = window._shPendingRemovals || [];
-  var diff = window._shPendingDiff || {};
+  var items = document.querySelectorAll('#removals-content .rm-item');
+  var removalRecords = [];
+  var ts = new Date().toISOString();
 
-  /* Записать решение: какие фото удалены и что с ними делать */
-  var removalRecords = removals.map(function(file) {
-    return { file: file, decision: decision, timestamp: new Date().toISOString() };
-  });
+  for (var i = 0; i < items.length; i++) {
+    var fileName = items[i].getAttribute('data-file');
+    var isSelected = items[i].classList.contains('rm-selected');
+    removalRecords.push({
+      file: fileName,
+      decision: isSelected ? 'keep' : 'kill',
+      timestamp: ts
+    });
+  }
 
   /* Сохранить в проект для аудита */
   if (!proj._removalLog) proj._removalLog = [];
-  for (var i = 0; i < removalRecords.length; i++) {
-    proj._removalLog.push(removalRecords[i]);
+  for (var r = 0; r < removalRecords.length; r++) {
+    proj._removalLog.push(removalRecords[r]);
   }
 
   _shDoSubmitChanges(proj, removalRecords);
