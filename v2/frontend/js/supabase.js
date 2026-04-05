@@ -2479,6 +2479,335 @@ function sbCurrentUserId() {
 }
 
 
+// ══════════════════════════════════════════════
+//  Snapshots — снимки состояния проекта
+// ══════════════════════════════════════════════
+
+/**
+ * Активный снимок-контекст.
+ * Если не null — Rate Setter, синхронизация и другие инструменты
+ * читают список фото из этого снимка, а не из живых карточек.
+ *
+ * @type {null|{id: string, stageId: string, trigger: string, note: string, data: object, created_at: string}}
+ */
+var _snActiveSnapshot = null;
+
+/**
+ * Кэш загруженных снимков для текущего проекта.
+ * @type {Array}
+ */
+var _snCachedSnapshots = [];
+
+/**
+ * Установить активный снимок-контекст (или null для текущего состояния).
+ * Обновляет индикатор в UI.
+ *
+ * @param {object|null} snapshot — объект снимка из Supabase или null
+ */
+function snSetActiveContext(snapshot) {
+  _snActiveSnapshot = snapshot;
+  _snUpdateContextIndicator();
+  console.log('snSetActiveContext:', snapshot ? ('снимок ' + snapshot.trigger + ' ' + snapshot.created_at) : 'текущее состояние');
+}
+
+/**
+ * Получить список файлов из активного контекста.
+ * Если активен снимок — берёт из снимка. Иначе — из живых карточек.
+ *
+ * Используется Rate Setter, синхронизацией и другими инструментами
+ * вместо прямого чтения proj.cards.
+ *
+ * @returns {string[]} — массив имён файлов (stems без расширения НЕ убираются)
+ */
+function snGetActiveFiles() {
+  if (_snActiveSnapshot && _snActiveSnapshot.data) {
+    var data = _snActiveSnapshot.data;
+    var names = {};
+    (data.cards || []).forEach(function(card) {
+      (card.slots || []).forEach(function(slot) {
+        if (slot.file) names[slot.file] = true;
+      });
+    });
+    (data.ocContainers || []).forEach(function(cnt) {
+      (cnt.items || []).forEach(function(it) {
+        var name = (typeof it === 'string') ? it : it.name || it;
+        if (name) names[name] = true;
+      });
+    });
+    return Object.keys(names);
+  }
+
+  /* Фолбэк: текущее состояние проекта */
+  var proj = getActiveProject();
+  if (!proj) return [];
+  var names = {};
+  (proj.cards || []).forEach(function(card) {
+    (card.slots || []).forEach(function(slot) {
+      if (slot.file) names[slot.file] = true;
+    });
+  });
+  (proj.otherContent || []).forEach(function(oc) {
+    if (oc.name) names[oc.name] = true;
+  });
+  (proj.ocContainers || []).forEach(function(cnt) {
+    (cnt.items || []).forEach(function(it) {
+      if (it.name) names[it.name] = true;
+    });
+  });
+  return Object.keys(names);
+}
+
+/**
+ * Получить данные карточек из активного контекста (для отображения).
+ * @returns {object} — { cards: [...], ocContainers: [...] } из снимка или текущего состояния
+ */
+function snGetActiveData() {
+  if (_snActiveSnapshot && _snActiveSnapshot.data) {
+    return _snActiveSnapshot.data;
+  }
+  return snBuildSnapshotData();
+}
+
+/**
+ * Проверить, активен ли режим просмотра снимка.
+ * @returns {boolean}
+ */
+function snIsViewingSnapshot() {
+  return _snActiveSnapshot !== null;
+}
+
+/**
+ * Обновить индикатор контекста в UI (баннер вверху экрана).
+ * @private
+ */
+function _snUpdateContextIndicator() {
+  var existing = document.getElementById('sn-context-banner');
+  if (existing) existing.remove();
+
+  if (!_snActiveSnapshot) return;
+
+  var snap = _snActiveSnapshot;
+  var triggerLabels = {
+    'client_approved': 'Согласование клиента',
+    'client_changes': 'Изменения клиента',
+    'client_edit_start': 'До изменений клиента',
+    'manual_advance': 'Переход этапа',
+    'manual': 'Ручной снимок'
+  };
+  var label = triggerLabels[snap.trigger] || snap.trigger;
+  var dateStr = '';
+  if (snap.created_at) {
+    var d = new Date(snap.created_at);
+    dateStr = d.toLocaleDateString('ru-RU') + ' ' + d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  var banner = document.createElement('div');
+  banner.id = 'sn-context-banner';
+  banner.className = 'sn-context-banner';
+  banner.innerHTML =
+    '<span class="sn-ctx-label">Просмотр: ' + esc(label) + (dateStr ? ' (' + dateStr + ')' : '') + '</span>' +
+    '<span class="sn-ctx-note">' + esc(snap.note || '') + '</span>' +
+    '<button class="btn sn-ctx-close" onclick="snSetActiveContext(null)">Вернуться к текущему</button>';
+
+  var appMain = document.getElementById('app-main');
+  if (appMain) appMain.insertBefore(banner, appMain.firstChild);
+}
+
+/**
+ * Собрать слепок текущего состояния проекта (cards + ocContainers).
+ * Возвращает компактный JSON без base64/dataUrl.
+ *
+ * @returns {object} { cards: [...], ocContainers: [...] }
+ */
+function snBuildSnapshotData() {
+  var proj = getActiveProject();
+  if (!proj) return { cards: [], ocContainers: [] };
+
+  /* Карточки: для каждого слота сохраняем имя файла + ориентацию + вес */
+  var cardsData = (proj.cards || []).map(function(card, ci) {
+    var slotsData = (card.slots || []).map(function(slot, si) {
+      return {
+        position: si,
+        orient: slot.orient || 'v',
+        weight: slot.weight || 1,
+        row: slot.row !== undefined ? slot.row : null,
+        file: slot.file || null,
+        rotation: slot.rotation || 0
+      };
+    });
+    return {
+      position: ci,
+      status: card.status || 'draft',
+      category: card.category || '',
+      hasHero: card._hasHero !== undefined ? card._hasHero : true,
+      hAspect: card._hAspect || '3/2',
+      vAspect: card._vAspect || '2/3',
+      lockRows: card._lockRows || false,
+      slots: slotsData
+    };
+  });
+
+  /* Контейнеры: id, name, список имён файлов */
+  var cntData = (proj.ocContainers || []).map(function(cnt) {
+    return {
+      id: cnt.id,
+      name: cnt.name,
+      items: (cnt.items || []).map(function(it) { return it.name; })
+    };
+  });
+
+  return { cards: cardsData, ocContainers: cntData };
+}
+
+/**
+ * Создать снимок и сохранить в Supabase (через RPC create_snapshot).
+ *
+ * @param {string} stageId — 'client', 'color', etc.
+ * @param {string} trigger — 'client_approved', 'client_changes', 'manual'
+ * @param {string} [note] — описание
+ * @param {function(err, snapshotId)} callback
+ */
+function snCreateSnapshot(stageId, trigger, note, callback) {
+  callback = callback || function() {};
+  var proj = getActiveProject();
+  if (!proj || !proj._cloudId) { callback('Нет cloudId'); return; }
+  if (!sbClient) { callback('SDK not initialized'); return; }
+
+  var data = snBuildSnapshotData();
+  var actor = (typeof sbGetActor === 'function') ? sbGetActor() : {};
+
+  sbClient.rpc('create_snapshot', {
+    p_project_id: proj._cloudId,
+    p_stage_id: stageId,
+    p_trigger: trigger,
+    p_actor_id: actor.id || null,
+    p_actor_token: actor.token || null,
+    p_actor_name: actor.name || null,
+    p_data: data,
+    p_note: note || null
+  }).then(function(res) {
+    if (res.error) {
+      console.error('snCreateSnapshot:', res.error);
+      callback(res.error.message);
+    } else {
+      console.log('snCreateSnapshot: снимок создан, id=' + res.data);
+      callback(null, res.data);
+    }
+  });
+}
+
+/**
+ * Загрузить все снимки проекта.
+ * Владелец: напрямую из таблицы. Клиент: через RPC get_snapshots_by_token.
+ *
+ * @param {function(err, snapshots[])} callback
+ */
+function snLoadSnapshots(callback) {
+  callback = callback || function() {};
+  var proj = getActiveProject();
+  if (!proj || !proj._cloudId) { callback('Нет cloudId', []); return; }
+  if (!sbClient) { callback('SDK not initialized', []); return; }
+
+  var isClient = !!window._shareToken;
+
+  if (isClient) {
+    sbClient.rpc('get_snapshots_by_token', { p_token: window._shareToken })
+      .then(function(res) {
+        if (res.error) { callback(res.error.message, []); return; }
+        callback(null, res.data || []);
+      });
+  } else {
+    sbClient.from('snapshots')
+      .select('*')
+      .eq('project_id', proj._cloudId)
+      .order('created_at', { ascending: true })
+      .then(function(res) {
+        if (res.error) { callback(res.error.message, []); return; }
+        callback(null, res.data || []);
+      });
+  }
+}
+
+/**
+ * Сравнить два снимка (или снимок vs текущее состояние).
+ * Возвращает diff: какие фото добавлены, удалены, перемещены.
+ *
+ * @param {object} before — snapshot.data (cards + ocContainers)
+ * @param {object} after — snapshot.data или snBuildSnapshotData()
+ * @returns {object} { added: [filename,...], removed: [filename,...], moved: [{file, fromCard, toCard},...] }
+ */
+function snCompareSnapshots(before, after) {
+  var result = { added: [], removed: [], moved: [] };
+
+  /* Собираем карту: filename → {cardIdx, slotIdx} для обоих состояний */
+  function buildFileMap(data) {
+    var map = {};
+    (data.cards || []).forEach(function(card, ci) {
+      (card.slots || []).forEach(function(slot, si) {
+        if (slot.file) {
+          map[slot.file] = { card: ci, slot: si, location: 'card' };
+        }
+      });
+    });
+    (data.ocContainers || []).forEach(function(cnt, ci) {
+      (cnt.items || []).forEach(function(itemName) {
+        var name = (typeof itemName === 'string') ? itemName : itemName.name || itemName;
+        if (name) map[name] = { container: ci, containerName: cnt.name, location: 'container' };
+      });
+    });
+    return map;
+  }
+
+  var mapBefore = buildFileMap(before);
+  var mapAfter = buildFileMap(after);
+
+  /* Удалённые: были в before, нет в after */
+  for (var fb in mapBefore) {
+    if (!mapAfter[fb]) {
+      result.removed.push(fb);
+    } else if (mapBefore[fb].card !== mapAfter[fb].card || mapBefore[fb].slot !== mapAfter[fb].slot ||
+               mapBefore[fb].location !== mapAfter[fb].location) {
+      result.moved.push({
+        file: fb,
+        from: mapBefore[fb],
+        to: mapAfter[fb]
+      });
+    }
+  }
+
+  /* Добавленные: есть в after, нет в before */
+  for (var fa in mapAfter) {
+    if (!mapBefore[fa]) {
+      result.added.push(fa);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Получить набор имён файлов в снимке (или текущем состоянии) — для быстрых проверок.
+ * @param {object} snapshotData — { cards, ocContainers }
+ * @returns {object} — { fileInSlots: {filename: true}, fileInContainers: {filename: true} }
+ */
+function snGetFileSet(snapshotData) {
+  var slots = {};
+  var containers = {};
+  (snapshotData.cards || []).forEach(function(card) {
+    (card.slots || []).forEach(function(slot) {
+      if (slot.file) slots[slot.file] = true;
+    });
+  });
+  (snapshotData.ocContainers || []).forEach(function(cnt) {
+    (cnt.items || []).forEach(function(it) {
+      var name = (typeof it === 'string') ? it : it.name || it;
+      if (name) containers[name] = true;
+    });
+  });
+  return { fileInSlots: slots, fileInContainers: containers };
+}
+
+
 // Автоинициализация
 if (typeof window !== 'undefined') {
   // Вызовется после загрузки Supabase SDK

@@ -1888,3 +1888,60 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   font-size: 12px; padding: 3px 6px; border: 1px solid #ccc;
   border-radius: 4px; background: #fff; max-width: 160px;
 }
+
+/* ══════════════════════════════════════════════
+   Snapshots: контекстный баннер, кликабельные этапы, diff
+   ══════════════════════════════════════════════ */
+
+/* Баннер "Просмотр снимка" */
+.sn-context-banner {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 16px; background: #fff3cd; border-bottom: 1px solid #e6d590;
+  font-size: 12px; color: #665d34;
+}
+.sn-ctx-label { font-weight: 600; }
+.sn-ctx-note { color: #998b4a; flex: 1; }
+.sn-ctx-close {
+  font-size: 11px; padding: 3px 10px; background: #fff; border: 1px solid #ccc;
+  border-radius: 4px; cursor: pointer;
+}
+.sn-ctx-close:hover { background: #f5f5f5; }
+
+/* Кликабельные завершённые этапы пайплайна */
+.pipeline-step.step-clickable { cursor: pointer; }
+.pipeline-step.step-clickable:hover { background: #f0f0f0; border-radius: 6px; }
+.pipeline-step.step-clickable:hover .step-name { text-decoration: underline; }
+
+/* Подсветка активного этапа-снимка */
+.pipeline-step.sn-active-stage {
+  background: #fff8e0; border-radius: 6px;
+  box-shadow: inset 0 0 0 1.5px #e6d590;
+}
+
+/* Diff: секции результатов */
+.sn-diff-section { margin-bottom: 12px; }
+.sn-diff-title {
+  font-size: 12px; font-weight: 600; margin-bottom: 6px; padding: 2px 0;
+}
+.sn-diff-added-title { color: #2a7d2a; }
+.sn-diff-removed-title { color: #c23030; }
+.sn-diff-files { display: flex; flex-wrap: wrap; gap: 4px; }
+.sn-diff-file {
+  font-size: 11px; padding: 3px 8px; border-radius: 4px;
+  display: inline-block; max-width: 220px; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sn-diff-file-added { background: #e6f7e6; color: #2a6b2a; border: 1px solid #b3dab3; }
+.sn-diff-file-removed { background: #fde8e8; color: #a02020; border: 1px solid #e8b3b3; }
+.sn-diff-file-moved { background: #fff8e0; color: #665d34; border: 1px solid #e6d590; }
+
+/* Diff в карточках: подсветка слотов при просмотре снимка */
+.slot-diff-added { box-shadow: inset 0 0 0 3px #4caf50 !important; }
+.slot-diff-removed { opacity: 0.4; box-shadow: inset 0 0 0 3px #f44336 !important; }
+.slot-diff-moved { box-shadow: inset 0 0 0 3px #ff9800 !important; }
+
+/* Кнопка "Внести изменения" в клиентской панели */
+.client-btn-edit {
+  background: #fff; color: #333; border: 1.5px solid #333;
+}
+.client-btn-edit:hover { background: #f5f5f5; }
