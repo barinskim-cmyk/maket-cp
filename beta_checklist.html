@@ -557,6 +557,163 @@ tr:hover td { background: #fafafa; }
   <td contenteditable="true" class="my-comment"></td>
 </tr>
 
+<tr class="sprint-row"><td colspan="9">ВЕРСИИ ПРЕВЬЮ -- переключение RAW / ЦК / Ретушь</td></tr>
+
+<tr class="section-row"><td colspan="9">Загрузка и переключение версий</td></tr>
+
+<tr data-row="V1">
+  <td>V1</td>
+  <td><strong>Загрузка ЦК-версии превью</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Превью</td>
+  <td>Селект "Загрузить... / + ЦК версию / + Ретушь версию" в тулбаре. Открывает папку, матчит по именам, сохраняет в versions[stageId]</td>
+  <td class="files">previews.js, index.html</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="V2">
+  <td>V2</td>
+  <td><strong>Переключатель версий (RAW / ЦК / Ретушь)</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Превью</td>
+  <td>Кнопки "Все / RAW / ЦК / Ретушь" появляются после загрузки версии. Переключают отображение в галерее + карточках + лайтбоксе</td>
+  <td class="files">previews.js, style.css</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="V3">
+  <td>V3</td>
+  <td><strong>Индикатор отсутствующей версии</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Превью</td>
+  <td>Красная точка на фото без версии для выбранного этапа + счётчик "не хватает N"</td>
+  <td class="files">previews.js, style.css</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="V4">
+  <td>V4</td>
+  <td><strong>Карточки обновляются при переключении версии</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Карточки</td>
+  <td>pvUpdateCardSlotsForVersion: при смене версии все слоты карточек показывают соответствующее превью</td>
+  <td class="files">previews.js, cards.js</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="V5">
+  <td>V5</td>
+  <td><strong>IndexedDB + localStorage хранят версии</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Инфраструктура</td>
+  <td>IndexedDB хранит полные данные версий. localStorage хранит только thumb-версии (лёгкие). При рестарте версии восстанавливаются</td>
+  <td class="files">previews.js, shootings.js</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="V6">
+  <td>V6</td>
+  <td><strong>Supabase: версии превью в облаке</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Облако</td>
+  <td>Добавить stage в таблицу previews. sbUploadPreviews загружает версии. Клиент видит версию по активному этапу проекта</td>
+  <td class="files">supabase.js, migration</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="V7">
+  <td>V7</td>
+  <td><strong>Persistent photo ID (COS + суффикс)</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Rate Setter</td>
+  <td>UUID в COS keyword + суффикс в имени файла при синхронизации. Связывает версии даже после ретуши (где сносят метаданные)</td>
+  <td class="files">sync.js, preview_service.py</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr class="section-row"><td colspan="9">Масштабирование (20 съёмок/неделю)</td></tr>
+
+<tr data-row="S1">
+  <td>S1</td>
+  <td><strong>Supabase Pro ($25/мес)</strong></td>
+  <td><span class="who-masha">Masha</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Инфраструктура</td>
+  <td>Переключить на Pro план. Free tier (1GB) закончится за 1-2 дня при 20 съёмках. Pro = 100GB storage + 250GB transfer</td>
+  <td class="files">Supabase dashboard</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="S2">
+  <td>S2</td>
+  <td><strong>localStorage: только текущий проект</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Инфраструктура</td>
+  <td>При 5+ проектах с 500 фото localStorage (5-10MB) переполнится. Хранить thumbs только активного проекта, остальное в IndexedDB/облаке</td>
+  <td class="files">shootings.js</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="S3">
+  <td>S3</td>
+  <td><strong>Автоочистка IndexedDB</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Инфраструктура</td>
+  <td>Чистить превью завершённых проектов из IndexedDB (>30 дней). С версиями один проект = 200MB+</td>
+  <td class="files">previews.js</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="S4">
+  <td>S4</td>
+  <td><strong>Storage lifecycle (архивация)</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Инфраструктура</td>
+  <td>Автоматически архивировать/удалять превью в Storage для проектов старше 90 дней. Экономия при 16GB/мес роста</td>
+  <td class="files">Supabase function</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="S5">
+  <td>S5</td>
+  <td><strong>Batch upload оптимизация</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Облако</td>
+  <td>1000 файлов на проект: загружать батчами по 20 параллельно, retry при ошибках, прогресс-бар</td>
+  <td class="files">supabase.js</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr class="checkpoint-row" data-row="cp-versions">
+  <td></td>
+  <td colspan="6"><strong>VERSIONS CHECK:</strong> Загрузка ЦК-версии работает. Переключение версий корректно. Масштабирование подготовлено.</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
 <tr class="checkpoint-row" data-row="cp-final">
   <td></td>
   <td colspan="6"><strong>FINAL:</strong> Все DONE протестированы. Баги записаны. TODO приоритизированы. Бета готова.</td>
