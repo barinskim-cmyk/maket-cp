@@ -2811,15 +2811,19 @@ function cpMobileSelectFullscreen(idx) {
  */
 function cpMobileRenderOther() {
   var proj = getActiveProject();
-  var store = (proj && proj.otherContent) ? proj.otherContent : [];
+  var freeStore = (proj && proj.otherContent) ? proj.otherContent : [];
+  var containers = (proj && proj.ocContainers) ? proj.ocContainers : [];
+  var totalPhotos = freeStore.length;
+  for (var tc = 0; tc < containers.length; tc++) totalPhotos += (containers[tc].items || []).length;
 
-  /* Кнопка "Все опции" — всегда показывается, ведёт на Options */
+  /* Тулбар */
   var html = '<div class="mob-other-toolbar">';
-  html += '<span class="mob-other-count">' + store.length + ' фото</span>';
+  html += '<span class="mob-other-count">' + totalPhotos + ' фото</span>';
+  html += '<button class="mob-other-options-btn" onclick="ocAddContainer()">+ Контейнер</button>';
   html += '<button class="mob-other-options-btn" onclick="cpMobileSetView(\'options\')">Все опции</button>';
   html += '</div>';
 
-  if (store.length === 0) {
+  if (totalPhotos === 0 && containers.length === 0) {
     html += '<div style="padding:40px 16px;text-align:center;color:#999">';
     html += 'Нет доп. контента.<br>';
     html += '<button class="mob-other-go-options" onclick="cpMobileSetView(\'options\')">Перейти в Options для отбора</button>';
@@ -2835,39 +2839,84 @@ function cpMobileRenderOther() {
     }
   }
 
-  html += '<div class="mob-select">';
-
-  for (var i = 0; i < store.length; i++) {
-    var item = store[i];
+  /* Хелпер: генерация плитки фото */
+  function _mobOcTile(item, onclickFn, removeFn) {
     var src = item.preview || item.thumb || '';
-    if (!src) continue;
-
-    /* Определить ориентацию */
+    if (!src) return '';
     var pv = pvMap[item.name];
     var orient = 'v';
     if (pv) {
       orient = (pv.width && pv.height) ? (pv.width > pv.height ? 'h' : 'v') : (pv.orient || 'v');
     }
     var itemClass = orient === 'h' ? 'mob-select-item-h' : 'mob-select-item-v';
+    var t = '<div class="mob-select-item ' + itemClass + '">';
+    t += '<img src="' + src + '" loading="lazy" onclick="' + onclickFn + '">';
+    t += '<button class="mob-oc-remove" onclick="' + removeFn + '">&times;</button>';
+    t += '</div>';
+    return t;
+  }
 
-    html += '<div class="mob-select-item ' + itemClass + '">';
-    html += '<img src="' + src + '" loading="lazy" onclick="cpMobileOtherFullscreen(' + i + ')">';
-    html += '<button class="mob-oc-remove" onclick="cpMobileOtherRemove(' + i + ',event)">&times;</button>';
+  /* ── Контейнеры ── */
+  for (var c = 0; c < containers.length; c++) {
+    var cnt = containers[c];
+    var items = cnt.items || [];
+    html += '<div class="mob-oc-cnt-block">';
+    html += '<div class="mob-oc-cnt-header">';
+    html += '<span class="mob-oc-cnt-name" onclick="ocEditContainerName(' + c + ')">' + esc(cnt.name) + '</span>';
+    html += '<span class="mob-oc-cnt-count">' + items.length + '</span>';
+    html += '<button class="mob-oc-cnt-del" onclick="cpMobileDeleteContainer(' + c + ')">&times;</button>';
+    html += '</div>';
+    if (items.length > 0) {
+      html += '<div class="mob-select">';
+      for (var i = 0; i < items.length; i++) {
+        html += _mobOcTile(
+          items[i],
+          'cpMobileContainerFullscreen(' + c + ',' + i + ')',
+          'cpMobileContainerRemove(' + c + ',' + i + ',event)'
+        );
+      }
+      html += '</div>';
+    } else {
+      html += '<div style="padding:16px;text-align:center;color:#ccc;font-size:13px">Пусто</div>';
+    }
     html += '</div>';
   }
 
-  html += '</div>';
+  /* ── Свободные фото ── */
+  if (freeStore.length > 0 || containers.length > 0) {
+    if (containers.length > 0) {
+      html += '<div style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:0.5px;padding:8px 16px 4px">Свободные фото</div>';
+    }
+    html += '<div class="mob-select">';
+    for (var f = 0; f < freeStore.length; f++) {
+      html += _mobOcTile(
+        freeStore[f],
+        'cpMobileOtherFullscreen(' + f + ')',
+        'cpMobileOtherRemove(' + f + ',event)'
+      );
+    }
+    html += '</div>';
+  }
+
   return html;
 }
 
 /**
- * Открыть лайтбокс из мобильной вкладки Other.
- * Показывает только OC-фото (не все превью).
+ * Открыть лайтбокс из мобильной вкладки Other (свободные фото).
  * @param {number} idx — индекс в otherContent
  */
 function cpMobileOtherFullscreen(idx) {
   if (typeof ocOpenLightbox === 'function') {
     ocOpenLightbox(idx, null);
+  }
+}
+
+/**
+ * Открыть лайтбокс из мобильной вкладки Other (контейнер).
+ */
+function cpMobileContainerFullscreen(cntIdx, itemIdx) {
+  if (typeof ocOpenContainerLightbox === 'function') {
+    ocOpenContainerLightbox(cntIdx, itemIdx, null);
   }
 }
 
@@ -2880,6 +2929,27 @@ function cpMobileOtherRemove(idx, e) {
   if (e) { e.stopPropagation(); e.preventDefault(); }
   if (typeof ocRemoveItem === 'function') {
     ocRemoveItem(idx);
+  }
+  cpMobileRender();
+}
+
+/**
+ * Удалить фото из контейнера через мобильную вкладку.
+ */
+function cpMobileContainerRemove(cntIdx, itemIdx, e) {
+  if (e) { e.stopPropagation(); e.preventDefault(); }
+  if (typeof ocRemoveFromContainer === 'function') {
+    ocRemoveFromContainer(cntIdx, itemIdx);
+  }
+  cpMobileRender();
+}
+
+/**
+ * Удалить контейнер через мобильную вкладку (фото → свободные).
+ */
+function cpMobileDeleteContainer(cntIdx) {
+  if (typeof ocDeleteContainer === 'function') {
+    ocDeleteContainer(cntIdx);
   }
   cpMobileRender();
 }

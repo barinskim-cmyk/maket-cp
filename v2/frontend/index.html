@@ -152,11 +152,15 @@
           <div class="section-title">Other</div>
           <div class="oc-toolbar" id="oc-toolbar" style="display:none">
             <span id="oc-count">0 фото</span>
+            <button class="btn btn-sm" onclick="ocAddContainer()">+ Контейнер</button>
             <button class="btn btn-sm" onclick="ocClearAll()">Очистить</button>
           </div>
         </div>
-        <div class="oc-field" id="oc-field">
-          <div class="oc-field-empty" id="oc-field-empty">Перетащите сюда фото из превью</div>
+        <!-- Динамическая область: контейнеры + свободные фото -->
+        <div id="oc-dynamic-area"></div>
+        <!-- Старое поле (скрыто, для обратной совместимости) -->
+        <div class="oc-field" id="oc-field" style="display:none">
+          <div class="oc-field-empty" id="oc-field-empty"></div>
           <div class="oc-gallery" id="oc-gallery"></div>
         </div>
       </div>
