@@ -728,19 +728,67 @@ function cpToggleWeight(slotIdx, e) {
 function cpClearSlotPhoto(slotIdx, e) {
   e.stopPropagation();
   cpSaveHistory();
-  var card = getActiveProject().cards[App.currentCardIdx];
+  var proj = getActiveProject();
+  var card = proj.cards[App.currentCardIdx];
   var oldFile = card.slots[slotIdx].file;
   card.slots[slotIdx].file = null;
   card.slots[slotIdx].dataUrl = null;
   card.slots[slotIdx].thumbUrl = null;
   card.slots[slotIdx].path = null;
   if (oldFile && typeof sbLogAction === 'function') sbLogAction('remove_from_slot', 'card', card.id, card.name, oldFile);
+
+  /* Клиентский режим: авто-переверстка (убрать пустые слоты, удалить пустые карточки) */
+  if (typeof _appClientMode !== 'undefined' && _appClientMode) {
+    cpAutoReflow(proj, App.currentCardIdx);
+  }
+
   cpSyncFiles(card);
   cpRenderCard();
   cpRenderList();
   if (typeof shAutoSave === 'function') shAutoSave();
-  /* Авто-синхронизация для клиента */
-  if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
+  if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
+}
+
+/**
+ * Авто-переверстка карточки после удаления фото (клиентский режим).
+ * 1. Убирает пустые слоты из карточки (оставшиеся фото сдвигаются)
+ * 2. Если карточка полностью пуста — удаляет её
+ * 3. Корректирует App.currentCardIdx если нужно
+ *
+ * Вызывается ТОЛЬКО в клиентском режиме — фотограф управляет слотами вручную.
+ *
+ * @param {object} proj — текущий проект
+ * @param {number} cardIdx — индекс карточки
+ */
+function cpAutoReflow(proj, cardIdx) {
+  if (!proj || !proj.cards || !proj.cards[cardIdx]) return;
+  var card = proj.cards[cardIdx];
+  if (!card.slots) return;
+
+  /* 1. Собрать только заполненные слоты */
+  var filled = [];
+  for (var s = 0; s < card.slots.length; s++) {
+    if (card.slots[s].file) {
+      filled.push(card.slots[s]);
+    }
+  }
+
+  if (filled.length === 0) {
+    /* 2. Карточка пуста — удалить */
+    proj.cards.splice(cardIdx, 1);
+    /* Скорректировать текущий индекс */
+    if (App.currentCardIdx >= proj.cards.length) {
+      App.currentCardIdx = Math.max(0, proj.cards.length - 1);
+    }
+    console.log('cpAutoReflow: пустая карточка ' + cardIdx + ' удалена');
+    return;
+  }
+
+  if (filled.length < card.slots.length) {
+    /* 3. Есть пустые слоты — пересобрать массив слотов */
+    card.slots = filled;
+    console.log('cpAutoReflow: карточка ' + cardIdx + ' переверстана, осталось ' + filled.length + ' слотов');
+  }
 }
 
 
@@ -2608,7 +2656,12 @@ function cpMobileClearSlot(cardIdx, slotIdx) {
   slot.path = null;
   if (oldFile && typeof sbLogAction === 'function') sbLogAction('remove_from_slot', 'card', card.id, card.name, oldFile);
 
-  if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
+  /* Авто-переверстка: убрать пустые слоты, удалить пустые карточки */
+  if (typeof _appClientMode !== 'undefined' && _appClientMode) {
+    cpAutoReflow(proj, cardIdx);
+  }
+
+  if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
   if (typeof shAutoSave === 'function') shAutoSave();
 
   cpMobileRender();
