@@ -1276,6 +1276,117 @@ function sbGetComments(projectId, cardId, callback) {
 
 
 // ══════════════════════════════════════════════
+//  Аудит-лог действий (action_log)
+//
+//  Два уровня:
+//    1. Метка _addedBy на фото — перезаписывается всегда (лёгкая)
+//    2. action_log в Supabase — пишется только с этапа >= 3
+// ══════════════════════════════════════════════
+
+/** Минимальный этап проекта для записи в action_log */
+var SB_LOG_MIN_STAGE = 3;
+
+/**
+ * Получить информацию о текущем акторе.
+ * Возвращает {id, token, name, role}.
+ */
+function sbGetActor() {
+  var proj = getActiveProject();
+  var role = (proj && proj._role) ? proj._role : 'owner';
+
+  if (sbUser) {
+    var name = sbUser.email || '';
+    if (sbUser.user_metadata && sbUser.user_metadata.name) {
+      name = sbUser.user_metadata.name;
+    }
+    return { id: sbUser.id, token: null, name: name, role: role };
+  }
+
+  if (window._shareToken) {
+    return { id: null, token: window._shareToken, name: role + ' (ссылка)', role: role };
+  }
+
+  return { id: null, token: null, name: 'local', role: 'owner' };
+}
+
+/**
+ * Поставить метку актора на объект (slot item, OC item и т.д.).
+ * Перезаписывает _addedBy / _addedAt при каждом действии.
+ *
+ * @param {Object} item — объект с полем name (slot, OC item и т.д.)
+ */
+function sbStampActor(item) {
+  if (!item) return;
+  var actor = sbGetActor();
+  item._addedBy = actor.name;
+  item._addedRole = actor.role;
+  item._addedAt = new Date().toISOString();
+}
+
+/**
+ * Записать действие в action_log (Supabase RPC).
+ * Пишет только если:
+ *   - есть облачный проект (_cloudId)
+ *   - этап >= SB_LOG_MIN_STAGE
+ *
+ * @param {string} action       — add_to_card, remove_from_card, approve_card, ...
+ * @param {string} targetType   — card | container | slot | project
+ * @param {string} targetId     — id карточки/контейнера
+ * @param {string} [targetName] — имя для снапшота
+ * @param {string} [photoName]  — имя файла фото
+ * @param {Object} [details]    — доп. контекст
+ */
+function sbLogAction(action, targetType, targetId, targetName, photoName, details) {
+  var proj = getActiveProject();
+  if (!proj || !proj._cloudId) return;
+  if ((proj._stage || 0) < SB_LOG_MIN_STAGE) return;
+  if (!sbClient) return;
+
+  var actor = sbGetActor();
+
+  sbClient.rpc('log_action', {
+    p_project_id:  proj._cloudId,
+    p_share_token: actor.token || null,
+    p_actor_name:  actor.name,
+    p_actor_role:  actor.role,
+    p_action:      action,
+    p_target_type: targetType || null,
+    p_target_id:   targetId || null,
+    p_target_name: targetName || null,
+    p_photo_name:  photoName || null,
+    p_details:     details || null
+  }).then(function(res) {
+    if (res.error) console.warn('action_log error:', res.error.message);
+  });
+}
+
+/**
+ * Получить журнал действий проекта.
+ * @param {string} projectId
+ * @param {Object} [opts] — {photo_name, target_id, limit}
+ * @param {function} callback — callback(error, logs[])
+ */
+function sbGetActionLog(projectId, opts, callback) {
+  if (!sbClient) { callback('Supabase не подключён'); return; }
+  if (!opts) opts = {};
+
+  var query = sbClient.from('action_log')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: false })
+    .limit(opts.limit || 100);
+
+  if (opts.photo_name) query = query.eq('photo_name', opts.photo_name);
+  if (opts.target_id) query = query.eq('target_id', opts.target_id);
+
+  query.then(function(res) {
+    if (res.error) callback(res.error.message, []);
+    else callback(null, res.data || []);
+  });
+}
+
+
+// ══════════════════════════════════════════════
 //  Загрузка миниатюр в Storage
 // ══════════════════════════════════════════════
 

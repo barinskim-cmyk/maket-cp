@@ -462,6 +462,17 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 }
 .photo-slot:hover .remove-btn { display: block; }
 
+/* Бейдж «кто добавил» — показывается при наведении */
+.slot-added-by {
+  position: absolute; bottom: 4px; left: 4px;
+  background: rgba(0,0,0,0.6); color: #fff;
+  font-size: 10px; padding: 1px 6px; border-radius: 3px;
+  pointer-events: none; display: none; z-index: 2;
+  max-width: 90%; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.photo-slot:hover .slot-added-by { display: block; }
+
 /* Main-слот: тонкая рамка-индикатор */
 .photo-slot.main-slot { border: 2px solid #333; }
 .photo-slot.main-slot.empty { border: 2px dashed #333; }
@@ -879,6 +890,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 }
 .oc-item:hover .pv-remove { display: block; }
 .oc-item:hover .pv-name { display: block; }
+/* Бейдж «кто добавил» на OC-фото */
+.oc-added-by {
+  position: absolute; bottom: 4px; left: 4px;
+  background: rgba(0,0,0,0.6); color: #fff;
+  font-size: 9px; padding: 1px 5px; border-radius: 3px;
+  pointer-events: none; display: none; z-index: 2;
+}
+.oc-item:hover .oc-added-by { display: block; }
 
 /* ── Контейнеры в Other ── */
 
