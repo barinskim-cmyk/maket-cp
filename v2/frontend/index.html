@@ -128,6 +128,11 @@
         <div class="pv-toolbar" id="pv-toolbar" style="display:none">
           <span id="pv-count">0 фото</span>
           <input type="range" id="pv-thumb-slider" min="2" max="6" value="3" class="pv-slider" title="Размер миниатюр" oninput="pvSetColumns(this.value)">
+          <select class="btn btn-sm pv-load-version-select" id="pv-load-version-select" title="Загрузить версию превью" onchange="pvOnLoadVersionSelect(this)">
+            <option value="">Загрузить...</option>
+            <option value="color">+ ЦК версию</option>
+            <option value="retouch">+ Ретушь версию</option>
+          </select>
           <button class="btn btn-sm" onclick="pvDownloadSorted()">Скачать</button>
           <button class="btn btn-sm" onclick="pvClearAll()">Очистить</button>
         </div>
@@ -139,6 +144,10 @@
           <select class="pv-folder-select" id="pv-folder-select" onchange="pvSetFolderFilter('pv', this.value)">
             <option value="">Все папки</option>
           </select>
+        </div>
+        <div class="pv-version-bar" id="pv-version-bar" style="display:none">
+          <div class="pv-version-switcher" id="pv-version-switcher"></div>
+          <div class="pv-version-stats" id="pv-version-stats"></div>
         </div>
         <div class="pv-gallery" id="pv-gallery"></div>
       </div>
