@@ -25,6 +25,9 @@ var cpDragSourceSlot = null;
 /** @type {number} Максимальная глубина undo-истории */
 var CP_MAX_HISTORY = 10;
 
+/** @type {number} Минимальный рейтинг для фильтрации в карусели (0 = без фильтра) */
+var _cpCardFilter = 0;
+
 
 // ══════════════════════════════════════════════
 //  Сайдбар: список карточек
@@ -285,6 +288,9 @@ function cpRenderCard() {
   /* Быстрое сохранение как шаблон */
   html += '<button class="btn btn-sm" onclick="cpSaveAsTemplate()">Сохранить шаблон</button>';
 
+  /* Фильтр по рейтингу для карусели */
+  html += '<span class="cp-filter-bar">' + _cpFilterStarsHTML() + '</span>';
+
   /* Удалить карточку */
   html += '<button class="delete-card-btn" onclick="cpDeleteCard(' + idx + ')">Удалить</button>';
   html += '</div></div>';
@@ -409,9 +415,14 @@ function cpSlotHTML(slotIdx, span, hasHero) {
     /* Кнопка увеличения: прямо на фото, иконка expand */
     var expandSvg = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
     var zoomBtn = '<button class="slot-expand" onclick="cpShowFullscreen(' + slotIdx + ',event)" title="На весь экран">' + expandSvg + '</button>';
+    /* Стрелки карусели: листание фото в слоте (по ориентации) */
+    var carouselArrows = '<div class="slot-carousel-arrows">' +
+      '<button class="slot-carousel-arrow slot-carousel-prev" onclick="cpDesktopCarousel(' + slotIdx + ',-1,event)">&lsaquo;</button>' +
+      '<button class="slot-carousel-arrow slot-carousel-next" onclick="cpDesktopCarousel(' + slotIdx + ',1,event)">&rsaquo;</button>' +
+      '</div>';
     return '<div class="photo-slot filled' + mainCls + '" data-slot="' + slotIdx + '" draggable="true">' +
       '<img src="' + src + '" loading="lazy"' + rotStyle + ' onerror="this.parentNode.classList.add(\'img-error\')">' +
-      zoomBtn +
+      zoomBtn + carouselArrows +
       '<button class="remove-btn" onclick="cpClearSlotPhoto(' + slotIdx + ',event)">&times;</button></div>';
   }
 
@@ -419,6 +430,110 @@ function cpSlotHTML(slotIdx, span, hasHero) {
     '<div class="ph-text">' + (isHero ? 'Заглавное' : 'Перетащите фото') + '</div>' +
     toolbar +
     '</div>';
+}
+
+/**
+ * Desktop-карусель: заменить фото в слоте на следующее/предыдущее.
+ * Работает аналогично cpMobileCarousel, но для текущей карточки в редакторе.
+ * Учитывает _cpCardFilter (минимальный рейтинг).
+ * @param {number} slotIdx - индекс слота в текущей карточке
+ * @param {number} dir - направление (-1 = назад, 1 = вперёд)
+ * @param {Event} [e] - событие клика
+ */
+function cpDesktopCarousel(slotIdx, dir, e) {
+  if (e) { e.stopPropagation(); e.preventDefault(); }
+  var proj = getActiveProject();
+  if (!proj || !proj.cards || App.currentCardIdx < 0) return;
+
+  var card = proj.cards[App.currentCardIdx];
+  if (!card || !card.slots || slotIdx < 0 || slotIdx >= card.slots.length) return;
+  var slot = card.slots[slotIdx];
+  if (!slot) return;
+
+  var orient = slot.orient || 'v';
+  var currentFile = slot.file || '';
+
+  /* Получить ближайшие по ориентации с учётом рейтинг-фильтра */
+  var nearby = cpGetNearbyPreviews(currentFile, orient, 15);
+  if (_cpCardFilter > 0) {
+    var filtered = [];
+    for (var f = 0; f < nearby.length; f++) {
+      if ((nearby[f].rating || 0) >= _cpCardFilter) filtered.push(nearby[f]);
+    }
+    /* Если фильтр отсёк всё — показать все без фильтра */
+    if (filtered.length > 0) nearby = filtered;
+  }
+  if (nearby.length === 0) return;
+
+  /* Найти текущий в списке nearby */
+  var curIdx = -1;
+  for (var i = 0; i < nearby.length; i++) {
+    if (nearby[i].name === currentFile || nearby[i].stem === currentFile) {
+      curIdx = i;
+      break;
+    }
+  }
+
+  /* Следующий/предыдущий */
+  var newIdx = curIdx + dir;
+  if (newIdx < 0) newIdx = 0;
+  if (newIdx >= nearby.length) newIdx = nearby.length - 1;
+  if (newIdx === curIdx) return;
+
+  var newPv = nearby[newIdx];
+
+  /* Сохранить для undo */
+  if (typeof cpPushUndo === 'function') cpPushUndo();
+
+  /* Обновить данные слота */
+  slot.file = newPv.name || newPv.stem || '';
+  slot.dataUrl = newPv.preview || newPv.thumb || '';
+  slot.thumbUrl = newPv.thumb || newPv.preview || '';
+  slot.path = newPv.path || '';
+
+  /* Обновить ТОЛЬКО картинку в DOM (без перерисовки всей карточки) */
+  var slotEl = document.querySelector('.photo-slot[data-slot="' + slotIdx + '"]');
+  if (slotEl) {
+    var img = slotEl.querySelector('img');
+    if (img) img.src = slot.dataUrl || slot.thumbUrl || '';
+  }
+
+  /* Синхронизация */
+  if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
+  if (typeof shAutoSave === 'function') shAutoSave();
+}
+
+/**
+ * Установить фильтр по рейтингу для карусели в карточках.
+ * Повторный клик на тот же рейтинг — снять фильтр.
+ * @param {number} minRating - минимальный рейтинг (1-5), 0 = снять фильтр
+ */
+function cpSetCardFilter(minRating) {
+  if (_cpCardFilter === minRating) {
+    _cpCardFilter = 0;
+  } else {
+    _cpCardFilter = minRating;
+  }
+  /* Перерисовать тулбар для обновления звёздочек */
+  var bar = document.querySelector('.cp-filter-bar');
+  if (bar) {
+    bar.innerHTML = _cpFilterStarsHTML();
+  }
+}
+
+/**
+ * Генерирует HTML звёздочек фильтра для тулбара карточки.
+ * @returns {string} HTML строка
+ */
+function _cpFilterStarsHTML() {
+  var html = '';
+  for (var s = 1; s <= 5; s++) {
+    html += '<button class="cp-filter-star' + (s <= _cpCardFilter ? ' cp-star-active' : '') +
+      '" onclick="cpSetCardFilter(' + s + ')">&#9733;</button>';
+  }
+  html += '<button class="cp-filter-reset' + (_cpCardFilter === 0 ? ' cp-star-active' : '') +
+    '" onclick="cpSetCardFilter(0)">Все</button>';
+  return html;
 }
 
 /**
