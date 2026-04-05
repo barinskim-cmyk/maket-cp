@@ -1318,22 +1318,16 @@ function shEnterClientMode() {
 }
 
 /**
- * Флаг: клиент нажал "Внести изменения" и сейчас редактирует после согласования.
+ * Флаг: popup "вы редактируете после согласования" уже показан в этой сессии.
  * @type {boolean}
  */
-var _shClientEditMode = false;
-
-/**
- * Флаг: popup про изменения уже был показан в этой сессии.
- * @type {boolean}
- */
-var _shChangesPopupShown = false;
+var _shPostApprovePopupShown = false;
 
 /**
  * Отрисовать панель действий клиента.
  * - До согласования: "Запросить доп. кадры" + "Согласовать отбор"
- * - После согласования: "Внести изменения в отбор"
- * - В режиме редактирования: "Отменить" + "Сохранить изменения"
+ * - После согласования: "Запросить доп. кадры" + "Внести изменения в отбор"
+ *   Клиент свободно редактирует. Снимок — закладка для отката, не блокировка.
  */
 function shRenderClientBar() {
   /* Удалить существующую панель если есть */
@@ -1349,34 +1343,22 @@ function shRenderClientBar() {
   var role = proj ? (proj._role || 'client') : 'client';
   var isApproved = proj && proj._stageHistory && proj._stageHistory['client_approved'];
   var buttonsHtml = '';
+  var subtitle = '';
 
   if (role === 'client') {
-    if (_shClientEditMode) {
-      /* Режим редактирования после согласования */
-      buttonsHtml =
-        '<div class="client-bar-buttons">' +
-          '<button class="btn client-btn-extra" onclick="shClientCancelEdit()">Отменить изменения</button>' +
-          '<button class="btn btn-primary client-btn-approve" onclick="shClientSubmitChanges()">Сохранить изменения</button>' +
-        '</div>';
-    } else if (isApproved) {
-      /* Уже согласовано — предложить внести изменения */
+    if (isApproved) {
+      /* Согласовано — клиент может свободно редактировать,
+         "Внести изменения" = пуш команде (новый снимок + уведомление) */
       var approvedTime = proj._stageHistory['client_approved'];
+      subtitle = 'Отбор согласован ' + approvedTime + '. Вы можете вносить правки.';
       buttonsHtml =
         '<div class="client-bar-buttons">' +
           '<button class="btn client-btn-extra" onclick="shClientRequestExtra()">Запросить доп. кадры</button>' +
-          '<button class="btn btn-primary client-btn-edit" onclick="shClientStartEdit()">Внести изменения в отбор</button>' +
+          '<button class="btn btn-primary client-btn-edit" onclick="shClientSubmitChanges()">Внести изменения в отбор</button>' +
         '</div>';
-      bar.innerHTML =
-        '<div class="client-bar-info">' +
-          '<div class="client-bar-title">' + (brandName || 'Проект') + '</div>' +
-          '<div class="client-bar-subtitle">Отбор согласован ' + approvedTime + '</div>' +
-        '</div>' +
-        buttonsHtml;
-      var appMain = document.getElementById('app-main');
-      if (appMain) appMain.insertBefore(bar, appMain.firstChild);
-      return;
     } else {
       /* Ещё не согласовано — стандартные кнопки */
+      subtitle = 'Просмотрите карточки и примите решение';
       buttonsHtml =
         '<div class="client-bar-buttons">' +
           '<button class="btn client-btn-extra" onclick="shClientRequestExtra()">Запросить доп. кадры</button>' +
@@ -1384,15 +1366,15 @@ function shRenderClientBar() {
         '</div>';
     }
   } else if (role === 'retoucher') {
+    subtitle = 'Ретушёр';
     buttonsHtml =
       '<div class="client-bar-buttons">' +
         '<span style="color:#888;font-size:12px">Ретушёр</span>' +
       '</div>';
+  } else {
+    /* viewer */
+    subtitle = 'Режим просмотра';
   }
-  /* viewer: no buttons */
-
-  var subtitle = _shClientEditMode ? 'Режим редактирования. Внесите изменения и сохраните.'
-    : (role === 'viewer' ? 'Режим просмотра' : 'Просмотрите карточки и примите решение');
 
   bar.innerHTML =
     '<div class="client-bar-info">' +
@@ -1455,9 +1437,9 @@ function shClientRequestExtra() {
 
 /**
  * Клиент: согласовать отбор.
- * 1. Создаёт снимок текущего состояния
+ * 1. Создаёт снимок текущего состояния (закладка для отката)
  * 2. Переводит проект на этап 3 (Цветокоррекция)
- * 3. Обновляет панель (кнопка → "Внести изменения")
+ * 3. Обновляет панель (кнопка → "Внести изменения в отбор")
  */
 function shClientApprove() {
   var proj = getActiveProject();
@@ -1472,7 +1454,7 @@ function shClientApprove() {
   proj._stageHistory[proj._stage] = timeStr;
   proj._stageHistory['client_approved'] = timeStr;
 
-  /* Создать снимок состояния ПЕРЕД сменой этапа */
+  /* Создать снимок состояния — закладка, к которой можно откатиться */
   if (typeof snCreateSnapshot === 'function') {
     snCreateSnapshot('client', 'client_approved', 'Согласование клиента ' + timeStr, function(err, snapId) {
       if (err) console.warn('Ошибка создания снимка:', err);
@@ -1496,70 +1478,31 @@ function shClientApprove() {
   shAutoSave();
   alert('Отбор согласован! Фотограф получит уведомление.');
 
-  /* Обновить панель — теперь покажет "Внести изменения" */
+  /* Обновить панель — теперь покажет "Внести изменения в отбор" */
   shRenderClientBar();
 }
 
 /**
- * Клиент: начать редактирование после согласования.
- * Показывает предупреждение и переводит в режим редактирования.
- */
-function shClientStartEdit() {
-  var proj = getActiveProject();
-  if (!proj) return;
-
-  /* Показать popup один раз за сессию */
-  if (!_shChangesPopupShown) {
-    _shChangesPopupShown = true;
-    var msg = 'Отбор уже согласован. Вы можете внести изменения, ' +
-      'но после всех доработок необходимо нажать кнопку "Сохранить изменения", ' +
-      'чтобы команда увидела ваши правки.\n\n' +
-      'Если вы просто смотрите — можно ничего не сохранять.';
-    if (!confirm(msg)) return;
-  }
-
-  _shClientEditMode = true;
-
-  /* Создать снимок "до редактирования" если ещё не было */
-  if (typeof snCreateSnapshot === 'function') {
-    snCreateSnapshot('client', 'client_edit_start', 'Начало редактирования клиентом', function(err) {
-      if (err) console.warn('Ошибка снимка edit_start:', err);
-    });
-  }
-
-  shRenderClientBar();
-}
-
-/**
- * Клиент: отменить редактирование (без сохранения).
- */
-function shClientCancelEdit() {
-  if (!confirm('Отменить все изменения? Карточки вернутся к состоянию на момент согласования.')) return;
-
-  _shClientEditMode = false;
-
-  /* Восстановить из последнего снимка client_approved */
-  /* Пока что просто перезагружаем проект из облака */
-  if (typeof sbPullProject === 'function') {
-    sbPullProject(function() {
-      console.log('shClientCancelEdit: проект перезагружен из облака');
-      if (typeof cpRenderAll === 'function') cpRenderAll();
-      shRenderClientBar();
-    });
-  } else {
-    shRenderClientBar();
-  }
-}
-
-/**
- * Клиент: сохранить изменения после согласования.
- * Создаёт снимок "client_changes", синхронизирует с облаком.
+ * Клиент: внести изменения в отбор после согласования.
+ * Создаёт новый снимок текущего состояния, синхронизирует с облаком,
+ * уведомляет команду. Клиент при этом свободно редактирует всё время —
+ * эта кнопка лишь фиксирует "вот мои правки, посмотрите".
  */
 function shClientSubmitChanges() {
   var proj = getActiveProject();
   if (!proj) return;
 
-  if (!confirm('Сохранить изменения в отборе? Команда получит обновлённую версию.')) return;
+  /* Первый раз — объяснить что происходит */
+  if (!_shPostApprovePopupShown) {
+    _shPostApprovePopupShown = true;
+    var msg = 'Вы можете свободно менять отбор. ' +
+      'Нажмите "Внести изменения", когда будете готовы — ' +
+      'команда получит обновлённую версию.\n\n' +
+      'Отправить изменения сейчас?';
+    if (!confirm(msg)) return;
+  } else {
+    if (!confirm('Отправить изменения команде?')) return;
+  }
 
   var now = new Date();
   var timeStr = now.toLocaleDateString('ru-RU') + ' ' + now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
@@ -1568,7 +1511,7 @@ function shClientSubmitChanges() {
   if (!proj._stageHistory) proj._stageHistory = {};
   proj._stageHistory['client_changes'] = timeStr;
 
-  /* Создать снимок изменений */
+  /* Создать снимок изменений — новая закладка */
   if (typeof snCreateSnapshot === 'function') {
     snCreateSnapshot('client', 'client_changes', 'Изменения клиента ' + timeStr, function(err, snapId) {
       if (err) console.warn('Ошибка снимка client_changes:', err);
@@ -1581,10 +1524,7 @@ function shClientSubmitChanges() {
   if (typeof sbSyncStage === 'function') sbSyncStage('client_changes', timeStr);
 
   shAutoSave();
-  _shClientEditMode = false;
-
-  alert('Изменения сохранены. Команда увидит обновлённый отбор.');
-  shRenderClientBar();
+  alert('Изменения отправлены команде.');
 }
 
 
