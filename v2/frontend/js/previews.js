@@ -1240,7 +1240,7 @@ function _pvLbToggleOC(add) {
 
   /* Сохранить + синхронизировать + обновить галереи */
   if (typeof shAutoSave === 'function') shAutoSave();
-  if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
+  if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
   if (typeof ocRenderField === 'function') ocRenderField();
   if (typeof acRenderField === 'function') acRenderField();
 }
@@ -1512,7 +1512,7 @@ function ocAddContainer() {
   if (typeof sbLogAction === 'function') sbLogAction('create_container', 'container', newId, newName);
   ocRenderField();
   if (typeof shAutoSave === 'function') shAutoSave();
-  if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
+  if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
 }
 
 /**
@@ -1538,7 +1538,7 @@ function ocDeleteContainer(idx) {
   containers.splice(idx, 1);
   ocRenderField();
   if (typeof shAutoSave === 'function') shAutoSave();
-  if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
+  if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
 }
 
 /**
@@ -1565,7 +1565,7 @@ function ocEditContainerName(idx) {
     if (val) containers[idx].name = val;
     ocRenderField();
     if (typeof shAutoSave === 'function') shAutoSave();
-    if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
+    if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
   };
   input.addEventListener('blur', save);
   input.addEventListener('keydown', function(e) {
@@ -1589,7 +1589,7 @@ function ocRemoveFromContainer(cntIdx, itemIdx, e) {
   } else return;
   ocRenderField();
   if (typeof shAutoSave === 'function') shAutoSave();
-  if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
+  if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
 }
 
 /**
@@ -1653,7 +1653,7 @@ function _ocBindDropZone(el, targetType, targetIdx) {
 
       ocRenderField();
       if (typeof shAutoSave === 'function') shAutoSave();
-      if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
+      if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
     } catch(err) {}
   });
 }
@@ -1822,7 +1822,7 @@ function ocRemoveItem(idx, e) {
   } else return;
   ocRenderField();
   if (typeof shAutoSave === 'function') shAutoSave();
-  if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
+  if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
 }
 
 function ocClearAll() {
@@ -1833,7 +1833,7 @@ function ocClearAll() {
   proj.ocContainers = [];
   ocRenderField();
   if (typeof shAutoSave === 'function') shAutoSave();
-  if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
+  if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
 }
 
 // ── Мультивыбор фото (Cmd/Ctrl + клик) ──
@@ -2004,7 +2004,7 @@ function ocGroupSelected(targetIdx) {
   _ocSelected = {};
   ocRenderField();
   if (typeof shAutoSave === 'function') shAutoSave();
-  if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
+  if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
 }
 
 // ══════════════════════════════════════════════
@@ -2294,7 +2294,7 @@ function pvToggleSelection(name, e, source) {
 
   /* Сохранить и обновить все галереи */
   if (typeof shAutoSave === 'function') shAutoSave();
-  if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
+  if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
   if (typeof acRenderField === 'function') acRenderField();
   if (typeof ocRenderField === 'function') ocRenderField();
   return true;

@@ -1208,11 +1208,16 @@ function sbSaveCardsByToken(token, cards, callback) {
   /* Собираем доп. контент (имена файлов) */
   var proj = getActiveProject();
   var ocNames = (proj && proj.otherContent) ? proj.otherContent.map(function(oc) { return oc.name; }) : [];
+  /* Контейнеры */
+  var ocCntData = (proj && proj.ocContainers) ? proj.ocContainers.map(function(cnt) {
+    return { id: cnt.id, name: cnt.name, items: (cnt.items || []).map(function(it) { return it.name; }) };
+  }) : [];
 
   sbClient.rpc('save_cards_by_token', {
     share_token: token,
     cards_data: cardsJson,
-    oc_data: JSON.stringify(ocNames)
+    oc_data: JSON.stringify(ocNames),
+    oc_containers_data: JSON.stringify(ocCntData)
   }).then(function(res) {
     if (res.error) {
       console.error('save_cards_by_token:', res.error);
