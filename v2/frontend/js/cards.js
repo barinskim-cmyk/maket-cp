@@ -1962,7 +1962,7 @@ function cpSaveHistory() {
   if (card._history.length > CP_MAX_HISTORY) card._history.shift();
 
   /* Авто-синхронизация карточек с облаком (debounced) */
-  if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
+  if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
 }
 
 /**
@@ -2631,7 +2631,7 @@ function cpMobileCarousel(cardIdx, slotIdx, dir, e) {
   }
 
   /* Авто-синхронизация (тихо, без UI перерисовки) */
-  if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
+  if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
   if (typeof shAutoSave === 'function') shAutoSave();
 }
 
@@ -3096,7 +3096,7 @@ function cpMobileAutoFillSlot(cardIdx, slotIdx) {
   slot.dataUrl = newPv.preview || newPv.thumb || '';
   slot.path = newPv.path || '';
 
-  if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
+  if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
   if (typeof shAutoSave === 'function') shAutoSave();
 
   cpMobileRender();
@@ -3205,7 +3205,7 @@ function cpMobileToggleOC(pvName, el) {
   }
 
   /* Синхронизация */
-  if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
+  if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
   if (typeof shAutoSave === 'function') shAutoSave();
 }
 
