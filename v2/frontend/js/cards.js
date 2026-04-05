@@ -2241,9 +2241,14 @@ function cpMobileRender() {
 
   var html = '';
 
-  /* Sticky-шапка с тремя кнопками */
+  /* Sticky-шапка: бургер-кнопка + название + табы */
   html += '<div class="mob-header">';
+  html += '<div class="mob-header-left">';
+  html += '<button class="mob-burger" onclick="cpMobileToggleCardMenu()" title="Список карточек">';
+  html += '<span></span><span></span><span></span>';
+  html += '</button>';
   html += '<div class="mob-header-title">' + (brandName || 'Просмотр') + '</div>';
+  html += '</div>';
   html += '<div class="mob-header-tabs">';
   html += '<button class="mob-tab-btn' + (_mobViewMode === 'cards' ? ' mob-tab-active' : '') + '" onclick="cpMobileSetView(\'cards\')">Cards</button>';
   html += '<button class="mob-tab-btn' + (_mobViewMode === 'select' ? ' mob-tab-active' : '') + '" onclick="cpMobileSetView(\'select\')">Select</button>';
@@ -2251,6 +2256,9 @@ function cpMobileRender() {
   html += '<button class="mob-tab-btn' + (_mobViewMode === 'options' ? ' mob-tab-active' : '') + '" onclick="cpMobileSetView(\'options\')">Options</button>';
   html += '</div>';
   html += '</div>';
+
+  /* Выдвижное меню карточек (бургер) */
+  html += _cpMobileCardMenuHTML(proj);
 
   if (_mobViewMode === 'cards') {
     html += cpMobileRenderFeed();
@@ -2270,6 +2278,102 @@ function cpMobileRender() {
     cpMobileBindDoubleTap();
     cpMobileBindSlotTap();
   }
+}
+
+// ══════════════════════════════════════════════
+//  Мобильное меню карточек (бургер)
+// ══════════════════════════════════════════════
+
+/**
+ * Генерирует HTML выдвижного меню со списком карточек.
+ * Меню появляется слева при нажатии на бургер-кнопку.
+ * @param {object} proj — активный проект
+ * @returns {string} HTML
+ */
+function _cpMobileCardMenuHTML(proj) {
+  if (!proj || !proj.cards || proj.cards.length === 0) return '';
+
+  var html = '';
+  html += '<div class="mob-card-menu" id="mob-card-menu">';
+  html += '<div class="mob-card-menu-overlay" onclick="cpMobileToggleCardMenu()"></div>';
+  html += '<div class="mob-card-menu-panel">';
+  html += '<div class="mob-card-menu-header">';
+  html += '<span>Карточки (' + proj.cards.length + ')</span>';
+  html += '<button class="mob-card-menu-close" onclick="cpMobileToggleCardMenu()">&times;</button>';
+  html += '</div>';
+  html += '<div class="mob-card-menu-list">';
+
+  for (var i = 0; i < proj.cards.length; i++) {
+    var card = proj.cards[i];
+    var label = (card.name && card.name.trim()) ? esc(card.name.trim()) : ('Карточка ' + (i + 1));
+
+    /* Мини-инфо: сколько слотов заполнено */
+    var filled = 0;
+    var total = card.slots ? card.slots.length : 0;
+    for (var s = 0; s < total; s++) {
+      if (card.slots[s] && (card.slots[s].file || card.slots[s].dataUrl)) filled++;
+    }
+    var info = filled + ' / ' + total;
+
+    /* Первое фото как миниатюра (если есть) */
+    var thumbSrc = '';
+    if (card.slots) {
+      for (var t = 0; t < card.slots.length; t++) {
+        if (card.slots[t] && (card.slots[t].thumbUrl || card.slots[t].dataUrl || card.slots[t].thumb)) {
+          thumbSrc = card.slots[t].thumbUrl || card.slots[t].thumb || card.slots[t].dataUrl;
+          break;
+        }
+      }
+    }
+
+    html += '<button class="mob-card-menu-item" onclick="cpMobileGoToCard(' + i + ')">';
+    if (thumbSrc) {
+      html += '<img class="mob-card-menu-thumb" src="' + thumbSrc + '">';
+    } else {
+      html += '<div class="mob-card-menu-thumb mob-card-menu-thumb-empty"></div>';
+    }
+    html += '<div class="mob-card-menu-item-info">';
+    html += '<div class="mob-card-menu-item-name">' + label + '</div>';
+    html += '<div class="mob-card-menu-item-count">' + info + ' фото</div>';
+    html += '</div>';
+    html += '</button>';
+  }
+
+  html += '</div></div></div>';
+  return html;
+}
+
+/**
+ * Открыть/закрыть выдвижное меню карточек.
+ */
+function cpMobileToggleCardMenu() {
+  var menu = document.getElementById('mob-card-menu');
+  if (!menu) return;
+  menu.classList.toggle('mob-card-menu-open');
+}
+
+/**
+ * Перейти к карточке: переключить на вкладку Cards, закрыть меню, прокрутить к карточке.
+ * @param {number} cardIdx — индекс карточки
+ */
+function cpMobileGoToCard(cardIdx) {
+  /* Закрыть меню */
+  var menu = document.getElementById('mob-card-menu');
+  if (menu) menu.classList.remove('mob-card-menu-open');
+
+  /* Переключить на вкладку Cards если не на ней */
+  if (_mobViewMode !== 'cards') {
+    _mobViewMode = 'cards';
+    cpMobileRender();
+  }
+
+  /* Прокрутить к карточке */
+  setTimeout(function() {
+    var block = document.querySelector('.mob-card-block[data-card-idx="' + cardIdx + '"]');
+    if (block) {
+      block.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, 50);
 }
 
 /**
