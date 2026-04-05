@@ -2,828 +2,814 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>Maket CP — Beta Release Checklist</title>
+<title>Maket CP -- Beta Checklist</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #333; padding: 24px; max-width: 1200px; margin: 0 auto; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #333; padding: 24px; max-width: 1600px; margin: 0 auto; }
 h1 { font-size: 22px; margin-bottom: 4px; }
 .subtitle { font-size: 13px; color: #888; margin-bottom: 20px; }
 
-/* Summary bar */
-.summary { background: #fff; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px; display: flex; gap: 24px; align-items: center; flex-wrap: wrap; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
-.summary-item { text-align: center; }
-.summary-num { font-size: 28px; font-weight: 700; }
-.summary-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.3px; }
-.s-green { color: #4caf50; }
-.s-orange { color: #ff9800; }
-.s-red { color: #e53935; }
-.s-blue { color: #1976d2; }
-.s-gray { color: #90a4ae; }
-.summary-bar { flex: 1; min-width: 200px; height: 8px; background: #eee; border-radius: 4px; overflow: hidden; }
-.summary-bar-fill { height: 100%; background: #4caf50; border-radius: 4px; transition: width 0.3s; }
-
-/* Tabs */
-.tabs { display: flex; gap: 0; margin-bottom: 20px; }
-.tab { padding: 10px 20px; background: #e0e0e0; border: none; cursor: pointer; font-size: 13px; font-weight: 500; }
-.tab:first-child { border-radius: 6px 0 0 6px; }
-.tab:last-child { border-radius: 0 6px 6px 0; }
-.tab.active { background: #333; color: #fff; }
-
-/* Table */
-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; font-size: 13px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
-thead { background: #333; color: #fff; }
-th { padding: 10px 8px; text-align: left; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px; }
-td { padding: 10px 8px; border-bottom: 1px solid #eee; vertical-align: top; }
-tr:last-child td { border-bottom: none; }
-tr:hover td { background: #fafafa; }
-tr.section-row td { background: #f0f0f0; font-weight: 600; font-size: 13px; padding: 10px 8px; }
-
-/* Status badges */
-.badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; }
-.b-done { background: #e8f5e9; color: #2e7d32; }
-.b-partial { background: #fff3e0; color: #e65100; }
-.b-bug { background: #fce4ec; color: #c62828; }
-.b-new { background: #e3f2fd; color: #1565c0; }
-.b-plan { background: #eceff1; color: #546e7a; }
-.b-skip { background: #f5f5f5; color: #bbb; text-decoration: line-through; }
-
-/* Beta toggle */
-.beta-toggle { width: 20px; height: 20px; cursor: pointer; accent-color: #4caf50; }
-
-/* Priority */
-.pri-high { color: #c62828; font-weight: 600; }
-.pri-med { color: #e65100; }
-.pri-low { color: #90a4ae; }
-
-/* Notes */
-.note-cell { min-height: 32px; font-size: 12px; color: #555; }
-.note-cell:empty::before { content: 'Кликни...'; color: #ccc; font-style: italic; }
-
-/* Toolbar */
-.toolbar { display: flex; gap: 10px; margin-bottom: 16px; align-items: center; }
+.toolbar { display: flex; gap: 10px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; }
 .toolbar button { padding: 6px 16px; border: none; border-radius: 4px; font-size: 13px; cursor: pointer; font-weight: 500; }
-.btn-export { background: #4caf50; color: #fff; }
-.btn-import { background: #2196f3; color: #fff; }
-.btn-reset { background: #eee; color: #666; }
-.save-hint { font-size: 11px; color: #aaa; margin-left: auto; }
+.btn-save { background: #4caf50; color: #fff; }
+.btn-load { background: #2196f3; color: #fff; }
+.btn-reset { background: #f44336; color: #fff; }
+.save-status { font-size: 12px; color: #888; margin-left: 8px; }
 
-.hidden { display: none; }
+.test-summary { display: flex; gap: 16px; padding: 10px 16px; background: #fff; border-radius: 8px; margin-bottom: 16px; font-size: 13px; align-items: center; border: 1px solid #e0e0e0; }
+.test-summary .ts-label { font-weight: 600; color: #333; }
+.test-summary .ts-pass { color: #2e7d32; font-weight: 600; }
+.test-summary .ts-fail { color: #c62828; font-weight: 600; }
+.test-summary .ts-issues { color: #e65100; font-weight: 600; }
+.test-summary .ts-untested { color: #9e9e9e; }
+.test-summary .ts-bar { flex: 1; height: 8px; background: #eceff1; border-radius: 4px; overflow: hidden; display: flex; min-width: 200px; }
+.test-summary .ts-bar-pass { background: #4caf50; height: 100%; }
+.test-summary .ts-bar-fail { background: #f44336; height: 100%; }
+.test-summary .ts-bar-issues { background: #ff9800; height: 100%; }
+
+table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; font-size: 11.5px; line-height: 1.45; margin-bottom: 24px; }
+thead { background: #333; color: #fff; }
+th { padding: 8px 6px; text-align: left; font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: 0.3px; }
+td { padding: 6px; border-bottom: 1px solid #eee; vertical-align: top; }
+td[contenteditable="true"] { cursor: text; }
+td[contenteditable="true"]:focus { outline: 2px solid #2196f3; outline-offset: -2px; background: #fff; }
+tr:hover td { background: #fafafa; }
+
+.sprint-row td { background: #1a237e; color: #fff; font-weight: 700; font-size: 14px; padding: 10px 8px; letter-spacing: 0.5px; }
+.section-row td { background: #e8eaf6; font-weight: 600; font-size: 12px; padding: 6px 8px; color: #283593; }
+.checkpoint-row td { background: #fff3e0; font-weight: 600; font-size: 11px; border-left: 4px solid #ff9800; }
+
+.who-claude { background: #e3f2fd; color: #1565c0; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+.who-masha { background: #fce4ec; color: #c62828; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+.who-both { background: #f3e5f5; color: #6a1b9a; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+
+.s-todo { background: #eceff1; color: #546e7f; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+.s-progress { background: #fff3e0; color: #e65100; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+.s-done { background: #e8f5e9; color: #2e7d32; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+.s-migration { background: #fff8e1; color: #f57f17; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+
+.files { font-size: 10px; color: #999; font-family: monospace; }
+.my-comment { min-height: 28px; padding: 4px 6px; background: #fffde7; border-left: 3px solid #ffc107; font-size: 11px; }
+.my-comment:empty::before { content: '...'; color: #ccc; font-style: italic; }
+
+.t-cell { text-align: center; cursor: pointer; user-select: none; min-width: 56px; }
+.t-none { color: #bbb; font-size: 10px; }
+.t-pass { background: #e8f5e9; color: #2e7d32; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+.t-fail { background: #ffebee; color: #c62828; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+.t-issues { background: #fff3e0; color: #e65100; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+
+.auto-saved { color: #4caf50; font-weight: 500; }
+
+/* ── Tabs ── */
+.tabs { display: flex; gap: 0; margin-bottom: 0; border-bottom: 2px solid #333; }
+.tab { padding: 10px 24px; font-size: 14px; font-weight: 600; cursor: pointer; background: #e0e0e0; color: #666; border: none; border-radius: 6px 6px 0 0; margin-right: 2px; transition: background 0.15s; }
+.tab:hover { background: #ccc; }
+.tab.active { background: #333; color: #fff; }
+.tab .tab-badge { display: inline-block; background: #f44336; color: #fff; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 10px; margin-left: 6px; min-width: 18px; text-align: center; }
+.tab .tab-badge.zero { background: #9e9e9e; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; padding-top: 16px; }
+
+/* ── Bug tracker ── */
+.bug-form { display: flex; gap: 8px; margin-bottom: 16px; align-items: flex-end; flex-wrap: wrap; }
+.bug-form label { font-size: 12px; font-weight: 600; color: #555; display: flex; flex-direction: column; gap: 3px; }
+.bug-form input, .bug-form select { padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px; font-family: inherit; }
+.bug-form input:focus, .bug-form select:focus { outline: 2px solid #2196f3; border-color: #2196f3; }
+.bug-form .bf-screen { width: 140px; }
+.bug-form .bf-desc { width: 360px; }
+.bug-form .bf-pri { width: 100px; }
+.btn-add-bug { padding: 6px 20px; border: none; border-radius: 4px; font-size: 13px; cursor: pointer; font-weight: 600; background: #f44336; color: #fff; align-self: flex-end; }
+
+.bug-summary { display: flex; gap: 16px; padding: 10px 16px; background: #fff; border-radius: 8px; margin-bottom: 16px; font-size: 13px; align-items: center; border: 1px solid #e0e0e0; }
+.bug-summary .bs-label { font-weight: 600; }
+.bug-summary .bs-open { color: #c62828; font-weight: 600; }
+.bug-summary .bs-fixed { color: #2e7d32; font-weight: 600; }
+.bug-summary .bs-bar { flex: 1; height: 8px; background: #ffebee; border-radius: 4px; overflow: hidden; min-width: 200px; }
+.bug-summary .bs-bar-fixed { background: #4caf50; height: 100%; transition: width 0.3s; }
+
+.bug-row td { font-size: 12px; }
+.bug-row.fixed td { opacity: 0.5; text-decoration: line-through; }
+.bug-check { width: 18px; height: 18px; cursor: pointer; accent-color: #4caf50; }
+.bug-pri-high { color: #c62828; font-weight: 600; }
+.bug-pri-med { color: #e65100; font-weight: 600; }
+.bug-pri-low { color: #2e7d32; }
+.bug-date { color: #999; font-size: 10px; }
+.bug-id { color: #999; font-family: monospace; font-size: 10px; }
+.btn-del-bug { background: none; border: none; color: #bbb; cursor: pointer; font-size: 14px; padding: 2px 6px; }
+.btn-del-bug:hover { color: #f44336; }
 </style>
 </head>
 <body>
 
-<h1>Maket CP — Beta Release Checklist</h1>
-<p class="subtitle">v0.9-beta | Snapshot 2026-04-04 | Цель: продукт для отбора + синхронизация с C1</p>
-
-<div class="summary" id="summary">
-  <div class="summary-item"><div class="summary-num s-green" id="sum-in">0</div><div class="summary-label">В бету</div></div>
-  <div class="summary-item"><div class="summary-num s-orange" id="sum-fix">0</div><div class="summary-label">Доработать</div></div>
-  <div class="summary-item"><div class="summary-num s-red" id="sum-bug">0</div><div class="summary-label">Баги</div></div>
-  <div class="summary-item"><div class="summary-num s-gray" id="sum-skip">0</div><div class="summary-label">Убрать</div></div>
-  <div class="summary-bar"><div class="summary-bar-fill" id="sum-bar"></div></div>
-</div>
+<h1>Maket CP -- Beta Checklist</h1>
+<p class="subtitle">v0.9-beta | Supabase + Pipeline Snapshots + Client Flow | 05.04.2026</p>
 
 <div class="tabs">
-  <button class="tab active" onclick="showTab('features')">Фичи</button>
-  <button class="tab" onclick="showTab('bugs')">Баги / доработки</button>
-  <button class="tab" onclick="showTab('cleanup')">Что убрать</button>
+  <button class="tab active" onclick="switchTab('backlog')">Задачи <span class="tab-badge zero" id="tb-tasks">0</span></button>
+  <button class="tab" onclick="switchTab('bugs')">Баги <span class="tab-badge zero" id="tb-bugs">0</span></button>
+</div>
+
+<div class="tab-panel active" id="panel-backlog">
+
+<div class="test-summary" id="tsum">
+  <span class="ts-label">Тестирование:</span>
+  <span class="ts-pass" id="ts-pass">0 OK</span>
+  <span class="ts-fail" id="ts-fail">0 FAIL</span>
+  <span class="ts-issues" id="ts-issues">0 ?</span>
+  <span class="ts-untested" id="ts-untested">0 --</span>
+  <span class="ts-bar"><span class="ts-bar-pass" id="tsb-pass"></span><span class="ts-bar-fail" id="tsb-fail"></span><span class="ts-bar-issues" id="tsb-issues"></span></span>
 </div>
 
 <div class="toolbar">
-  <button class="btn-export" onclick="exportJSON()">Экспорт JSON</button>
-  <button class="btn-import" onclick="document.getElementById('imp').click()">Импорт JSON</button>
-  <input type="file" id="imp" accept=".json" style="display:none" onchange="importJSON(this)">
-  <button class="btn-reset" onclick="if(confirm('Сбросить все галочки?')){localStorage.removeItem('beta_cl');location.reload()}">Сброс</button>
-  <span class="save-hint">Автосохранение в localStorage</span>
+  <button class="btn-save" onclick="exportEdits()">Экспорт JSON</button>
+  <button class="btn-load" onclick="document.getElementById('li').click()">Импорт JSON</button>
+  <input type="file" id="li" accept=".json" style="display:none" onchange="importEdits(this)">
+  <button class="btn-reset" onclick="if(confirm('Сбросить все тесты и комментарии?')){localStorage.removeItem('maketcp_beta');location.reload()}">Сброс</button>
+  <span class="save-status" id="ss"></span>
 </div>
 
-<!-- ═══════ TAB: FEATURES ═══════ -->
-<div id="tab-features">
-<table id="tbl-features">
+<table id="bt">
 <thead>
 <tr>
-  <th style="width:4%">Beta</th>
-  <th style="width:18%">Фича</th>
-  <th style="width:8%">Статус</th>
-  <th style="width:8%">Экран</th>
-  <th style="width:30%">Что есть</th>
-  <th style="width:12%">Что нужно для беты</th>
-  <th style="width:20%">Заметки Masha</th>
+  <th style="width:3%">#</th>
+  <th style="width:14%">Задача</th>
+  <th style="width:4%">Кто</th>
+  <th style="width:5%">Статус</th>
+  <th style="width:6%">Экран</th>
+  <th style="width:23%">Что сделать / как тестировать</th>
+  <th style="width:9%">Файлы</th>
+  <th style="width:5%">Тест</th>
+  <th style="width:14%">Мои комментарии</th>
 </tr>
 </thead>
 <tbody>
 
-<!-- ПРОЕКТЫ -->
-<tr class="section-row"><td colspan="7">Проекты и навигация</td></tr>
+<!-- ═══════════ МИГРАЦИИ SUPABASE ═══════════ -->
+<tr class="sprint-row"><td colspan="9">МИГРАЦИИ -- запустить в Supabase SQL Editor</td></tr>
 
-<tr data-id="f01">
-  <td><input type="checkbox" class="beta-toggle" checked data-id="f01"></td>
-  <td><strong>Создание съёмки</strong></td>
-  <td><span class="badge b-done">Готово</span></td>
-  <td>Съёмки</td>
-  <td>Модалка: бренд, дата, шаблон. Выбор из сохранённых шаблонов. Шаблон с превью.</td>
-  <td>--</td>
-  <td contenteditable="true" class="note-cell"></td>
+<tr data-row="m-009">
+  <td>M1</td>
+  <td><strong>Миграция 009: Fix teams RLS recursion</strong></td>
+  <td><span class="who-masha">Masha</span></td>
+  <td><span class="s-migration">MIGRATION</span></td>
+  <td>Supabase</td>
+  <td>Открыть Supabase Dashboard > SQL Editor. Скопировать содержимое файла <code>v2/supabase/009_fix_teams_rls_recursion.sql</code> и выполнить. Проверить: модалка "Моя команда" открывается без ошибки "infinite recursion".</td>
+  <td class="files">009_fix_teams_rls_recursion.sql</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
 </tr>
 
-<tr data-id="f02">
-  <td><input type="checkbox" class="beta-toggle" checked data-id="f02"></td>
-  <td><strong>Список проектов</strong></td>
-  <td><span class="badge b-done">Готово</span></td>
-  <td>Съёмки</td>
-  <td>Список с брендом, датой, кол-вом карточек. Переключение между проектами. Открытие из файла (JSON).</td>
-  <td>--</td>
-  <td contenteditable="true" class="note-cell"></td>
+<tr data-row="m-010">
+  <td>M2</td>
+  <td><strong>Миграция 010: Snapshots table</strong></td>
+  <td><span class="who-masha">Masha</span></td>
+  <td><span class="s-migration">MIGRATION</span></td>
+  <td>Supabase</td>
+  <td>Открыть Supabase Dashboard > SQL Editor. Скопировать содержимое файла <code>v2/supabase/010_snapshots.sql</code> и выполнить. Проверить: таблица snapshots появилась в Table Editor, функции create_snapshot и get_snapshots_by_token видны.</td>
+  <td class="files">010_snapshots.sql</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
 </tr>
 
-<tr data-id="f03">
-  <td><input type="checkbox" class="beta-toggle" checked data-id="f03"></td>
-  <td><strong>Пайплайн</strong></td>
-  <td><span class="badge b-done">Готово</span></td>
-  <td>Съёмки</td>
-  <td>8 этапов, визуальный прогресс, кнопка "Завершить этап", история переходов в Supabase (stage_events), авто-синхронизация.</td>
-  <td>--</td>
-  <td contenteditable="true" class="note-cell"></td>
+<tr class="checkpoint-row" data-row="cp-mig">
+  <td></td>
+  <td colspan="6"><strong>CHECKPOINT:</strong> Обе миграции выполнены. Команды работают без "infinite recursion". Таблица snapshots существует.</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
 </tr>
 
-<tr data-id="f04">
-  <td><input type="checkbox" class="beta-toggle" checked data-id="f04"></td>
-  <td><strong>Сохранение проекта</strong></td>
-  <td><span class="badge b-done">Готово</span></td>
-  <td>Съёмки</td>
-  <td>Desktop: save/load JSON через Python. Браузер: автосохранение в localStorage, восстановление при перезагрузке. Облако: автосинхронизация с Supabase.</td>
-  <td>--</td>
-  <td contenteditable="true" class="note-cell"></td>
+<!-- ═══════════ CLOUD + AUTH ═══════════ -->
+<tr class="sprint-row"><td colspan="9">CLOUD -- авторизация и облако</td></tr>
+
+<tr class="section-row"><td colspan="9">Авторизация и команды</td></tr>
+
+<tr data-row="b-auth1">
+  <td>C1</td>
+  <td><strong>Регистрация / Логин</strong></td>
+  <td><span class="who-masha">Masha</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Auth Gate</td>
+  <td>Открыть приложение в браузере. Должен показаться auth gate. Зарегистрироваться или залогиниться. После логина -- список съемок.</td>
+  <td class="files">cloud-ui.js, supabase.js</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
 </tr>
 
-<tr data-id="f05">
-  <td><input type="checkbox" class="beta-toggle" checked data-id="f05"></td>
-  <td><strong>Облачные проекты</strong></td>
-  <td><span class="badge b-done">Готово</span></td>
-  <td>Съёмки</td>
-  <td>Кнопка "Из облака" -- загрузка списка проектов из Supabase. Скачивание проекта с карточками, слотами, превью.</td>
-  <td>--</td>
-  <td contenteditable="true" class="note-cell"></td>
+<tr data-row="b-auth2">
+  <td>C2</td>
+  <td><strong>Модалка "Моя команда"</strong></td>
+  <td><span class="who-masha">Masha</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Команды</td>
+  <td>После миграции 009: открыть модалку команды. Должна открыться без ошибок. Добавить участника (по email). Проверить что он появляется в списке.</td>
+  <td class="files">cloud-ui.js, supabase.js</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
 </tr>
 
-<!-- КАРТОЧКИ -->
-<tr class="section-row"><td colspan="7">Карточки товара</td></tr>
-
-<tr data-id="f10">
-  <td><input type="checkbox" class="beta-toggle" checked data-id="f10"></td>
-  <td><strong>Сайдбар карточек</strong></td>
-  <td><span class="badge b-done">Готово</span></td>
-  <td>Контент</td>
-  <td>Список карточек с номерами. Добавление/удаление. Экспорт списка (.txt). Навигация кликом.</td>
-  <td>--</td>
-  <td contenteditable="true" class="note-cell"></td>
+<tr data-row="b-auth3">
+  <td>C3</td>
+  <td><strong>Создание съемки в облаке</strong></td>
+  <td><span class="who-masha">Masha</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Съемки</td>
+  <td>Создать новую съемку (кнопка +). Заполнить бренд, выбрать шаблон. Съемка должна появиться в списке и сохраниться в Supabase.</td>
+  <td class="files">shootings.js, supabase.js</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
 </tr>
 
-<tr data-id="f11">
-  <td><input type="checkbox" class="beta-toggle" checked data-id="f11"></td>
-  <td><strong>Редактор карточки</strong></td>
-  <td><span class="badge b-done">Готово</span></td>
-  <td>Контент</td>
-  <td>Раскладка: hero + вертикали/горизонтали. Drag-drop из ОС, из превью, между слотами (swap). Удаление фото. +/- слот, переключение H/V. Undo (Cmd+Z). Стрелки между карточками. Zoom на фото.</td>
-  <td>--</td>
-  <td contenteditable="true" class="note-cell"></td>
+<tr data-row="b-auth4">
+  <td>C4</td>
+  <td><strong>Share-ссылка</strong></td>
+  <td><span class="who-masha">Masha</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Съемки</td>
+  <td>Открыть съемку, нажать "Поделиться". Скопировать ссылку. Открыть в другом браузере / инкогнито. Должен открыться клиентский режим (ввести имя, увидеть карточки).</td>
+  <td class="files">shootings.js, supabase.js</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
 </tr>
 
-<tr data-id="f12">
-  <td><input type="checkbox" class="beta-toggle" checked data-id="f12"></td>
-  <td><strong>Шаблоны карточек</strong></td>
-  <td><span class="badge b-done">Готово</span></td>
-  <td>Контент</td>
-  <td>Редактор шаблона (V/H кол-во, пропорции, ряды, hero). Сохранение шаблона. Применение к карточке. Создание проекта с шаблоном.</td>
-  <td>--</td>
-  <td contenteditable="true" class="note-cell"></td>
+<tr data-row="b-auth5">
+  <td>C5</td>
+  <td><strong>Облачная синхронизация карточек</strong></td>
+  <td><span class="who-masha">Masha</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Карточки</td>
+  <td>Добавить карточки и фото в съемке. Нажать "Синхронизировать". Открыть ту же съемку по share-ссылке -- карточки и фото должны совпадать.</td>
+  <td class="files">cards.js, supabase.js</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
 </tr>
 
-<tr data-id="f13">
-  <td><input type="checkbox" class="beta-toggle" checked data-id="f13"></td>
-  <td><strong>Авто-раскладка (layout engine)</strong></td>
-  <td><span class="badge b-done">Готово</span></td>
-  <td>Контент</td>
-  <td>Авто-ряды по весу слотов. Hero сверху (H) или слева (V). Constraint-based sizing. lockRows режим.</td>
-  <td>--</td>
-  <td contenteditable="true" class="note-cell"></td>
+<tr class="checkpoint-row" data-row="cp-cloud">
+  <td></td>
+  <td colspan="6"><strong>CHECKPOINT:</strong> Полный цикл: логин > создать съемку > share-ссылка > клиент видит карточки. Команда работает.</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
 </tr>
 
-<tr data-id="f14">
-  <td><input type="checkbox" class="beta-toggle" checked data-id="f14"></td>
-  <td><strong>Экспорт PDF</strong></td>
-  <td><span class="badge b-done">Готово</span></td>
-  <td>Контент</td>
-  <td>Экспорт карточек в PDF (jsPDF). Карточка = страница.</td>
-  <td>Проверить качество</td>
-  <td contenteditable="true" class="note-cell"></td>
+<!-- ═══════════ PIPELINE + SNAPSHOTS ═══════════ -->
+<tr class="sprint-row"><td colspan="9">PIPELINE -- снимки состояния и динамический пайплайн</td></tr>
+
+<tr class="section-row"><td colspan="9">Согласование клиента</td></tr>
+
+<tr data-row="b-snap1">
+  <td>P1</td>
+  <td><strong>Клиент: кнопка "Согласовать отбор"</strong></td>
+  <td><span class="who-masha">Masha</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Клиент</td>
+  <td>Открыть съемку по share-ссылке (клиент). Кнопка "Согласовать отбор". Нажать -- подтверждение. После: "Согласовано [время]" + "Внести изменения в отбор". Проверить snapshot в Supabase > snapshots.</td>
+  <td class="files">shootings.js, supabase.js</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
 </tr>
 
-<!-- ПРЕВЬЮ -->
-<tr class="section-row"><td colspan="7">Превью-панель</td></tr>
-
-<tr data-id="f20">
-  <td><input type="checkbox" class="beta-toggle" checked data-id="f20"></td>
-  <td><strong>Загрузка фото</strong></td>
-  <td><span class="badge b-done">Готово</span></td>
-  <td>Контент</td>
-  <td>Drag-drop папки/файлов. Кнопка "Выбрать папку" (desktop). Прогресс загрузки. Дедупликация по имени.</td>
-  <td>--</td>
-  <td contenteditable="true" class="note-cell"></td>
+<tr data-row="b-snap2">
+  <td>P2</td>
+  <td><strong>Свободное редактирование после согласования</strong></td>
+  <td><span class="who-masha">Masha</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Клиент</td>
+  <td>После согласования: клиент может свободно менять карточки (добавлять/удалять фото). Ничего не блокируется. Попап при первом изменении показывается один раз.</td>
+  <td class="files">shootings.js, cards.js</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
 </tr>
 
-<tr data-id="f21">
-  <td><input type="checkbox" class="beta-toggle" checked data-id="f21"></td>
-  <td><strong>Миниатюры + лайтбокс</strong></td>
-  <td><span class="badge b-done">Готово</span></td>
-  <td>Контент</td>
-  <td>Canvas thumbnails (браузер) / Pillow (desktop). Lazy loading. Клик = лайтбокс. Стрелки. Зелёная галочка на использованных фото. Slider размера. Ротация landscape 90.</td>
-  <td>--</td>
-  <td contenteditable="true" class="note-cell"></td>
+<tr data-row="b-snap3">
+  <td>P3</td>
+  <td><strong>"Внести изменения в отбор" (push to team)</strong></td>
+  <td><span class="who-masha">Masha</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Клиент</td>
+  <td>После редактирования: нажать "Внести изменения в отбор". Только добавления -- сразу snapshot. Есть удаления -- галерея (тест P4).</td>
+  <td class="files">shootings.js, supabase.js</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
 </tr>
 
-<tr data-id="f22">
-  <td><input type="checkbox" class="beta-toggle" checked data-id="f22"></td>
-  <td><strong>Фильтры</strong></td>
-  <td><span class="badge b-done">Готово</span></td>
-  <td>Контент</td>
-  <td>По рейтингу (XMP из Capture One). По папке. По источнику (Все/Карточки/Other).</td>
-  <td>--</td>
-  <td contenteditable="true" class="note-cell"></td>
+<tr class="section-row"><td colspan="9">Галерея удаленных фото</td></tr>
+
+<tr data-row="b-snap4">
+  <td>P4</td>
+  <td><strong>Removal gallery: визуальный отбор</strong></td>
+  <td><span class="who-masha">Masha</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Клиент</td>
+  <td>Клиент удаляет фото, нажимает "Внести изменения": модалка-галерея с миниатюрами удаленных. Клик = переключение оставить/убрать (яркое = оставить). Кнопки "Оставить все" / "Убрать все". Счетчик.</td>
+  <td class="files">shootings.js, style.css</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
 </tr>
 
-<tr data-id="f23">
-  <td><input type="checkbox" class="beta-toggle" checked data-id="f23"></td>
-  <td><strong>Облачные превью</strong></td>
-  <td><span class="badge b-done">Готово</span></td>
-  <td>Контент</td>
-  <td>Авто-загрузка превью в Supabase Storage (thumbnails bucket). Пакетная загрузка по 5. Дедупликация (не перезаливает существующие).</td>
-  <td>--</td>
-  <td contenteditable="true" class="note-cell"></td>
+<tr data-row="b-snap5">
+  <td>P5</td>
+  <td><strong>Removal gallery: подтверждение</strong></td>
+  <td><span class="who-masha">Masha</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Клиент</td>
+  <td>Нажать "Подтвердить". Snapshot создается с removalRecords (keep/kill по каждому фото). Проверить в Supabase: snapshot.data.</td>
+  <td class="files">shootings.js, supabase.js</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
 </tr>
 
-<!-- СИНХРОНИЗАЦИЯ -->
-<tr class="section-row"><td colspan="7">Синхронизация с Capture One</td></tr>
+<tr class="section-row"><td colspan="9">Авто-переверстка (auto-reflow)</td></tr>
 
-<tr data-id="f30">
-  <td><input type="checkbox" class="beta-toggle" checked data-id="f30"></td>
-  <td><strong>Rate Setter</strong></td>
-  <td><span class="badge b-done">Готово</span></td>
+<tr data-row="b-reflow1">
+  <td>P6</td>
+  <td><strong>Auto-reflow: удаление фото из слота</strong></td>
+  <td><span class="who-masha">Masha</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Клиент</td>
+  <td>В клиентском режиме: удалить фото (X). Пустой слот исчезает, карточка переверстывается. Все слоты пустые = карточка удалена. В desktop reflow НЕ работает.</td>
+  <td class="files">cards.js</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="b-reflow2">
+  <td>P7</td>
+  <td><strong>Auto-reflow: нет пустых слотов</strong></td>
+  <td><span class="who-masha">Masha</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Клиент</td>
+  <td>Удалить несколько фото подряд. Не должно оставаться пустых слотов между заполненными. Карточка с 0 фото исчезает.</td>
+  <td class="files">cards.js</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr class="section-row"><td colspan="9">Контекст пайплайна (snapshot viewer)</td></tr>
+
+<tr data-row="b-ctx1">
+  <td>P8</td>
+  <td><strong>Клик на этап загружает snapshot</strong></td>
+  <td><span class="who-masha">Masha</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Пайплайн</td>
+  <td>Завершенные этапы кликабельны (cursor pointer). Клик загружает snapshot. Желтый баннер "Просмотр: [этап]" + "Вернуться к текущему". Активный этап подсвечен желтым.</td>
+  <td class="files">shootings.js, supabase.js, style.css</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="b-ctx2">
+  <td>P9</td>
+  <td><strong>Rate Setter из snapshot-контекста</strong></td>
+  <td><span class="who-masha">Masha</span></td>
+  <td><span class="s-done">DONE</span></td>
   <td>Синхронизация</td>
-  <td>Два режима: список имён / папка. Автозаполнение из проекта (select-фото из карточек). COS-запись рейтинга + ключевых слов. Пробный запуск. Лог. Суффикс-резалка.</td>
-  <td>--</td>
-  <td contenteditable="true" class="note-cell"></td>
+  <td>При активном snapshot: Rate Setter > "Все файлы" = файлы из snapshot (не текущие). Надпись "из снимка".</td>
+  <td class="files">sync.js, supabase.js</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
 </tr>
 
-<!-- SHARE / КЛИЕНТ -->
-<tr class="section-row"><td colspan="7">Доступ клиента (web)</td></tr>
-
-<tr data-id="f40">
-  <td><input type="checkbox" class="beta-toggle" checked data-id="f40"></td>
-  <td><strong>Auth (вход/регистрация)</strong></td>
-  <td><span class="badge b-done">Готово</span></td>
-  <td>Auth gate</td>
-  <td>Email + пароль. Magic link. Регистрация с именем. Auth gate при загрузке.</td>
-  <td>--</td>
-  <td contenteditable="true" class="note-cell"></td>
+<tr data-row="b-ctx3">
+  <td>P10</td>
+  <td><strong>Delta sync: "Только изменения"</strong></td>
+  <td><span class="who-masha">Masha</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Синхронизация</td>
+  <td>Кнопка "Только изменения" (зеленая). Заполняет только файлы, изменившиеся с последнего согласования + тег итерации (iter2, iter3...). Нет изменений -- сообщение.</td>
+  <td class="files">sync.js, supabase.js</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
 </tr>
 
-<tr data-id="f41">
-  <td><input type="checkbox" class="beta-toggle" checked data-id="f41"></td>
-  <td><strong>Share-ссылки</strong></td>
-  <td><span class="badge b-done">Готово</span></td>
-  <td>Съёмки</td>
-  <td>Создание ссылки (роль: клиент/ретушёр, метка). Копирование. Деактивация. Анонимный доступ без регистрации.</td>
-  <td>--</td>
-  <td contenteditable="true" class="note-cell"></td>
+<tr class="section-row"><td colspan="9">Сверка состояний (diff mode)</td></tr>
+
+<tr data-row="b-diff1">
+  <td>P11</td>
+  <td><strong>Сравнение двух snapshot-ов</strong></td>
+  <td><span class="who-masha">Masha</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Пайплайн</td>
+  <td>При 2+ snapshot: кнопка "Сверка состояний". Модалка с двумя селекторами (до/после). "Сравнить" -- добавленные (зеленые), удаленные (красные), перемещенные (желтые).</td>
+  <td class="files">shootings.js, supabase.js, style.css</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
 </tr>
 
-<tr data-id="f42">
-  <td><input type="checkbox" class="beta-toggle" checked data-id="f42"></td>
-  <td><strong>Клиентский просмотр</strong></td>
-  <td><span class="badge b-done">Готово</span></td>
-  <td>Web (share)</td>
-  <td>Анонимный клиент видит карточки, превью, лайтбокс. Пайплайн показывает текущий этап. Мобильная версия (адаптивная).</td>
-  <td>--</td>
-  <td contenteditable="true" class="note-cell"></td>
+<tr class="checkpoint-row" data-row="cp-pipeline">
+  <td></td>
+  <td colspan="6"><strong>CHECKPOINT:</strong> Полный цикл: фотограф создает > клиент согласовывает > редактирует > push > removal gallery > snapshot > diff > delta sync.</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
 </tr>
 
-<tr data-id="f43">
-  <td><input type="checkbox" class="beta-toggle" checked data-id="f43"></td>
-  <td><strong>Клиентский отбор</strong></td>
-  <td><span class="badge b-done">Готово</span></td>
-  <td>Web (share)</td>
-  <td>Галочка/крестик на фото в карточке. Комментарии к карточке. Имя клиента (cookie). Фотограф видит выбор клиента в desktop.</td>
-  <td>--</td>
-  <td contenteditable="true" class="note-cell"></td>
+<!-- ═══════════ OC CONTAINERS ═══════════ -->
+<tr class="sprint-row"><td colspan="9">OC CONTAINERS + ACTION AUDIT</td></tr>
+
+<tr data-row="b-oc1">
+  <td>O1</td>
+  <td><strong>OC Containers: создание и управление</strong></td>
+  <td><span class="who-masha">Masha</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Доп. контент</td>
+  <td>Экран доп. контента: создать контейнер (+), задать название. Перетащить фото. Переименовать / удалить контейнер.</td>
+  <td class="files">cards.js, style.css</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
 </tr>
 
-<tr data-id="f44">
-  <td><input type="checkbox" class="beta-toggle" checked data-id="f44"></td>
-  <td><strong>Авто-синхронизация карточек</strong></td>
-  <td><span class="badge b-done">Готово</span></td>
-  <td>--</td>
-  <td>Debounce 3 сек. Лёгкий sync (только метаданные, без перезаливки thumb). Авто-pull каждые 30 сек. Фотограф видит изменения клиента.</td>
-  <td>--</td>
-  <td contenteditable="true" class="note-cell"></td>
+<tr data-row="b-oc2">
+  <td>O2</td>
+  <td><strong>Action Audit: журнал действий</strong></td>
+  <td><span class="who-masha">Masha</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Все</td>
+  <td>Кнопка "Журнал". История действий: кто, что, когда. Фильтрация по типу. Записи создаются автоматически.</td>
+  <td class="files">cards.js, shootings.js</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
 </tr>
 
-<!-- MOBILE -->
-<tr class="section-row"><td colspan="7">Мобильная версия</td></tr>
-
-<tr data-id="f50">
-  <td><input type="checkbox" class="beta-toggle" checked data-id="f50"></td>
-  <td><strong>Мобильный клиент</strong></td>
-  <td><span class="badge b-done">Готово</span></td>
-  <td>Web (mobile)</td>
-  <td>Адаптивный layout. Карточки в виде карусели слотов. Zoom на слот. Лайтбокс с ротацией landscape. Вкладка "Other" для доп. контента.</td>
-  <td>--</td>
-  <td contenteditable="true" class="note-cell"></td>
+<tr data-row="b-oc3">
+  <td>O3</td>
+  <td><strong>Cloud sync: все кнопки работают</strong></td>
+  <td><span class="who-masha">Masha</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Все</td>
+  <td>Замена sbAutoSyncCards на shCloudSyncExplicit. После drag фото, удаления, согласования -- синхронизация вызывается корректно.</td>
+  <td class="files">cards.js, shootings.js</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
 </tr>
 
-<!-- ПОД ВОПРОСОМ -->
-<tr class="section-row"><td colspan="7">Под вопросом (оставить/убрать?)</td></tr>
-
-<tr data-id="q01">
-  <td><input type="checkbox" class="beta-toggle" data-id="q01"></td>
-  <td><strong>Вкладка "Доп. контент"</strong></td>
-  <td><span class="badge b-done">Готово</span></td>
-  <td>Контент</td>
-  <td>Отдельная зона для фото, не попавших в карточки. Drag из превью. Своя превью-панель.</td>
-  <td>Нужен бета-тестерам?</td>
-  <td contenteditable="true" class="note-cell"></td>
+<tr class="checkpoint-row" data-row="cp-oc">
+  <td></td>
+  <td colspan="6"><strong>CHECKPOINT:</strong> OC контейнеры работают. Аудит записывает действия. Синхронизация не ломается.</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
 </tr>
 
-<tr data-id="q02">
-  <td><input type="checkbox" class="beta-toggle" data-id="q02"></td>
-  <td><strong>Вкладка "Отбор" (allcontent)</strong></td>
-  <td><span class="badge b-done">Готово</span></td>
-  <td>Контент</td>
-  <td>Все фото из карточек + other в одной галерее. Фильтр по источнику. Фильтр по рейтингу. "Посмотреть все опции".</td>
-  <td>Нужен бета-тестерам?</td>
-  <td contenteditable="true" class="note-cell"></td>
+<!-- ═══════════ TODO ═══════════ -->
+<tr class="sprint-row"><td colspan="9">TODO -- оставшиеся задачи (критичные для беты)</td></tr>
+
+<tr class="section-row"><td colspan="9">Пайплайн</td></tr>
+
+<tr data-row="b-todo1">
+  <td>T1</td>
+  <td><strong>Реестр триггеров</strong></td>
+  <td><span class="who-both">Вместе</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Пайплайн</td>
+  <td>PIPELINE_STAGES: trigger {description, check(proj)} для каждого этапа. Кнопка "Завершить" проверяет check(). (backlog 1.12)</td>
+  <td class="files">state.js, shootings.js</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
 </tr>
 
-<tr data-id="q03">
-  <td><input type="checkbox" class="beta-toggle" data-id="q03"></td>
-  <td><strong>Вкладка "Артикулы"</strong></td>
-  <td><span class="badge b-done">Готово</span></td>
-  <td>Артикулы</td>
-  <td>Чек-лист артикулов (загрузка PDF/Excel/CSV). Сопоставление артикулов с карточками (ручное + AI). Верификация. Импорт legacy.</td>
-  <td>Нужен бета-тестерам?</td>
-  <td contenteditable="true" class="note-cell"></td>
+<tr class="section-row"><td colspan="9">Карточки</td></tr>
+
+<tr data-row="b-todo2">
+  <td>T2</td>
+  <td><strong>Полноэкранный просмотр фото</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Превью</td>
+  <td>Клик на миниатюру / слот -> полноэкранный просмотр с навигацией. (backlog 2.3)</td>
+  <td class="files">previews.js, cards.js, style.css</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
 </tr>
 
-<tr data-id="q04">
-  <td><input type="checkbox" class="beta-toggle" data-id="q04"></td>
-  <td><strong>Модалка "Настройка облака"</strong></td>
-  <td><span class="badge b-done">Готово</span></td>
-  <td>--</td>
-  <td>Ввод Supabase URL / anon key. Сохранение в localStorage. Для самостоятельного подключения.</td>
-  <td>Убрать -- хардкод?</td>
-  <td contenteditable="true" class="note-cell"></td>
+<tr data-row="b-todo3">
+  <td>T3</td>
+  <td><strong>Рефакторинг Slot: options[]</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Карточки</td>
+  <td>Slot = {options: [{file, dataUrl, path}], selected: idx}. Drop нескольких фото в один слот. (backlog 2.1)</td>
+  <td class="files">cards.js, state.js</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
 </tr>
 
-<tr data-id="q05">
-  <td><input type="checkbox" class="beta-toggle" data-id="q05"></td>
-  <td><strong>Кнопка "Импорт" (legacy JSON)</strong></td>
-  <td><span class="badge b-done">Готово</span></td>
-  <td>Съёмки</td>
-  <td>Импорт проектов из старого формата (MVP v0.1).</td>
-  <td>Убрать для беты?</td>
-  <td contenteditable="true" class="note-cell"></td>
+<tr data-row="b-todo4">
+  <td>T4</td>
+  <td><strong>Карусель в слоте</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Карточки</td>
+  <td>Стрелки/свайп внутри слота для просмотра вариантов. Индикатор "3 варианта". (backlog 2.2, зависит от T3)</td>
+  <td class="files">cards.js, style.css</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr class="section-row"><td colspan="9">Rate Setter</td></tr>
+
+<tr data-row="b-todo5">
+  <td>T5</td>
+  <td><strong>Запись ключевых слов в COS</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Синхронизация</td>
+  <td>update_keywords() в CosRepository. Теги: "MaketCP", площадки из proj.channels. (backlog 1.16)</td>
+  <td class="files">cos_repository.py, sync.js</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr class="section-row"><td colspan="9">Доп. контент</td></tr>
+
+<tr data-row="b-todo6">
+  <td>T6</td>
+  <td><strong>Теги площадок публикации</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Доп. контент</td>
+  <td>На фото в доп. отборе -- кликабельные теги: WB, Ozon, Lamoda, сайт, соцсети. Фильтрация. (backlog 1.17)</td>
+  <td class="files">previews.js, style.css</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr class="section-row"><td colspan="9">Инфраструктура</td></tr>
+
+<tr data-row="b-todo7">
+  <td>T7</td>
+  <td><strong>Оптимизация сохранения (пути вместо base64)</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Инфра</td>
+  <td>Хранить path + thumbnail отдельно. Reduce JSON размер. (backlog 2.4)</td>
+  <td class="files">project_service.py, cards.js</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="b-todo8">
+  <td>T8</td>
+  <td><strong>Горизонты = 2x ширина в превью</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Превью</td>
+  <td>Горизонтальные фото (aspect > 1) = 2 колонки. CSS grid-column: span 2. (backlog 1.11b)</td>
+  <td class="files">previews.js, style.css</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr class="checkpoint-row" data-row="cp-final">
+  <td></td>
+  <td colspan="6"><strong>FINAL:</strong> Все DONE протестированы. Баги записаны. TODO приоритизированы. Бета готова.</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
 </tr>
 
 </tbody>
 </table>
+
+</div><!-- /panel-backlog -->
+
+<div class="tab-panel" id="panel-bugs">
+
+<div class="bug-summary" id="bsum">
+  <span class="bs-label">Баги:</span>
+  <span class="bs-open" id="bs-open">0 открытых</span>
+  <span class="bs-fixed" id="bs-fixed">0 исправлено</span>
+  <span class="bs-bar"><span class="bs-bar-fixed" id="bsb-fixed"></span></span>
 </div>
 
-<!-- ═══════ TAB: BUGS / ДОРАБОТКИ ═══════ -->
-<div id="tab-bugs" class="hidden">
-<table id="tbl-bugs">
+<div class="bug-form">
+  <label>Экран<input class="bf-screen" id="bf-screen" type="text" placeholder="Пайплайн, Карточки..."></label>
+  <label>Описание<input class="bf-desc" id="bf-desc" type="text" placeholder="Что сломалось / что не так"></label>
+  <label>Приоритет
+    <select class="bf-pri" id="bf-pri">
+      <option value="high">Высокий</option>
+      <option value="med" selected>Средний</option>
+      <option value="low">Низкий</option>
+    </select>
+  </label>
+  <label>Задача<input id="bf-task" type="text" placeholder="P1, T2..." style="width:80px"></label>
+  <button class="btn-add-bug" onclick="addBug()">+ Добавить баг</button>
+</div>
+
+<div class="toolbar">
+  <button class="btn-save" onclick="exportAll()">Экспорт JSON</button>
+  <button class="btn-load" onclick="document.getElementById('li2').click()">Импорт JSON</button>
+  <input type="file" id="li2" accept=".json" style="display:none" onchange="importAll(this)">
+  <span class="save-status" id="ss2"></span>
+</div>
+
+<table id="bug-table">
 <thead>
 <tr>
-  <th style="width:4%">Fix</th>
+  <th style="width:3%"></th>
+  <th style="width:5%">#</th>
+  <th style="width:8%">Дата</th>
+  <th style="width:10%">Экран</th>
+  <th style="width:38%">Описание</th>
   <th style="width:8%">Приоритет</th>
-  <th style="width:18%">Проблема</th>
-  <th style="width:8%">Экран</th>
-  <th style="width:30%">Описание</th>
-  <th style="width:12%">Решение</th>
-  <th style="width:20%">Заметки Masha</th>
+  <th style="width:7%">Задача</th>
+  <th style="width:8%">Статус</th>
+  <th style="width:10%">Коммит</th>
+  <th style="width:3%"></th>
 </tr>
 </thead>
-<tbody>
-
-<tr class="section-row"><td colspan="7">UX: проекты и навигация (из комментариев Masha)</td></tr>
-
-<tr data-id="b20">
-  <td><input type="checkbox" class="beta-toggle" data-id="b20"></td>
-  <td><span class="pri-high">Высокий</span></td>
-  <td><strong>Формат имён съёмок</strong></td>
-  <td>Съёмки</td>
-  <td>Названия съёмок должны быть в формате Бренд_YYYY_MM_DD. Сейчас свободный текст.</td>
-  <td>Автоформат из полей бренд + дата</td>
-  <td contenteditable="true" class="note-cell"></td>
-</tr>
-
-<tr data-id="b21">
-  <td><input type="checkbox" class="beta-toggle" data-id="b21"></td>
-  <td><span class="pri-high">Высокий</span></td>
-  <td><strong>Soft delete проектов</strong></td>
-  <td>Съёмки</td>
-  <td>Нет кнопки удаления проекта. Проекты накапливаются. Нужен soft delete (в базе остаётся, из списка пропадает).</td>
-  <td>Кнопка удаления + поле deleted_at в БД + фильтр "Скрытые"</td>
-  <td contenteditable="true" class="note-cell"></td>
-</tr>
-
-<tr data-id="b22">
-  <td><input type="checkbox" class="beta-toggle" data-id="b22"></td>
-  <td><span class="pri-high">Высокий</span></td>
-  <td><strong>Убрать ручную загрузку/выгрузку из облака</strong></td>
-  <td>Съёмки</td>
-  <td>Кнопки "Из облака" не нужны -- всё должно синхронизироваться автоматически. Скрыть завершённые проекты.</td>
-  <td>Убрать кнопки, добавить фильтр "Скрыть завершённые"</td>
-  <td contenteditable="true" class="note-cell"></td>
-</tr>
-
-<tr data-id="b23">
-  <td><input type="checkbox" class="beta-toggle" data-id="b23"></td>
-  <td><span class="pri-high">Высокий</span></td>
-  <td><strong>Командный доступ к проектам</strong></td>
-  <td>Съёмки</td>
-  <td>Нет обмена съёмками между участниками команды (стилист, фотограф). Один создаёт проект -- у другого он не отображается.</td>
-  <td>Роль "team member" + проект виден всем участникам</td>
-  <td contenteditable="true" class="note-cell"></td>
-</tr>
-
-<tr data-id="b24">
-  <td><input type="checkbox" class="beta-toggle" data-id="b24"></td>
-  <td><span class="pri-med">Средний</span></td>
-  <td><strong>Почистить этапы пайплайна</strong></td>
-  <td>Съёмки</td>
-  <td>Сейчас 8 этапов, но часть пока не покрываем. Оставить: от преотбора до "передано на ретушь".</td>
-  <td>Скрыть/деактивировать неготовые этапы</td>
-  <td contenteditable="true" class="note-cell"></td>
-</tr>
-
-<tr class="section-row"><td colspan="7">UX: карточки и превью (из комментариев Masha)</td></tr>
-
-<tr data-id="b30">
-  <td><input type="checkbox" class="beta-toggle" data-id="b30"></td>
-  <td><span class="pri-high">Высокий</span></td>
-  <td><strong>Шаблоны: нет меню выбора и управления</strong></td>
-  <td>Контент</td>
-  <td>Шаблоны сохраняются непонятно куда. Нет окна просмотра шаблонов, нет меню выбора из сохранённых. Нужно сохранить реальные шаблоны из проектов.</td>
-  <td>Окно управления шаблонами + меню выбора</td>
-  <td contenteditable="true" class="note-cell"></td>
-</tr>
-
-<tr data-id="b31">
-  <td><input type="checkbox" class="beta-toggle" data-id="b31"></td>
-  <td><span class="pri-high">Высокий</span></td>
-  <td><strong>Drop zone: drag в любую область экрана</strong></td>
-  <td>Превью</td>
-  <td>Когда нет фотографий, перетаскивание должно работать на весь экран. Сейчас маленький контейнер -- неудобно.</td>
-  <td>Fullscreen drop overlay при пустой галерее</td>
-  <td contenteditable="true" class="note-cell"></td>
-</tr>
-
-<tr data-id="b32">
-  <td><input type="checkbox" class="beta-toggle" data-id="b32"></td>
-  <td><span class="pri-med">Средний</span></td>
-  <td><strong>Режим карусели в desktop (как в мобилке)</strong></td>
-  <td>Контент</td>
-  <td>В мобилке есть пролистывание внутри карточки -- круто. Хочется так же в desktop как альтернативный режим.</td>
-  <td>Переключатель grid/carousel в desktop</td>
-  <td contenteditable="true" class="note-cell"></td>
-</tr>
-
-<tr data-id="b33">
-  <td><input type="checkbox" class="beta-toggle" data-id="b33"></td>
-  <td><span class="pri-med">Средний</span></td>
-  <td><strong>Редактирование имени карточки</strong></td>
-  <td>Контент</td>
-  <td>Нет возможности вручную редактировать имя карточки. Должно поддерживать автопереименование из чек-листа артикулов.</td>
-  <td>Редактируемое поле имени + авто из артикулов</td>
-  <td contenteditable="true" class="note-cell"></td>
-</tr>
-
-<tr data-id="b34">
-  <td><input type="checkbox" class="beta-toggle" data-id="b34"></td>
-  <td><span class="pri-med">Средний</span></td>
-  <td><strong>Глюк layout в раскладке карточек</strong></td>
-  <td>Контент</td>
-  <td>Layout engine работает в редакторе, но глючит в общем раскладе карточек (список всех карточек).</td>
-  <td>Отладить рендер карточек в списке</td>
-  <td contenteditable="true" class="note-cell"></td>
-</tr>
-
-<tr data-id="b35">
-  <td><input type="checkbox" class="beta-toggle" data-id="b35"></td>
-  <td><span class="pri-med">Средний</span></td>
-  <td><strong>Фильтр по рейтингу в карточках</strong></td>
-  <td>Контент</td>
-  <td>Фильтрация по рейтингу есть в превью, но не в карточках. Должна быть доступна в desktop.</td>
-  <td>Добавить pv-filter в карточки</td>
-  <td contenteditable="true" class="note-cell"></td>
-</tr>
-
-<tr data-id="b36">
-  <td><input type="checkbox" class="beta-toggle" data-id="b36"></td>
-  <td><span class="pri-low">Низкий</span></td>
-  <td><strong>PDF экспорт на все экраны</strong></td>
-  <td>Контент</td>
-  <td>PDF экспорт работает для карточек. Хочется экспорт всего селекта (не только карточки).</td>
-  <td>Расширить PDF на allcontent</td>
-  <td contenteditable="true" class="note-cell"></td>
-</tr>
-
-<tr data-id="b37">
-  <td><input type="checkbox" class="beta-toggle" data-id="b37"></td>
-  <td><span class="pri-low">Низкий</span></td>
-  <td><strong>Убрать "Экспорт списка" и названия в сайдбаре</strong></td>
-  <td>Контент</td>
-  <td>Кнопка "Экспорт списка" в сайдбаре лишняя. Названия карточек в списке -- тоже лишнее.</td>
-  <td>Убрать кнопку + упростить сайдбар</td>
-  <td contenteditable="true" class="note-cell"></td>
-</tr>
-
-<tr class="section-row"><td colspan="7">UX: доступ и роли (из комментариев Masha)</td></tr>
-
-<tr data-id="b40">
-  <td><input type="checkbox" class="beta-toggle" data-id="b40"></td>
-  <td><span class="pri-high">Высокий</span></td>
-  <td><strong>Роли в share-ссылках: права и отображение</strong></td>
-  <td>Share</td>
-  <td>Непонятно где отображаются метки ссылок. Изменения должны фиксироваться по роли. Согласовать может только заказчик. Нет разграничения прав.</td>
-  <td>UI меток + role-based permissions (только client approve)</td>
-  <td contenteditable="true" class="note-cell"></td>
-</tr>
-
-<tr class="section-row"><td colspan="7">Технические (аудит preview loading)</td></tr>
-
-<tr data-id="b01">
-  <td><input type="checkbox" class="beta-toggle" data-id="b01"></td>
-  <td><span class="pri-high">Высокий</span></td>
-  <td><strong>Race condition: параллельные sync</strong></td>
-  <td>Cloud sync</td>
-  <td>sbUploadPreviews() и sbUploadProject() могут запускаться одновременно. Риск: частичные загрузки, повреждение данных.</td>
-  <td>Добавить sync queue</td>
-  <td contenteditable="true" class="note-cell"></td>
-</tr>
-
-<tr data-id="b02">
-  <td><input type="checkbox" class="beta-toggle" data-id="b02"></td>
-  <td><span class="pri-high">Высокий</span></td>
-  <td><strong>Тихий провал загрузки превью</strong></td>
-  <td>Cloud sync</td>
-  <td>Если загрузка падает, _pendingSync не устанавливается. Пользователь думает что данные в облаке.</td>
-  <td>Добавить _previewsPendingSync + retry</td>
-  <td contenteditable="true" class="note-cell"></td>
-</tr>
-
-<tr data-id="b03">
-  <td><input type="checkbox" class="beta-toggle" data-id="b03"></td>
-  <td><span class="pri-med">Средний</span></td>
-  <td><strong>async/await в ES5 коде</strong></td>
-  <td>shootings.js</td>
-  <td>Строки 140, 199 используют async/await. Может сломать старые браузеры.</td>
-  <td>Заменить на .then()</td>
-  <td contenteditable="true" class="note-cell"></td>
-</tr>
-
-<tr data-id="b04">
-  <td><input type="checkbox" class="beta-toggle" data-id="b04"></td>
-  <td><span class="pri-low">Низкий</span></td>
-  <td><strong>FileReader ошибки не ловятся</strong></td>
-  <td>Превью</td>
-  <td>Ошибки чтения файлов пропускаются без уведомления.</td>
-  <td>Добавить onerror обработчик</td>
-  <td contenteditable="true" class="note-cell"></td>
-</tr>
-
-<tr data-id="b11">
-  <td><input type="checkbox" class="beta-toggle" data-id="b11"></td>
-  <td><span class="pri-low">Низкий</span></td>
-  <td><strong>Canvas memory leak</strong></td>
-  <td>Превью</td>
-  <td>Canvas не освобождается при перезагрузке галереи. При 1000+ фото может замедлить.</td>
-  <td>Cleanup при rerender</td>
-  <td contenteditable="true" class="note-cell"></td>
-</tr>
-
+<tbody id="bug-body">
 </tbody>
 </table>
-</div>
 
-<!-- ═══════ TAB: CLEANUP ═══════ -->
-<div id="tab-cleanup" class="hidden">
-<table id="tbl-cleanup">
-<thead>
-<tr>
-  <th style="width:4%">Убрать</th>
-  <th style="width:18%">Элемент</th>
-  <th style="width:10%">Где</th>
-  <th style="width:30%">Зачем убирать</th>
-  <th style="width:18%">Как убрать</th>
-  <th style="width:20%">Заметки Masha</th>
-</tr>
-</thead>
-<tbody>
-
-<tr class="section-row"><td colspan="6">Убрать из всех версий</td></tr>
-
-<tr data-id="c04">
-  <td><input type="checkbox" class="beta-toggle" checked data-id="c04"></td>
-  <td><strong>Модалка "Настройка облака"</strong></td>
-  <td>Съёмки</td>
-  <td>Атавизм. Supabase захардкожен, бета-тестерам не нужно.</td>
-  <td>Убрать кнопку + модалку</td>
-  <td contenteditable="true" class="note-cell">Masha: "атавизм, убирай"</td>
-</tr>
-
-<tr data-id="c05">
-  <td><input type="checkbox" class="beta-toggle" checked data-id="c05"></td>
-  <td><strong>Кнопка "Импорт" (legacy JSON)</strong></td>
-  <td>Съёмки</td>
-  <td>Только для миграции с MVP v0.1. Вся синхронизация облачная.</td>
-  <td>Убрать кнопку</td>
-  <td contenteditable="true" class="note-cell">Masha: "убрать, вся синхронизация облачная"</td>
-</tr>
-
-<tr data-id="c08">
-  <td><input type="checkbox" class="beta-toggle" checked data-id="c08"></td>
-  <td><strong>Кнопки "Из облака" / "Открыть"</strong></td>
-  <td>Съёмки</td>
-  <td>Всё должно синхронизироваться автоматически. Ручная загрузка из облака не нужна.</td>
-  <td>Убрать кнопки, проекты подтягиваются сами</td>
-  <td contenteditable="true" class="note-cell">Masha: "никакой выгрузки и загрузки"</td>
-</tr>
-
-<tr data-id="c09">
-  <td><input type="checkbox" class="beta-toggle" checked data-id="c09"></td>
-  <td><strong>"Экспорт списка" в сайдбаре карточек</strong></td>
-  <td>Контент</td>
-  <td>Лишняя кнопка в сайдбаре, никто не пользуется.</td>
-  <td>Убрать кнопку</td>
-  <td contenteditable="true" class="note-cell">Masha: "можно убрать"</td>
-</tr>
-
-<tr class="section-row"><td colspan="6">Убрать из web (оставить в desktop)</td></tr>
-
-<tr data-id="c10">
-  <td><input type="checkbox" class="beta-toggle" checked data-id="c10"></td>
-  <td><strong>Rate Setter в web-версии</strong></td>
-  <td>Синхронизация</td>
-  <td>Rate Setter пишет COS -- работает только с desktop и Capture One. В web бесполезен.</td>
-  <td>Скрыть вкладку "Синхронизация" в web</td>
-  <td contenteditable="true" class="note-cell">Masha: "убрать из web"</td>
-</tr>
-
-<tr data-id="c11">
-  <td><input type="checkbox" class="beta-toggle" checked data-id="c11"></td>
-  <td><strong>Артикулы в web-версии</strong></td>
-  <td>Артикулы</td>
-  <td>Артикулы -- функция фотографа на desktop. Клиент в web не работает с чек-листом.</td>
-  <td>Скрыть вкладку "Артикулы" в web</td>
-  <td contenteditable="true" class="note-cell">Masha: "убрать из web, оставить в desktop"</td>
-</tr>
-
-<tr class="section-row"><td colspan="6">Упростить</td></tr>
-
-<tr data-id="c06">
-  <td><input type="checkbox" class="beta-toggle" checked data-id="c06"></td>
-  <td><strong>Status bar</strong></td>
-  <td>Внизу</td>
-  <td>Технические детали (backend, cloud status) не для пользователей.</td>
-  <td>Оставить только статус sync + user</td>
-  <td contenteditable="true" class="note-cell"></td>
-</tr>
-
-<tr data-id="c12">
-  <td><input type="checkbox" class="beta-toggle" checked data-id="c12"></td>
-  <td><strong>Переименовать "Доп. контент" в "Other"</strong></td>
-  <td>Контент subtabs</td>
-  <td>Masha хочет название "Other" вместо "Доп. контент".</td>
-  <td>Поменять текст subtab</td>
-  <td contenteditable="true" class="note-cell">Masha: "пусть будет Other"</td>
-</tr>
-
-</tbody>
-</table>
-</div>
-
+</div><!-- /panel-bugs -->
 
 <script>
-// ── State ──
-var STATE_KEY = 'beta_cl';
-var state = {};
+var CN=['num','task','who','status','screen','desc','files','test','my'];
+var LS_KEY='maketcp_beta';
+var BUGS_KEY='maketcp_beta_bugs';
+var TEST_STATES=['none','pass','fail','issues'];
+var TEST_LABELS={'none':'--','pass':'OK','fail':'FAIL','issues':'?'};
+var TEST_CLASSES={'none':'t-none','pass':'t-pass','fail':'t-fail','issues':'t-issues'};
+var PRI_LABELS={'high':'Высокий','med':'Средний','low':'Низкий'};
+var PRI_CLASSES={'high':'bug-pri-high','med':'bug-pri-med','low':'bug-pri-low'};
 
-function loadState() {
-  try { state = JSON.parse(localStorage.getItem(STATE_KEY)) || {}; } catch(e) { state = {}; }
-  // Apply checkboxes
-  var cbs = document.querySelectorAll('.beta-toggle');
-  for (var i = 0; i < cbs.length; i++) {
-    var id = cbs[i].getAttribute('data-id');
-    if (state[id] !== undefined) cbs[i].checked = state[id];
-  }
-  // Apply notes
-  var notes = document.querySelectorAll('.note-cell');
-  for (var j = 0; j < notes.length; j++) {
-    var tr = notes[j].closest('tr');
-    if (tr && tr.getAttribute('data-id') && state['note_' + tr.getAttribute('data-id')]) {
-      notes[j].innerHTML = state['note_' + tr.getAttribute('data-id')];
+var bugs=[];
+var bugCounter=0;
+
+function switchTab(name){
+  document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('active')});
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active')});
+  document.getElementById('panel-'+name).classList.add('active');
+  var btns=document.querySelectorAll('.tab');
+  if(name==='backlog') btns[0].classList.add('active');
+  else btns[1].classList.add('active');
+}
+
+function collectData(){
+  var d={_saved:new Date().toISOString(),rows:{}};
+  document.querySelectorAll('#bt tr[data-row]').forEach(function(r){
+    var k=r.getAttribute('data-row'),c=r.querySelectorAll('td'),o={};
+    for(var i=0;i<c.length&&i<CN.length;i++) o[CN[i]]=c[i].innerHTML.trim();
+    d.rows[k]=o;
+  });
+  return d;
+}
+
+function autoSave(){
+  try{
+    localStorage.setItem(LS_KEY,JSON.stringify(collectData()));
+    localStorage.setItem(BUGS_KEY,JSON.stringify({_saved:new Date().toISOString(),counter:bugCounter,bugs:bugs}));
+    var ss=document.getElementById('ss');
+    ss.textContent='Авто-сохранено: '+new Date().toLocaleTimeString();
+    ss.className='save-status auto-saved';
+    updateTestSummary();
+    updateBugSummary();
+    updateTabBadges();
+  }catch(e){console.error('autoSave:',e)}
+}
+
+function autoLoad(){
+  try{
+    var raw=localStorage.getItem(LS_KEY);
+    if(raw){var d=JSON.parse(raw);if(d&&d.rows)applyData(d)}
+    var braw=localStorage.getItem(BUGS_KEY);
+    if(braw){
+      var bd=JSON.parse(braw);
+      if(bd&&bd.bugs){bugs=bd.bugs;bugCounter=bd.counter||bugs.length}
     }
-  }
-  updateSummary();
+    document.getElementById('ss').textContent='Загружено из авто-сохранения';
+  }catch(e){console.error('autoLoad:',e)}
 }
 
-function saveState() {
-  var cbs = document.querySelectorAll('.beta-toggle');
-  for (var i = 0; i < cbs.length; i++) {
-    state[cbs[i].getAttribute('data-id')] = cbs[i].checked;
-  }
-  var notes = document.querySelectorAll('.note-cell');
-  for (var j = 0; j < notes.length; j++) {
-    var tr = notes[j].closest('tr');
-    if (tr && tr.getAttribute('data-id')) {
-      var val = notes[j].innerHTML.trim();
-      if (val) state['note_' + tr.getAttribute('data-id')] = val;
+function applyData(d){
+  document.querySelectorAll('#bt tr[data-row]').forEach(function(tr){
+    var k=tr.getAttribute('data-row');
+    if(!d.rows||!d.rows[k])return;
+    var c=tr.querySelectorAll('td');
+    for(var i=0;i<c.length&&i<CN.length;i++){
+      var col=CN[i];
+      if(d.rows[k][col]!==undefined) c[i].innerHTML=d.rows[k][col];
     }
-  }
-  localStorage.setItem(STATE_KEY, JSON.stringify(state));
-  updateSummary();
+  });
 }
 
-function updateSummary() {
-  var featureChecks = document.querySelectorAll('#tbl-features .beta-toggle');
-  var bugChecks = document.querySelectorAll('#tbl-bugs .beta-toggle');
-  var cleanChecks = document.querySelectorAll('#tbl-cleanup .beta-toggle');
-  var inBeta = 0, toFix = 0, bugs = 0, toSkip = 0;
-  for (var i = 0; i < featureChecks.length; i++) { if (featureChecks[i].checked) inBeta++; }
-  for (var j = 0; j < bugChecks.length; j++) { if (bugChecks[j].checked) toFix++; }
-  bugs = toFix;
-  for (var k = 0; k < cleanChecks.length; k++) { if (cleanChecks[k].checked) toSkip++; }
-
-  document.getElementById('sum-in').textContent = inBeta;
-  document.getElementById('sum-fix').textContent = toFix;
-  document.getElementById('sum-bug').textContent = bugs;
-  document.getElementById('sum-skip').textContent = toSkip;
-
-  var total = featureChecks.length;
-  var pct = total > 0 ? Math.round(inBeta / total * 100) : 0;
-  document.getElementById('sum-bar').style.width = pct + '%';
+function exportAll(){
+  var all={backlog:collectData(),bugs:{counter:bugCounter,bugs:bugs},_saved:new Date().toISOString()};
+  var b=new Blob([JSON.stringify(all,null,2)],{type:'application/json'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(b);a.download='beta_edits.json';a.click();
 }
+function exportEdits(){exportAll()}
 
-// ── Tabs ──
-function showTab(name) {
-  var tabs = document.querySelectorAll('.tab');
-  for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('active');
-  document.getElementById('tab-features').classList.add('hidden');
-  document.getElementById('tab-bugs').classList.add('hidden');
-  document.getElementById('tab-cleanup').classList.add('hidden');
-  if (name === 'features') { tabs[0].classList.add('active'); document.getElementById('tab-features').classList.remove('hidden'); }
-  if (name === 'bugs') { tabs[1].classList.add('active'); document.getElementById('tab-bugs').classList.remove('hidden'); }
-  if (name === 'cleanup') { tabs[2].classList.add('active'); document.getElementById('tab-cleanup').classList.remove('hidden'); }
-}
-
-// ── Export/Import ──
-function exportJSON() {
-  saveState();
-  var blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
-  var a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'beta_checklist_' + new Date().toISOString().slice(0,10) + '.json';
-  a.click();
-}
-
-function importJSON(input) {
-  if (!input.files[0]) return;
-  var reader = new FileReader();
-  reader.onload = function() {
-    try {
-      state = JSON.parse(reader.result);
-      localStorage.setItem(STATE_KEY, JSON.stringify(state));
-      loadState();
-    } catch(e) { alert('Ошибка чтения файла'); }
+function importAll(inp){
+  if(!inp.files[0])return;
+  var r=new FileReader();
+  r.onload=function(e){
+    try{
+      var d=JSON.parse(e.target.result);
+      if(d.backlog&&d.backlog.rows){applyData(d.backlog)}
+      if(d.bugs&&d.bugs.bugs){bugs=d.bugs.bugs;bugCounter=d.bugs.counter||bugs.length;renderBugs()}
+      if(d.rows&&!d.backlog){applyData(d)}
+      autoSave();
+    }catch(e){alert(e)}
   };
-  reader.readAsText(input.files[0]);
+  r.readAsText(inp.files[0]);inp.value='';
+}
+function importEdits(inp){importAll(inp)}
+
+function cycleTest(td){
+  var span=td.querySelector('span');if(!span)return;
+  var cur='none';
+  for(var s in TEST_CLASSES){if(span.className===TEST_CLASSES[s]){cur=s;break}}
+  var idx=TEST_STATES.indexOf(cur);
+  var next=TEST_STATES[(idx+1)%TEST_STATES.length];
+  span.className=TEST_CLASSES[next];
+  span.textContent=TEST_LABELS[next];
+  autoSave();
 }
 
-// ── Event listeners ──
-document.addEventListener('change', function(e) {
-  if (e.target.classList.contains('beta-toggle')) saveState();
-});
-document.addEventListener('input', function(e) {
-  if (e.target.classList.contains('note-cell')) {
-    clearTimeout(e.target._saveTimer);
-    e.target._saveTimer = setTimeout(saveState, 500);
+function updateTestSummary(){
+  var cells=document.querySelectorAll('#bt .t-cell');
+  var counts={none:0,pass:0,fail:0,issues:0},total=0;
+  cells.forEach(function(td){
+    var span=td.querySelector('span');if(!span)return;total++;
+    for(var s in TEST_CLASSES){if(span.className===TEST_CLASSES[s]){counts[s]++;break}}
+  });
+  document.getElementById('ts-pass').textContent=counts.pass+' OK';
+  document.getElementById('ts-fail').textContent=counts.fail+' FAIL';
+  document.getElementById('ts-issues').textContent=counts.issues+' ?';
+  document.getElementById('ts-untested').textContent=counts.none+' --';
+  if(total>0){
+    document.getElementById('tsb-pass').style.width=(counts.pass/total*100)+'%';
+    document.getElementById('tsb-fail').style.width=(counts.fail/total*100)+'%';
+    document.getElementById('tsb-issues').style.width=(counts.issues/total*100)+'%';
   }
-});
+}
 
-// ── Init ──
-loadState();
+function addBug(){
+  var scr=document.getElementById('bf-screen').value.trim();
+  var desc=document.getElementById('bf-desc').value.trim();
+  var pri=document.getElementById('bf-pri').value;
+  var task=document.getElementById('bf-task').value.trim();
+  if(!desc){document.getElementById('bf-desc').focus();return}
+  bugCounter++;
+  bugs.unshift({id:'BUG-'+bugCounter,date:new Date().toISOString().slice(0,10),screen:scr||'--',desc:desc,priority:pri,task:task||'--',fixed:false,commit:''});
+  renderBugs();autoSave();
+  document.getElementById('bf-desc').value='';
+  document.getElementById('bf-screen').value='';
+  document.getElementById('bf-task').value='';
+}
+
+function toggleBug(id){
+  for(var i=0;i<bugs.length;i++){
+    if(bugs[i].id===id){bugs[i].fixed=!bugs[i].fixed;if(bugs[i].fixed)bugs[i].fixDate=new Date().toISOString().slice(0,10);else delete bugs[i].fixDate;break}
+  }
+  renderBugs();autoSave();
+}
+
+function deleteBug(id){
+  if(!confirm('Удалить '+id+'?'))return;
+  bugs=bugs.filter(function(b){return b.id!==id});
+  renderBugs();autoSave();
+}
+
+function editBugCommit(id,val){
+  for(var i=0;i<bugs.length;i++){if(bugs[i].id===id){bugs[i].commit=val;break}}
+  autoSave();
+}
+
+function renderBugs(){
+  var body=document.getElementById('bug-body');body.innerHTML='';
+  bugs.forEach(function(b){
+    var tr=document.createElement('tr');
+    tr.className='bug-row'+(b.fixed?' fixed':'');
+    var st=b.fixed?'<span class="t-pass">FIXED</span>'+(b.fixDate?' <span class="bug-date">'+b.fixDate+'</span>':''):'<span class="t-fail">OPEN</span>';
+    tr.innerHTML='<td><input type="checkbox" class="bug-check"'+(b.fixed?' checked':'')+' onchange="toggleBug(\''+b.id+'\')"></td><td class="bug-id">'+b.id+'</td><td class="bug-date">'+b.date+'</td><td>'+b.screen+'</td><td>'+b.desc+'</td><td><span class="'+PRI_CLASSES[b.priority]+'">'+PRI_LABELS[b.priority]+'</span></td><td>'+b.task+'</td><td>'+st+'</td><td><input type="text" value="'+(b.commit||'')+'" placeholder="hash" style="width:80px;font-size:10px;font-family:monospace;padding:2px 4px;border:1px solid #ddd;border-radius:3px" onblur="editBugCommit(\''+b.id+'\',this.value)"></td><td><button class="btn-del-bug" onclick="deleteBug(\''+b.id+'\')" title="x">x</button></td>';
+    body.appendChild(tr);
+  });
+  updateBugSummary();
+}
+
+function updateBugSummary(){
+  var open=0,fixed=0;
+  bugs.forEach(function(b){if(b.fixed)fixed++;else open++});
+  document.getElementById('bs-open').textContent=open+' открытых';
+  document.getElementById('bs-fixed').textContent=fixed+' исправлено';
+  var total=open+fixed;
+  document.getElementById('bsb-fixed').style.width=total>0?(fixed/total*100)+'%':'0%';
+}
+
+function updateTabBadges(){
+  var todo=0;
+  document.querySelectorAll('#bt .s-todo').forEach(function(){todo++});
+  var tb=document.getElementById('tb-tasks');tb.textContent=todo;tb.className='tab-badge'+(todo===0?' zero':'');
+  var open=0;bugs.forEach(function(b){if(!b.fixed)open++});
+  var tb2=document.getElementById('tb-bugs');tb2.textContent=open;tb2.className='tab-badge'+(open===0?' zero':'');
+}
+
+(function(){
+  autoLoad();renderBugs();
+  document.querySelectorAll('#bt .t-cell').forEach(function(td){td.addEventListener('click',function(){cycleTest(td)})});
+  document.querySelectorAll('td[contenteditable="true"]').forEach(function(td){td.addEventListener('blur',function(){autoSave()})});
+  updateTestSummary();updateBugSummary();updateTabBadges();
+})();
 </script>
-
 </body>
 </html>
