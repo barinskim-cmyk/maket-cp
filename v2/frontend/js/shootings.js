@@ -433,7 +433,15 @@ function renderPipeline() {
     if (i < stage) cls = 'done';
     else if (i === stage) cls = 'active';
 
-    html += '<div class="pipeline-step ' + cls + '">';
+    /* Активный снимок-контекст: подсветить соответствующий этап */
+    var isSnapshotCtx = (typeof _snActiveSnapshot !== 'undefined' && _snActiveSnapshot &&
+      _snActiveSnapshot.stageId === s.id);
+    if (isSnapshotCtx) cls += ' sn-active-stage';
+
+    /* Завершённые этапы — кликабельны для загрузки снимка */
+    var clickable = (i < stage && proj._cloudId);
+    html += '<div class="pipeline-step ' + cls + (clickable ? ' step-clickable' : '') + '"' +
+      (clickable ? ' onclick="shLoadStageSnapshot(\'' + s.id + '\')" title="Посмотреть состояние на этом этапе"' : '') + '>';
     html += '<div class="step-dot">' + (i < stage ? '&#10003;' : (i + 1)) + '</div>';
     html += '<div class="step-info">';
     html += '<div class="step-name">' + esc(s.name) + '</div>';
@@ -456,7 +464,239 @@ function renderPipeline() {
     html += '</div>';
   }
   html += '</div>';
+
+  /* Кнопка сверки: если есть хотя бы 2 снимка */
+  if (proj._cloudId && typeof _snCachedSnapshots !== 'undefined' && _snCachedSnapshots.length >= 2) {
+    html += '<div style="margin-top:8px">';
+    html += '<button class="btn btn-sm" onclick="shOpenDiffMode()" style="font-size:11px;padding:2px 8px">Сверка состояний</button>';
+    html += '</div>';
+  }
+
   container.innerHTML = html;
+}
+
+/**
+ * Загрузить снимок для конкретного этапа и установить его как активный контекст.
+ * Кликается из пайплайна.
+ *
+ * @param {string} stageId — 'preselect', 'selection', 'client', ...
+ */
+function shLoadStageSnapshot(stageId) {
+  /* Если уже смотрим этот этап — вернуться к текущему */
+  if (typeof _snActiveSnapshot !== 'undefined' && _snActiveSnapshot &&
+      _snActiveSnapshot.stageId === stageId) {
+    snSetActiveContext(null);
+    renderPipeline();
+    return;
+  }
+
+  /* Ищем в кэше */
+  if (typeof _snCachedSnapshots !== 'undefined' && _snCachedSnapshots.length > 0) {
+    var found = _findSnapshotForStage(stageId);
+    if (found) {
+      /* Нормализуем stageId для удобства */
+      found.stageId = found.stage_id || stageId;
+      snSetActiveContext(found);
+      renderPipeline();
+      return;
+    }
+  }
+
+  /* Кэш пуст — загрузить с сервера */
+  if (typeof snLoadSnapshots === 'function') {
+    snLoadSnapshots(function(err, snaps) {
+      if (err) { console.warn('shLoadStageSnapshot:', err); return; }
+      _snCachedSnapshots = snaps || [];
+      var found = _findSnapshotForStage(stageId);
+      if (found) {
+        found.stageId = found.stage_id || stageId;
+        snSetActiveContext(found);
+      } else {
+        alert('Снимок для этого этапа ещё не создан. Снимки создаются при согласовании.');
+      }
+      renderPipeline();
+    });
+  }
+}
+
+/**
+ * Найти последний снимок для указанного этапа.
+ * @param {string} stageId
+ * @returns {object|null}
+ * @private
+ */
+function _findSnapshotForStage(stageId) {
+  if (!_snCachedSnapshots || !_snCachedSnapshots.length) return null;
+  /* Ищем последний снимок с этим stage_id */
+  var found = null;
+  for (var i = 0; i < _snCachedSnapshots.length; i++) {
+    if (_snCachedSnapshots[i].stage_id === stageId) {
+      found = _snCachedSnapshots[i];
+    }
+  }
+  return found;
+}
+
+/**
+ * Открыть режим сверки (diff mode): выбрать два снимка и показать различия.
+ */
+function shOpenDiffMode() {
+  if (typeof _snCachedSnapshots === 'undefined' || _snCachedSnapshots.length < 2) {
+    /* Загрузить если нет в кэше */
+    if (typeof snLoadSnapshots === 'function') {
+      snLoadSnapshots(function(err, snaps) {
+        if (err) { alert('Ошибка загрузки снимков: ' + err); return; }
+        _snCachedSnapshots = snaps || [];
+        if (_snCachedSnapshots.length < 2) {
+          alert('Для сверки нужно минимум 2 снимка. Пока создано: ' + _snCachedSnapshots.length);
+          return;
+        }
+        _shShowDiffModal();
+      });
+    }
+    return;
+  }
+  _shShowDiffModal();
+}
+
+/**
+ * Показать модалку выбора двух снимков для сверки.
+ * @private
+ */
+function _shShowDiffModal() {
+  var triggerLabels = {
+    'client_approved': 'Согласование клиента',
+    'client_changes': 'Изменения клиента',
+    'client_edit_start': 'До изменений клиента',
+    'manual_advance': 'Переход этапа',
+    'manual': 'Ручной снимок'
+  };
+
+  var optionsHtml = '';
+  for (var i = 0; i < _snCachedSnapshots.length; i++) {
+    var sn = _snCachedSnapshots[i];
+    var label = triggerLabels[sn.trigger] || sn.trigger;
+    var d = new Date(sn.created_at);
+    var dateStr = d.toLocaleDateString('ru-RU') + ' ' + d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    optionsHtml += '<option value="' + i + '">' + label + ' (' + dateStr + ')' + (sn.note ? ' -- ' + esc(sn.note) : '') + '</option>';
+  }
+
+  /* Добавить вариант "Текущее состояние" */
+  optionsHtml += '<option value="current">Текущее состояние</option>';
+
+  var html = '<div class="sn-diff-modal-body">' +
+    '<p style="margin:0 0 12px 0;font-size:13px">Выберите два состояния для сравнения:</p>' +
+    '<div style="display:flex;gap:12px;margin-bottom:16px">' +
+      '<div style="flex:1">' +
+        '<label style="font-size:11px;color:#888;display:block;margin-bottom:4px">Было (до)</label>' +
+        '<select id="sn-diff-before" style="width:100%;padding:6px;font-size:12px">' + optionsHtml + '</select>' +
+      '</div>' +
+      '<div style="flex:1">' +
+        '<label style="font-size:11px;color:#888;display:block;margin-bottom:4px">Стало (после)</label>' +
+        '<select id="sn-diff-after" style="width:100%;padding:6px;font-size:12px">' + optionsHtml + '</select>' +
+      '</div>' +
+    '</div>' +
+    '<div id="sn-diff-result" style="max-height:300px;overflow-y:auto"></div>' +
+    '<div style="margin-top:12px;text-align:right">' +
+      '<button class="btn" onclick="closeModal(\'modal-diff\')">Закрыть</button>' +
+      '<button class="btn btn-primary" style="margin-left:8px" onclick="_shRunDiff()">Сравнить</button>' +
+    '</div>' +
+  '</div>';
+
+  /* Используем openModal если доступен, иначе создаём свой */
+  var modal = document.getElementById('modal-diff');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'modal-diff';
+    modal.className = 'modal';
+    modal.innerHTML = '<div class="modal-content"><div class="modal-header"><h3>Сверка состояний</h3><button class="modal-close" onclick="closeModal(\'modal-diff\')">&times;</button></div><div id="diff-content"></div></div>';
+    document.body.appendChild(modal);
+  }
+  var contentEl = document.getElementById('diff-content');
+  if (contentEl) contentEl.innerHTML = html;
+
+  /* Выбрать по умолчанию: первый и последний снимок */
+  var selBefore = document.getElementById('sn-diff-before');
+  var selAfter = document.getElementById('sn-diff-after');
+  if (selBefore) selBefore.value = '0';
+  if (selAfter) selAfter.value = 'current';
+
+  if (typeof openModal === 'function') openModal('modal-diff');
+}
+
+/**
+ * Выполнить сравнение выбранных снимков и отобразить результат.
+ * @private
+ */
+function _shRunDiff() {
+  var selBefore = document.getElementById('sn-diff-before');
+  var selAfter = document.getElementById('sn-diff-after');
+  if (!selBefore || !selAfter) return;
+
+  var beforeData, afterData;
+
+  if (selBefore.value === 'current') {
+    beforeData = (typeof snBuildSnapshotData === 'function') ? snBuildSnapshotData() : { cards: [], ocContainers: [] };
+  } else {
+    beforeData = _snCachedSnapshots[parseInt(selBefore.value)].data;
+  }
+
+  if (selAfter.value === 'current') {
+    afterData = (typeof snBuildSnapshotData === 'function') ? snBuildSnapshotData() : { cards: [], ocContainers: [] };
+  } else {
+    afterData = _snCachedSnapshots[parseInt(selAfter.value)].data;
+  }
+
+  if (typeof snCompareSnapshots !== 'function') {
+    alert('Функция сравнения не найдена');
+    return;
+  }
+
+  var diff = snCompareSnapshots(beforeData, afterData);
+  var resultEl = document.getElementById('sn-diff-result');
+  if (!resultEl) return;
+
+  if (diff.added.length === 0 && diff.removed.length === 0 && diff.moved.length === 0) {
+    resultEl.innerHTML = '<div style="text-align:center;color:#888;padding:20px">Различий не найдено</div>';
+    return;
+  }
+
+  var html = '';
+
+  if (diff.added.length > 0) {
+    html += '<div class="sn-diff-section">';
+    html += '<div class="sn-diff-title sn-diff-added-title">Добавлено (' + diff.added.length + ')</div>';
+    html += '<div class="sn-diff-files">';
+    for (var a = 0; a < diff.added.length; a++) {
+      html += '<span class="sn-diff-file sn-diff-file-added">' + esc(diff.added[a]) + '</span>';
+    }
+    html += '</div></div>';
+  }
+
+  if (diff.removed.length > 0) {
+    html += '<div class="sn-diff-section">';
+    html += '<div class="sn-diff-title sn-diff-removed-title">Удалено (' + diff.removed.length + ')</div>';
+    html += '<div class="sn-diff-files">';
+    for (var r = 0; r < diff.removed.length; r++) {
+      html += '<span class="sn-diff-file sn-diff-file-removed">' + esc(diff.removed[r]) + '</span>';
+    }
+    html += '</div></div>';
+  }
+
+  if (diff.moved.length > 0) {
+    html += '<div class="sn-diff-section">';
+    html += '<div class="sn-diff-title">Перемещено (' + diff.moved.length + ')</div>';
+    html += '<div class="sn-diff-files">';
+    for (var m = 0; m < diff.moved.length; m++) {
+      var mv = diff.moved[m];
+      var fromLabel = mv.from.location === 'card' ? ('Карточка ' + (mv.from.card + 1)) : ('Контейнер ' + (mv.from.containerName || ''));
+      var toLabel = mv.to.location === 'card' ? ('Карточка ' + (mv.to.card + 1)) : ('Контейнер ' + (mv.to.containerName || ''));
+      html += '<span class="sn-diff-file sn-diff-file-moved">' + esc(mv.file) + ' <span style="color:#888;font-size:10px">' + fromLabel + ' -> ' + toLabel + '</span></span>';
+    }
+    html += '</div></div>';
+  }
+
+  resultEl.innerHTML = html;
 }
 
 /**
@@ -1078,8 +1318,22 @@ function shEnterClientMode() {
 }
 
 /**
+ * Флаг: клиент нажал "Внести изменения" и сейчас редактирует после согласования.
+ * @type {boolean}
+ */
+var _shClientEditMode = false;
+
+/**
+ * Флаг: popup про изменения уже был показан в этой сессии.
+ * @type {boolean}
+ */
+var _shChangesPopupShown = false;
+
+/**
  * Отрисовать панель действий клиента.
- * Две кнопки: "Запросить доп. кадры" и "Согласовать отбор".
+ * - До согласования: "Запросить доп. кадры" + "Согласовать отбор"
+ * - После согласования: "Внести изменения в отбор"
+ * - В режиме редактирования: "Отменить" + "Сохранить изменения"
  */
 function shRenderClientBar() {
   /* Удалить существующую панель если есть */
@@ -1093,14 +1347,42 @@ function shRenderClientBar() {
   bar.id = 'client-action-bar';
   bar.className = 'client-action-bar';
   var role = proj ? (proj._role || 'client') : 'client';
-  var subtitle = role === 'viewer' ? 'Режим просмотра' : 'Просмотрите карточки и примите решение';
+  var isApproved = proj && proj._stageHistory && proj._stageHistory['client_approved'];
   var buttonsHtml = '';
+
   if (role === 'client') {
-    buttonsHtml =
-      '<div class="client-bar-buttons">' +
-        '<button class="btn client-btn-extra" onclick="shClientRequestExtra()">Запросить доп. кадры</button>' +
-        '<button class="btn btn-primary client-btn-approve" onclick="shClientApprove()">Согласовать отбор</button>' +
-      '</div>';
+    if (_shClientEditMode) {
+      /* Режим редактирования после согласования */
+      buttonsHtml =
+        '<div class="client-bar-buttons">' +
+          '<button class="btn client-btn-extra" onclick="shClientCancelEdit()">Отменить изменения</button>' +
+          '<button class="btn btn-primary client-btn-approve" onclick="shClientSubmitChanges()">Сохранить изменения</button>' +
+        '</div>';
+    } else if (isApproved) {
+      /* Уже согласовано — предложить внести изменения */
+      var approvedTime = proj._stageHistory['client_approved'];
+      buttonsHtml =
+        '<div class="client-bar-buttons">' +
+          '<button class="btn client-btn-extra" onclick="shClientRequestExtra()">Запросить доп. кадры</button>' +
+          '<button class="btn btn-primary client-btn-edit" onclick="shClientStartEdit()">Внести изменения в отбор</button>' +
+        '</div>';
+      bar.innerHTML =
+        '<div class="client-bar-info">' +
+          '<div class="client-bar-title">' + (brandName || 'Проект') + '</div>' +
+          '<div class="client-bar-subtitle">Отбор согласован ' + approvedTime + '</div>' +
+        '</div>' +
+        buttonsHtml;
+      var appMain = document.getElementById('app-main');
+      if (appMain) appMain.insertBefore(bar, appMain.firstChild);
+      return;
+    } else {
+      /* Ещё не согласовано — стандартные кнопки */
+      buttonsHtml =
+        '<div class="client-bar-buttons">' +
+          '<button class="btn client-btn-extra" onclick="shClientRequestExtra()">Запросить доп. кадры</button>' +
+          '<button class="btn btn-primary client-btn-approve" onclick="shClientApprove()">Согласовать отбор</button>' +
+        '</div>';
+    }
   } else if (role === 'retoucher') {
     buttonsHtml =
       '<div class="client-bar-buttons">' +
@@ -1108,6 +1390,9 @@ function shRenderClientBar() {
       '</div>';
   }
   /* viewer: no buttons */
+
+  var subtitle = _shClientEditMode ? 'Режим редактирования. Внесите изменения и сохраните.'
+    : (role === 'viewer' ? 'Режим просмотра' : 'Просмотрите карточки и примите решение');
 
   bar.innerHTML =
     '<div class="client-bar-info">' +
@@ -1170,7 +1455,9 @@ function shClientRequestExtra() {
 
 /**
  * Клиент: согласовать отбор.
- * Переводит проект на следующий этап (Цветокоррекция).
+ * 1. Создаёт снимок текущего состояния
+ * 2. Переводит проект на этап 3 (Цветокоррекция)
+ * 3. Обновляет панель (кнопка → "Внести изменения")
  */
 function shClientApprove() {
   var proj = getActiveProject();
@@ -1184,6 +1471,14 @@ function shClientApprove() {
   var timeStr = now.toLocaleDateString('ru-RU') + ' ' + now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
   proj._stageHistory[proj._stage] = timeStr;
   proj._stageHistory['client_approved'] = timeStr;
+
+  /* Создать снимок состояния ПЕРЕД сменой этапа */
+  if (typeof snCreateSnapshot === 'function') {
+    snCreateSnapshot('client', 'client_approved', 'Согласование клиента ' + timeStr, function(err, snapId) {
+      if (err) console.warn('Ошибка создания снимка:', err);
+      else console.log('shClientApprove: снимок создан, id=' + snapId);
+    });
+  }
 
   /* Перейти на этап 3 (Цветокоррекция) */
   proj._stage = 3;
@@ -1201,15 +1496,95 @@ function shClientApprove() {
   shAutoSave();
   alert('Отбор согласован! Фотограф получит уведомление.');
 
-  /* Обновить панель — убрать кнопки */
-  var bar = document.getElementById('client-action-bar');
-  if (bar) {
-    bar.innerHTML =
-      '<div class="client-bar-info">' +
-        '<div class="client-bar-title">Отбор согласован</div>' +
-        '<div class="client-bar-subtitle">Спасибо! Фотограф начнёт цветокоррекцию.</div>' +
-      '</div>';
+  /* Обновить панель — теперь покажет "Внести изменения" */
+  shRenderClientBar();
+}
+
+/**
+ * Клиент: начать редактирование после согласования.
+ * Показывает предупреждение и переводит в режим редактирования.
+ */
+function shClientStartEdit() {
+  var proj = getActiveProject();
+  if (!proj) return;
+
+  /* Показать popup один раз за сессию */
+  if (!_shChangesPopupShown) {
+    _shChangesPopupShown = true;
+    var msg = 'Отбор уже согласован. Вы можете внести изменения, ' +
+      'но после всех доработок необходимо нажать кнопку "Сохранить изменения", ' +
+      'чтобы команда увидела ваши правки.\n\n' +
+      'Если вы просто смотрите — можно ничего не сохранять.';
+    if (!confirm(msg)) return;
   }
+
+  _shClientEditMode = true;
+
+  /* Создать снимок "до редактирования" если ещё не было */
+  if (typeof snCreateSnapshot === 'function') {
+    snCreateSnapshot('client', 'client_edit_start', 'Начало редактирования клиентом', function(err) {
+      if (err) console.warn('Ошибка снимка edit_start:', err);
+    });
+  }
+
+  shRenderClientBar();
+}
+
+/**
+ * Клиент: отменить редактирование (без сохранения).
+ */
+function shClientCancelEdit() {
+  if (!confirm('Отменить все изменения? Карточки вернутся к состоянию на момент согласования.')) return;
+
+  _shClientEditMode = false;
+
+  /* Восстановить из последнего снимка client_approved */
+  /* Пока что просто перезагружаем проект из облака */
+  if (typeof sbPullProject === 'function') {
+    sbPullProject(function() {
+      console.log('shClientCancelEdit: проект перезагружен из облака');
+      if (typeof cpRenderAll === 'function') cpRenderAll();
+      shRenderClientBar();
+    });
+  } else {
+    shRenderClientBar();
+  }
+}
+
+/**
+ * Клиент: сохранить изменения после согласования.
+ * Создаёт снимок "client_changes", синхронизирует с облаком.
+ */
+function shClientSubmitChanges() {
+  var proj = getActiveProject();
+  if (!proj) return;
+
+  if (!confirm('Сохранить изменения в отборе? Команда получит обновлённую версию.')) return;
+
+  var now = new Date();
+  var timeStr = now.toLocaleDateString('ru-RU') + ' ' + now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+
+  /* Записать историю */
+  if (!proj._stageHistory) proj._stageHistory = {};
+  proj._stageHistory['client_changes'] = timeStr;
+
+  /* Создать снимок изменений */
+  if (typeof snCreateSnapshot === 'function') {
+    snCreateSnapshot('client', 'client_changes', 'Изменения клиента ' + timeStr, function(err, snapId) {
+      if (err) console.warn('Ошибка снимка client_changes:', err);
+      else console.log('shClientSubmitChanges: снимок изменений создан, id=' + snapId);
+    });
+  }
+
+  /* Синхронизировать с облаком */
+  if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
+  if (typeof sbSyncStage === 'function') sbSyncStage('client_changes', timeStr);
+
+  shAutoSave();
+  _shClientEditMode = false;
+
+  alert('Изменения сохранены. Команда увидит обновлённый отбор.');
+  shRenderClientBar();
 }
 
 
