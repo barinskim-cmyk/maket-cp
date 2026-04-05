@@ -991,14 +991,26 @@ function _shLightenPreviews(previews) {
   var result = [];
   for (var i = 0; i < previews.length; i++) {
     var pv = previews[i];
-    result.push({
+    var lightPv = {
       name: pv.name,
       path: pv.path || '',
       thumb: pv.thumb || '',
       rating: pv.rating || 0,
       orient: pv.orient || 'v',
       folders: pv.folders || []
-    });
+    };
+    /* Сохраняем мета-информацию о версиях (какие этапы загружены),
+       но без тяжёлых base64 данных -- они в IndexedDB.
+       Формат: versions: {stageId: {thumb: '300px base64'}} -- только thumbs */
+    if (pv.versions) {
+      lightPv.versions = {};
+      for (var sid in pv.versions) {
+        if (pv.versions.hasOwnProperty(sid)) {
+          lightPv.versions[sid] = { thumb: pv.versions[sid].thumb || '' };
+        }
+      }
+    }
+    result.push(lightPv);
   }
   return result;
 }

@@ -489,11 +489,11 @@ function cpDesktopCarousel(slotIdx, dir, e) {
   /* Сохранить для undo */
   if (typeof cpPushUndo === 'function') cpPushUndo();
 
-  /* Обновить данные слота */
+  /* Обновить данные слота (с учётом активной версии превью) */
   slot.file = newPv.name || newPv.stem || '';
-  slot.dataUrl = newPv.preview || newPv.thumb || '';
-  slot.thumbUrl = newPv.thumb || newPv.preview || '';
-  slot.path = newPv.path || '';
+  slot.dataUrl = (typeof pvGetPreview === 'function') ? pvGetPreview(newPv) : (newPv.preview || newPv.thumb || '');
+  slot.thumbUrl = (typeof pvGetThumb === 'function') ? pvGetThumb(newPv) : (newPv.thumb || newPv.preview || '');
+  slot.path = (typeof pvGetPath === 'function') ? pvGetPath(newPv) : (newPv.path || '');
   /* Метка актора + аудит */
   if (typeof sbStampActor === 'function') sbStampActor(slot);
   if (typeof sbLogAction === 'function') {
@@ -1766,10 +1766,11 @@ function cpBindSlotEvents() {
           var pv = JSON.parse(pvData);
           cpSaveHistory();
           slot.file = pv.name;
-          slot.path = pv.path || '';
+          slot.path = (typeof pvGetPath === 'function') ? pvGetPath(pv) : (pv.path || '');
           /* Используем preview (1200px) для карточки, thumb (300px) как фолбэк */
-          slot.dataUrl = pv.preview || pv.thumb;
-          slot.thumbUrl = pv.thumb;
+          /* С учётом активной версии (ЦК/ретушь) */
+          slot.dataUrl = (typeof pvGetPreview === 'function') ? pvGetPreview(pv) : (pv.preview || pv.thumb);
+          slot.thumbUrl = (typeof pvGetThumb === 'function') ? pvGetThumb(pv) : pv.thumb;
           /* Метка актора + аудит */
           if (typeof sbStampActor === 'function') sbStampActor(slot);
           if (typeof sbLogAction === 'function') sbLogAction('add_to_slot', 'card', card.id, card.name, pv.name);
@@ -2616,10 +2617,10 @@ function cpMobileCarousel(cardIdx, slotIdx, dir, e) {
 
   var newPv = nearby[newIdx];
 
-  /* Обновить слот данные */
+  /* Обновить слот данные (с учётом активной версии) */
   slot.file = newPv.name || newPv.stem || '';
-  slot.dataUrl = newPv.preview || newPv.thumb || '';
-  slot.path = newPv.path || '';
+  slot.dataUrl = (typeof pvGetPreview === 'function') ? pvGetPreview(newPv) : (newPv.preview || newPv.thumb || '');
+  slot.path = (typeof pvGetPath === 'function') ? pvGetPath(newPv) : (newPv.path || '');
   if (typeof sbStampActor === 'function') sbStampActor(slot);
   if (typeof sbLogAction === 'function') sbLogAction('add_to_slot', 'card', card.id, card.name, slot.file);
 
@@ -3093,8 +3094,8 @@ function cpMobileAutoFillSlot(cardIdx, slotIdx) {
   if (!newPv) return;
 
   slot.file = newPv.name || newPv.stem || '';
-  slot.dataUrl = newPv.preview || newPv.thumb || '';
-  slot.path = newPv.path || '';
+  slot.dataUrl = (typeof pvGetPreview === 'function') ? pvGetPreview(newPv) : (newPv.preview || newPv.thumb || '');
+  slot.path = (typeof pvGetPath === 'function') ? pvGetPath(newPv) : (newPv.path || '');
 
   if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
   if (typeof shAutoSave === 'function') shAutoSave();

@@ -5,12 +5,16 @@
      Desktop (pywebview): Python сканирует папку, Pillow генерирует миниатюры
      Browser (фолбэк):    FileReader + canvas на клиенте
 
-   Модель данных превью: {name, path, thumb, rating, folders}
-     name    — имя файла
-     path    — путь к оригиналу (desktop) или "" (browser)
-     thumb   — base64 миниатюра для отображения
-     rating  — рейтинг 0–5 (0 = без рейтинга)
-     folders — массив имён папок-источников (дедупликация по имени файла)
+   Модель данных превью: {name, path, thumb, rating, folders, versions}
+     name     — имя файла
+     path     — путь к оригиналу (desktop) или "" (browser)
+     thumb    — base64 миниатюра для отображения (дефолтная версия)
+     preview  — 1200px превью для карточек (дефолтная версия)
+     rating   — рейтинг 0–5 (0 = без рейтинга)
+     folders  — массив имён папок-источников (дедупликация по имени файла)
+     versions — {stageId: {thumb, preview, path}} — версии превью по этапам пайплайна
+                Этапы: 'preselect' (RAW), 'color' (ЦК), 'retouch' (Ретушь)
+                Дефолтные thumb/preview = версия активного этапа
 
    Для слотов карточек:
      Desktop: хранит {file, path}, полное изображение грузится через get_full_image
@@ -27,6 +31,18 @@ var PV_RENDER_BATCH = 60;
 var PV_FILTER = { 'pv': 0, 'oc-pv': 0 };
 // Текущий фильтр по папке: '' = все
 var PV_FOLDER_FILTER = { 'pv': '', 'oc-pv': '' };
+
+// ── Версии превью (по этапам пайплайна) ──
+// Этапы, для которых можно загружать отдельные версии превью
+var PV_VERSION_STAGES = [
+  { id: 'preselect', label: 'RAW' },
+  { id: 'color',     label: 'ЦК' },
+  { id: 'retouch',   label: 'Ретушь' }
+];
+// Текущая активная версия для просмотра: '' = дефолт (последняя загруженная)
+var PV_ACTIVE_VERSION = '';
+// Этап, выбранный для следующей загрузки папки ('' = обычная загрузка RAW)
+var _pvLoadAsStage = '';
 
 
 // ══════════════════════════════════════════════
@@ -80,7 +96,7 @@ function pvDbSavePreviews(projKey, previews) {
       for (var i = 0; i < previews.length; i++) {
         var pv = previews[i];
         var key = projKey + '/' + pv.name;
-        store.put({
+        var saveObj = {
           name: pv.name,
           path: pv.path || '',
           thumb: pv.thumb || '',
@@ -88,7 +104,10 @@ function pvDbSavePreviews(projKey, previews) {
           rating: pv.rating || 0,
           orient: pv.orient || 'v',
           folders: pv.folders || []
-        }, key);
+        };
+        /* Сохраняем версии превью если есть */
+        if (pv.versions) saveObj.versions = pv.versions;
+        store.put(saveObj, key);
       }
     } catch(e) {
       console.warn('pvDbSavePreviews:', e);
@@ -219,6 +238,146 @@ function pvGetFolders() {
   return Object.keys(map).sort();
 }
 
+// ══════════════════════════════════════════════
+//  Версии превью: helpers
+//  Каждое превью может хранить versions = {stageId: {thumb, preview, path}}
+//  pvGetThumb/pvGetPreview возвращают данные для активной версии
+// ══════════════════════════════════════════════
+
+/**
+ * Получить thumb для превью с учётом активной версии.
+ * Если у превью есть versions[activeVersion], вернуть его thumb.
+ * Иначе — дефолтный thumb превью.
+ * @param {Object} pv — объект превью
+ * @returns {string} base64 или URL thumb
+ */
+function pvGetThumb(pv) {
+  if (PV_ACTIVE_VERSION && pv.versions && pv.versions[PV_ACTIVE_VERSION]) {
+    return pv.versions[PV_ACTIVE_VERSION].thumb || pv.thumb;
+  }
+  return pv.thumb;
+}
+
+/**
+ * Получить preview (1200px) для превью с учётом активной версии.
+ * @param {Object} pv — объект превью
+ * @returns {string} base64 или URL preview
+ */
+function pvGetPreview(pv) {
+  if (PV_ACTIVE_VERSION && pv.versions && pv.versions[PV_ACTIVE_VERSION]) {
+    return pv.versions[PV_ACTIVE_VERSION].preview || pv.versions[PV_ACTIVE_VERSION].thumb || pv.preview || pv.thumb;
+  }
+  return pv.preview || pv.thumb;
+}
+
+/**
+ * Получить path для превью с учётом активной версии.
+ * @param {Object} pv — объект превью
+ * @returns {string} путь к файлу
+ */
+function pvGetPath(pv) {
+  if (PV_ACTIVE_VERSION && pv.versions && pv.versions[PV_ACTIVE_VERSION]) {
+    return pv.versions[PV_ACTIVE_VERSION].path || pv.path || '';
+  }
+  return pv.path || '';
+}
+
+/**
+ * Проверить, есть ли у превью версия для указанного этапа.
+ * @param {Object} pv — объект превью
+ * @param {string} stageId — id этапа (напр. 'color', 'retouch')
+ * @returns {boolean}
+ */
+function pvHasVersion(pv, stageId) {
+  return !!(pv.versions && pv.versions[stageId]);
+}
+
+/**
+ * Получить список этапов, для которых у проекта загружены хотя бы одно превью.
+ * @returns {Array} массив stage id
+ */
+function pvGetLoadedVersions() {
+  var store = pvGetStore();
+  var stages = {};
+  for (var i = 0; i < store.length; i++) {
+    var pv = store[i];
+    if (pv.versions) {
+      for (var sid in pv.versions) {
+        if (pv.versions.hasOwnProperty(sid)) stages[sid] = true;
+      }
+    }
+  }
+  return Object.keys(stages);
+}
+
+/**
+ * Посчитать сколько превью НЕ имеют версии для указанного этапа.
+ * Полезно для показа "не хватает 12 фото для ретуши".
+ * @param {string} stageId — id этапа
+ * @returns {{total: number, missing: number, loaded: number}}
+ */
+function pvVersionStats(stageId) {
+  var store = pvGetStore();
+  var total = store.length;
+  var loaded = 0;
+  for (var i = 0; i < store.length; i++) {
+    if (pvHasVersion(store[i], stageId)) loaded++;
+  }
+  return { total: total, missing: total - loaded, loaded: loaded };
+}
+
+/**
+ * Переключить активную версию и перерисовать.
+ * @param {string} stageId — id этапа или '' для дефолта
+ */
+function pvSetVersion(stageId) {
+  PV_ACTIVE_VERSION = stageId || '';
+  pvRenderAll();
+  /* Обновить dataUrl слотов карточек для новой версии */
+  pvUpdateCardSlotsForVersion();
+}
+
+/**
+ * Обновить dataUrl всех заполненных слотов карточек для активной версии.
+ * Когда пользователь переключает версию (RAW→ЦК→Ретушь),
+ * карточки должны показывать соответствующие превью.
+ */
+function pvUpdateCardSlotsForVersion() {
+  var proj = getActiveProject();
+  if (!proj || !proj.cards || !proj.previews) return;
+
+  /* Строим карту превью по имени */
+  var pvMap = {};
+  for (var p = 0; p < proj.previews.length; p++) {
+    pvMap[proj.previews[p].name] = proj.previews[p];
+  }
+
+  var changed = false;
+  for (var c = 0; c < proj.cards.length; c++) {
+    var card = proj.cards[c];
+    if (!card.slots) continue;
+    for (var s = 0; s < card.slots.length; s++) {
+      var slot = card.slots[s];
+      if (!slot.file || !pvMap[slot.file]) continue;
+      var pv = pvMap[slot.file];
+      var newPreview = pvGetPreview(pv);
+      var newThumb = pvGetThumb(pv);
+      var newPath = pvGetPath(pv);
+      if (newPreview && slot.dataUrl !== newPreview) {
+        slot.dataUrl = newPreview;
+        slot.thumbUrl = newThumb;
+        if (newPath) slot.path = newPath;
+        changed = true;
+      }
+    }
+  }
+
+  /* Перерисовать карточки если что-то изменилось */
+  if (changed && typeof cpRenderLayout === 'function') {
+    cpRenderLayout();
+  }
+}
+
 // ── Определение режима ──
 
 function pvHasBackend() {
@@ -267,6 +426,26 @@ function pvUsedInCards() {
 // ══════════════════════════════════════════════
 
 function pvPickFolder() {
+  _pvLoadAsStage = '';
+  pvPickFolderInternal();
+}
+
+/**
+ * Загрузить папку как версию для определённого этапа пайплайна.
+ * Вызывается из селекта в тулбаре: "Загрузить ЦК версию" / "Загрузить ретушь версию".
+ * @param {string} stageId — id этапа ('color', 'retouch')
+ */
+function pvPickFolderAs(stageId) {
+  if (!stageId) return;
+  _pvLoadAsStage = stageId;
+  pvPickFolderInternal();
+}
+
+/**
+ * Внутренняя функция: запуск сканирования папки.
+ * _pvLoadAsStage определяет как будет сохранена загрузка.
+ */
+function pvPickFolderInternal() {
   var proj = getActiveProject();
   if (!proj) { alert('Сначала создайте или откройте съёмку'); return; }
 
@@ -298,6 +477,10 @@ window.onPreviewDone = function(data) {
   var folderPath = data.folder || '';
   var folderLabel = pvFolderName(folderPath);
 
+  /* Определяем: это загрузка версии (ЦК/ретушь) или обычная загрузка RAW? */
+  var loadStage = _pvLoadAsStage || '';
+  _pvLoadAsStage = ''; /* Сбросить после использования */
+
   // Индекс существующих превью по имени
   var existingMap = {};
   for (var k = 0; k < proj.previews.length; k++) {
@@ -305,33 +488,81 @@ window.onPreviewDone = function(data) {
   }
 
   var items = data.items || [];
+  var versionCount = 0; /* счётчик добавленных версий */
 
   for (var i = 0; i < items.length; i++) {
     var incoming = items[i];
-    if (existingMap.hasOwnProperty(incoming.name)) {
-      // Дубликат: обновляем рейтинг + добавляем папку
+
+    if (loadStage && existingMap.hasOwnProperty(incoming.name)) {
+      /* ── Загрузка версии: матчим по имени, записываем в versions ── */
       var idx = existingMap[incoming.name];
       var pv = proj.previews[idx];
+      if (!pv.versions) pv.versions = {};
+      pv.versions[loadStage] = {
+        thumb: incoming.thumb,
+        preview: incoming.preview || '',
+        path: incoming.path || ''
+      };
+      /* Также обновляем рейтинг если он есть */
       if (incoming.rating && incoming.rating > 0) {
         pv.rating = incoming.rating;
       }
-      if (!pv.folders) pv.folders = [];
-      if (folderLabel && pv.folders.indexOf(folderLabel) < 0) {
-        pv.folders.push(folderLabel);
+      versionCount++;
+
+    } else if (loadStage && !existingMap.hasOwnProperty(incoming.name)) {
+      /* Загрузка версии, но такого фото нет в проекте — пропускаем
+         (нельзя добавить ЦК-версию без базового RAW-превью) */
+      console.warn('pvVersion: пропущен ' + incoming.name + ' — нет в проекте (RAW)');
+
+    } else if (existingMap.hasOwnProperty(incoming.name)) {
+      /* ── Обычная загрузка: дубликат — обновляем рейтинг + папку ── */
+      var idx2 = existingMap[incoming.name];
+      var pv2 = proj.previews[idx2];
+      if (incoming.rating && incoming.rating > 0) {
+        pv2.rating = incoming.rating;
       }
+      if (!pv2.folders) pv2.folders = [];
+      if (folderLabel && pv2.folders.indexOf(folderLabel) < 0) {
+        pv2.folders.push(folderLabel);
+      }
+      /* Миграция: первая загрузка = версия preselect */
+      if (!pv2.versions) pv2.versions = {};
+      if (!pv2.versions.preselect) {
+        pv2.versions.preselect = {
+          thumb: pv2.thumb,
+          preview: pv2.preview || '',
+          path: pv2.path || ''
+        };
+      }
+
     } else {
-      /* orient: определяем по w/h из backend (desktop) */
+      /* ── Обычная загрузка: новое фото ── */
       var pvOrient = (incoming.w && incoming.h && incoming.w > incoming.h) ? 'h' : 'v';
-      proj.previews.push({
+      var newPv = {
         name: incoming.name,
         path: incoming.path,
         thumb: incoming.thumb,
         preview: incoming.preview || '',
         rating: incoming.rating || 0,
         orient: pvOrient,
-        folders: folderLabel ? [folderLabel] : []
-      });
+        folders: folderLabel ? [folderLabel] : [],
+        versions: {
+          preselect: {
+            thumb: incoming.thumb,
+            preview: incoming.preview || '',
+            path: incoming.path || ''
+          }
+        }
+      };
+      proj.previews.push(newPv);
     }
+  }
+
+  /* Лог для отладки */
+  if (loadStage) {
+    console.log('pvVersion: загружено ' + versionCount + ' версий для этапа "' + loadStage + '"');
+    /* Автоматически переключаем на загруженную версию */
+    PV_ACTIVE_VERSION = loadStage;
   }
 
   // Запоминаем путь к папке превью
@@ -678,11 +909,15 @@ function pvRenderPanel(galleryId, toolbarId, countId, dropzoneId) {
   var folderFilterEl = document.getElementById(folderFilterId);
   var folderFilter = PV_FOLDER_FILTER[panelKey] || '';
 
+  // Версии превью (только для основной панели)
+  var versionBarEl = (panelKey === 'pv') ? document.getElementById('pv-version-bar') : null;
+
   if (allStore.length === 0) {
     gallery.innerHTML = '';
     if (toolbar) toolbar.style.display = 'none';
     if (filterEl) filterEl.style.display = 'none';
     if (folderFilterEl) folderFilterEl.style.display = 'none';
+    if (versionBarEl) versionBarEl.style.display = 'none';
     if (dropzone) { dropzone.style.display = ''; dropzone.classList.remove('pv-compact'); }
     return;
   }
@@ -707,6 +942,17 @@ function pvRenderPanel(galleryId, toolbarId, countId, dropzoneId) {
       pvRenderFolderSelect(panelKey, folders, folderFilter);
     } else {
       folderFilterEl.style.display = 'none';
+    }
+  }
+
+  // Рендер панели версий (только если есть загруженные версии)
+  if (versionBarEl) {
+    var loadedVersions = pvGetLoadedVersions();
+    if (loadedVersions.length > 1 || (loadedVersions.length === 1 && loadedVersions[0] !== 'preselect')) {
+      versionBarEl.style.display = '';
+      pvRenderVersionBar(loadedVersions);
+    } else {
+      versionBarEl.style.display = 'none';
     }
   }
 
@@ -779,8 +1025,14 @@ function pvBuildHTML(store, used, from, to) {
     var rating = pv.rating || 0;
     /* orient может не быть у старых данных — фолбэк по thumb (img.src) */
     var orientCls = (pv.orient === 'h') ? ' pv-h' : '';
-    html += '<div class="pv-thumb' + orientCls + (inCard ? ' pv-in-card' : '') + '" draggable="true" data-pv-name="' + esc(pv.name) + '" data-pv-idx="' + i + '" title="' + esc(pv.name) + '" onclick="pvShowFullscreen(' + i + ',event)">';
-    html += '<img src="' + pv.thumb + '" loading="lazy">';
+    /* Получить thumb для активной версии */
+    var thumbSrc = pvGetThumb(pv);
+    /* Индикатор отсутствия версии для активного этапа */
+    var noVersion = (PV_ACTIVE_VERSION && !pvHasVersion(pv, PV_ACTIVE_VERSION));
+
+    html += '<div class="pv-thumb' + orientCls + (inCard ? ' pv-in-card' : '') + '" draggable="true" data-pv-name="' + esc(pv.name) + '" data-pv-idx="' + i + '" title="' + esc(pv.name) + (noVersion ? ' [нет версии ' + PV_ACTIVE_VERSION + ']' : '') + '" onclick="pvShowFullscreen(' + i + ',event)">';
+    html += '<img src="' + thumbSrc + '" loading="lazy">';
+    if (noVersion) html += '<span class="pv-no-version"></span>';
     if (inCard) html += '<span class="pv-check"></span>';
     html += '<button class="pv-zoom" onclick="pvShowFullscreen(' + i + ',event)" title="На весь экран"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>';
     html += '<button class="pv-remove" onclick="pvRemoveByName(\'' + esc(pv.name).replace(/'/g, "\\'") + '\',event)">&times;</button>';
@@ -850,7 +1102,8 @@ function _pvLbOpenDesktop() {
   var pv = _pvLbList[_pvLbIdx];
   if (!pv) return;
 
-  var src = pv.preview || pv.thumb || pv.dataUrl || '';
+  /* Используем активную версию для лайтбокса */
+  var src = pvGetPreview(pv) || pv.dataUrl || '';
   if (!src) return;
 
   var isInOC = _pvIsInOtherContent(pv.name);
@@ -1026,7 +1279,7 @@ function _pvLbMobBuildPanels(scroller) {
     panel.className = 'pv-lb-panel';
 
     var img = document.createElement('img');
-    img.src = p ? (p.preview || p.thumb || p.dataUrl || '') : '';
+    img.src = p ? (pvGetPreview(p) || p.dataUrl || '') : '';
 
     /* Горизонт → развернуть на 90° в вертикаль */
     var isLandscape = p && (p.orient === 'h' ||
@@ -1365,6 +1618,83 @@ function pvSetFolderFilter(panelKey, folderName) {
   pvRenderAll();
 }
 
+// ══════════════════════════════════════════════
+//  Рендер панели версий превью
+// ══════════════════════════════════════════════
+
+/**
+ * Отрисовать панель переключения версий.
+ * Показывает кнопки для каждой загруженной версии + статистику.
+ * @param {Array} loadedVersions — массив stage id с загруженными версиями
+ */
+function pvRenderVersionBar(loadedVersions) {
+  var switcherEl = document.getElementById('pv-version-switcher');
+  var statsEl = document.getElementById('pv-version-stats');
+  if (!switcherEl) return;
+
+  /* Кнопки переключения */
+  var html = '';
+  /* Кнопка "Все" (без фильтра версий) */
+  html += '<button class="pv-version-btn' + (!PV_ACTIVE_VERSION ? ' active' : '') + '" onclick="pvSetVersion(\'\')" title="Показать дефолтные превью">Все</button>';
+
+  for (var i = 0; i < PV_VERSION_STAGES.length; i++) {
+    var vs = PV_VERSION_STAGES[i];
+    /* Показываем кнопку только если для этого этапа есть хотя бы одно превью */
+    if (loadedVersions.indexOf(vs.id) < 0) continue;
+    var isActive = (PV_ACTIVE_VERSION === vs.id);
+    html += '<button class="pv-version-btn' + (isActive ? ' active' : '') + '" onclick="pvSetVersion(\'' + vs.id + '\')" title="Показать версию: ' + vs.label + '">' + vs.label + '</button>';
+  }
+  switcherEl.innerHTML = html;
+
+  /* Статистика для активной версии */
+  if (statsEl) {
+    if (PV_ACTIVE_VERSION) {
+      var stats = pvVersionStats(PV_ACTIVE_VERSION);
+      var label = '';
+      for (var j = 0; j < PV_VERSION_STAGES.length; j++) {
+        if (PV_VERSION_STAGES[j].id === PV_ACTIVE_VERSION) { label = PV_VERSION_STAGES[j].label; break; }
+      }
+      if (stats.missing > 0) {
+        statsEl.innerHTML = label + ': ' + stats.loaded + '/' + stats.total + ' <span class="pv-vs-missing">(не хватает ' + stats.missing + ')</span>';
+      } else {
+        statsEl.innerHTML = label + ': ' + stats.loaded + '/' + stats.total + ' -- все загружены';
+      }
+    } else {
+      statsEl.innerHTML = '';
+    }
+  }
+}
+
+/**
+ * Обработчик выбора в селекте "Загрузить версию".
+ * Привязывается к элементу pv-load-version-select.
+ * @param {HTMLSelectElement} sel — элемент select
+ */
+function pvOnLoadVersionSelect(sel) {
+  var stageId = sel.value;
+  sel.value = ''; /* Сбросить селект */
+  if (!stageId) return;
+
+  /* Найти label для красивого сообщения */
+  var label = stageId;
+  for (var i = 0; i < PV_VERSION_STAGES.length; i++) {
+    if (PV_VERSION_STAGES[i].id === stageId) { label = PV_VERSION_STAGES[i].label; break; }
+  }
+
+  var proj = getActiveProject();
+  if (!proj || !proj.previews || proj.previews.length === 0) {
+    alert('Сначала загрузите RAW-превью');
+    return;
+  }
+
+  /* Подтверждение */
+  if (!confirm('Выберите папку с версией "' + label + '".\n\nФайлы будут сопоставлены по имени с текущими превью.')) {
+    return;
+  }
+
+  pvPickFolderAs(stageId);
+}
+
 // ── Удаление по имени (стабильное) ──
 
 function pvRemoveByName(name, e) {
@@ -1417,7 +1747,14 @@ function pvBindDragFromGallery(gallery) {
       }
       if (!pv) return;
 
-      var payload = { name: pv.name, path: pv.path || '', thumb: pv.thumb, preview: pv.preview || '' };
+      /* Payload для drag: используем активную версию превью */
+      var payload = {
+        name: pv.name,
+        path: pvGetPath(pv),
+        thumb: pvGetThumb(pv),
+        preview: pvGetPreview(pv),
+        versions: pv.versions || null
+      };
       e.dataTransfer.setData('application/x-preview', JSON.stringify(payload));
       e.dataTransfer.effectAllowed = 'copy';
       this.classList.add('pv-dragging');
