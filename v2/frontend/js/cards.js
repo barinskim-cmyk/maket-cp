@@ -1797,6 +1797,98 @@ function cpBindSlotEvents() {
 document.addEventListener('dragover', function(e) { e.preventDefault(); });
 document.addEventListener('drop', function(e) { e.preventDefault(); });
 
+/**
+ * Full-area drop zone: при перетаскивании файлов в окно показывает
+ * полноэкранную зону, файлы попадают в пул превью текущего проекта.
+ * Особенно полезно когда превью ещё не загружены и дропзона маленькая.
+ */
+(function() {
+  var overlay = null;
+  var hideTimer = null;
+
+  function getOverlay() {
+    if (overlay) return overlay;
+    overlay = document.createElement('div');
+    overlay.id = 'cp-fullscreen-drop';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;' +
+      'background:rgba(0,0,0,0.25);z-index:9999;display:none;' +
+      'align-items:center;justify-content:center;pointer-events:all';
+    overlay.innerHTML = '<div style="background:#fff;border-radius:12px;padding:40px 60px;' +
+      'box-shadow:0 8px 32px rgba(0,0,0,0.2);text-align:center">' +
+      '<div style="font-size:18px;font-weight:600;margin-bottom:8px">Перетащите фото сюда</div>' +
+      '<div style="font-size:13px;color:#888">Файлы или папка с фотографиями</div></div>';
+    document.body.appendChild(overlay);
+
+    overlay.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+    });
+    overlay.addEventListener('dragleave', function(e) {
+      /* Скрыть только если курсор вышел за пределы overlay */
+      if (e.relatedTarget && overlay.contains(e.relatedTarget)) return;
+      hideOverlay();
+    });
+    overlay.addEventListener('drop', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      hideOverlay();
+
+      /* Направить файлы в dropzone превью */
+      var dz = document.getElementById('pv-dropzone');
+      if (dz) {
+        /* Синтетический drop-event на дропзону */
+        var synth = new DragEvent('drop', {
+          dataTransfer: e.dataTransfer,
+          bubbles: true, cancelable: true
+        });
+        dz.dispatchEvent(synth);
+      }
+    });
+    return overlay;
+  }
+
+  function showOverlay() {
+    var el = getOverlay();
+    el.style.display = 'flex';
+    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+  }
+
+  function hideOverlay() {
+    if (overlay) overlay.style.display = 'none';
+    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+  }
+
+  var enterCount = 0;
+  document.addEventListener('dragenter', function(e) {
+    /* Показать только для файлов из ОС, не для внутренних drag */
+    if (!e.dataTransfer || !e.dataTransfer.types) return;
+    var hasFiles = false;
+    for (var i = 0; i < e.dataTransfer.types.length; i++) {
+      if (e.dataTransfer.types[i] === 'Files') { hasFiles = true; break; }
+    }
+    if (!hasFiles) return;
+    /* Не показывать если уже внутри приложения (drag из галереи) */
+    if (e.dataTransfer.types.indexOf('application/x-preview') >= 0) return;
+
+    enterCount++;
+    if (enterCount === 1) showOverlay();
+  });
+
+  document.addEventListener('dragleave', function(e) {
+    enterCount--;
+    if (enterCount <= 0) {
+      enterCount = 0;
+      /* Задержка чтобы не мерцало при переходе между элементами */
+      hideTimer = setTimeout(hideOverlay, 100);
+    }
+  });
+
+  document.addEventListener('drop', function() {
+    enterCount = 0;
+    hideOverlay();
+  });
+})();
+
 
 // ══════════════════════════════════════════════
 //  History / Undo
