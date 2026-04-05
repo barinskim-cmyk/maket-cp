@@ -804,26 +804,42 @@ function sbDownloadProject(cloudId, callback) {
 function sbListProjects(callback) {
   if (!sbIsLoggedIn()) { callback('Не авторизован'); return; }
 
-  /* Загружаем ВСЕ проекты, доступные пользователю (RLS обеспечивает фильтрацию):
-     - owner_id = auth.uid() (свои)
-     - project_members (приглашённые)
-     - team_members через team_id (командные)
-     Поэтому не фильтруем по owner_id — полагаемся на RLS. */
+  /* 1. Свои проекты (надёжный запрос по owner_id) */
   sbClient.from('projects')
-    .select('id, brand, shoot_date, stage, updated_at, deleted_at, owner_id, team_id')
+    .select('id, brand, shoot_date, stage, updated_at, deleted_at')
+    .eq('owner_id', sbUser.id)
     .order('updated_at', { ascending: false })
     .then(function(res) {
-      if (res.error) callback(res.error.message, []);
-      else {
-        /* Отметить чужие проекты флагом _shared */
-        var data = res.data || [];
-        for (var i = 0; i < data.length; i++) {
-          if (data[i].owner_id !== sbUser.id) {
-            data[i]._shared = true;
+      if (res.error) { callback(res.error.message, []); return; }
+      var own = res.data || [];
+
+      /* 2. Проекты, в которые меня пригласили (через project_members) */
+      sbClient.from('project_members')
+        .select('project_id, role, projects(id, brand, shoot_date, stage, updated_at, deleted_at)')
+        .eq('user_id', sbUser.id)
+        .then(function(res2) {
+          var shared = [];
+          if (!res2.error && res2.data) {
+            for (var i = 0; i < res2.data.length; i++) {
+              var pm = res2.data[i];
+              if (pm.projects) {
+                var p = pm.projects;
+                p._shared = true;
+                p._memberRole = pm.role;
+                shared.push(p);
+              }
+            }
           }
-        }
-        callback(null, data);
-      }
+
+          /* 3. Объединить, исключить дубликаты */
+          var ownIds = {};
+          for (var j = 0; j < own.length; j++) { ownIds[own[j].id] = true; }
+          var merged = own.slice();
+          for (var k = 0; k < shared.length; k++) {
+            if (!ownIds[shared[k].id]) merged.push(shared[k]);
+          }
+          callback(null, merged);
+        });
     });
 }
 
