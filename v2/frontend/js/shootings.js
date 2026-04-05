@@ -860,6 +860,17 @@ function _shBuildSavePayload(aggressive) {
     for (var key in proj) {
       if (!proj.hasOwnProperty(key)) continue;
       if (key === 'previews' || key === 'otherContent') continue;
+      /* Контейнеры: сохраняем структуру, но без base64 (восстановим из превью) */
+      if (key === 'ocContainers' && proj.ocContainers) {
+        light.ocContainers = proj.ocContainers.map(function(cnt) {
+          return {
+            id: cnt.id,
+            name: cnt.name,
+            items: (cnt.items || []).map(function(it) { return { name: it.name }; })
+          };
+        });
+        continue;
+      }
       if (key === '_history') continue;
       if (key === '_cloudClean') continue; /* не сохранять — при рестарте грузим из облака заново */
       light[key] = proj[key];
@@ -957,6 +968,24 @@ function shLoadAutoSaved() {
         }
       }
       if (!proj.previews) proj.previews = [];
+
+      /* Восстановить ocContainers: обогатить items thumb/preview из превью */
+      if (proj.ocContainers && proj.previews.length > 0) {
+        var pvMap = {};
+        for (var pi = 0; pi < proj.previews.length; pi++) {
+          pvMap[proj.previews[pi].name] = proj.previews[pi];
+        }
+        for (var ci = 0; ci < proj.ocContainers.length; ci++) {
+          var items = proj.ocContainers[ci].items || [];
+          for (var ii = 0; ii < items.length; ii++) {
+            if (!items[ii].thumb && pvMap[items[ii].name]) {
+              items[ii].thumb = pvMap[items[ii].name].thumb || '';
+              items[ii].preview = pvMap[items[ii].name].preview || '';
+            }
+          }
+        }
+      }
+      if (!proj.ocContainers) proj.ocContainers = [];
 
       App.projects.push(proj);
     }
