@@ -804,42 +804,15 @@ function sbDownloadProject(cloudId, callback) {
 function sbListProjects(callback) {
   if (!sbIsLoggedIn()) { callback('Не авторизован'); return; }
 
-  /* 1. Свои проекты (надёжный запрос по owner_id) */
+  /* Свои проекты по owner_id (надёжный запрос без project_members).
+     Shared-проекты подтянутся отдельно когда RLS-рекурсия будет решена. */
   sbClient.from('projects')
     .select('id, brand, shoot_date, stage, updated_at, deleted_at')
     .eq('owner_id', sbUser.id)
     .order('updated_at', { ascending: false })
     .then(function(res) {
-      if (res.error) { callback(res.error.message, []); return; }
-      var own = res.data || [];
-
-      /* 2. Проекты, в которые меня пригласили (через project_members) */
-      sbClient.from('project_members')
-        .select('project_id, role, projects(id, brand, shoot_date, stage, updated_at, deleted_at)')
-        .eq('user_id', sbUser.id)
-        .then(function(res2) {
-          var shared = [];
-          if (!res2.error && res2.data) {
-            for (var i = 0; i < res2.data.length; i++) {
-              var pm = res2.data[i];
-              if (pm.projects) {
-                var p = pm.projects;
-                p._shared = true;
-                p._memberRole = pm.role;
-                shared.push(p);
-              }
-            }
-          }
-
-          /* 3. Объединить, исключить дубликаты */
-          var ownIds = {};
-          for (var j = 0; j < own.length; j++) { ownIds[own[j].id] = true; }
-          var merged = own.slice();
-          for (var k = 0; k < shared.length; k++) {
-            if (!ownIds[shared[k].id]) merged.push(shared[k]);
-          }
-          callback(null, merged);
-        });
+      if (res.error) callback(res.error.message, []);
+      else callback(null, res.data || []);
     });
 }
 
@@ -2131,18 +2104,18 @@ function sbRestoreCosToDesktop(cosStoragePath, photoStem, callback) {
  * @param {function(err, {owned: object|null, memberOf: Array})} callback
  */
 function sbLoadTeams(callback) {
-  if (!_sb) { callback('SDK not initialized'); return; }
+  if (!sbClient) { callback('SDK not initialized'); return; }
 
   var result = { owned: null, memberOf: [] };
 
   /* Команда, которой я владею (одна) */
-  _sb.from('teams').select('*').eq('owner_id', sbCurrentUserId())
+  sbClient.from('teams').select('*').eq('owner_id', sbCurrentUserId())
     .then(function(res) {
       if (res.error) { callback(res.error.message); return; }
       result.owned = (res.data && res.data.length > 0) ? res.data[0] : null;
 
       /* Команды, в которых я участник */
-      _sb.from('team_members').select('team_id, role, teams(id, name, owner_id, profiles!teams_owner_id_fkey(email, name))')
+      sbClient.from('team_members').select('team_id, role, teams(id, name, owner_id, profiles!teams_owner_id_fkey(email, name))')
         .eq('user_id', sbCurrentUserId())
         .then(function(res2) {
           if (res2.error) { callback(res2.error.message); return; }
@@ -2158,9 +2131,9 @@ function sbLoadTeams(callback) {
  * @param {function(err, team)} callback
  */
 function sbCreateTeam(name, callback) {
-  if (!_sb) { callback('SDK not initialized'); return; }
+  if (!sbClient) { callback('SDK not initialized'); return; }
 
-  _sb.from('teams').insert({ name: name, owner_id: sbCurrentUserId() })
+  sbClient.from('teams').insert({ name: name, owner_id: sbCurrentUserId() })
     .select().single()
     .then(function(res) {
       if (res.error) { callback(res.error.message); return; }
@@ -2175,9 +2148,9 @@ function sbCreateTeam(name, callback) {
  * @param {function(err)} callback
  */
 function sbRenameTeam(teamId, newName, callback) {
-  if (!_sb) { callback('SDK not initialized'); return; }
+  if (!sbClient) { callback('SDK not initialized'); return; }
 
-  _sb.from('teams').update({ name: newName }).eq('id', teamId)
+  sbClient.from('teams').update({ name: newName }).eq('id', teamId)
     .then(function(res) {
       callback(res.error ? res.error.message : null);
     });
@@ -2189,9 +2162,9 @@ function sbRenameTeam(teamId, newName, callback) {
  * @param {function(err, Array)} callback
  */
 function sbLoadTeamMembers(teamId, callback) {
-  if (!_sb) { callback('SDK not initialized'); return; }
+  if (!sbClient) { callback('SDK not initialized'); return; }
 
-  _sb.from('team_members')
+  sbClient.from('team_members')
     .select('user_id, role, joined_at, profiles(email, name)')
     .eq('team_id', teamId)
     .then(function(res) {
@@ -2208,9 +2181,9 @@ function sbLoadTeamMembers(teamId, callback) {
  * @param {function(err, result)} callback - result: {status, user_id, email, name}
  */
 function sbInviteToTeam(teamId, email, role, callback) {
-  if (!_sb) { callback('SDK not initialized'); return; }
+  if (!sbClient) { callback('SDK not initialized'); return; }
 
-  _sb.rpc('invite_to_team', {
+  sbClient.rpc('invite_to_team', {
     p_team_id: teamId,
     p_email: email.trim().toLowerCase(),
     p_role: role || 'member'
@@ -2227,9 +2200,9 @@ function sbInviteToTeam(teamId, email, role, callback) {
  * @param {function(err)} callback
  */
 function sbRemoveTeamMember(teamId, userId, callback) {
-  if (!_sb) { callback('SDK not initialized'); return; }
+  if (!sbClient) { callback('SDK not initialized'); return; }
 
-  _sb.from('team_members')
+  sbClient.from('team_members')
     .delete()
     .eq('team_id', teamId)
     .eq('user_id', userId)
@@ -2245,9 +2218,9 @@ function sbRemoveTeamMember(teamId, userId, callback) {
  * @param {function(err)} callback
  */
 function sbSetProjectTeam(projectCloudId, teamId, callback) {
-  if (!_sb) { callback('SDK not initialized'); return; }
+  if (!sbClient) { callback('SDK not initialized'); return; }
 
-  _sb.from('projects').update({ team_id: teamId }).eq('id', projectCloudId)
+  sbClient.from('projects').update({ team_id: teamId }).eq('id', projectCloudId)
     .then(function(res) {
       callback(res.error ? res.error.message : null);
     });
@@ -2261,9 +2234,9 @@ function sbSetProjectTeam(projectCloudId, teamId, callback) {
  * @param {function(err, result)} callback
  */
 function sbInviteToProject(projectCloudId, email, role, callback) {
-  if (!_sb) { callback('SDK not initialized'); return; }
+  if (!sbClient) { callback('SDK not initialized'); return; }
 
-  _sb.rpc('invite_to_project', {
+  sbClient.rpc('invite_to_project', {
     p_project_id: projectCloudId,
     p_email: email.trim().toLowerCase(),
     p_role: role || 'editor'
@@ -2279,9 +2252,9 @@ function sbInviteToProject(projectCloudId, email, role, callback) {
  * @param {function(err, Array)} callback
  */
 function sbLoadProjectMembers(projectCloudId, callback) {
-  if (!_sb) { callback('SDK not initialized'); return; }
+  if (!sbClient) { callback('SDK not initialized'); return; }
 
-  _sb.from('project_members')
+  sbClient.from('project_members')
     .select('user_id, role, joined_at, profiles(email, name)')
     .eq('project_id', projectCloudId)
     .then(function(res) {
@@ -2297,9 +2270,9 @@ function sbLoadProjectMembers(projectCloudId, callback) {
  * @param {function(err)} callback
  */
 function sbRemoveProjectMember(projectCloudId, userId, callback) {
-  if (!_sb) { callback('SDK not initialized'); return; }
+  if (!sbClient) { callback('SDK not initialized'); return; }
 
-  _sb.from('project_members')
+  sbClient.from('project_members')
     .delete()
     .eq('project_id', projectCloudId)
     .eq('user_id', userId)
@@ -2313,8 +2286,8 @@ function sbRemoveProjectMember(projectCloudId, userId, callback) {
  * @returns {string|null}
  */
 function sbCurrentUserId() {
-  if (!_sb) return null;
-  var session = _sb.auth.getSession && _sb.auth.getSession();
+  if (!sbClient) return null;
+  var session = sbClient.auth.getSession && sbClient.auth.getSession();
   /* getSession() может вернуть promise в новых версиях SDK */
   if (session && session.data && session.data.session) {
     return session.data.session.user.id;
