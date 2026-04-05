@@ -418,9 +418,14 @@ function cpSlotHTML(slotIdx, span, hasHero) {
       '<button class="slot-carousel-arrow slot-carousel-prev" onclick="cpDesktopCarousel(' + slotIdx + ',-1,event)">&lsaquo;</button>' +
       '<button class="slot-carousel-arrow slot-carousel-next" onclick="cpDesktopCarousel(' + slotIdx + ',1,event)">&rsaquo;</button>' +
       '</div>';
+    /* Бейдж «кто добавил» — показывается при наведении */
+    var addedBadge = '';
+    if (slot._addedBy) {
+      addedBadge = '<span class="slot-added-by" title="' + esc(slot._addedAt || '') + '">' + esc(slot._addedBy) + '</span>';
+    }
     return '<div class="photo-slot filled' + mainCls + '" data-slot="' + slotIdx + '" draggable="true">' +
       '<img src="' + src + '" loading="lazy"' + rotStyle + ' onerror="this.parentNode.classList.add(\'img-error\')">' +
-      zoomBtn + carouselArrows +
+      zoomBtn + carouselArrows + addedBadge +
       '<button class="remove-btn" onclick="cpClearSlotPhoto(' + slotIdx + ',event)">&times;</button></div>';
   }
 
@@ -489,6 +494,12 @@ function cpDesktopCarousel(slotIdx, dir, e) {
   slot.dataUrl = newPv.preview || newPv.thumb || '';
   slot.thumbUrl = newPv.thumb || newPv.preview || '';
   slot.path = newPv.path || '';
+  /* Метка актора + аудит */
+  if (typeof sbStampActor === 'function') sbStampActor(slot);
+  if (typeof sbLogAction === 'function') {
+    var _card = getActiveProject().cards[App.currentCardIdx];
+    sbLogAction('add_to_slot', 'card', _card ? _card.id : '', _card ? _card.name : '', slot.file);
+  }
 
   /* Обновить ТОЛЬКО картинку в DOM (без перерисовки всей карточки) */
   var slotEl = document.querySelector('.photo-slot[data-slot="' + slotIdx + '"]');
@@ -718,10 +729,12 @@ function cpClearSlotPhoto(slotIdx, e) {
   e.stopPropagation();
   cpSaveHistory();
   var card = getActiveProject().cards[App.currentCardIdx];
+  var oldFile = card.slots[slotIdx].file;
   card.slots[slotIdx].file = null;
   card.slots[slotIdx].dataUrl = null;
   card.slots[slotIdx].thumbUrl = null;
   card.slots[slotIdx].path = null;
+  if (oldFile && typeof sbLogAction === 'function') sbLogAction('remove_from_slot', 'card', card.id, card.name, oldFile);
   cpSyncFiles(card);
   cpRenderCard();
   cpRenderList();
@@ -1709,6 +1722,9 @@ function cpBindSlotEvents() {
           /* Используем preview (1200px) для карточки, thumb (300px) как фолбэк */
           slot.dataUrl = pv.preview || pv.thumb;
           slot.thumbUrl = pv.thumb;
+          /* Метка актора + аудит */
+          if (typeof sbStampActor === 'function') sbStampActor(slot);
+          if (typeof sbLogAction === 'function') sbLogAction('add_to_slot', 'card', card.id, card.name, pv.name);
           cpSyncFiles(card);
           cpRenderCard();
           cpRenderList();
@@ -1737,6 +1753,8 @@ function cpBindSlotEvents() {
           slot.file = file.name;
           slot.dataUrl = ev.target.result;
           slot.path = '';
+          if (typeof sbStampActor === 'function') sbStampActor(slot);
+          if (typeof sbLogAction === 'function') sbLogAction('add_to_slot', 'card', card.id, card.name, file.name);
           cpSyncFiles(card);
           cpRenderCard();
           cpRenderList();
@@ -2554,6 +2572,8 @@ function cpMobileCarousel(cardIdx, slotIdx, dir, e) {
   slot.file = newPv.name || newPv.stem || '';
   slot.dataUrl = newPv.preview || newPv.thumb || '';
   slot.path = newPv.path || '';
+  if (typeof sbStampActor === 'function') sbStampActor(slot);
+  if (typeof sbLogAction === 'function') sbLogAction('add_to_slot', 'card', card.id, card.name, slot.file);
 
   /* Обновить ТОЛЬКО картинку в DOM (без перерисовки ленты) */
   var wrap = document.querySelector('.mob-carousel-wrap[data-card="' + cardIdx + '"][data-slot="' + slotIdx + '"]');
@@ -2581,10 +2601,12 @@ function cpMobileClearSlot(cardIdx, slotIdx) {
   var slot = card.slots[slotIdx];
   if (!slot) return;
 
+  var oldFile = slot.file;
   slot.file = null;
   slot.dataUrl = null;
   slot.thumbUrl = null;
   slot.path = null;
+  if (oldFile && typeof sbLogAction === 'function') sbLogAction('remove_from_slot', 'card', card.id, card.name, oldFile);
 
   if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
   if (typeof shAutoSave === 'function') shAutoSave();

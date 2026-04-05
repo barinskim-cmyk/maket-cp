@@ -1224,14 +1224,13 @@ function _pvLbToggleOC(add) {
     for (var i = 0; i < proj.otherContent.length; i++) {
       if (proj.otherContent[i].name === pv.name) return;
     }
-    proj.otherContent.push({
-      name: pv.name,
-      path: pv.path || '',
-      thumb: pv.thumb || '',
-      preview: pv.preview || ''
-    });
+    var newItem = { name: pv.name, path: pv.path || '', thumb: pv.thumb || '', preview: pv.preview || '' };
+    if (typeof sbStampActor === 'function') sbStampActor(newItem);
+    if (typeof sbLogAction === 'function') sbLogAction('add_to_other', 'project', null, null, pv.name);
+    proj.otherContent.push(newItem);
   } else {
     /* Убрать */
+    if (typeof sbLogAction === 'function') sbLogAction('remove_from_other', 'project', null, null, pv.name);
     for (var j = proj.otherContent.length - 1; j >= 0; j--) {
       if (proj.otherContent[j].name === pv.name) {
         proj.otherContent.splice(j, 1);
@@ -1507,11 +1506,10 @@ function ocAddContainer() {
   if (!proj) return;
   if (!proj.ocContainers) proj.ocContainers = [];
   var idx = proj.ocContainers.length + 1;
-  proj.ocContainers.push({
-    id: 'oc_' + Math.random().toString(36).substr(2, 8),
-    name: 'Контейнер ' + idx,
-    items: []
-  });
+  var newId = 'oc_' + Math.random().toString(36).substr(2, 8);
+  var newName = 'Контейнер ' + idx;
+  proj.ocContainers.push({ id: newId, name: newName, items: [] });
+  if (typeof sbLogAction === 'function') sbLogAction('create_container', 'container', newId, newName);
   ocRenderField();
   if (typeof shAutoSave === 'function') shAutoSave();
   if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
@@ -1524,6 +1522,7 @@ function ocDeleteContainer(idx) {
   var containers = ocGetContainers();
   if (idx < 0 || idx >= containers.length) return;
   if (!confirm('Удалить "' + containers[idx].name + '"? Фото переместятся в свободную зону.')) return;
+  if (typeof sbLogAction === 'function') sbLogAction('delete_container', 'container', containers[idx].id, containers[idx].name);
   var proj = getActiveProject();
   if (!proj) return;
   if (!proj.otherContent) proj.otherContent = [];
@@ -1583,7 +1582,11 @@ function ocRemoveFromContainer(cntIdx, itemIdx, e) {
   var containers = ocGetContainers();
   if (!containers[cntIdx]) return;
   var items = containers[cntIdx].items;
-  if (itemIdx >= 0 && itemIdx < items.length) items.splice(itemIdx, 1);
+  if (itemIdx >= 0 && itemIdx < items.length) {
+    var removedName = items[itemIdx].name;
+    if (typeof sbLogAction === 'function') sbLogAction('remove_from_container', 'container', containers[cntIdx].id, containers[cntIdx].name, removedName);
+    items.splice(itemIdx, 1);
+  } else return;
   ocRenderField();
   if (typeof shAutoSave === 'function') shAutoSave();
   if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
@@ -1634,6 +1637,8 @@ function _ocBindDropZone(el, targetType, targetIdx) {
         for (var k = 0; k < cntItems.length; k++) {
           if (cntItems[k].name === pv.name) return;
         }
+        if (typeof sbStampActor === 'function') sbStampActor(item);
+        if (typeof sbLogAction === 'function') sbLogAction('add_to_container', 'container', containers[targetIdx].id, containers[targetIdx].name, pv.name);
         cntItems.push(item);
       } else {
         /* Свободная зона */
@@ -1641,6 +1646,8 @@ function _ocBindDropZone(el, targetType, targetIdx) {
         for (var f = 0; f < proj.otherContent.length; f++) {
           if (proj.otherContent[f].name === pv.name) return;
         }
+        if (typeof sbStampActor === 'function') sbStampActor(item);
+        if (typeof sbLogAction === 'function') sbLogAction('add_to_other', 'project', null, null, pv.name);
         proj.otherContent.push(item);
       }
 
@@ -1717,6 +1724,7 @@ function ocRenderField() {
       html += '<img src="' + (item.preview || item.thumb) + '" loading="lazy">';
       html += '<button class="oc-zoom" onclick="ocOpenContainerLightbox(' + c + ',' + i + ',event)" title="На весь экран">' + zoomSvg + '</button>';
       html += '<button class="pv-remove" onclick="ocRemoveFromContainer(' + c + ',' + i + ',event)">&times;</button>';
+      if (item._addedBy) html += '<span class="oc-added-by">' + esc(item._addedBy) + '</span>';
       html += '<span class="pv-name">' + esc(pvShortName(item.name)) + '</span>';
       html += '</div>';
     }
@@ -1740,6 +1748,7 @@ function ocRenderField() {
     html += '<img src="' + (fItem.preview || fItem.thumb) + '" loading="lazy">';
     html += '<button class="oc-zoom" onclick="ocOpenLightbox(' + f + ',event)" title="На весь экран">' + zoomSvg + '</button>';
     html += '<button class="pv-remove" onclick="ocRemoveItem(' + f + ',event)">&times;</button>';
+    if (fItem._addedBy) html += '<span class="oc-added-by">' + esc(fItem._addedBy) + '</span>';
     html += '<span class="pv-name">' + esc(pvShortName(fItem.name)) + '</span>';
     html += '</div>';
   }
@@ -1806,7 +1815,11 @@ function _ocOpenLb(store, idx) {
 function ocRemoveItem(idx, e) {
   if (e) { e.stopPropagation(); e.preventDefault(); }
   var store = ocGetStore();
-  if (idx >= 0 && idx < store.length) store.splice(idx, 1);
+  if (idx >= 0 && idx < store.length) {
+    var removedName = store[idx].name;
+    if (typeof sbLogAction === 'function') sbLogAction('remove_from_other', 'project', null, null, removedName);
+    store.splice(idx, 1);
+  } else return;
   ocRenderField();
   if (typeof shAutoSave === 'function') shAutoSave();
   if (typeof sbAutoSyncCards === 'function') sbAutoSyncCards();
