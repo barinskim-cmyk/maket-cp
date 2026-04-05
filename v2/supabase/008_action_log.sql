@@ -97,7 +97,7 @@ BEGIN
 
   IF NOT v_has_access AND p_share_token IS NOT NULL THEN
     SELECT EXISTS(
-      SELECT 1 FROM project_shares
+      SELECT 1 FROM share_links
       WHERE project_id = p_project_id
         AND token = p_share_token
         AND (expires_at IS NULL OR expires_at > now())
@@ -126,7 +126,7 @@ GRANT EXECUTE ON FUNCTION public.log_action TO anon, authenticated;
 CREATE POLICY action_log_anon_read ON public.action_log
   FOR SELECT USING (
     project_id IN (
-      SELECT project_id FROM public.project_shares
+      SELECT project_id FROM public.share_links
       WHERE token = current_setting('request.headers', true)::json->>'x-share-token'
         AND (expires_at IS NULL OR expires_at > now())
     )
