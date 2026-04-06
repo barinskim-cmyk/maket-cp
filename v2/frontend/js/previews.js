@@ -320,9 +320,13 @@ function pvGetLoadedVersions() {
  */
 function pvVersionStats(stageId) {
   var store = pvGetStore();
-  var total = store.length;
+  var selSet = pvGetSelectionSet();
+  var total = 0;
   var loaded = 0;
   for (var i = 0; i < store.length; i++) {
+    /* Считаем только фото из отбора */
+    if (!selSet[store[i].name]) continue;
+    total++;
     if (pvHasVersion(store[i], stageId)) loaded++;
   }
   return { total: total, missing: total - loaded, loaded: loaded };
@@ -605,13 +609,22 @@ window.onPreviewDone = function(data) {
     existingMap[proj.previews[k].name] = k;
   }
 
+  /* Для загрузки версий — сопоставляем только с фото из отбора (карточки + OC) */
+  var selectionSet = loadStage ? pvGetSelectionSet() : null;
+
   var items = data.items || [];
   var versionCount = 0; /* счётчик добавленных версий */
+  var skippedNotInSelection = 0; /* пропущено: есть в превью, но не в отборе */
 
   for (var i = 0; i < items.length; i++) {
     var incoming = items[i];
 
     if (loadStage && existingMap.hasOwnProperty(incoming.name)) {
+      /* Проверяем что фото в отборе */
+      if (selectionSet && !selectionSet[incoming.name]) {
+        skippedNotInSelection++;
+        continue;
+      }
       /* ── Загрузка версии: матчим по имени, записываем в versions ── */
       var idx = existingMap[incoming.name];
       var pv = proj.previews[idx];
@@ -678,7 +691,8 @@ window.onPreviewDone = function(data) {
 
   /* Лог для отладки */
   if (loadStage) {
-    console.log('pvVersion: загружено ' + versionCount + ' версий для этапа "' + loadStage + '"');
+    console.log('pvVersion: загружено ' + versionCount + ' версий для этапа "' + loadStage + '"' +
+      (skippedNotInSelection > 0 ? ' (пропущено ' + skippedNotInSelection + ' — не в отборе)' : ''));
     /* Автоматически переключаем на загруженную версию */
     PV_ACTIVE_VERSION = loadStage;
     /* Сохранить в проект для восстановления при рестарте */

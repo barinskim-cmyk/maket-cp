@@ -130,11 +130,6 @@
         <div class="pv-toolbar" id="pv-toolbar" style="display:none">
           <span id="pv-count">0 фото</span>
           <input type="range" id="pv-thumb-slider" min="2" max="6" value="3" class="pv-slider" title="Размер миниатюр" oninput="pvSetColumns(this.value)">
-          <select class="btn btn-sm pv-load-version-select" id="pv-load-version-select" title="Загрузить версию превью" onchange="pvOnLoadVersionSelect(this)">
-            <option value="">Загрузить...</option>
-            <option value="color">+ ЦК версию</option>
-            <option value="retouch">+ Ретушь версию</option>
-          </select>
           <button class="btn btn-sm" onclick="pvDownloadSorted()">Скачать</button>
           <button class="btn btn-sm" onclick="pvClearAll()">Очистить</button>
         </div>
@@ -213,6 +208,11 @@
             </span>
             <span class="pv-filter-stars" id="ac-filter-stars"></span>
             <button class="pv-filter-reset active" id="ac-filter-reset" onclick="acSetRatingFilter(0)">Все</button>
+            <select class="btn btn-sm pv-load-version-select" id="ac-load-version-select" title="Загрузить версию" onchange="pvOnLoadVersionSelect(this)">
+              <option value="">Загрузить версию...</option>
+              <option value="color">+ ЦК</option>
+              <option value="retouch">+ Ретушь</option>
+            </select>
             <button class="ac-view-all-btn" onclick="acViewAll()">Посмотреть все опции</button>
             <input type="range" id="ac-thumb-slider" min="2" max="8" value="4" class="pv-slider" title="Размер миниатюр" oninput="acSetColumns(this.value)">
           </div>

@@ -616,6 +616,13 @@ function renderPipeline() {
       if (s.id === 'selection') {
         html += '<button class="step-action" style="border-color:#333;color:#333;margin-left:6px" onclick="shSendClientLink()">Ссылка на преотбор</button>';
       }
+      /* На этапах ЦК/Ретушь -- кнопка загрузки версии */
+      if (s.id === 'color') {
+        html += '<button class="step-action" style="border-color:#333;color:#333;margin-left:6px" onclick="pvOnLoadVersionSelect({value:\'color\'})" title="Загрузить ЦК версию для отбора">Загрузить ЦК</button>';
+      }
+      if (s.id === 'retouch') {
+        html += '<button class="step-action" style="border-color:#333;color:#333;margin-left:6px" onclick="pvOnLoadVersionSelect({value:\'retouch\'})" title="Загрузить ретушь версию для отбора">Загрузить ретушь</button>';
+      }
     }
 
     html += '</div>';
