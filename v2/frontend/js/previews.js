@@ -1363,7 +1363,11 @@ function _pvLbOpenDesktop() {
   var overlay = document.createElement('div');
   overlay.className = 'cp-fullscreen-overlay';
   overlay.id = 'pv-lightbox';
-  overlay.onclick = function(ev) { if (ev.target === overlay) pvCloseFullscreen(); };
+  overlay.onclick = function(ev) {
+    /* Не закрывать если активен режим аннотирования */
+    if (_rtAnnotMode) return;
+    if (ev.target === overlay) pvCloseFullscreen();
+  };
 
   var imgWrap = document.createElement('div');
   imgWrap.className = 'pv-lb-img-wrap';
@@ -3965,6 +3969,21 @@ function rtRenderAnnotations(photoName, imgWrap) {
       })(a, i);
       svg.appendChild(hitPath);
 
+      /* Текст комментария рядом с линией (HTML div поверх SVG) */
+      var lineLabelText = a.text || '';
+      var lineTypeLabel = typeInfo.label || '';
+      var lineTagStr = (a.tags && a.tags.length > 0) ? a.tags.join(', ') : '';
+      var lineFullLabel = lineTypeLabel + (lineTagStr ? ' / ' + lineTagStr : '') + (lineLabelText ? ': ' + lineLabelText : '');
+      if (lineFullLabel) {
+        var lineLabel = document.createElement('div');
+        lineLabel.className = 'rt-annot-label rt-annot-label-line';
+        lineLabel.style.left = a.points[midIdx].x + '%';
+        lineLabel.style.top = a.points[midIdx].y + '%';
+        lineLabel.style.borderColor = typeInfo.border;
+        lineLabel.textContent = lineFullLabel.length > 60 ? lineFullLabel.substring(0, 60) + '...' : lineFullLabel;
+        layer.appendChild(lineLabel);
+      }
+
       continue;
     }
 
@@ -4007,6 +4026,19 @@ function rtRenderAnnotations(photoName, imgWrap) {
         rtShowAnnotPopup(pName, annot, idx, imgWrap);
       });
     })(a, i, a.id, photoName);
+
+    /* Текст комментария рядом с эллипсом */
+    var labelText = a.text || '';
+    var typeLabel = typeInfo2.label || '';
+    var tagStr = (a.tags && a.tags.length > 0) ? a.tags.join(', ') : '';
+    var fullLabel = typeLabel + (tagStr ? ' / ' + tagStr : '') + (labelText ? ': ' + labelText : '');
+    if (fullLabel) {
+      var label = document.createElement('div');
+      label.className = 'rt-annot-label';
+      label.style.borderColor = typeInfo2.border;
+      label.textContent = fullLabel.length > 60 ? fullLabel.substring(0, 60) + '...' : fullLabel;
+      ellipse.appendChild(label);
+    }
 
     /* Ручки ресайза */
     var handleR = document.createElement('div');
