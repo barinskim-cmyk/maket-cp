@@ -813,7 +813,11 @@ function sbDownloadProject(cloudId, callback) {
           /* Загрузить историю этапов из stage_events */
           sbLoadStageHistory(cloudId, function(history) {
             proj._stageHistory = history;
-            callback(null, proj);
+
+            /* Загрузить версии (ЦК/Ретушь) из photo_versions и привязать к превью */
+            _sbLoadAndAttachVersions(cloudId, proj, pvByName, function() {
+              callback(null, proj);
+            });
           });
         });
       });
@@ -1864,6 +1868,51 @@ function sbLoadStageHistory(projectId, callback) {
     })['catch'](function(err) {
       console.error('sbLoadStageHistory catch:', err);
       callback({});
+    });
+}
+
+/**
+ * Загрузить версии фото из photo_versions и привязать к объектам превью.
+ * Вызывается при загрузке проекта из облака.
+ *
+ * @param {string} cloudId — UUID проекта
+ * @param {Object} proj — объект проекта
+ * @param {Object} pvByName — карта превью по имени
+ * @param {function} done — callback()
+ */
+function _sbLoadAndAttachVersions(cloudId, proj, pvByName, done) {
+  if (!sbClient) { done(); return; }
+
+  sbClient.from('photo_versions')
+    .select('photo_name, stage, preview_path')
+    .eq('project_id', cloudId)
+    .then(function(res) {
+      if (res.error || !res.data || res.data.length === 0) {
+        done();
+        return;
+      }
+
+      var rows = res.data;
+      console.log('sbVersions: загружено ' + rows.length + ' версий');
+
+      for (var i = 0; i < rows.length; i++) {
+        var r = rows[i];
+        var pv = pvByName[r.photo_name];
+        if (!pv) continue;
+        if (!pv.versions) pv.versions = {};
+        /* Не перезаписывать если уже есть (из IndexedDB) */
+        if (!pv.versions[r.stage]) {
+          pv.versions[r.stage] = {
+            thumb: r.preview_path || '',
+            preview: r.preview_path || ''
+          };
+        }
+      }
+
+      done();
+    })['catch'](function(err) {
+      console.warn('_sbLoadAndAttachVersions:', err);
+      done();
     });
 }
 

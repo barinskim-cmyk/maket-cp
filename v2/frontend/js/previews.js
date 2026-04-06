@@ -327,6 +327,72 @@ function pvVersionStats(stageId) {
 }
 
 /**
+ * Получить набор имён фото, которые находятся в отборе (карточки + OC).
+ * Используется для фильтрации галереи при активной ЦК/Ретушь версии.
+ * @returns {Object} карта {photoName: true}
+ */
+function pvGetSelectionSet() {
+  var proj = getActiveProject();
+  if (!proj) return {};
+  var set = {};
+  /* Из карточек */
+  if (proj.cards) {
+    for (var c = 0; c < proj.cards.length; c++) {
+      var card = proj.cards[c];
+      if (!card.slots) continue;
+      for (var s = 0; s < card.slots.length; s++) {
+        if (card.slots[s].file) set[card.slots[s].file] = true;
+      }
+    }
+  }
+  /* Из OC контейнеров */
+  if (proj.ocContainers) {
+    for (var oc = 0; oc < proj.ocContainers.length; oc++) {
+      var items = proj.ocContainers[oc].items || [];
+      for (var oi = 0; oi < items.length; oi++) {
+        if (items[oi].name) set[items[oi].name] = true;
+      }
+    }
+  }
+  /* Из свободного OC */
+  if (proj.otherContent) {
+    for (var f = 0; f < proj.otherContent.length; f++) {
+      if (proj.otherContent[f].name) set[proj.otherContent[f].name] = true;
+    }
+  }
+  return set;
+}
+
+/**
+ * Пометить фото без ЦК-версии как «осталось прежним».
+ * Копирует дефолтное превью в versions.color, убирает red-dot индикатор.
+ */
+function pvMarkAsUnchanged() {
+  var proj = getActiveProject();
+  if (!proj || !proj.previews) return;
+  var count = 0;
+  for (var i = 0; i < proj.previews.length; i++) {
+    var pv = proj.previews[i];
+    if (!pv.versions) pv.versions = {};
+    if (!pv.versions[PV_ACTIVE_VERSION]) {
+      /* Копируем дефолтные данные как версию */
+      pv.versions[PV_ACTIVE_VERSION] = {
+        thumb: pv.versions.preselect ? pv.versions.preselect.thumb : pv.thumb,
+        preview: pv.versions.preselect ? pv.versions.preselect.preview : (pv.preview || pv.dataUrl || ''),
+        _unchanged: true
+      };
+      count++;
+    }
+  }
+  if (count > 0) {
+    pvRenderAll();
+    pvUpdateCardSlotsForVersion();
+    if (typeof shAutoSave === 'function') shAutoSave();
+  }
+  return count;
+}
+
+/**
  * Переключить активную версию и перерисовать.
  * @param {string} stageId — id этапа или '' для дефолта
  */
@@ -591,9 +657,107 @@ window.onPreviewDone = function(data) {
     });
   }
 
+  /* Синхронизация версий с Supabase (ЦК/Ретушь) */
+  if (loadStage && proj._cloudId && versionCount > 0 && typeof sbUploadThumb === 'function' && typeof sbSavePhotoVersion === 'function') {
+    _pvSyncVersionsToCloud(proj, loadStage);
+  }
+
   /* Авто-фиксация этапа 0 ("Преотбор и превью") при завершении загрузки */
   pvAutoAdvancePreselect();
 };
+
+/**
+ * Загрузить версии превью (ЦК/Ретушь) в Supabase Storage + photo_versions.
+ * Пакетная загрузка по 3 штуки для экономии трафика.
+ * @param {Object} proj — проект
+ * @param {string} stageId — этап ('color', 'retouch')
+ */
+function _pvSyncVersionsToCloud(proj, stageId) {
+  if (!proj._cloudId || !proj.previews) return;
+
+  /* Собрать список фото с новой версией */
+  var toUpload = [];
+  for (var i = 0; i < proj.previews.length; i++) {
+    var pv = proj.previews[i];
+    if (pv.versions && pv.versions[stageId]) {
+      var ver = pv.versions[stageId];
+      /* Загружаем только если есть base64 данные (не URL) */
+      var hasData = (ver.thumb && ver.thumb.indexOf('data:') === 0) || (ver.preview && ver.preview.indexOf('data:') === 0);
+      if (hasData) {
+        toUpload.push({ name: pv.name, ver: ver });
+      }
+    }
+  }
+
+  if (toUpload.length === 0) return;
+  console.log('pvSyncVersions: загрузка ' + toUpload.length + ' версий "' + stageId + '" в облако...');
+
+  var BATCH = 3;
+  var idx = 0;
+  var uploaded = 0;
+
+  function nextBatch() {
+    if (idx >= toUpload.length) {
+      console.log('pvSyncVersions: загружено ' + uploaded + '/' + toUpload.length + ' версий "' + stageId + '"');
+      return;
+    }
+
+    var end = Math.min(idx + BATCH, toUpload.length);
+    var batchDone = 0;
+    var batchSize = end - idx;
+
+    for (var b = idx; b < end; b++) {
+      (function(item) {
+        var ver = item.ver;
+        var thumbData = ver.thumb || '';
+        var previewData = ver.preview || '';
+        var storageName = stageId + '_pv_' + item.name;
+
+        /* Загрузить thumb */
+        sbUploadThumb(proj._cloudId, storageName, thumbData, function(err, thumbUrl) {
+          /* Загрузить preview если есть */
+          if (previewData && previewData.indexOf('data:') === 0) {
+            sbUploadThumb(proj._cloudId, stageId + '_full_' + item.name, previewData, function(err2, previewUrl) {
+              /* Сохранить запись в photo_versions */
+              sbSavePhotoVersion({
+                project_id: proj._cloudId,
+                photo_name: item.name,
+                stage: stageId,
+                version_num: 1,
+                preview_path: previewUrl || thumbUrl || ''
+              }, function() { /* игнорируем ошибки записи */ });
+
+              /* Заменить base64 на URL для экономии памяти */
+              if (thumbUrl) ver.thumb = thumbUrl;
+              if (previewUrl) ver.preview = previewUrl;
+
+              uploaded++;
+              batchDone++;
+              if (batchDone >= batchSize) nextBatch();
+            });
+          } else {
+            sbSavePhotoVersion({
+              project_id: proj._cloudId,
+              photo_name: item.name,
+              stage: stageId,
+              version_num: 1,
+              preview_path: thumbUrl || ''
+            }, function() {});
+
+            if (thumbUrl) ver.thumb = thumbUrl;
+            uploaded++;
+            batchDone++;
+            if (batchDone >= batchSize) nextBatch();
+          }
+        });
+      })(toUpload[b]);
+    }
+
+    idx = end;
+  }
+
+  nextBatch();
+}
 
 // ══════════════════════════════════════════════
 //  Индикатор прогресса
@@ -956,12 +1120,20 @@ function pvRenderPanel(galleryId, toolbarId, countId, dropzoneId) {
     }
   }
 
-  // Фильтрация по рейтингу + папке
+  // Фильтрация по рейтингу + папке + версия ЦК (только отбор)
   var store = [];
+  /* Если активна версия ЦК или Ретушь — показывать только фото из отбора */
+  var versionNeedsSelection = (PV_ACTIVE_VERSION === 'color' || PV_ACTIVE_VERSION === 'retouch');
+  var selectionSet = null;
+  if (versionNeedsSelection && panelKey === 'pv') {
+    selectionSet = pvGetSelectionSet();
+  }
   for (var i = 0; i < allStore.length; i++) {
     var pv = allStore[i];
     if (minRating > 0 && (pv.rating || 0) < minRating) continue;
     if (folderFilter && (!pv.folders || pv.folders.indexOf(folderFilter) < 0)) continue;
+    /* ЦК/Ретушь фильтр: только фото в отборе */
+    if (selectionSet && !selectionSet[pv.name]) continue;
     store.push(pv);
   }
 
@@ -1147,20 +1319,44 @@ function _pvLbOpenDesktop() {
   imgWrap.appendChild(img);
   imgWrap.appendChild(checkWrap);
 
-  /* Аннотации ретуши: кнопка + отрисовка кружков */
+  /* ── Тулбар комментариев ── */
+  var cmtBar = document.createElement('div');
+  cmtBar.className = 'rt-cmt-bar';
+  cmtBar.id = 'rt-cmt-bar';
+  cmtBar.style.display = 'none';
+
+  /* Кнопка "+ Текст" */
+  var addTextBtn = document.createElement('button');
+  addTextBtn.className = 'rt-cmt-action';
+  addTextBtn.textContent = '+ Текст';
+  addTextBtn.onclick = function(ev) { ev.stopPropagation(); rtShowAnnotPopup(pv.name, null, rtAnnotCount(pv.name), imgWrap, null); };
+
+  /* Кнопка "+ Кружок" (режим рисования) */
+  var addCircleBtn = document.createElement('button');
+  addCircleBtn.className = 'rt-cmt-action';
+  addCircleBtn.id = 'rt-circle-mode-btn';
+  addCircleBtn.textContent = '+ Кружок';
+  addCircleBtn.onclick = function(ev) { ev.stopPropagation(); rtToggleAnnotMode(); };
+
+  /* Список существующих комментариев */
+  var cmtList = document.createElement('div');
+  cmtList.className = 'rt-cmt-list';
+  cmtList.id = 'rt-cmt-list';
+
+  cmtBar.appendChild(addTextBtn);
+  cmtBar.appendChild(addCircleBtn);
+  cmtBar.appendChild(cmtList);
+
+  /* Главная кнопка открытия тулбара */
   var annotBtn = document.createElement('button');
   annotBtn.className = 'rt-annot-btn';
   annotBtn.id = 'rt-annot-toggle';
-  annotBtn.textContent = 'На ретушь';
-  annotBtn.onclick = function(ev) { ev.stopPropagation(); rtToggleAnnotMode(); };
-
-  var annotCountEl = document.createElement('span');
-  annotCountEl.className = 'rt-annot-count';
   var ac = rtAnnotCount(pv.name);
-  annotCountEl.textContent = ac > 0 ? (ac + ' комм.') : '';
+  annotBtn.textContent = 'Комментарии' + (ac > 0 ? ' (' + ac + ')' : '');
+  annotBtn.onclick = function(ev) { ev.stopPropagation(); rtToggleCmtBar(pv.name, imgWrap); };
 
   overlay.appendChild(annotBtn);
-  overlay.appendChild(annotCountEl);
+  overlay.appendChild(cmtBar);
 
   /* Обработчик клика для рисования кружков */
   imgWrap.addEventListener('click', function(ev) {
@@ -1716,7 +1912,7 @@ function pvRenderVersionBar(loadedVersions) {
         if (PV_VERSION_STAGES[j].id === PV_ACTIVE_VERSION) { label = PV_VERSION_STAGES[j].label; break; }
       }
       if (stats.missing > 0) {
-        statsEl.innerHTML = label + ': ' + stats.loaded + '/' + stats.total + ' <span class="pv-vs-missing">(не хватает ' + stats.missing + ')</span>';
+        statsEl.innerHTML = label + ': ' + stats.loaded + '/' + stats.total + ' <span class="pv-vs-missing">(не хватает ' + stats.missing + ')</span> <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;margin-left:4px" onclick="pvMarkAsUnchanged()" title="Пометить фото без версии как неизменённые">Осталось прежним</button>';
       } else {
         statsEl.innerHTML = label + ': ' + stats.loaded + '/' + stats.total + ' -- все загружены';
       }
@@ -1972,6 +2168,108 @@ function ocEditContainerName(idx) {
   });
 }
 
+// ── Комментарии к OC-контейнерам ──
+
+/**
+ * Получить комментарии контейнера.
+ * @param {number} cntIdx
+ * @returns {Array}
+ */
+function ocGetContainerComments(cntIdx) {
+  var containers = ocGetContainers();
+  if (!containers[cntIdx]) return [];
+  if (!containers[cntIdx]._comments) containers[cntIdx]._comments = [];
+  return containers[cntIdx]._comments;
+}
+
+/**
+ * Добавить комментарий к контейнеру.
+ */
+function ocAddContainerComment(cntIdx, text) {
+  var containers = ocGetContainers();
+  if (!containers[cntIdx]) return;
+  if (!containers[cntIdx]._comments) containers[cntIdx]._comments = [];
+  containers[cntIdx]._comments.push({
+    id: 'oc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+    text: text,
+    author: 'team',
+    created: new Date().toISOString()
+  });
+  if (typeof shAutoSave === 'function') shAutoSave();
+  ocRenderField();
+}
+
+/**
+ * Удалить комментарий контейнера.
+ */
+function ocDeleteContainerComment(cntIdx, commentId) {
+  var containers = ocGetContainers();
+  if (!containers[cntIdx]) return;
+  if (!containers[cntIdx]._comments) return;
+  containers[cntIdx]._comments = containers[cntIdx]._comments.filter(function(c) { return c.id !== commentId; });
+  if (typeof shAutoSave === 'function') shAutoSave();
+  ocRenderField();
+}
+
+/**
+ * Показать поле ввода нового комментария контейнера.
+ */
+function ocShowAddContainerComment(cntIdx) {
+  var el = document.getElementById('oc-cmt-input-' + cntIdx);
+  if (el) {
+    el.style.display = 'block';
+    var ta = document.getElementById('oc-cmt-text-' + cntIdx);
+    if (ta) ta.focus();
+  }
+}
+
+/**
+ * Сохранить новый комментарий контейнера.
+ */
+function ocSaveContainerComment(cntIdx) {
+  var ta = document.getElementById('oc-cmt-text-' + cntIdx);
+  if (!ta) return;
+  var text = ta.value.trim();
+  if (!text) return;
+  ocAddContainerComment(cntIdx, text);
+}
+
+/**
+ * HTML блока комментариев контейнера.
+ * @param {number} cntIdx
+ * @returns {string}
+ */
+function ocRenderContainerComments(cntIdx) {
+  var comments = ocGetContainerComments(cntIdx);
+  var html = '<div class="cp-comments oc-cmt-block">';
+  html += '<div class="cp-comments-header">';
+  html += '<span class="cp-comments-title" style="font-size:11px">' + (comments.length > 0 ? comments.length + ' комм.' : '') + '</span>';
+  html += '<button class="btn btn-sm" style="font-size:10px;padding:2px 8px" onclick="ocShowAddContainerComment(' + cntIdx + ')">+ Комментарий</button>';
+  html += '</div>';
+
+  html += '<div class="cp-comment-input" id="oc-cmt-input-' + cntIdx + '" style="display:none">';
+  html += '<textarea class="cp-comment-textarea" id="oc-cmt-text-' + cntIdx + '" placeholder="Комментарий..." rows="2"></textarea>';
+  html += '<div style="display:flex;gap:6px;margin-top:4px">';
+  html += '<button class="btn btn-sm btn-primary" style="font-size:10px" onclick="ocSaveContainerComment(' + cntIdx + ')">Добавить</button>';
+  html += '<button class="btn btn-sm" style="font-size:10px" onclick="document.getElementById(\'oc-cmt-input-' + cntIdx + '\').style.display=\'none\'">Отмена</button>';
+  html += '</div>';
+  html += '</div>';
+
+  for (var i = 0; i < comments.length; i++) {
+    var c = comments[i];
+    var dateStr = c.created ? new Date(c.created).toLocaleDateString('ru-RU') : '';
+    html += '<div class="cp-comment-item" style="padding:5px 8px">';
+    html += '<div class="cp-comment-text">' + esc(c.text) + '</div>';
+    html += '<div class="cp-comment-meta">';
+    html += '<span>' + dateStr + '</span>';
+    html += '<button class="cp-comment-del" onclick="ocDeleteContainerComment(' + cntIdx + ',\'' + c.id + '\')">&times;</button>';
+    html += '</div>';
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
 /**
  * Удалить фото из контейнера.
  */
@@ -2111,6 +2409,8 @@ function ocRenderField() {
     html += '<span class="oc-cnt-count">' + items.length + ' фото</span>';
     html += '<button class="oc-cnt-del" onclick="ocDeleteContainer(' + c + ')" title="Удалить контейнер">&times;</button>';
     html += '</div>';
+    /* Комментарии контейнера */
+    html += ocRenderContainerComments(c);
     html += '<div class="oc-cnt-gallery" id="oc-cnt-gallery-' + c + '">';
     if (items.length === 0) {
       html += '<div class="oc-cnt-empty">Перетащите фото сюда</div>';
@@ -3212,23 +3512,24 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 // ══════════════════════════════════════════════
-//  Аннотации ретуши (комментарии на фото)
+//  Комментарии к фото
 //
 //  Модель: proj._annotations = {
 //    "photo_name.jpg": [
-//      { id, x, y, r, type, text, tags, author, created }
+//      { id, x?, y?, r?, type, text, tags, author, created, hasCircle }
 //    ]
 //  }
-//    x, y  — координаты центра круга в % от размера фото (0–100)
-//    r     — радиус круга в % от ширины фото (default 5)
+//    hasCircle — true если к комментарию привязан кружок
+//    x, y  — координаты центра круга в % от размера фото (0–100), только если hasCircle
+//    r     — радиус круга в % от ширины фото (default 5), только если hasCircle
 //    type  — 'remove' | 'soften' | 'attention' (удалить / смягчить / обрати внимание)
-//    text  — текстовый комментарий
-//    tags  — массив тегов ['skin', 'clothes', 'bg', ...]
+//    text  — текстовый комментарий (может быть пустым)
+//    tags  — массив тегов ['кожа', 'одежда', 'фон', ...]
 //    author— 'team' | 'client'
 //    created — ISO timestamp
 //
-//  UI: из лайтбокса → кнопка «На ретушь» → режим рисования →
-//  клик = поставить круг → попап с типом + текстом → сохранить
+//  UI: лайтбокс → «Комментарии» → тулбар [+ Текст] [+ Кружок] →
+//  Текст = попап без привязки к месту, Кружок = клик на фото → попап
 // ══════════════════════════════════════════════
 
 /** Режим аннотирования: true когда активен */
@@ -3268,17 +3569,22 @@ function rtAddAnnotation(photoName, annotation) {
   if (!proj._annotations) proj._annotations = {};
   if (!proj._annotations[photoName]) proj._annotations[photoName] = [];
 
+  var hasCircle = !!(annotation.x !== undefined && annotation.y !== undefined);
   var a = {
     id: 'rt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
-    x: annotation.x,
-    y: annotation.y,
-    r: annotation.r || 5,
+    hasCircle: hasCircle,
     type: annotation.type || 'attention',
     text: annotation.text || '',
     tags: annotation.tags || [],
     author: annotation.author || 'team',
     created: new Date().toISOString()
   };
+
+  if (hasCircle) {
+    a.x = annotation.x;
+    a.y = annotation.y;
+    a.r = annotation.r || 5;
+  }
 
   proj._annotations[photoName].push(a);
 
@@ -3349,8 +3655,12 @@ function rtRenderAnnotations(photoName, imgWrap) {
   var layer = document.createElement('div');
   layer.className = 'rt-annot-layer';
 
+  var circleNum = 0;
   for (var i = 0; i < annots.length; i++) {
     var a = annots[i];
+    /* Только комментарии с кружком рендерятся на фото */
+    if (!a.hasCircle && a.x === undefined) continue;
+    circleNum++;
     var typeInfo = RT_ANNOTATION_TYPES[a.type] || RT_ANNOTATION_TYPES.attention;
     var circle = document.createElement('div');
     circle.className = 'rt-circle';
@@ -3363,10 +3673,10 @@ function rtRenderAnnotations(photoName, imgWrap) {
     circle.style.background = typeInfo.color;
     circle.style.borderColor = typeInfo.border;
 
-    /* Номер аннотации */
+    /* Номер кружка */
     var num = document.createElement('span');
     num.className = 'rt-circle-num';
-    num.textContent = (i + 1);
+    num.textContent = circleNum;
     circle.appendChild(num);
 
     /* Клик: показать/редактировать комментарий */
@@ -3384,6 +3694,73 @@ function rtRenderAnnotations(photoName, imgWrap) {
 }
 
 /**
+ * Обновить список комментариев в тулбаре лайтбокса.
+ * @param {string} photoName
+ * @param {HTMLElement} imgWrap
+ */
+function rtRenderCmtList(photoName, imgWrap) {
+  var listEl = document.getElementById('rt-cmt-list');
+  if (!listEl) return;
+
+  var annots = rtGetAnnotations(photoName);
+  if (annots.length === 0) {
+    listEl.innerHTML = '<div class="rt-cmt-empty">Нет комментариев</div>';
+    return;
+  }
+
+  var html = '';
+  for (var i = 0; i < annots.length; i++) {
+    var a = annots[i];
+    var typeInfo = RT_ANNOTATION_TYPES[a.type] || RT_ANNOTATION_TYPES.attention;
+    var icon = a.hasCircle ? '<span class="rt-cmt-icon" style="background:' + typeInfo.border + '"></span>' : '';
+    var preview = a.text ? a.text.substring(0, 60) : (a.hasCircle ? typeInfo.label : 'Пустой');
+    html += '<div class="rt-cmt-item" data-annot-id="' + a.id + '" onclick="rtCmtItemClick(\'' + esc(photoName) + '\',\'' + a.id + '\')">';
+    html += icon;
+    html += '<span class="rt-cmt-preview">' + esc(preview) + '</span>';
+    html += '</div>';
+  }
+  listEl.innerHTML = html;
+
+  /* Обновить счётчик на кнопке */
+  var btn = document.getElementById('rt-annot-toggle');
+  if (btn) btn.textContent = 'Комментарии (' + annots.length + ')';
+}
+
+/**
+ * Клик по элементу списка комментариев — открыть попап.
+ */
+function rtCmtItemClick(photoName, annotId) {
+  var annots = rtGetAnnotations(photoName);
+  var imgWrap = document.querySelector('.pv-lb-img-wrap');
+  for (var i = 0; i < annots.length; i++) {
+    if (annots[i].id === annotId) {
+      rtShowAnnotPopup(photoName, annots[i], i, imgWrap);
+      return;
+    }
+  }
+}
+
+/**
+ * Переключить видимость тулбара комментариев.
+ */
+function rtToggleCmtBar(photoName, imgWrap) {
+  var bar = document.getElementById('rt-cmt-bar');
+  if (!bar) return;
+  var isHidden = bar.style.display === 'none';
+  bar.style.display = isHidden ? 'flex' : 'none';
+  if (isHidden) {
+    rtRenderCmtList(photoName, imgWrap);
+  } else {
+    /* Закрытие тулбара — выключить режим рисования */
+    _rtAnnotMode = false;
+    var circleBtn = document.getElementById('rt-circle-mode-btn');
+    if (circleBtn) circleBtn.classList.remove('rt-mode-active');
+    var iw = document.querySelector('.pv-lb-img-wrap');
+    if (iw) iw.classList.remove('rt-annot-mode');
+  }
+}
+
+/**
  * Показать попап для создания/редактирования аннотации.
  * @param {string} photoName
  * @param {Object|null} annot — существующая аннотация или null для новой
@@ -3391,12 +3768,21 @@ function rtRenderAnnotations(photoName, imgWrap) {
  * @param {HTMLElement} imgWrap — контейнер для позиционирования
  * @param {Object} [newPos] — {x, y} для новой аннотации
  */
+/**
+ * Показать попап для создания/редактирования комментария.
+ * @param {string} photoName
+ * @param {Object|null} annot — существующий комментарий или null для нового
+ * @param {number} idx — индекс (для заголовка)
+ * @param {HTMLElement} imgWrap — контейнер изображения
+ * @param {Object} [newPos] — {x, y} для нового кружка, null для текстового комментария
+ */
 function rtShowAnnotPopup(photoName, annot, idx, imgWrap, newPos) {
   /* Удалить старый попап */
   var oldPopup = document.querySelector('.rt-popup');
   if (oldPopup) oldPopup.remove();
 
   var isNew = !annot;
+  var hasCircle = isNew ? !!newPos : (annot.hasCircle || annot.x !== undefined);
   var currentType = annot ? annot.type : 'attention';
   var currentText = annot ? annot.text : '';
   var currentTags = annot ? (annot.tags || []) : [];
@@ -3404,20 +3790,23 @@ function rtShowAnnotPopup(photoName, annot, idx, imgWrap, newPos) {
   var popup = document.createElement('div');
   popup.className = 'rt-popup';
 
+  var headerText = isNew ? (hasCircle ? 'Кружок + текст' : 'Текстовый комментарий') : 'Комментарий #' + (idx + 1);
   var html = '<div class="rt-popup-header">';
-  html += isNew ? 'Новый комментарий' : 'Комментарий #' + (idx + 1);
+  html += headerText;
   html += '<button class="rt-popup-close" onclick="this.closest(\'.rt-popup\').remove()">&times;</button>';
   html += '</div>';
 
-  /* Тип */
-  html += '<div class="rt-popup-types">';
-  for (var tid in RT_ANNOTATION_TYPES) {
-    if (!RT_ANNOTATION_TYPES.hasOwnProperty(tid)) continue;
-    var t = RT_ANNOTATION_TYPES[tid];
-    var sel = (tid === currentType) ? ' rt-type-active' : '';
-    html += '<button class="rt-type-btn' + sel + '" data-type="' + tid + '" style="border-color:' + t.border + '" onclick="rtPopupSetType(this,\'' + tid + '\')">' + t.label + '</button>';
+  /* Тип (показывать только для кружков) */
+  if (hasCircle) {
+    html += '<div class="rt-popup-types">';
+    for (var tid in RT_ANNOTATION_TYPES) {
+      if (!RT_ANNOTATION_TYPES.hasOwnProperty(tid)) continue;
+      var t = RT_ANNOTATION_TYPES[tid];
+      var sel = (tid === currentType) ? ' rt-type-active' : '';
+      html += '<button class="rt-type-btn' + sel + '" data-type="' + tid + '" style="border-color:' + t.border + '" onclick="rtPopupSetType(this,\'' + tid + '\')">' + t.label + '</button>';
+    }
+    html += '</div>';
   }
-  html += '</div>';
 
   /* Теги */
   html += '<div class="rt-popup-tags">';
@@ -3429,19 +3818,24 @@ function rtShowAnnotPopup(photoName, annot, idx, imgWrap, newPos) {
   html += '</div>';
 
   /* Текст */
-  html += '<textarea class="rt-popup-text" id="rt-popup-text" placeholder="Комментарий для ретушера...">' + esc(currentText) + '</textarea>';
+  html += '<textarea class="rt-popup-text" id="rt-popup-text" placeholder="Комментарий...">' + esc(currentText) + '</textarea>';
 
   /* Кнопки */
   html += '<div class="rt-popup-actions">';
   if (!isNew) {
     html += '<button class="rt-popup-del" onclick="rtPopupDelete(\'' + esc(photoName) + '\',\'' + annot.id + '\')">Удалить</button>';
   }
-  html += '<button class="rt-popup-save" onclick="rtPopupSave(\'' + esc(photoName) + '\'' + (isNew ? ',null,' + (newPos ? newPos.x : 50) + ',' + (newPos ? newPos.y : 50) : ',\'' + annot.id + '\'') + ')">' + (isNew ? 'Добавить' : 'Сохранить') + '</button>';
+  /* Для нового: передаём координаты (или null для текстового) */
+  if (isNew) {
+    var posX = newPos ? newPos.x : 'null';
+    var posY = newPos ? newPos.y : 'null';
+    html += '<button class="rt-popup-save" onclick="rtPopupSave(\'' + esc(photoName) + '\',null,' + posX + ',' + posY + ')">' + 'Добавить' + '</button>';
+  } else {
+    html += '<button class="rt-popup-save" onclick="rtPopupSave(\'' + esc(photoName) + '\',\'' + annot.id + '\')">' + 'Сохранить' + '</button>';
+  }
   html += '</div>';
 
   popup.innerHTML = html;
-
-  /* Позиция: по центру лайтбокса */
   document.body.appendChild(popup);
 
   /* Фокус на текст */
@@ -3461,7 +3855,7 @@ function rtPopupToggleTag(btn) {
   btn.classList.toggle('rt-tag-active');
 }
 
-/** Сохранить аннотацию из попапа */
+/** Сохранить комментарий из попапа */
 function rtPopupSave(photoName, annotId, newX, newY) {
   var popup = document.querySelector('.rt-popup');
   if (!popup) return;
@@ -3481,35 +3875,45 @@ function rtPopupSave(photoName, annotId, newX, newY) {
   }
 
   if (annotId) {
-    /* Обновить существующую */
+    /* Обновить существующий */
     rtUpdateAnnotation(photoName, annotId, { type: type, text: text, tags: tags });
   } else {
-    /* Создать новую */
-    rtAddAnnotation(photoName, { x: newX, y: newY, type: type, text: text, tags: tags });
+    /* Создать новый */
+    var annData = { type: type, text: text, tags: tags };
+    /* newX/newY = null означает текстовый комментарий без кружка */
+    if (newX !== null && newX !== undefined && newY !== null && newY !== undefined) {
+      annData.x = newX;
+      annData.y = newY;
+    }
+    rtAddAnnotation(photoName, annData);
   }
 
   popup.remove();
 
-  /* Перерисовать аннотации в лайтбоксе */
+  /* Перерисовать кружки на фото */
   var imgWrap = document.querySelector('.pv-lb-img-wrap');
   if (imgWrap) {
     var pv = _pvLbList[_pvLbIdx];
     if (pv) rtRenderAnnotations(pv.name, imgWrap);
   }
+  /* Обновить список комментариев в тулбаре */
+  rtRenderCmtList(photoName, imgWrap);
 }
 
-/** Удалить аннотацию из попапа */
+/** Удалить комментарий из попапа */
 function rtPopupDelete(photoName, annotId) {
   rtRemoveAnnotation(photoName, annotId);
   var popup = document.querySelector('.rt-popup');
   if (popup) popup.remove();
 
-  /* Перерисовать */
+  /* Перерисовать кружки */
   var imgWrap = document.querySelector('.pv-lb-img-wrap');
   if (imgWrap) {
     var pv = _pvLbList[_pvLbIdx];
     if (pv) rtRenderAnnotations(pv.name, imgWrap);
   }
+  /* Обновить список */
+  rtRenderCmtList(photoName, imgWrap);
 }
 
 // ── Режим аннотирования в лайтбоксе ──
@@ -3520,10 +3924,10 @@ function rtPopupDelete(photoName, annotId) {
  */
 function rtToggleAnnotMode() {
   _rtAnnotMode = !_rtAnnotMode;
-  var btn = document.getElementById('rt-annot-toggle');
-  if (btn) {
-    btn.classList.toggle('rt-mode-active', _rtAnnotMode);
-    btn.textContent = _rtAnnotMode ? 'Готово' : 'На ретушь';
+  var circleBtn = document.getElementById('rt-circle-mode-btn');
+  if (circleBtn) {
+    circleBtn.classList.toggle('rt-mode-active', _rtAnnotMode);
+    circleBtn.textContent = _rtAnnotMode ? 'Готово' : '+ Кружок';
   }
   var imgWrap = document.querySelector('.pv-lb-img-wrap');
   if (imgWrap) {

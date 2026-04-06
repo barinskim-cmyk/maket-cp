@@ -339,6 +339,9 @@ function cpRenderCard() {
   }
   html += '</div>';
 
+  /* ── Комментарии к карточке ── */
+  html += cpRenderComments(idx);
+
   /* ── Навигация ── */
   var histLen = (card._history && card._history.length) || 0;
   var total = proj.cards.length;
@@ -3218,4 +3221,123 @@ function cpMobileGalleryFullscreen(pvIdx) {
   if (typeof pvShowFullscreen === 'function') {
     pvShowFullscreen(pvIdx);
   }
+}
+
+
+// ══════════════════════════════════════════════
+//  Комментарии к карточкам
+//
+//  Модель: card._comments = [
+//    { id, text, author, created }
+//  ]
+//  author — 'team' | 'client'
+// ══════════════════════════════════════════════
+
+/**
+ * Получить комментарии карточки.
+ * @param {number} cardIdx
+ * @returns {Array}
+ */
+function cpGetComments(cardIdx) {
+  var proj = getActiveProject();
+  if (!proj || !proj.cards || !proj.cards[cardIdx]) return [];
+  var card = proj.cards[cardIdx];
+  if (!card._comments) card._comments = [];
+  return card._comments;
+}
+
+/**
+ * Добавить комментарий к карточке.
+ * @param {number} cardIdx
+ * @param {string} text
+ */
+function cpAddComment(cardIdx, text) {
+  var proj = getActiveProject();
+  if (!proj || !proj.cards || !proj.cards[cardIdx]) return;
+  var card = proj.cards[cardIdx];
+  if (!card._comments) card._comments = [];
+  card._comments.push({
+    id: 'cc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+    text: text,
+    author: 'team',
+    created: new Date().toISOString()
+  });
+  if (typeof shAutoSave === 'function') shAutoSave();
+  cpRenderCard();
+}
+
+/**
+ * Удалить комментарий карточки.
+ * @param {number} cardIdx
+ * @param {string} commentId
+ */
+function cpDeleteComment(cardIdx, commentId) {
+  var proj = getActiveProject();
+  if (!proj || !proj.cards || !proj.cards[cardIdx]) return;
+  var card = proj.cards[cardIdx];
+  if (!card._comments) return;
+  card._comments = card._comments.filter(function(c) { return c.id !== commentId; });
+  if (typeof shAutoSave === 'function') shAutoSave();
+  cpRenderCard();
+}
+
+/**
+ * Сгенерировать HTML блока комментариев для карточки.
+ * @param {number} cardIdx
+ * @returns {string} HTML
+ */
+function cpRenderComments(cardIdx) {
+  var comments = cpGetComments(cardIdx);
+  var html = '<div class="cp-comments">';
+  html += '<div class="cp-comments-header">';
+  html += '<span class="cp-comments-title">Комментарии' + (comments.length > 0 ? ' (' + comments.length + ')' : '') + '</span>';
+  html += '<button class="btn btn-sm" onclick="cpShowAddComment(' + cardIdx + ')">+ Комментарий</button>';
+  html += '</div>';
+
+  /* Поле ввода (скрыто по умолчанию) */
+  html += '<div class="cp-comment-input" id="cp-comment-input-' + cardIdx + '" style="display:none">';
+  html += '<textarea class="cp-comment-textarea" id="cp-comment-text-' + cardIdx + '" placeholder="Текст комментария..." rows="2"></textarea>';
+  html += '<div style="display:flex;gap:6px;margin-top:4px">';
+  html += '<button class="btn btn-sm btn-primary" onclick="cpSaveNewComment(' + cardIdx + ')">Добавить</button>';
+  html += '<button class="btn btn-sm" onclick="document.getElementById(\'cp-comment-input-' + cardIdx + '\').style.display=\'none\'">Отмена</button>';
+  html += '</div>';
+  html += '</div>';
+
+  /* Список комментариев */
+  for (var i = 0; i < comments.length; i++) {
+    var c = comments[i];
+    var dateStr = c.created ? new Date(c.created).toLocaleDateString('ru-RU') : '';
+    html += '<div class="cp-comment-item">';
+    html += '<div class="cp-comment-text">' + esc(c.text) + '</div>';
+    html += '<div class="cp-comment-meta">';
+    html += '<span>' + dateStr + '</span>';
+    html += '<button class="cp-comment-del" onclick="cpDeleteComment(' + cardIdx + ',\'' + c.id + '\')" title="Удалить">&times;</button>';
+    html += '</div>';
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+/**
+ * Показать поле ввода нового комментария.
+ */
+function cpShowAddComment(cardIdx) {
+  var el = document.getElementById('cp-comment-input-' + cardIdx);
+  if (el) {
+    el.style.display = 'block';
+    var ta = document.getElementById('cp-comment-text-' + cardIdx);
+    if (ta) ta.focus();
+  }
+}
+
+/**
+ * Сохранить новый комментарий из поля ввода.
+ */
+function cpSaveNewComment(cardIdx) {
+  var ta = document.getElementById('cp-comment-text-' + cardIdx);
+  if (!ta) return;
+  var text = ta.value.trim();
+  if (!text) return;
+  cpAddComment(cardIdx, text);
 }
