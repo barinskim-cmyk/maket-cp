@@ -1231,7 +1231,8 @@ function sbSaveCardsByToken(token, cards, callback) {
     share_token: token,
     cards_data: cardsJson,
     oc_data: JSON.stringify(ocNames),
-    oc_containers_data: JSON.stringify(ocCntData)
+    oc_containers_data: JSON.stringify(ocCntData),
+    annotations_data: (proj && proj._annotations) ? proj._annotations : {}
   }).then(function(res) {
     if (res.error) {
       console.error('save_cards_by_token:', res.error);
@@ -1601,6 +1602,7 @@ function sbSyncCardsLight(projectId, cards, callback) {
       oc_containers: JSON.stringify(ocCntData),
       template_config: proj._template || null,
       stage: proj._stage || 0,
+      annotations: proj._annotations || {},
       updated_at: new Date().toISOString()
     }).eq('id', projectId).then(function() {});
   }
@@ -1859,6 +1861,13 @@ function sbPullProject(callback) {
       proj.ocContainers = newContainers;
       proj._stage = data.stage || 0;
 
+      /* Обновить аннотации из облака */
+      var _remoteAnnot = data.annotations || {};
+      if (typeof _remoteAnnot === 'string') {
+        try { _remoteAnnot = JSON.parse(_remoteAnnot); } catch(e) { _remoteAnnot = {}; }
+      }
+      proj._annotations = _remoteAnnot;
+
       /* Восстановить выбор карточки после pull */
       if (_savedCardId && newCards.length > 0) {
         for (var sci = 0; sci < newCards.length; sci++) {
@@ -1886,7 +1895,7 @@ function sbPullProject(callback) {
   }
 
   /* 1. Загрузить проект (stage, other_content) */
-  sbClient.from('projects').select('stage, other_content, oc_containers, updated_at').eq('id', cloudId).single().then(function(projRes) {
+  sbClient.from('projects').select('stage, other_content, oc_containers, annotations, updated_at').eq('id', cloudId).single().then(function(projRes) {
     if (projRes.error) { _sbPullRunning = false; callback(projRes.error.message); return; }
 
     var remote = projRes.data;
@@ -2019,6 +2028,13 @@ function sbPullProject(callback) {
         proj.otherContent = newOC;
         proj.ocContainers = newContainers;
         proj._stage = remote.stage || 0;
+
+        /* Обновить аннотации из облака */
+        var _remoteAnnot2 = remote.annotations || {};
+        if (typeof _remoteAnnot2 === 'string') {
+          try { _remoteAnnot2 = JSON.parse(_remoteAnnot2); } catch(e) { _remoteAnnot2 = {}; }
+        }
+        proj._annotations = _remoteAnnot2;
 
         /* Восстановить выбор карточки после pull */
         if (_savedCardId2 && newCards.length > 0) {
