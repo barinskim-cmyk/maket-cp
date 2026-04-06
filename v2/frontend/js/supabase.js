@@ -1219,28 +1219,227 @@ function sbSaveCardsByToken(token, cards, callback) {
     });
   }
 
-  /* Собираем доп. контент (имена файлов) */
+  /* ВАЖНО: other_content НЕ передаём — он синхронизируется через дельта-операции.
+     Чтобы не перезатирать OC при параллельных вкладках, читаем текущий OC с сервера. */
   var proj = getActiveProject();
-  var ocNames = (proj && proj.otherContent) ? proj.otherContent.map(function(oc) { return oc.name; }) : [];
-  /* Контейнеры */
+
+  /* Контейнеры (пока синхронизируем полностью — они меняются редко) */
   var ocCntData = (proj && proj.ocContainers) ? proj.ocContainers.map(function(cnt) {
     return { id: cnt.id, name: cnt.name, items: (cnt.items || []).map(function(it) { return it.name; }) };
   }) : [];
 
-  sbClient.rpc('save_cards_by_token', {
-    share_token: token,
-    cards_data: cardsJson,
-    oc_data: JSON.stringify(ocNames),
-    oc_containers_data: JSON.stringify(ocCntData)
-  }).then(function(res) {
-    if (res.error) {
-      console.error('save_cards_by_token:', res.error);
-      callback('Ошибка сохранения: ' + res.error.message);
-    } else {
-      console.log('supabase.js: данные клиента сохранены (' + cards.length + ' карточек, ' + ocNames.length + ' доп. контент)');
-      callback(null);
+  /* Читаем актуальный OC с сервера чтобы не перезатереть дельта-изменения */
+  sbClient.rpc('get_project_by_token', { share_token: token }).then(function(projRes) {
+    var serverOC = '[]';
+    if (!projRes.error && projRes.data) {
+      serverOC = projRes.data.other_content || '[]';
     }
+
+    sbClient.rpc('save_cards_by_token', {
+      share_token: token,
+      cards_data: cardsJson,
+      oc_data: serverOC,
+      oc_containers_data: JSON.stringify(ocCntData)
+    }).then(function(res) {
+      if (res.error) {
+        console.error('save_cards_by_token:', res.error);
+        callback('Ошибка сохранения: ' + res.error.message);
+      } else {
+        console.log('supabase.js: данные клиента сохранены (' + cards.length + ' карточек)');
+        callback(null);
+      }
+    });
   });
+}
+
+// ══════════════════════════════════════════════
+//  Дельта-синхронизация OC (add/remove одного элемента)
+//
+//  Атомарные операции на сервере — не перезатирают чужие изменения.
+//  Используются из pvToggleSelection вместо полной синхронизации.
+//  Требуют миграцию 013_oc_delta_sync.sql.
+//
+//  Fallback: если RPC не найдена — read-modify-write через select+update.
+// ══════════════════════════════════════════════
+
+/**
+ * Добавить файл в other_content на сервере (атомарно).
+ * Работает для владельца (по projectId) и клиента (по shareToken).
+ *
+ * @param {string} fileName — имя файла
+ * @param {function} [callback] — callback(error)
+ */
+function sbOcDeltaAdd(fileName, callback) {
+  if (!sbClient) { callback && callback('Supabase не подключён'); return; }
+  if (!fileName) { callback && callback('Нет имени файла'); return; }
+
+  var proj = getActiveProject();
+  if (!proj || !proj._cloudId) { callback && callback('Нет облачного проекта'); return; }
+
+  var isClient = !!window._shareToken;
+
+  if (isClient) {
+    /* Клиент: RPC по share_token */
+    sbClient.rpc('oc_add_item_by_token', {
+      p_share_token: window._shareToken,
+      p_file_name: fileName
+    }).then(function(res) {
+      if (res.error) {
+        console.warn('sbOcDeltaAdd (client RPC):', res.error.message);
+        /* Fallback: полный push через sbSaveCardsByToken */
+        _sbOcFallbackPush(callback);
+        return;
+      }
+      console.log('supabase.js: OC +', fileName, '(delta, client)');
+      if (typeof sbMarkPushDone === 'function') sbMarkPushDone();
+      callback && callback(null);
+    });
+  } else {
+    /* Владелец: RPC по project_id */
+    sbClient.rpc('oc_add_item', {
+      p_project_id: proj._cloudId,
+      p_file_name: fileName
+    }).then(function(res) {
+      if (res.error) {
+        console.warn('sbOcDeltaAdd (owner RPC):', res.error.message);
+        /* Fallback: read-modify-write */
+        _sbOcFallbackAdd(proj._cloudId, fileName, callback);
+        return;
+      }
+      console.log('supabase.js: OC +', fileName, '(delta, owner)');
+      if (typeof sbMarkPushDone === 'function') sbMarkPushDone();
+      callback && callback(null);
+    });
+  }
+}
+
+/**
+ * Убрать файл из other_content на сервере (атомарно).
+ *
+ * @param {string} fileName — имя файла
+ * @param {function} [callback] — callback(error)
+ */
+function sbOcDeltaRemove(fileName, callback) {
+  if (!sbClient) { callback && callback('Supabase не подключён'); return; }
+  if (!fileName) { callback && callback('Нет имени файла'); return; }
+
+  var proj = getActiveProject();
+  if (!proj || !proj._cloudId) { callback && callback('Нет облачного проекта'); return; }
+
+  var isClient = !!window._shareToken;
+
+  if (isClient) {
+    sbClient.rpc('oc_remove_item_by_token', {
+      p_share_token: window._shareToken,
+      p_file_name: fileName
+    }).then(function(res) {
+      if (res.error) {
+        console.warn('sbOcDeltaRemove (client RPC):', res.error.message);
+        _sbOcFallbackPush(callback);
+        return;
+      }
+      console.log('supabase.js: OC -', fileName, '(delta, client)');
+      if (typeof sbMarkPushDone === 'function') sbMarkPushDone();
+      callback && callback(null);
+    });
+  } else {
+    sbClient.rpc('oc_remove_item', {
+      p_project_id: proj._cloudId,
+      p_file_name: fileName
+    }).then(function(res) {
+      if (res.error) {
+        console.warn('sbOcDeltaRemove (owner RPC):', res.error.message);
+        _sbOcFallbackRemove(proj._cloudId, fileName, callback);
+        return;
+      }
+      console.log('supabase.js: OC -', fileName, '(delta, owner)');
+      if (typeof sbMarkPushDone === 'function') sbMarkPushDone();
+      callback && callback(null);
+    });
+  }
+}
+
+/**
+ * Fallback для владельца: read-modify-write (добавление).
+ * Используется, если RPC oc_add_item ещё не развёрнута.
+ */
+function _sbOcFallbackAdd(projectId, fileName, callback) {
+  sbClient.from('projects').select('other_content').eq('id', projectId).single().then(function(res) {
+    if (res.error) { callback && callback(res.error.message); return; }
+    var arr = [];
+    try { arr = JSON.parse(res.data.other_content || '[]'); } catch(e) { arr = []; }
+    if (arr.indexOf(fileName) === -1) arr.push(fileName);
+    sbClient.from('projects').update({
+      other_content: JSON.stringify(arr),
+      updated_at: new Date().toISOString()
+    }).eq('id', projectId).then(function(upd) {
+      if (typeof sbMarkPushDone === 'function') sbMarkPushDone();
+      callback && callback(upd.error ? upd.error.message : null);
+    });
+  });
+}
+
+/**
+ * Fallback для владельца: read-modify-write (удаление).
+ */
+function _sbOcFallbackRemove(projectId, fileName, callback) {
+  sbClient.from('projects').select('other_content').eq('id', projectId).single().then(function(res) {
+    if (res.error) { callback && callback(res.error.message); return; }
+    var arr = [];
+    try { arr = JSON.parse(res.data.other_content || '[]'); } catch(e) { arr = []; }
+    var idx = arr.indexOf(fileName);
+    if (idx >= 0) arr.splice(idx, 1);
+    sbClient.from('projects').update({
+      other_content: JSON.stringify(arr),
+      updated_at: new Date().toISOString()
+    }).eq('id', projectId).then(function(upd) {
+      if (typeof sbMarkPushDone === 'function') sbMarkPushDone();
+      callback && callback(upd.error ? upd.error.message : null);
+    });
+  });
+}
+
+/**
+ * Fallback для клиента: полный push через save_cards_by_token.
+ * Используется, если RPC oc_*_by_token ещё не развёрнута.
+ */
+function _sbOcFallbackPush(callback) {
+  var proj = getActiveProject();
+  if (!proj || !window._shareToken) { callback && callback('no project/token'); return; }
+  sbSaveCardsByToken(window._shareToken, proj.cards || [], function(err) {
+    if (typeof sbMarkPushDone === 'function') sbMarkPushDone();
+    callback && callback(err);
+  });
+}
+
+/**
+ * Записать полный список OC на сервер (для редких массовых операций:
+ * удаление контейнера, очистка всего OC).
+ * Для одиночных add/remove использовать sbOcDeltaAdd/sbOcDeltaRemove.
+ *
+ * @param {function} [callback] — callback(error)
+ */
+function sbOcWriteFull(callback) {
+  if (!sbClient) { callback && callback('Supabase не подключён'); return; }
+  var proj = getActiveProject();
+  if (!proj || !proj._cloudId) { callback && callback('Нет проекта'); return; }
+
+  var ocNames = (proj.otherContent || []).map(function(oc) { return oc.name; });
+
+  var isClient = !!window._shareToken;
+  if (isClient) {
+    /* Клиент: полный push (включает и карточки — неизбежно) */
+    _sbOcFallbackPush(callback);
+  } else {
+    /* Владелец: прямой update поля other_content */
+    sbClient.from('projects').update({
+      other_content: JSON.stringify(ocNames),
+      updated_at: new Date().toISOString()
+    }).eq('id', proj._cloudId).then(function(res) {
+      if (typeof sbMarkPushDone === 'function') sbMarkPushDone();
+      callback && callback(res.error ? res.error.message : null);
+    });
+  }
 }
 
 // ══════════════════════════════════════════════
@@ -1475,15 +1674,16 @@ var SB_CARD_SYNC_DELAY = 3000; // 3 секунды после последнег
 function sbSyncCardsLight(projectId, cards, callback) {
   if (!sbClient) { callback('Supabase не подключён'); return; }
 
-  /* Обновить other_content + oc_containers + stage в проекте */
+  /* Обновить oc_containers + stage + template в проекте.
+     ВАЖНО: other_content НЕ пишем здесь — он синхронизируется
+     через дельта-операции sbOcDeltaAdd/Remove (атомарно).
+     Это предотвращает перезатирание OC при параллельных вкладках. */
   var proj = getActiveProject();
   if (proj) {
-    var ocNames = (proj.otherContent || []).map(function(oc) { return oc.name; });
     var ocCntData = (proj.ocContainers || []).map(function(cnt) {
       return { id: cnt.id, name: cnt.name, items: (cnt.items || []).map(function(it) { return it.name; }) };
     });
     sbClient.from('projects').update({
-      other_content: JSON.stringify(ocNames),
       oc_containers: JSON.stringify(ocCntData),
       template_config: proj._template || null,
       stage: proj._stage || 0,

@@ -3218,7 +3218,9 @@ function cpMobileToggleOC(pvName, el) {
   var done = pvToggleSelection(pvName);
   if (!done) return;
 
-  /* Обновить визуал галочки */
+  /* Обновить визуал галочки.
+     pvToggleSelection уже делает: shAutoSave + delta/full sync + render.
+     Дублировать sync здесь не нужно. */
   var inCard = (typeof _pvIsInCard === 'function') ? _pvIsInCard(pvName) >= 0 : false;
   var inOC = (typeof _pvIsInOtherContent === 'function') ? _pvIsInOtherContent(pvName) : false;
   if (inCard || inOC) {
@@ -3228,10 +3230,6 @@ function cpMobileToggleOC(pvName, el) {
     el.className = 'mob-gallery-check';
     el.innerHTML = '';
   }
-
-  /* Синхронизация */
-  if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
-  if (typeof shAutoSave === 'function') shAutoSave();
 }
 
 /**

@@ -1775,9 +1775,15 @@ function _pvLbToggleOC(add) {
     }
   }
 
-  /* Сохранить + синхронизировать + обновить галереи */
+  /* Сохранить + дельта-синхронизация + обновить галереи */
   if (typeof shAutoSave === 'function') shAutoSave();
-  if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
+  if (add && typeof sbOcDeltaAdd === 'function') {
+    sbOcDeltaAdd(pv.name);
+  } else if (!add && typeof sbOcDeltaRemove === 'function') {
+    sbOcDeltaRemove(pv.name);
+  } else if (typeof shCloudSyncExplicit === 'function') {
+    shCloudSyncExplicit();
+  }
   if (typeof ocRenderField === 'function') ocRenderField();
   if (typeof acRenderField === 'function') acRenderField();
 }
@@ -2238,7 +2244,9 @@ function ocDeleteContainer(idx) {
   containers.splice(idx, 1);
   ocRenderField();
   if (typeof shAutoSave === 'function') shAutoSave();
+  /* Контейнеры — полная синхронизация; OC — полная запись (массовая операция) */
   if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
+  if (typeof sbOcWriteFull === 'function') sbOcWriteFull();
 }
 
 /**
@@ -2455,7 +2463,14 @@ function _ocBindDropZone(el, targetType, targetIdx) {
 
       ocRenderField();
       if (typeof shAutoSave === 'function') shAutoSave();
-      if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
+
+      /* Для свободной зоны: дельта-синхронизация OC (атомарно).
+         Для контейнеров: полная синхронизация (структура контейнеров). */
+      if (targetType === 'free' && pv.name && typeof sbOcDeltaAdd === 'function') {
+        sbOcDeltaAdd(pv.name);
+      } else if (typeof shCloudSyncExplicit === 'function') {
+        shCloudSyncExplicit();
+      }
     } catch(err) {}
   });
 }
@@ -2633,10 +2648,15 @@ function ocRemoveItem(idx, e) {
     var removedName = store[idx].name;
     if (typeof sbLogAction === 'function') sbLogAction('remove_from_other', 'project', null, null, removedName);
     store.splice(idx, 1);
-  } else return;
-  ocRenderField();
-  if (typeof shAutoSave === 'function') shAutoSave();
-  if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
+    ocRenderField();
+    if (typeof shAutoSave === 'function') shAutoSave();
+    /* Дельта-удаление на сервере (атомарно, без перезаписи) */
+    if (removedName && typeof sbOcDeltaRemove === 'function') {
+      sbOcDeltaRemove(removedName);
+    } else if (typeof shCloudSyncExplicit === 'function') {
+      shCloudSyncExplicit();
+    }
+  }
 }
 
 function ocClearAll() {
@@ -2647,7 +2667,9 @@ function ocClearAll() {
   proj.ocContainers = [];
   ocRenderField();
   if (typeof shAutoSave === 'function') shAutoSave();
+  /* Контейнеры — полная синхронизация; OC — полная запись (очистка) */
   if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
+  if (typeof sbOcWriteFull === 'function') sbOcWriteFull();
 }
 
 // ── Мультивыбор фото (Cmd/Ctrl + клик) ──
@@ -3092,6 +3114,10 @@ function pvToggleSelection(name, e, source) {
   var inCardIdx = _pvIsInCard(name);
   var inOC = _pvIsInOtherContent(name);
 
+  /* Флаг: была ли операция именно над OC (для дельта-синхронизации) */
+  var ocAdded = false;
+  var ocRemoved = false;
+
   if (source === 'card') {
     /* Вызвано из редактора карточки — удалить из карточки молча */
     if (inCardIdx >= 0) {
@@ -3101,6 +3127,7 @@ function pvToggleSelection(name, e, source) {
   } else if (source === 'oc') {
     /* Вызвано из панели допконтента — удалить из OC молча */
     _pvRemoveFromOC(proj, name);
+    ocRemoved = true;
   } else {
     /* Вызвано из галереи / селекта / лайтбокса */
     if (inCardIdx >= 0) {
@@ -3111,17 +3138,33 @@ function pvToggleSelection(name, e, source) {
     } else if (inOC) {
       /* В допконтенте — убрать молча */
       _pvRemoveFromOC(proj, name);
+      ocRemoved = true;
     } else {
       /* Нигде нет — добавить в допконтент */
       _pvAddToOC(proj, name);
+      ocAdded = true;
     }
   }
 
-  /* Сохранить и обновить все галереи */
+  /* Сохранить локально */
   if (typeof shAutoSave === 'function') shAutoSave();
-  if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
+
+  /* Синхронизация: для OC-операций — дельта (атомарная),
+     для карточных — полная синхронизация через shCloudSyncExplicit */
+  if (ocAdded && typeof sbOcDeltaAdd === 'function') {
+    sbOcDeltaAdd(name);
+  } else if (ocRemoved && typeof sbOcDeltaRemove === 'function') {
+    sbOcDeltaRemove(name);
+  } else {
+    /* Карточная операция или fallback — полная синхронизация */
+    if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
+  }
+
+  /* Обновить все галереи */
   if (typeof acRenderField === 'function') acRenderField();
   if (typeof ocRenderField === 'function') ocRenderField();
+  /* Мобильный: обновить вкладку Other если открыта */
+  if (typeof cpMobileRender === 'function' && window.innerWidth < 768) cpMobileRender();
   return true;
 }
 
