@@ -438,9 +438,44 @@ function pvUpdateCardSlotsForVersion() {
     }
   }
 
-  /* Перерисовать карточки если что-то изменилось */
-  if (changed && typeof cpRenderLayout === 'function') {
-    cpRenderLayout();
+  /* Обновить OC-контейнеры + свободные фото */
+  if (proj.ocContainers) {
+    for (var oc = 0; oc < proj.ocContainers.length; oc++) {
+      var items = proj.ocContainers[oc].items || [];
+      for (var oi = 0; oi < items.length; oi++) {
+        var ocPv = pvMap[items[oi].name];
+        if (ocPv) {
+          var ocNew = pvGetPreview(ocPv);
+          var ocThumb = pvGetThumb(ocPv);
+          if (ocNew && items[oi].preview !== ocNew) {
+            items[oi].preview = ocNew;
+            items[oi].thumb = ocThumb;
+            changed = true;
+          }
+        }
+      }
+    }
+  }
+  if (proj.otherContent) {
+    for (var f = 0; f < proj.otherContent.length; f++) {
+      var fPv = pvMap[proj.otherContent[f].name];
+      if (fPv) {
+        var fNew = pvGetPreview(fPv);
+        var fThumb = pvGetThumb(fPv);
+        if (fNew && proj.otherContent[f].preview !== fNew) {
+          proj.otherContent[f].preview = fNew;
+          proj.otherContent[f].thumb = fThumb;
+          changed = true;
+        }
+      }
+    }
+  }
+
+  /* Перерисовать все экраны если что-то изменилось */
+  if (changed) {
+    if (typeof cpRenderCard === 'function') cpRenderCard();
+    if (typeof ocRenderField === 'function') ocRenderField();
+    if (typeof acRenderField === 'function') acRenderField();
   }
 }
 
@@ -664,6 +699,13 @@ window.onPreviewDone = function(data) {
 
   /* Авто-фиксация этапа 0 ("Преотбор и превью") при завершении загрузки */
   pvAutoAdvancePreselect();
+
+  /* Авто-переход этапа при загрузке версии (ЦК → этап 'color', Ретушь → этап 'retouch') */
+  if (loadStage && versionCount > 0) {
+    pvAutoAdvanceToStage(loadStage);
+    /* Обновить превью во всех экранах */
+    pvUpdateCardSlotsForVersion();
+  }
 };
 
 /**
@@ -2057,6 +2099,53 @@ function pvAutoAdvancePreselect() {
   if (typeof sbSyncStage === 'function') sbSyncStage('preview_loaded', timeStr);
 
   console.log('Авто-фиксация: Преотбор и превью завершён, переход на этап 1');
+}
+
+/**
+ * Авто-переход пайплайна при загрузке версии превью.
+ * Загрузка ЦК → переход на этап 'color' (3).
+ * Загрузка ретуши → переход на этап 'retouch' (5).
+ * Переход происходит только вперёд (не откатывает назад).
+ * @param {string} stageId — id загруженной версии ('color', 'retouch')
+ */
+function pvAutoAdvanceToStage(stageId) {
+  var proj = getActiveProject();
+  if (!proj) return;
+
+  /* Найти индекс целевого этапа в PIPELINE_STAGES */
+  var targetIdx = -1;
+  for (var i = 0; i < PIPELINE_STAGES.length; i++) {
+    if (PIPELINE_STAGES[i].id === stageId) { targetIdx = i; break; }
+  }
+  if (targetIdx < 0) return;
+
+  var currentStage = proj._stage || 0;
+  /* Только вперёд */
+  if (currentStage >= targetIdx) return;
+
+  /* Записать историю для промежуточных этапов */
+  if (!proj._stageHistory) proj._stageHistory = {};
+  var now = new Date();
+  var timeStr = now.toLocaleDateString('ru-RU') + ' ' + now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+
+  /* Пометить все промежуточные этапы как пройденные */
+  for (var s = currentStage; s < targetIdx; s++) {
+    if (!proj._stageHistory[s]) {
+      proj._stageHistory[s] = timeStr;
+    }
+  }
+
+  proj._stage = targetIdx;
+
+  if (typeof renderPipeline === 'function') renderPipeline();
+  if (typeof shAutoSave === 'function') shAutoSave();
+
+  /* Синхронизация этапа с облаком */
+  if (typeof sbSyncStage === 'function') {
+    sbSyncStage(stageId + '_version_loaded', timeStr);
+  }
+
+  console.log('Авто-переход: загружена версия "' + stageId + '", этап → ' + targetIdx + ' (' + PIPELINE_STAGES[targetIdx].name + ')');
 }
 
 // ── Действия ──
