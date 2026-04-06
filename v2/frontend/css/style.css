@@ -1544,8 +1544,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .mob-header {
   position: sticky; top: 0; z-index: 60;
   background: #fff; border-bottom: 1px solid #e0e0e0;
-  padding: 10px 12px;
-  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 12px 0;
+  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center;
 }
 .mob-header-left {
   display: flex; align-items: center; gap: 10px;
@@ -1646,6 +1646,25 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 }
 .mob-tab-btn:active { background: #ddd; }
 .mob-tab-active {
+  background: #333; color: #fff;
+}
+
+/* Навигация по карточкам (горизонтальная полоска в тулбаре) */
+.mob-card-nav {
+  width: 100%; display: flex; gap: 4px;
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  padding: 8px 0;
+  scrollbar-width: none;
+}
+.mob-card-nav::-webkit-scrollbar { display: none; }
+.mob-card-nav-btn {
+  flex-shrink: 0; padding: 4px 12px; font-size: 12px; font-weight: 500;
+  background: #f0f0f0; color: #666; border: none; border-radius: 4px;
+  cursor: pointer; white-space: nowrap;
+  min-width: 28px; text-align: center;
+}
+.mob-card-nav-btn:active { background: #ddd; }
+.mob-card-nav-btn.mob-nav-active {
   background: #333; color: #fff;
 }
 
@@ -1765,6 +1784,39 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 }
 
 /* --- Мобильные кнопки согласования (конец ленты) --- */
+/* Мобильные комментарии к карточкам */
+.mob-comments {
+  padding: 8px 12px 12px; background: #fafafa;
+  border-top: 1px solid #eee;
+}
+.mob-comment-item {
+  padding: 6px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+.mob-comment-text {
+  font-size: 13px; color: #333; line-height: 1.4;
+}
+.mob-comment-meta {
+  font-size: 11px; color: #999; margin-top: 2px;
+}
+.mob-comment-add {
+  display: flex; gap: 6px; margin-top: 8px;
+}
+.mob-comment-input {
+  flex: 1; padding: 8px 10px; font-size: 14px;
+  border: 1px solid #ddd; border-radius: 6px;
+  background: #fff; outline: none;
+}
+.mob-comment-input:focus {
+  border-color: #999;
+}
+.mob-comment-send {
+  padding: 8px 14px; font-size: 13px; font-weight: 600;
+  background: #333; color: #fff; border: none;
+  border-radius: 6px; cursor: pointer;
+}
+.mob-comment-send:active { background: #555; }
+
 .mob-approve-block {
   padding: 24px 16px; background: #fff;
   border-top: 1px solid #eee;

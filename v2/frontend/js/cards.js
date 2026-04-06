@@ -2345,24 +2345,26 @@ function cpMobileRender() {
 
   var html = '';
 
-  /* Sticky-шапка: бургер-кнопка + название + табы */
+  /* Sticky-шапка: название + табы + навигация по карточкам */
   html += '<div class="mob-header">';
   html += '<div class="mob-header-left">';
-  html += '<button class="mob-burger" onclick="cpMobileToggleCardMenu()" title="Список карточек">';
-  html += '<span></span><span></span><span></span>';
-  html += '</button>';
   html += '<div class="mob-header-title">' + (brandName || 'Просмотр') + '</div>';
   html += '</div>';
   html += '<div class="mob-header-tabs">';
   html += '<button class="mob-tab-btn' + (_mobViewMode === 'cards' ? ' mob-tab-active' : '') + '" onclick="cpMobileSetView(\'cards\')">Cards</button>';
   html += '<button class="mob-tab-btn' + (_mobViewMode === 'select' ? ' mob-tab-active' : '') + '" onclick="cpMobileSetView(\'select\')">Select</button>';
   html += '<button class="mob-tab-btn' + (_mobViewMode === 'other' ? ' mob-tab-active' : '') + '" onclick="cpMobileSetView(\'other\')">Other</button>';
-  html += '<button class="mob-tab-btn' + (_mobViewMode === 'options' ? ' mob-tab-active' : '') + '" onclick="cpMobileSetView(\'options\')">Options</button>';
   html += '</div>';
+  /* Панель навигации по карточкам (прокручиваемая полоска) */
+  if (proj && proj.cards && proj.cards.length > 0 && _mobViewMode === 'cards') {
+    html += '<div class="mob-card-nav" id="mob-card-nav">';
+    for (var ni = 0; ni < proj.cards.length; ni++) {
+      var navLabel = (proj.cards[ni].name && proj.cards[ni].name.trim()) ? esc(proj.cards[ni].name.trim()) : ('' + (ni + 1));
+      html += '<button class="mob-card-nav-btn" data-nav-card="' + ni + '" onclick="cpMobileGoToCard(' + ni + ')">' + navLabel + '</button>';
+    }
+    html += '</div>';
+  }
   html += '</div>';
-
-  /* Выдвижное меню карточек (бургер) */
-  html += _cpMobileCardMenuHTML(proj);
 
   if (_mobViewMode === 'cards') {
     html += cpMobileRenderFeed();
@@ -2370,8 +2372,6 @@ function cpMobileRender() {
     html += cpMobileRenderSelect();
   } else if (_mobViewMode === 'other') {
     html += cpMobileRenderOther();
-  } else {
-    html += cpMobileRenderGallery();
   }
 
   mobWrap.innerHTML = html;
@@ -2461,14 +2461,19 @@ function cpMobileToggleCardMenu() {
  * @param {number} cardIdx — индекс карточки
  */
 function cpMobileGoToCard(cardIdx) {
-  /* Закрыть меню */
-  var menu = document.getElementById('mob-card-menu');
-  if (menu) menu.classList.remove('mob-card-menu-open');
-
   /* Переключить на вкладку Cards если не на ней */
   if (_mobViewMode !== 'cards') {
     _mobViewMode = 'cards';
     cpMobileRender();
+  }
+
+  /* Подсветить активную кнопку в навигации */
+  var navBtns = document.querySelectorAll('.mob-card-nav-btn');
+  for (var nb = 0; nb < navBtns.length; nb++) {
+    navBtns[nb].classList.remove('mob-nav-active');
+    if (navBtns[nb].getAttribute('data-nav-card') === String(cardIdx)) {
+      navBtns[nb].classList.add('mob-nav-active');
+    }
   }
 
   /* Прокрутить к карточке */
@@ -2553,7 +2558,12 @@ function cpMobileRenderFeed() {
       }
     }
 
-    html += '</div></div>'; /* mob-card-slots, mob-card-block */
+    html += '</div>'; /* mob-card-slots */
+
+    /* Комментарии к карточке (мобильная версия) */
+    html += _cpMobileCommentsHTML(ci, card);
+
+    html += '</div>'; /* mob-card-block */
   }
 
   /* Кнопки согласования в конце ленты */
@@ -3448,4 +3458,68 @@ function cpSaveNewComment(cardIdx, e) {
   var text = ta.value.trim();
   if (!text) return;
   cpAddComment(cardIdx, text);
+}
+
+// ══════════════════════════════════════════════
+//  Мобильные комментарии к карточкам
+// ══════════════════════════════════════════════
+
+/**
+ * HTML блока комментариев для мобильной карточки.
+ * Отображается под слотами каждой карточки в ленте.
+ * @param {number} cardIdx
+ * @param {Object} card
+ * @returns {string}
+ */
+function _cpMobileCommentsHTML(cardIdx, card) {
+  var comments = card._comments || [];
+  var html = '<div class="mob-comments">';
+
+  /* Существующие комментарии */
+  if (comments.length > 0) {
+    for (var i = 0; i < comments.length; i++) {
+      var c = comments[i];
+      var dateStr = c.created ? new Date(c.created).toLocaleDateString('ru-RU') : '';
+      var authorLabel = (c.author === 'client') ? 'Клиент' : 'Команда';
+      html += '<div class="mob-comment-item">';
+      html += '<div class="mob-comment-text">' + esc(c.text) + '</div>';
+      html += '<div class="mob-comment-meta">' + authorLabel + ' ' + dateStr + '</div>';
+      html += '</div>';
+    }
+  }
+
+  /* Поле ввода (всегда видно, компактное) */
+  html += '<div class="mob-comment-add">';
+  html += '<input type="text" class="mob-comment-input" id="mob-cmt-input-' + cardIdx + '" placeholder="Комментарий...">';
+  html += '<button class="mob-comment-send" onclick="cpMobileSendComment(' + cardIdx + ')">OK</button>';
+  html += '</div>';
+
+  html += '</div>';
+  return html;
+}
+
+/**
+ * Отправить комментарий из мобильного поля ввода.
+ * @param {number} cardIdx
+ */
+function cpMobileSendComment(cardIdx) {
+  var input = document.getElementById('mob-cmt-input-' + cardIdx);
+  if (!input) return;
+  var text = input.value.trim();
+  if (!text) return;
+  /* Определить автора: клиент или команда */
+  var author = window._shareToken ? 'client' : 'team';
+  var proj = getActiveProject();
+  if (!proj || !proj.cards || !proj.cards[cardIdx]) return;
+  var card = proj.cards[cardIdx];
+  if (!card._comments) card._comments = [];
+  card._comments.push({
+    id: 'cc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+    text: text,
+    author: author,
+    created: new Date().toISOString()
+  });
+  if (typeof shAutoSave === 'function') shAutoSave();
+  /* Перерисовать ленту */
+  cpMobileRender();
 }
