@@ -816,6 +816,10 @@ function sbDownloadProject(cloudId, callback) {
 
             /* Загрузить версии (ЦК/Ретушь) из photo_versions и привязать к превью */
             _sbLoadAndAttachVersions(cloudId, proj, pvByName, function() {
+              /* Подписаться на realtime-обновления версий (для веб-клиента) */
+              if (typeof sbSubscribeVersions === 'function') {
+                sbSubscribeVersions(cloudId);
+              }
               callback(null, proj);
             });
           });
@@ -2854,6 +2858,133 @@ function snGetFileSet(snapshotData) {
     });
   });
   return { fileInSlots: slots, fileInContainers: containers };
+}
+
+
+// ══════════════════════════════════════════════
+//  Realtime: подписка на новые версии (ЦК/ретушь)
+//  Веб-клиент автоматически получает обновления
+//  когда десктоп загружает новую версию в облако.
+// ══════════════════════════════════════════════
+
+/** @type {Object|null} Активная realtime-подписка */
+var _sbVersionChannel = null;
+
+/**
+ * Подписаться на изменения photo_versions для проекта.
+ * При получении INSERT — подтянуть новую версию и обновить превью.
+ * @param {string} projectId — cloud ID проекта
+ */
+function sbSubscribeVersions(projectId) {
+  if (!sbClient || !projectId) return;
+
+  /* Отписаться от предыдущей подписки */
+  sbUnsubscribeVersions();
+
+  try {
+    _sbVersionChannel = sbClient
+      .channel('photo_versions_' + projectId)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'photo_versions',
+        filter: 'project_id=eq.' + projectId
+      }, function(payload) {
+        var row = payload.new;
+        if (!row) return;
+        console.log('realtime: новая версия — ' + row.photo_name + ' (' + row.stage + ')');
+        _sbApplyVersionUpdate(row);
+      })
+      .subscribe(function(status) {
+        console.log('realtime photo_versions: ' + status);
+      });
+  } catch(err) {
+    console.warn('sbSubscribeVersions:', err);
+  }
+}
+
+/**
+ * Отписаться от realtime-канала версий.
+ */
+function sbUnsubscribeVersions() {
+  if (_sbVersionChannel && sbClient) {
+    try { sbClient.removeChannel(_sbVersionChannel); } catch(e) {}
+    _sbVersionChannel = null;
+  }
+}
+
+/**
+ * Применить обновление версии из realtime-события.
+ * Находит pv-объект по имени, добавляет версию, перерисовывает.
+ * @param {Object} row — строка из photo_versions (photo_name, stage, preview_path)
+ */
+function _sbApplyVersionUpdate(row) {
+  var proj = getActiveProject();
+  if (!proj || !proj.previews || !proj._cloudId) return;
+  if (proj._cloudId !== row.project_id) return;
+
+  /* Найти pv-объект по имени */
+  var pv = null;
+  for (var i = 0; i < proj.previews.length; i++) {
+    if (proj.previews[i].name === row.photo_name) {
+      pv = proj.previews[i];
+      break;
+    }
+  }
+  if (!pv) return;
+
+  /* Добавить/обновить версию */
+  if (!pv.versions) pv.versions = {};
+  if (!pv.versions[row.stage]) {
+    pv.versions[row.stage] = {
+      thumb: row.preview_path || '',
+      preview: row.preview_path || ''
+    };
+  }
+
+  /* Автопереключение на новую версию + перерисовка */
+  if (typeof PV_ACTIVE_VERSION !== 'undefined') {
+    PV_ACTIVE_VERSION = row.stage;
+    proj._activeVersion = row.stage;
+  }
+  if (typeof pvRenderAll === 'function') pvRenderAll();
+  if (typeof pvUpdateCardSlotsForVersion === 'function') pvUpdateCardSlotsForVersion();
+}
+
+/**
+ * Ручное обновление версий из облака (кнопка "Обновить").
+ * Загружает photo_versions и применяет к текущему проекту.
+ */
+function sbRefreshVersions() {
+  var proj = getActiveProject();
+  if (!proj || !proj._cloudId || !sbClient) return;
+
+  var pvByName = {};
+  if (proj.previews) {
+    for (var i = 0; i < proj.previews.length; i++) {
+      pvByName[proj.previews[i].name] = proj.previews[i];
+    }
+  }
+
+  _sbLoadAndAttachVersions(proj._cloudId, proj, pvByName, function() {
+    console.log('sbRefreshVersions: версии обновлены');
+    /* Определить активную версию: последняя загруженная */
+    var latestStage = '';
+    for (var name in pvByName) {
+      if (!pvByName.hasOwnProperty(name)) continue;
+      var pv = pvByName[name];
+      if (pv.versions) {
+        if (pv.versions.retouch) { latestStage = 'retouch'; break; }
+        if (pv.versions.color) latestStage = 'color';
+      }
+    }
+    if (latestStage && typeof PV_ACTIVE_VERSION !== 'undefined') {
+      PV_ACTIVE_VERSION = latestStage;
+      proj._activeVersion = latestStage;
+    }
+    if (typeof pvRenderAll === 'function') pvRenderAll();
+    if (typeof pvUpdateCardSlotsForVersion === 'function') pvUpdateCardSlotsForVersion();
+  });
 }
 
 

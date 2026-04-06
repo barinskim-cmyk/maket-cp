@@ -398,6 +398,12 @@ function pvMarkAsUnchanged() {
  */
 function pvSetVersion(stageId) {
   PV_ACTIVE_VERSION = stageId || '';
+  /* Сохранить в проект для восстановления при рестарте */
+  var proj = getActiveProject();
+  if (proj) {
+    proj._activeVersion = PV_ACTIVE_VERSION;
+    if (typeof shAutoSave === 'function') shAutoSave();
+  }
   pvRenderAll();
   /* Обновить dataUrl слотов карточек для новой версии */
   pvUpdateCardSlotsForVersion();
@@ -580,6 +586,17 @@ window.onPreviewDone = function(data) {
   var loadStage = _pvLoadAsStage || '';
   _pvLoadAsStage = ''; /* Сбросить после использования */
 
+  /* Лимит загрузок версий на проект (ЦК + Ретушь суммарно, не больше 5) */
+  var PV_MAX_VERSION_LOADS = 5;
+  if (loadStage) {
+    if (!proj._versionLoadCount) proj._versionLoadCount = 0;
+    if (proj._versionLoadCount >= PV_MAX_VERSION_LOADS) {
+      alert('Достигнут лимит версий: ' + PV_MAX_VERSION_LOADS + ' загрузок на проект.\nТекущая версия не загружена. Если нужно больше — обратитесь к разработчику.');
+      return;
+    }
+    proj._versionLoadCount++;
+  }
+
   // Индекс существующих превью по имени
   var existingMap = {};
   for (var k = 0; k < proj.previews.length; k++) {
@@ -662,6 +679,8 @@ window.onPreviewDone = function(data) {
     console.log('pvVersion: загружено ' + versionCount + ' версий для этапа "' + loadStage + '"');
     /* Автоматически переключаем на загруженную версию */
     PV_ACTIVE_VERSION = loadStage;
+    /* Сохранить в проект для восстановления при рестарте */
+    proj._activeVersion = PV_ACTIVE_VERSION;
   }
 
   // Запоминаем путь к папке превью

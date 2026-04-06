@@ -246,10 +246,24 @@ function loadProject() {
 function selectProject(idx) {
   App.selectedProject = idx;
   App.currentCardIdx = -1;
+
+  /* Восстановить активную версию превью из проекта */
+  var proj = (idx >= 0 && idx < App.projects.length) ? App.projects[idx] : null;
+  if (proj && proj._activeVersion && typeof PV_ACTIVE_VERSION !== 'undefined') {
+    PV_ACTIVE_VERSION = proj._activeVersion;
+  } else if (typeof PV_ACTIVE_VERSION !== 'undefined') {
+    PV_ACTIVE_VERSION = '';
+  }
+
   renderProjects();
 
   /* Запустить авто-синхронизацию из облака для облачного проекта */
   if (typeof sbStartAutoPull === 'function') sbStartAutoPull();
+
+  /* Подписаться на realtime-обновления версий (для веб-клиента) */
+  if (proj && proj._cloudId && typeof sbSubscribeVersions === 'function') {
+    sbSubscribeVersions(proj._cloudId);
+  }
 }
 
 // ══════════════════════════════════════════════

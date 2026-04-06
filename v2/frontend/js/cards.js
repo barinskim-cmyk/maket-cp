@@ -3312,15 +3312,15 @@ function cpRenderComments(cardIdx) {
   var html = '<div class="cp-comments">';
   html += '<div class="cp-comments-header">';
   html += '<span class="cp-comments-title">Комментарии' + (comments.length > 0 ? ' (' + comments.length + ')' : '') + '</span>';
-  html += '<button class="btn btn-sm" onclick="cpShowAddComment(' + cardIdx + ')">+ Комментарий</button>';
+  html += '<button class="btn btn-sm" onclick="cpShowAddComment(' + cardIdx + ',event)">+ Комментарий</button>';
   html += '</div>';
 
-  /* Поле ввода (скрыто по умолчанию) */
-  html += '<div class="cp-comment-input" id="cp-comment-input-' + cardIdx + '" style="display:none">';
-  html += '<textarea class="cp-comment-textarea" id="cp-comment-text-' + cardIdx + '" placeholder="Текст комментария..." rows="2"></textarea>';
+  /* Поле ввода (скрыто по умолчанию) — onclick останавливает всплытие чтобы внешние обработчики не перерисовали карточку */
+  html += '<div class="cp-comment-input" id="cp-comment-input-' + cardIdx + '" style="display:none" onclick="event.stopPropagation()">';
+  html += '<textarea class="cp-comment-textarea" id="cp-comment-text-' + cardIdx + '" placeholder="Текст комментария..." rows="2" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"></textarea>';
   html += '<div style="display:flex;gap:6px;margin-top:4px">';
-  html += '<button class="btn btn-sm btn-primary" onclick="cpSaveNewComment(' + cardIdx + ')">Добавить</button>';
-  html += '<button class="btn btn-sm" onclick="document.getElementById(\'cp-comment-input-' + cardIdx + '\').style.display=\'none\'">Отмена</button>';
+  html += '<button class="btn btn-sm btn-primary" onclick="cpSaveNewComment(' + cardIdx + ',event)">Добавить</button>';
+  html += '<button class="btn btn-sm" onclick="event.stopPropagation();document.getElementById(\'cp-comment-input-' + cardIdx + '\').style.display=\'none\'">Отмена</button>';
   html += '</div>';
   html += '</div>';
 
@@ -3343,7 +3343,8 @@ function cpRenderComments(cardIdx) {
 /**
  * Показать поле ввода нового комментария.
  */
-function cpShowAddComment(cardIdx) {
+function cpShowAddComment(cardIdx, e) {
+  if (e) { e.stopPropagation(); e.preventDefault(); }
   var el = document.getElementById('cp-comment-input-' + cardIdx);
   if (el) {
     el.style.display = 'block';
@@ -3355,7 +3356,8 @@ function cpShowAddComment(cardIdx) {
 /**
  * Сохранить новый комментарий из поля ввода.
  */
-function cpSaveNewComment(cardIdx) {
+function cpSaveNewComment(cardIdx, e) {
+  if (e) { e.stopPropagation(); e.preventDefault(); }
   var ta = document.getElementById('cp-comment-text-' + cardIdx);
   if (!ta) return;
   var text = ta.value.trim();

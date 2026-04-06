@@ -396,6 +396,11 @@ window.addEventListener('DOMContentLoaded', function() {
           pvDbRestoreProjectPreviews(App.projects[i], function() {
             pending--;
             if (pending === 0) {
+              /* Восстановить активную версию из выбранного проекта */
+              var sel = (App.selectedProject >= 0) ? App.projects[App.selectedProject] : null;
+              if (sel && sel._activeVersion && typeof PV_ACTIVE_VERSION !== 'undefined') {
+                PV_ACTIVE_VERSION = sel._activeVersion;
+              }
               /* Все превью загружены — перерисовать */
               renderProjects();
               if (typeof pvRenderAll === 'function') pvRenderAll();
