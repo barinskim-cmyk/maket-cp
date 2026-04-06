@@ -1820,6 +1820,36 @@ function sbPullProject(callback) {
         newContainers.push(cnt);
       }
 
+      /* Перенести _comments из старых карточек в новые (по id) */
+      if (proj.cards && proj.cards.length > 0) {
+        var _oldCmtMap = {};
+        for (var oci = 0; oci < proj.cards.length; oci++) {
+          if (proj.cards[oci].id && proj.cards[oci]._comments && proj.cards[oci]._comments.length > 0) {
+            _oldCmtMap[proj.cards[oci].id] = proj.cards[oci]._comments;
+          }
+        }
+        for (var nci = 0; nci < newCards.length; nci++) {
+          if (newCards[nci].id && _oldCmtMap[newCards[nci].id]) {
+            newCards[nci]._comments = _oldCmtMap[newCards[nci].id];
+          }
+        }
+      }
+
+      /* Перенести _comments из старых контейнеров в новые (по id) */
+      if (proj.ocContainers && proj.ocContainers.length > 0) {
+        var _oldCntCmtMap = {};
+        for (var occi = 0; occi < proj.ocContainers.length; occi++) {
+          if (proj.ocContainers[occi].id && proj.ocContainers[occi]._comments && proj.ocContainers[occi]._comments.length > 0) {
+            _oldCntCmtMap[proj.ocContainers[occi].id] = proj.ocContainers[occi]._comments;
+          }
+        }
+        for (var ncci = 0; ncci < newContainers.length; ncci++) {
+          if (newContainers[ncci].id && _oldCntCmtMap[newContainers[ncci].id]) {
+            newContainers[ncci]._comments = _oldCntCmtMap[newContainers[ncci].id];
+          }
+        }
+      }
+
       /* Сохранить текущий выбор карточки по id */
       var _savedCardId = (App.currentCardIdx >= 0 && proj.cards && proj.cards[App.currentCardIdx])
         ? proj.cards[App.currentCardIdx].id : null;
@@ -1948,6 +1978,36 @@ function sbPullProject(callback) {
             }
           }
           newContainers.push(newCnt);
+        }
+
+        /* Перенести _comments из старых карточек в новые (по id) */
+        if (proj.cards && proj.cards.length > 0) {
+          var _oldCmtMap2 = {};
+          for (var oci2 = 0; oci2 < proj.cards.length; oci2++) {
+            if (proj.cards[oci2].id && proj.cards[oci2]._comments && proj.cards[oci2]._comments.length > 0) {
+              _oldCmtMap2[proj.cards[oci2].id] = proj.cards[oci2]._comments;
+            }
+          }
+          for (var nci2 = 0; nci2 < newCards.length; nci2++) {
+            if (newCards[nci2].id && _oldCmtMap2[newCards[nci2].id]) {
+              newCards[nci2]._comments = _oldCmtMap2[newCards[nci2].id];
+            }
+          }
+        }
+
+        /* Перенести _comments из старых контейнеров в новые (по id) */
+        if (proj.ocContainers && proj.ocContainers.length > 0) {
+          var _oldCntCmtMap2 = {};
+          for (var occi2 = 0; occi2 < proj.ocContainers.length; occi2++) {
+            if (proj.ocContainers[occi2].id && proj.ocContainers[occi2]._comments && proj.ocContainers[occi2]._comments.length > 0) {
+              _oldCntCmtMap2[proj.ocContainers[occi2].id] = proj.ocContainers[occi2]._comments;
+            }
+          }
+          for (var ncci2 = 0; ncci2 < newContainers.length; ncci2++) {
+            if (newContainers[ncci2].id && _oldCntCmtMap2[newContainers[ncci2].id]) {
+              newContainers[ncci2]._comments = _oldCntCmtMap2[newContainers[ncci2].id];
+            }
+          }
         }
 
         /* Сохранить текущий выбор карточки по id */

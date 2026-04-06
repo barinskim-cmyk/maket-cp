@@ -351,7 +351,35 @@ function cpRenderCard() {
   html += '<button class="cp-nav-btn" onclick="cpShowCard(' + (idx + 1) + ')"' + (idx >= total - 1 ? ' disabled' : '') + '>Вперёд</button>';
   html += '</div>';
 
+  /* ── Сохранить состояние поля ввода комментария перед перерисовкой ── */
+  var _cmtState = null;
+  var _cmtEl = document.getElementById('cp-comment-input-' + idx);
+  if (_cmtEl && _cmtEl.style.display !== 'none') {
+    var _cmtTa = document.getElementById('cp-comment-text-' + idx);
+    _cmtState = {
+      cardIdx: idx,
+      text: _cmtTa ? _cmtTa.value : '',
+      selStart: _cmtTa ? _cmtTa.selectionStart : 0,
+      selEnd: _cmtTa ? _cmtTa.selectionEnd : 0
+    };
+  }
+
   view.innerHTML = html;
+
+  /* ── Восстановить поле ввода комментария после перерисовки ── */
+  if (_cmtState && _cmtState.cardIdx === idx) {
+    var _cmtEl2 = document.getElementById('cp-comment-input-' + idx);
+    if (_cmtEl2) {
+      _cmtEl2.style.display = 'block';
+      var _cmtTa2 = document.getElementById('cp-comment-text-' + idx);
+      if (_cmtTa2) {
+        _cmtTa2.value = _cmtState.text;
+        _cmtTa2.selectionStart = _cmtState.selStart;
+        _cmtTa2.selectionEnd = _cmtState.selEnd;
+        _cmtTa2.focus();
+      }
+    }
+  }
 
   /* JS-sizing: пересчитать px-размеры landscape rest-ячеек.
      requestAnimationFrame даёт браузеру отрисовать grid/flex перед замером. */
