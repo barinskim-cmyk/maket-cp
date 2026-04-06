@@ -31,6 +31,8 @@ var PV_RENDER_BATCH = 60;
 var PV_FILTER = { 'pv': 0, 'oc-pv': 0 };
 // Текущий фильтр по папке: '' = все
 var PV_FOLDER_FILTER = { 'pv': '', 'oc-pv': '' };
+// Фильтр "с комментариями": true = показывать только с аннотациями
+var PV_COMMENT_FILTER = { 'pv': false, 'oc-pv': false };
 
 // ── Версии превью (по этапам пайплайна) ──
 // Этапы, для которых можно загружать отдельные версии превью
@@ -1187,12 +1189,15 @@ function pvRenderPanel(galleryId, toolbarId, countId, dropzoneId) {
   if (versionNeedsSelection && panelKey === 'pv') {
     selectionSet = pvGetSelectionSet();
   }
+  var commentFilter = PV_COMMENT_FILTER[panelKey] || false;
   for (var i = 0; i < allStore.length; i++) {
     var pv = allStore[i];
     if (minRating > 0 && (pv.rating || 0) < minRating) continue;
     if (folderFilter && (!pv.folders || pv.folders.indexOf(folderFilter) < 0)) continue;
     /* ЦК/Ретушь фильтр: только фото в отборе */
     if (selectionSet && !selectionSet[pv.name]) continue;
+    /* Фильтр: только с комментариями */
+    if (commentFilter && rtAnnotCount(pv.name) === 0) continue;
     store.push(pv);
   }
 
@@ -1397,6 +1402,13 @@ function _pvLbOpenDesktop() {
   addCircleBtn.textContent = '+ Кружок';
   addCircleBtn.onclick = function(ev) { ev.stopPropagation(); rtToggleAnnotMode(); };
 
+  /* Кнопка "+ Линия" (режим рисования кривой) */
+  var addLineBtn = document.createElement('button');
+  addLineBtn.className = 'rt-cmt-action';
+  addLineBtn.id = 'rt-line-mode-btn';
+  addLineBtn.textContent = '+ Линия';
+  addLineBtn.onclick = function(ev) { ev.stopPropagation(); rtToggleLineMode(); };
+
   /* Список существующих комментариев */
   var cmtList = document.createElement('div');
   cmtList.className = 'rt-cmt-list';
@@ -1404,6 +1416,7 @@ function _pvLbOpenDesktop() {
 
   cmtBar.appendChild(addTextBtn);
   cmtBar.appendChild(addCircleBtn);
+  cmtBar.appendChild(addLineBtn);
   cmtBar.appendChild(cmtList);
 
   /* Главная кнопка открытия тулбара */
@@ -1417,11 +1430,20 @@ function _pvLbOpenDesktop() {
   overlay.appendChild(annotBtn);
   overlay.appendChild(cmtBar);
 
-  /* Обработчик клика для рисования кружков */
+  /* Обработчик клика для линий и маршрутизации */
   imgWrap.addEventListener('click', function(ev) {
-    /* Не реагировать на клик по кнопкам внутри imgWrap */
-    if (ev.target.closest('.rt-circle') || ev.target.closest('.rt-popup') || ev.target.closest('button')) return;
+    if (ev.target.closest('.rt-circle') || ev.target.closest('.rt-line-hit') || ev.target.closest('.rt-popup') || ev.target.closest('button')) return;
     rtOnImageClick(ev);
+  });
+  /* Mousedown для кружков (drag-to-resize) */
+  imgWrap.addEventListener('mousedown', function(ev) {
+    if (ev.target.closest('.rt-circle') || ev.target.closest('.rt-line-hit') || ev.target.closest('.rt-popup') || ev.target.closest('button')) return;
+    rtOnMouseDown(ev);
+  });
+  /* Двойной клик для завершения линии */
+  imgWrap.addEventListener('dblclick', function(ev) {
+    if (ev.target.closest('.rt-circle') || ev.target.closest('.rt-popup') || ev.target.closest('button')) return;
+    rtOnLineDblClick(ev);
   });
 
   /* Отрисовать существующие аннотации */
@@ -1930,6 +1952,15 @@ function pvRenderFolderSelect(panelKey, folders, current) {
 
 function pvSetFolderFilter(panelKey, folderName) {
   PV_FOLDER_FILTER[panelKey] = folderName;
+  pvRenderAll();
+}
+
+// ── Фильтр по комментариям ──
+
+function pvToggleCommentFilter(panelKey) {
+  PV_COMMENT_FILTER[panelKey] = !PV_COMMENT_FILTER[panelKey];
+  var btn = document.getElementById(panelKey + '-comment-filter');
+  if (btn) btn.classList.toggle('active', PV_COMMENT_FILTER[panelKey]);
   pvRenderAll();
 }
 
@@ -3680,24 +3711,34 @@ document.addEventListener('DOMContentLoaded', function() {
 //
 //  Модель: proj._annotations = {
 //    "photo_name.jpg": [
-//      { id, x?, y?, r?, type, text, tags, author, created, hasCircle }
+//      { id, x?, y?, r?, type, text, tags, author, created, hasCircle, shape?, points? }
 //    ]
 //  }
 //    hasCircle — true если к комментарию привязан кружок
 //    x, y  — координаты центра круга в % от размера фото (0–100), только если hasCircle
 //    r     — радиус круга в % от ширины фото (default 5), только если hasCircle
+//    shape — 'circle' (default) | 'line' — тип фигуры
+//    points— [{x,y}, ...] массив точек линии в % (только если shape === 'line')
 //    type  — 'remove' | 'soften' | 'attention' (удалить / смягчить / обрати внимание)
 //    text  — текстовый комментарий (может быть пустым)
 //    tags  — массив тегов ['кожа', 'одежда', 'фон', ...]
 //    author— 'team' | 'client'
 //    created — ISO timestamp
 //
-//  UI: лайтбокс → «Комментарии» → тулбар [+ Текст] [+ Кружок] →
-//  Текст = попап без привязки к месту, Кружок = клик на фото → попап
+//  UI: лайтбокс → «Комментарии» → тулбар [+ Текст] [+ Кружок] [+ Линия] →
+//  Текст = попап без привязки к месту
+//  Кружок = mousedown+drag на фото → размер кружка → попап
+//  Линия = клики на фото → точки соединяются сглаженной кривой → двойной клик → попап
 // ══════════════════════════════════════════════
 
-/** Режим аннотирования: true когда активен */
+/** Режим аннотирования: 'circle' | 'line' | false */
 var _rtAnnotMode = false;
+
+/** Состояние перетаскивания кружка (drag для размера) */
+var _rtDragState = null; /* { startX, startY, imgRect, imgWrap } */
+
+/** Состояние рисования линии: массив точек [{x,y}] в % от фото */
+var _rtLinePoints = [];
 
 /** Типы аннотаций: id → {label, color} */
 var RT_ANNOTATION_TYPES = {
@@ -3733,10 +3774,12 @@ function rtAddAnnotation(photoName, annotation) {
   if (!proj._annotations) proj._annotations = {};
   if (!proj._annotations[photoName]) proj._annotations[photoName] = [];
 
-  var hasCircle = !!(annotation.x !== undefined && annotation.y !== undefined);
+  var isLine = annotation.shape === 'line';
+  var hasCircle = !isLine && !!(annotation.x !== undefined && annotation.y !== undefined);
   var a = {
     id: 'rt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
     hasCircle: hasCircle,
+    shape: isLine ? 'line' : 'circle',
     type: annotation.type || 'attention',
     text: annotation.text || '',
     tags: annotation.tags || [],
@@ -3744,7 +3787,11 @@ function rtAddAnnotation(photoName, annotation) {
     created: new Date().toISOString()
   };
 
-  if (hasCircle) {
+  if (isLine && annotation.points) {
+    a.points = annotation.points;
+    a.x = annotation.x;
+    a.y = annotation.y;
+  } else if (hasCircle) {
     a.x = annotation.x;
     a.y = annotation.y;
     a.r = annotation.r || 5;
@@ -3819,31 +3866,54 @@ function rtRenderAnnotations(photoName, imgWrap) {
   var layer = document.createElement('div');
   layer.className = 'rt-annot-layer';
 
-  var circleNum = 0;
+  var graphicNum = 0;
+  /* SVG для линий */
+  var svgLines = '';
+  var svgClickAreas = []; /* {annot, idx, pathD} для кликабельных зон */
+
   for (var i = 0; i < annots.length; i++) {
     var a = annots[i];
-    /* Только комментарии с кружком рендерятся на фото */
+
+    /* Линия — рендерим в SVG */
+    if (a.shape === 'line' && a.points && a.points.length >= 2) {
+      graphicNum++;
+      var typeInfo = RT_ANNOTATION_TYPES[a.type] || RT_ANNOTATION_TYPES.attention;
+      var d = _rtBuildSmoothPath(a.points);
+      svgLines += '<path d="' + d + '" fill="none" stroke="' + typeInfo.border + '" stroke-width="0.6" stroke-linecap="round" opacity="0.8"/>';
+      /* Точки на линии */
+      for (var pi = 0; pi < a.points.length; pi++) {
+        svgLines += '<circle cx="' + a.points[pi].x + '" cy="' + a.points[pi].y + '" r="0.6" fill="' + typeInfo.border + '"/>';
+      }
+      /* Номер посередине линии */
+      var midIdx = Math.floor(a.points.length / 2);
+      svgLines += '<circle cx="' + a.points[midIdx].x + '" cy="' + a.points[midIdx].y + '" r="1.8" fill="' + typeInfo.color + '" stroke="' + typeInfo.border + '" stroke-width="0.3"/>';
+      svgLines += '<text x="' + a.points[midIdx].x + '" y="' + (a.points[midIdx].y + 0.5) + '" text-anchor="middle" dominant-baseline="middle" font-size="2" font-weight="700" fill="#fff">' + graphicNum + '</text>';
+      /* Широкая невидимая линия для клика */
+      svgClickAreas.push({ annot: a, idx: i, d: d });
+      continue;
+    }
+
+    /* Кружок */
     if (!a.hasCircle && a.x === undefined) continue;
-    circleNum++;
-    var typeInfo = RT_ANNOTATION_TYPES[a.type] || RT_ANNOTATION_TYPES.attention;
+    if (a.shape === 'line') continue; /* пропускаем неполные линии */
+    graphicNum++;
+    var typeInfo2 = RT_ANNOTATION_TYPES[a.type] || RT_ANNOTATION_TYPES.attention;
     var circle = document.createElement('div');
     circle.className = 'rt-circle';
     circle.setAttribute('data-annot-id', a.id);
     circle.style.left = a.x + '%';
     circle.style.top = a.y + '%';
-    circle.style.width = (a.r * 2) + '%';
+    circle.style.width = ((a.r || 5) * 2) + '%';
     circle.style.height = '0';
-    circle.style.paddingBottom = (a.r * 2) + '%';
-    circle.style.background = typeInfo.color;
-    circle.style.borderColor = typeInfo.border;
+    circle.style.paddingBottom = ((a.r || 5) * 2) + '%';
+    circle.style.background = typeInfo2.color;
+    circle.style.borderColor = typeInfo2.border;
 
-    /* Номер кружка */
     var num = document.createElement('span');
     num.className = 'rt-circle-num';
-    num.textContent = circleNum;
+    num.textContent = graphicNum;
     circle.appendChild(num);
 
-    /* Клик: показать/редактировать комментарий */
     (function(annot, idx) {
       circle.onclick = function(ev) {
         ev.stopPropagation();
@@ -3852,6 +3922,37 @@ function rtRenderAnnotations(photoName, imgWrap) {
     })(a, i);
 
     layer.appendChild(circle);
+  }
+
+  /* Добавить SVG для линий */
+  if (svgLines || svgClickAreas.length > 0) {
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'rt-line-svg');
+    svg.setAttribute('viewBox', '0 0 100 100');
+    svg.setAttribute('preserveAspectRatio', 'none');
+    svg.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:4';
+    svg.innerHTML = svgLines;
+
+    /* Кликабельные зоны поверх линий (толстый невидимый path) */
+    for (var si = 0; si < svgClickAreas.length; si++) {
+      var hitPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      hitPath.setAttribute('d', svgClickAreas[si].d);
+      hitPath.setAttribute('fill', 'none');
+      hitPath.setAttribute('stroke', 'transparent');
+      hitPath.setAttribute('stroke-width', '3');
+      hitPath.setAttribute('class', 'rt-line-hit');
+      hitPath.style.pointerEvents = 'stroke';
+      hitPath.style.cursor = 'pointer';
+      (function(annot, idx) {
+        hitPath.addEventListener('click', function(ev) {
+          ev.stopPropagation();
+          rtShowAnnotPopup(photoName, annot, idx, imgWrap);
+        });
+      })(svgClickAreas[si].annot, svgClickAreas[si].idx);
+      svg.appendChild(hitPath);
+    }
+
+    layer.appendChild(svg);
   }
 
   imgWrap.appendChild(layer);
@@ -3876,8 +3977,10 @@ function rtRenderCmtList(photoName, imgWrap) {
   for (var i = 0; i < annots.length; i++) {
     var a = annots[i];
     var typeInfo = RT_ANNOTATION_TYPES[a.type] || RT_ANNOTATION_TYPES.attention;
-    var icon = a.hasCircle ? '<span class="rt-cmt-icon" style="background:' + typeInfo.border + '"></span>' : '';
-    var preview = a.text ? a.text.substring(0, 60) : (a.hasCircle ? typeInfo.label : 'Пустой');
+    var hasGraphic = a.hasCircle || a.shape === 'line';
+    var shapeLabel = a.shape === 'line' ? '~' : '';
+    var icon = hasGraphic ? '<span class="rt-cmt-icon" style="background:' + typeInfo.border + '">' + shapeLabel + '</span>' : '';
+    var preview = a.text ? a.text.substring(0, 60) : (hasGraphic ? typeInfo.label : 'Пустой');
     html += '<div class="rt-cmt-item" data-annot-id="' + a.id + '" onclick="rtCmtItemClick(\'' + esc(photoName) + '\',\'' + a.id + '\')">';
     html += icon;
     html += '<span class="rt-cmt-preview">' + esc(preview) + '</span>';
@@ -3946,7 +4049,9 @@ function rtShowAnnotPopup(photoName, annot, idx, imgWrap, newPos) {
   if (oldPopup) oldPopup.remove();
 
   var isNew = !annot;
-  var hasCircle = isNew ? !!newPos : (annot.hasCircle || annot.x !== undefined);
+  var isLine = isNew ? (newPos && newPos.shape === 'line') : (annot && annot.shape === 'line');
+  var hasCircle = isNew ? (!!newPos && !isLine) : (annot.hasCircle || (annot.x !== undefined && !isLine));
+  var hasGraphic = hasCircle || isLine;
   var currentType = annot ? annot.type : 'attention';
   var currentText = annot ? annot.text : '';
   var currentTags = annot ? (annot.tags || []) : [];
@@ -3954,14 +4059,16 @@ function rtShowAnnotPopup(photoName, annot, idx, imgWrap, newPos) {
   var popup = document.createElement('div');
   popup.className = 'rt-popup';
 
-  var headerText = isNew ? (hasCircle ? 'Кружок + текст' : 'Текстовый комментарий') : 'Комментарий #' + (idx + 1);
+  var headerText = isNew
+    ? (isLine ? 'Линия + текст' : (hasCircle ? 'Кружок + текст' : 'Текстовый комментарий'))
+    : 'Комментарий #' + (idx + 1);
   var html = '<div class="rt-popup-header">';
   html += headerText;
   html += '<button class="rt-popup-close" onclick="this.closest(\'.rt-popup\').remove()">&times;</button>';
   html += '</div>';
 
-  /* Тип (показывать только для кружков) */
-  if (hasCircle) {
+  /* Тип (показывать для кружков и линий) */
+  if (hasGraphic) {
     html += '<div class="rt-popup-types">';
     for (var tid in RT_ANNOTATION_TYPES) {
       if (!RT_ANNOTATION_TYPES.hasOwnProperty(tid)) continue;
@@ -3989,17 +4096,20 @@ function rtShowAnnotPopup(photoName, annot, idx, imgWrap, newPos) {
   if (!isNew) {
     html += '<button class="rt-popup-del" onclick="rtPopupDelete(\'' + esc(photoName) + '\',\'' + annot.id + '\')">Удалить</button>';
   }
-  /* Для нового: передаём координаты (или null для текстового) */
   if (isNew) {
-    var posX = newPos ? newPos.x : 'null';
-    var posY = newPos ? newPos.y : 'null';
-    html += '<button class="rt-popup-save" onclick="rtPopupSave(\'' + esc(photoName) + '\',null,' + posX + ',' + posY + ')">' + 'Добавить' + '</button>';
+    html += '<button class="rt-popup-save" onclick="rtPopupSave(\'' + esc(photoName) + '\',null)">Добавить</button>';
   } else {
-    html += '<button class="rt-popup-save" onclick="rtPopupSave(\'' + esc(photoName) + '\',\'' + annot.id + '\')">' + 'Сохранить' + '</button>';
+    html += '<button class="rt-popup-save" onclick="rtPopupSave(\'' + esc(photoName) + '\',\'' + annot.id + '\')">Сохранить</button>';
   }
   html += '</div>';
 
   popup.innerHTML = html;
+
+  /* Сохраняем данные позиции/линии на DOM-элементе (не в onclick-строке) */
+  if (isNew && newPos) {
+    popup._rtNewPos = newPos;
+  }
+
   document.body.appendChild(popup);
 
   /* Фокус на текст */
@@ -4020,7 +4130,7 @@ function rtPopupToggleTag(btn) {
 }
 
 /** Сохранить комментарий из попапа */
-function rtPopupSave(photoName, annotId, newX, newY) {
+function rtPopupSave(photoName, annotId) {
   var popup = document.querySelector('.rt-popup');
   if (!popup) return;
 
@@ -4044,10 +4154,24 @@ function rtPopupSave(photoName, annotId, newX, newY) {
   } else {
     /* Создать новый */
     var annData = { type: type, text: text, tags: tags };
-    /* newX/newY = null означает текстовый комментарий без кружка */
-    if (newX !== null && newX !== undefined && newY !== null && newY !== undefined) {
-      annData.x = newX;
-      annData.y = newY;
+    var newPos = popup._rtNewPos || null;
+    if (newPos && newPos.shape === 'line' && newPos.points) {
+      /* Линия */
+      annData.shape = 'line';
+      annData.points = newPos.points;
+      /* x,y = центр bounding box (для позиционирования номера) */
+      var bx = 0, by = 0;
+      for (var pi = 0; pi < newPos.points.length; pi++) {
+        bx += newPos.points[pi].x;
+        by += newPos.points[pi].y;
+      }
+      annData.x = Math.round((bx / newPos.points.length) * 10) / 10;
+      annData.y = Math.round((by / newPos.points.length) * 10) / 10;
+    } else if (newPos && newPos.x !== undefined && newPos.y !== undefined) {
+      /* Кружок */
+      annData.x = newPos.x;
+      annData.y = newPos.y;
+      if (newPos.r) annData.r = newPos.r;
     }
     rtAddAnnotation(photoName, annData);
   }
@@ -4083,46 +4207,303 @@ function rtPopupDelete(photoName, annotId) {
 // ── Режим аннотирования в лайтбоксе ──
 
 /**
- * Включить/выключить режим аннотирования.
- * В этом режиме клик по фото = новый кружок.
+ * Включить/выключить режим аннотирования кружком.
+ * В этом режиме mousedown+drag = рисование кружка с размером.
  */
 function rtToggleAnnotMode() {
-  _rtAnnotMode = !_rtAnnotMode;
+  if (_rtAnnotMode === 'circle') {
+    _rtAnnotMode = false;
+  } else {
+    _rtAnnotMode = 'circle';
+    _rtLinePoints = [];
+    _rtRemoveLinePreview();
+  }
+  _rtUpdateModeButtons();
+}
+
+/**
+ * Включить/выключить режим рисования линии.
+ * Клики ставят точки, двойной клик завершает.
+ */
+function rtToggleLineMode() {
+  if (_rtAnnotMode === 'line') {
+    /* Если есть точки — завершить линию */
+    if (_rtLinePoints.length >= 2) {
+      _rtFinishLine();
+    } else {
+      _rtAnnotMode = false;
+      _rtLinePoints = [];
+      _rtRemoveLinePreview();
+    }
+  } else {
+    _rtAnnotMode = 'line';
+    _rtLinePoints = [];
+    _rtRemoveLinePreview();
+  }
+  _rtUpdateModeButtons();
+}
+
+/**
+ * Обновить внешний вид кнопок режимов в тулбаре.
+ */
+function _rtUpdateModeButtons() {
   var circleBtn = document.getElementById('rt-circle-mode-btn');
   if (circleBtn) {
-    circleBtn.classList.toggle('rt-mode-active', _rtAnnotMode);
-    circleBtn.textContent = _rtAnnotMode ? 'Готово' : '+ Кружок';
+    circleBtn.classList.toggle('rt-mode-active', _rtAnnotMode === 'circle');
+    circleBtn.textContent = _rtAnnotMode === 'circle' ? 'Готово' : '+ Кружок';
+  }
+  var lineBtn = document.getElementById('rt-line-mode-btn');
+  if (lineBtn) {
+    lineBtn.classList.toggle('rt-mode-active', _rtAnnotMode === 'line');
+    lineBtn.textContent = _rtAnnotMode === 'line'
+      ? (_rtLinePoints.length >= 2 ? 'Завершить' : 'Готово')
+      : '+ Линия';
   }
   var imgWrap = document.querySelector('.pv-lb-img-wrap');
   if (imgWrap) {
-    imgWrap.classList.toggle('rt-annot-mode', _rtAnnotMode);
+    imgWrap.classList.toggle('rt-annot-mode', !!_rtAnnotMode);
   }
 }
 
 /**
- * Обработчик клика по изображению в режиме аннотирования.
- * Вычисляет относительные координаты и создаёт новый кружок.
- * @param {Event} ev — событие клика
+ * Координаты клика → проценты от изображения.
+ * @returns {{x: number, y: number, rect: DOMRect}} | null
  */
-function rtOnImageClick(ev) {
-  if (!_rtAnnotMode) return;
+function _rtEventToPercent(ev, imgWrap) {
+  var img = imgWrap.querySelector('img');
+  if (!img) return null;
+  var rect = img.getBoundingClientRect();
+  var x = Math.max(0, Math.min(100, ((ev.clientX - rect.left) / rect.width) * 100));
+  var y = Math.max(0, Math.min(100, ((ev.clientY - rect.top) / rect.height) * 100));
+  return { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, rect: rect };
+}
+
+/* ── Кружок: mousedown + drag ── */
+
+/**
+ * Начало рисования кружка: mousedown.
+ */
+function rtOnMouseDown(ev) {
+  if (_rtAnnotMode !== 'circle') return;
+  if (ev.button !== 0) return; /* только левая кнопка */
 
   var imgWrap = ev.currentTarget;
-  var img = imgWrap.querySelector('img');
-  if (!img) return;
+  var pos = _rtEventToPercent(ev, imgWrap);
+  if (!pos) return;
 
-  /* Вычислить координаты относительно изображения */
-  var rect = img.getBoundingClientRect();
-  var x = ((ev.clientX - rect.left) / rect.width) * 100;
-  var y = ((ev.clientY - rect.top) / rect.height) * 100;
+  ev.preventDefault();
+  _rtDragState = {
+    startX: pos.x, startY: pos.y,
+    imgRect: pos.rect, imgWrap: imgWrap
+  };
 
-  /* Ограничить в пределах изображения */
-  x = Math.max(0, Math.min(100, x));
-  y = Math.max(0, Math.min(100, y));
+  /* Показать превью кружка */
+  _rtShowCirclePreview(imgWrap, pos.x, pos.y, 0);
+
+  /* Слушатели на document для перетаскивания */
+  document.addEventListener('mousemove', _rtOnDragMove);
+  document.addEventListener('mouseup', _rtOnDragEnd);
+}
+
+/**
+ * Движение мыши при рисовании кружка.
+ */
+function _rtOnDragMove(ev) {
+  if (!_rtDragState) return;
+  var rect = _rtDragState.imgRect;
+  var dx = ((ev.clientX - rect.left) / rect.width) * 100 - _rtDragState.startX;
+  var dy = ((ev.clientY - rect.top) / rect.height) * 100 - _rtDragState.startY;
+  var r = Math.sqrt(dx * dx + dy * dy);
+  r = Math.max(1, Math.min(50, r));
+  _rtShowCirclePreview(_rtDragState.imgWrap, _rtDragState.startX, _rtDragState.startY, r);
+}
+
+/**
+ * Завершение рисования кружка: mouseup.
+ */
+function _rtOnDragEnd(ev) {
+  document.removeEventListener('mousemove', _rtOnDragMove);
+  document.removeEventListener('mouseup', _rtOnDragEnd);
+  if (!_rtDragState) return;
+
+  var rect = _rtDragState.imgRect;
+  var dx = ((ev.clientX - rect.left) / rect.width) * 100 - _rtDragState.startX;
+  var dy = ((ev.clientY - rect.top) / rect.height) * 100 - _rtDragState.startY;
+  var r = Math.sqrt(dx * dx + dy * dy);
+  r = Math.max(2, Math.min(50, r)); /* min 2% чтобы был видимым */
+  r = Math.round(r * 10) / 10;
+
+  var state = _rtDragState;
+  _rtDragState = null;
+  _rtRemoveCirclePreview(state.imgWrap);
 
   var pv = _pvLbList[_pvLbIdx];
   if (!pv) return;
 
-  /* Показать попап для нового комментария */
-  rtShowAnnotPopup(pv.name, null, rtAnnotCount(pv.name), imgWrap, { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 });
+  rtShowAnnotPopup(pv.name, null, rtAnnotCount(pv.name), state.imgWrap,
+    { x: state.startX, y: state.startY, r: r });
+}
+
+/**
+ * Показать превью кружка при перетаскивании.
+ */
+function _rtShowCirclePreview(imgWrap, cx, cy, r) {
+  var el = imgWrap.querySelector('.rt-circle-preview');
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'rt-circle-preview';
+    var layer = imgWrap.querySelector('.rt-annot-layer');
+    if (!layer) {
+      layer = document.createElement('div');
+      layer.className = 'rt-annot-layer';
+      imgWrap.appendChild(layer);
+    }
+    layer.appendChild(el);
+  }
+  el.style.left = cx + '%';
+  el.style.top = cy + '%';
+  el.style.width = (r * 2) + '%';
+  el.style.height = '0';
+  el.style.paddingBottom = (r * 2) + '%';
+  el.style.display = 'block';
+}
+
+function _rtRemoveCirclePreview(imgWrap) {
+  if (!imgWrap) imgWrap = document.querySelector('.pv-lb-img-wrap');
+  if (!imgWrap) return;
+  var el = imgWrap.querySelector('.rt-circle-preview');
+  if (el) el.remove();
+}
+
+/* ── Линия: клики ставят точки, двойной клик завершает ── */
+
+/**
+ * Обработчик клика по фото в режиме линии.
+ */
+function rtOnLineClick(ev) {
+  if (_rtAnnotMode !== 'line') return;
+
+  var imgWrap = ev.currentTarget;
+  var pos = _rtEventToPercent(ev, imgWrap);
+  if (!pos) return;
+
+  ev.preventDefault();
+  ev.stopPropagation();
+
+  _rtLinePoints.push({ x: pos.x, y: pos.y });
+  _rtRenderLinePreview(imgWrap);
+  _rtUpdateModeButtons();
+}
+
+/**
+ * Двойной клик — завершить линию.
+ */
+function rtOnLineDblClick(ev) {
+  if (_rtAnnotMode !== 'line') return;
+  ev.preventDefault();
+  ev.stopPropagation();
+  if (_rtLinePoints.length >= 2) {
+    _rtFinishLine();
+  }
+}
+
+/**
+ * Завершить линию: создать аннотацию.
+ */
+function _rtFinishLine() {
+  var pv = _pvLbList[_pvLbIdx];
+  if (!pv) return;
+  var imgWrap = document.querySelector('.pv-lb-img-wrap');
+  var points = _rtLinePoints.slice(); /* копия */
+  _rtLinePoints = [];
+  _rtAnnotMode = false;
+  _rtRemoveLinePreview();
+  _rtUpdateModeButtons();
+
+  /* Показать попап для линии */
+  rtShowAnnotPopup(pv.name, null, rtAnnotCount(pv.name), imgWrap,
+    { shape: 'line', points: points });
+}
+
+/**
+ * Построить SVG path из массива точек с авто-сглаживанием (Catmull-Rom → cubic Bezier).
+ * @param {Array} points — [{x,y}] в % (0-100)
+ * @returns {string} SVG path d-attribute (в координатах %)
+ */
+function _rtBuildSmoothPath(points) {
+  if (!points || points.length < 2) return '';
+  if (points.length === 2) {
+    return 'M ' + points[0].x + ' ' + points[0].y + ' L ' + points[1].x + ' ' + points[1].y;
+  }
+
+  /* Catmull-Rom сплайн → кубические Безье кривые */
+  var d = 'M ' + points[0].x + ' ' + points[0].y;
+  for (var i = 0; i < points.length - 1; i++) {
+    var p0 = points[Math.max(0, i - 1)];
+    var p1 = points[i];
+    var p2 = points[Math.min(points.length - 1, i + 1)];
+    var p3 = points[Math.min(points.length - 1, i + 2)];
+
+    /* Контрольные точки (tension = 0.5 / коэффициент 6) */
+    var cp1x = p1.x + (p2.x - p0.x) / 6;
+    var cp1y = p1.y + (p2.y - p0.y) / 6;
+    var cp2x = p2.x - (p3.x - p1.x) / 6;
+    var cp2y = p2.y - (p3.y - p1.y) / 6;
+
+    d += ' C ' + _rtR(cp1x) + ' ' + _rtR(cp1y) + ', ' + _rtR(cp2x) + ' ' + _rtR(cp2y) + ', ' + _rtR(p2.x) + ' ' + _rtR(p2.y);
+  }
+  return d;
+}
+
+/** Округлить до 1 десятичного знака */
+function _rtR(v) { return Math.round(v * 10) / 10; }
+
+/**
+ * Отрисовать превью линии при рисовании (SVG поверх фото).
+ */
+function _rtRenderLinePreview(imgWrap) {
+  if (!imgWrap) imgWrap = document.querySelector('.pv-lb-img-wrap');
+  if (!imgWrap) return;
+
+  var svg = imgWrap.querySelector('.rt-line-preview-svg');
+  if (!svg) {
+    svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'rt-line-preview-svg');
+    svg.setAttribute('viewBox', '0 0 100 100');
+    svg.setAttribute('preserveAspectRatio', 'none');
+    svg.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:6';
+    imgWrap.appendChild(svg);
+  }
+
+  var html = '';
+  /* Точки */
+  for (var i = 0; i < _rtLinePoints.length; i++) {
+    html += '<circle cx="' + _rtLinePoints[i].x + '" cy="' + _rtLinePoints[i].y + '" r="0.8" fill="#48c" stroke="#fff" stroke-width="0.3"/>';
+  }
+  /* Сглаженная кривая */
+  if (_rtLinePoints.length >= 2) {
+    var d = _rtBuildSmoothPath(_rtLinePoints);
+    html += '<path d="' + d + '" fill="none" stroke="rgba(50,130,220,0.7)" stroke-width="0.5" stroke-linecap="round"/>';
+  }
+  svg.innerHTML = html;
+}
+
+function _rtRemoveLinePreview() {
+  var svg = document.querySelector('.rt-line-preview-svg');
+  if (svg) svg.remove();
+}
+
+/**
+ * Обработчик клика по изображению — маршрутизатор для кружка и линии.
+ * Заменяет старый rtOnImageClick.
+ */
+function rtOnImageClick(ev) {
+  if (!_rtAnnotMode) return;
+
+  /* Линия: обрабатывается через click (не mousedown) */
+  if (_rtAnnotMode === 'line') {
+    rtOnLineClick(ev);
+    return;
+  }
+  /* Кружок обрабатывается через mousedown (rtOnMouseDown), не через click */
 }

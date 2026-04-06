@@ -141,6 +141,7 @@
         <div class="pv-filter" id="pv-filter" style="display:none">
           <span class="pv-filter-stars" id="pv-filter-stars" data-panel="pv"></span>
           <button class="pv-filter-reset" id="pv-filter-reset" onclick="pvSetFilter('pv', 0)">Все</button>
+          <button class="pv-filter-comment" id="pv-comment-filter" onclick="pvToggleCommentFilter('pv')" title="Только с комментариями">С комм.</button>
         </div>
         <div class="pv-folder-filter" id="pv-folder-filter" style="display:none">
           <select class="pv-folder-select" id="pv-folder-select" onchange="pvSetFolderFilter('pv', this.value)">

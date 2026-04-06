@@ -339,6 +339,9 @@ function cpRenderCard() {
   }
   html += '</div>';
 
+  /* ── Аннотации к фотографиям в слотах ── */
+  html += _cpRenderSlotAnnotations(card);
+
   /* ── Комментарии к карточке ── */
   html += cpRenderComments(idx);
 
@@ -671,29 +674,27 @@ var _cpFullscreenActive = false;
 
 function cpShowFullscreen(slotIdx, e) {
   e.stopPropagation();
-  var card = getActiveProject().cards[App.currentCardIdx];
+  var proj = getActiveProject();
+  var card = proj.cards[App.currentCardIdx];
   var slot = card.slots[slotIdx];
   if (!slot || (!slot.file && !slot.dataUrl)) return;
 
-  _cpFullscreenActive = true;
-
-  /* Для начала показываем то что есть (preview/thumb), потом догружаем оригинал */
-  /* Версионно-зависимый src */
-  var src = '';
-  var proj = getActiveProject();
-  if (slot.file && proj && proj.previews && typeof pvGetPreview === 'function') {
+  /* Перенаправить в основной лайтбокс (с аннотациями, навигацией, комментариями) */
+  if (slot.file && proj.previews && typeof pvShowFullscreen === 'function') {
     for (var pi = 0; pi < proj.previews.length; pi++) {
       if (proj.previews[pi].name === slot.file) {
-        src = pvGetPreview(proj.previews[pi]) || '';
-        break;
+        pvShowFullscreen(pi);
+        return;
       }
     }
   }
-  if (!src) src = slot.dataUrl || ('images/' + slot.file);
+
+  /* Фолбэк: простой оверлей если превью не найдено */
+  _cpFullscreenActive = true;
+  var src = slot.dataUrl || ('images/' + slot.file);
   var rot = slot.rotation || 0;
   var rotStyle = rot ? 'transform:rotate(' + rot + 'deg)' : '';
 
-  /* Создаём оверлей */
   var overlay = document.createElement('div');
   overlay.className = 'cp-fullscreen-overlay';
   overlay.onclick = function(ev) { if (ev.target === overlay) cpCloseFullscreen(); };
@@ -708,7 +709,6 @@ function cpShowFullscreen(slotIdx, e) {
   closeBtn.innerHTML = '&times;';
   closeBtn.onclick = cpCloseFullscreen;
 
-  /* Имя файла */
   var nameEl = document.createElement('div');
   nameEl.className = 'cp-fullscreen-name';
   nameEl.textContent = slot.file || '';
@@ -718,22 +718,7 @@ function cpShowFullscreen(slotIdx, e) {
   overlay.appendChild(nameEl);
   document.body.appendChild(overlay);
 
-  /* Escape для закрытия */
   document.addEventListener('keydown', cpFullscreenEscHandler);
-
-  /* Desktop: подгружаем оригинал через бэкенд (pywebview) */
-  if (slot.path && window.pywebview && window.pywebview.api) {
-    window.pywebview.api.get_full_image(slot.path).then(function(result) {
-      if (result && result.data_url) {
-        /* Подменяем src на оригинал (если оверлей ещё открыт) */
-        var currentOverlay = document.querySelector('.cp-fullscreen-overlay');
-        if (currentOverlay) {
-          var fullImg = currentOverlay.querySelector('.cp-fullscreen-img');
-          if (fullImg) fullImg.src = result.data_url;
-        }
-      }
-    });
-  }
 }
 
 /**
@@ -3270,6 +3255,80 @@ function cpMobileGalleryFullscreen(pvIdx) {
   }
 }
 
+
+// ══════════════════════════════════════════════
+//  Аннотации к фото на карточке (сводка)
+// ══════════════════════════════════════════════
+
+/**
+ * Сгенерировать HTML сводки аннотаций для слотов карточки.
+ * Показывает: графические маркеры (кружок/линия) с типом + текстовые комментарии.
+ * @param {Object} card
+ * @returns {string} HTML
+ */
+function _cpRenderSlotAnnotations(card) {
+  if (typeof rtGetAnnotations !== 'function') return '';
+  if (!card.slots || card.slots.length === 0) return '';
+
+  var items = []; /* {file, annots[]} */
+  for (var si = 0; si < card.slots.length; si++) {
+    var file = card.slots[si].file;
+    if (!file) continue;
+    var annots = rtGetAnnotations(file);
+    if (annots.length > 0) items.push({ file: file, annots: annots, slotIdx: si });
+  }
+
+  if (items.length === 0) return '';
+
+  var html = '<div class="cp-annot-summary">';
+  html += '<div class="cp-annot-header">Аннотации к фото</div>';
+
+  for (var ii = 0; ii < items.length; ii++) {
+    var item = items[ii];
+    html += '<div class="cp-annot-file">';
+    html += '<span class="cp-annot-file-name">' + esc(item.file) + '</span>';
+
+    for (var ai = 0; ai < item.annots.length; ai++) {
+      var a = item.annots[ai];
+      var RT_TYPES = (typeof RT_ANNOTATION_TYPES !== 'undefined') ? RT_ANNOTATION_TYPES : {};
+      var typeInfo = RT_TYPES[a.type] || { label: a.type, border: '#999' };
+      var shapeIcon = (a.shape === 'line') ? '~' : 'O';
+      var hasGraphic = a.hasCircle || a.shape === 'line';
+
+      html += '<div class="cp-annot-item" onclick="cpOpenAnnotInLightbox(\'' + esc(item.file) + '\')" title="Открыть в лайтбоксе">';
+      if (hasGraphic) {
+        html += '<span class="cp-annot-shape" style="border-color:' + typeInfo.border + '">' + shapeIcon + '</span>';
+        html += '<span class="cp-annot-type" style="color:' + typeInfo.border + '">' + typeInfo.label + '</span>';
+      }
+      if (a.tags && a.tags.length > 0) {
+        html += '<span class="cp-annot-tags">[' + a.tags.join(', ') + ']</span>';
+      }
+      if (a.text) {
+        html += '<span class="cp-annot-text">' + esc(a.text.substring(0, 80)) + (a.text.length > 80 ? '...' : '') + '</span>';
+      }
+      html += '</div>';
+    }
+
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+/**
+ * Открыть фото в лайтбоксе из карточки (для просмотра аннотаций).
+ */
+function cpOpenAnnotInLightbox(fileName) {
+  var proj = getActiveProject();
+  if (!proj || !proj.previews) return;
+  for (var i = 0; i < proj.previews.length; i++) {
+    if (proj.previews[i].name === fileName) {
+      if (typeof pvShowFullscreen === 'function') pvShowFullscreen(i);
+      return;
+    }
+  }
+}
 
 // ══════════════════════════════════════════════
 //  Комментарии к карточкам
