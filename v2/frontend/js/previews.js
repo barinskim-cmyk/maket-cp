@@ -471,12 +471,10 @@ function pvUpdateCardSlotsForVersion() {
     }
   }
 
-  /* Перерисовать все экраны если что-то изменилось */
-  if (changed) {
-    if (typeof cpRenderCard === 'function') cpRenderCard();
-    if (typeof ocRenderField === 'function') ocRenderField();
-    if (typeof acRenderField === 'function') acRenderField();
-  }
+  /* Перерисовать все экраны (всегда — рендеры сами берут актуальную версию) */
+  if (typeof cpRenderCard === 'function') cpRenderCard();
+  if (typeof ocRenderField === 'function') ocRenderField();
+  if (typeof acRenderField === 'function') acRenderField();
 }
 
 // ── Определение режима ──
@@ -2472,6 +2470,14 @@ function ocRenderField() {
   var totalPhotos = freeStore.length;
   for (var tc = 0; tc < containers.length; tc++) totalPhotos += (containers[tc].items || []).length;
 
+  /* Карта превью для версионного отображения */
+  var _ocPvMap = {};
+  if (proj.previews) {
+    for (var pm = 0; pm < proj.previews.length; pm++) {
+      _ocPvMap[proj.previews[pm].name] = proj.previews[pm];
+    }
+  }
+
   /* Тулбар — показываем всегда (можно создавать контейнеры без фото) */
   var toolbar = document.getElementById('oc-toolbar');
   var countEl = document.getElementById('oc-count');
@@ -2507,8 +2513,9 @@ function ocRenderField() {
     for (var i = 0; i < items.length; i++) {
       var item = items[i];
       var cSel = _ocSelected['cnt:' + c + ':' + i] ? ' oc-selected' : '';
+      var cSrc = (_ocPvMap[item.name] && typeof pvGetPreview === 'function') ? (pvGetPreview(_ocPvMap[item.name]) || item.preview || item.thumb) : (item.preview || item.thumb);
       html += '<div class="oc-item' + cSel + '" data-oc-idx="' + i + '" title="' + esc(item.name) + '" onclick="ocItemClick(\'cnt\',' + c + ',' + i + ',event)">';
-      html += '<img src="' + (item.preview || item.thumb) + '" loading="lazy">';
+      html += '<img src="' + cSrc + '" loading="lazy">';
       html += '<button class="oc-zoom" onclick="ocOpenContainerLightbox(' + c + ',' + i + ',event)" title="На весь экран">' + zoomSvg + '</button>';
       html += '<button class="pv-remove" onclick="ocRemoveFromContainer(' + c + ',' + i + ',event)">&times;</button>';
       if (item._addedBy) html += '<span class="oc-added-by">' + esc(item._addedBy) + '</span>';
@@ -2531,8 +2538,9 @@ function ocRenderField() {
   for (var f = 0; f < freeStore.length; f++) {
     var fItem = freeStore[f];
     var fSel = _ocSelected['free:' + f] ? ' oc-selected' : '';
+    var fSrc = (_ocPvMap[fItem.name] && typeof pvGetPreview === 'function') ? (pvGetPreview(_ocPvMap[fItem.name]) || fItem.preview || fItem.thumb) : (fItem.preview || fItem.thumb);
     html += '<div class="oc-item' + fSel + '" data-oc-idx="' + f + '" title="' + esc(fItem.name) + '" onclick="ocItemClick(\'free\',-1,' + f + ',event)">';
-    html += '<img src="' + (fItem.preview || fItem.thumb) + '" loading="lazy">';
+    html += '<img src="' + fSrc + '" loading="lazy">';
     html += '<button class="oc-zoom" onclick="ocOpenLightbox(' + f + ',event)" title="На весь экран">' + zoomSvg + '</button>';
     html += '<button class="pv-remove" onclick="ocRemoveItem(' + f + ',event)">&times;</button>';
     if (fItem._addedBy) html += '<span class="oc-added-by">' + esc(fItem._addedBy) + '</span>';
@@ -2932,6 +2940,15 @@ function acRenderField() {
 
   gallery.style.gridTemplateColumns = 'repeat(' + _acColumns + ', 1fr)';
 
+  /* Карта превью для версионного отображения */
+  var acProj = getActiveProject();
+  var _acPvMap = {};
+  if (acProj && acProj.previews) {
+    for (var ap = 0; ap < acProj.previews.length; ap++) {
+      _acPvMap[acProj.previews[ap].name] = acProj.previews[ap];
+    }
+  }
+
   var zoomSvg = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
 
   var html = '';
@@ -2940,8 +2957,10 @@ function acRenderField() {
     var isH = it.orient === 'h';
     var spanStyle = isH ? ' style="grid-column: span 2"' : '';
 
+    /* Версионно-зависимый src из pv-объекта */
+    var acSrc = (_acPvMap[it.name] && typeof pvGetPreview === 'function') ? (pvGetPreview(_acPvMap[it.name]) || it.preview || it.thumb) : (it.preview || it.thumb);
     html += '<div class="ac-tile' + (isH ? ' ac-tile-h' : '') + '"' + spanStyle + ' title="' + esc(it.name) + '" onclick="acViewFrom(\'' + esc(it.name).replace(/'/g, "\\'") + '\',event)">';
-    html += '<img src="' + (it.preview || it.thumb) + '" loading="lazy">';
+    html += '<img src="' + acSrc + '" loading="lazy">';
 
     if (it.source === 'card') {
       /* Фото из карточки — зелёная галочка, можно отжать (убрать из карточки) */

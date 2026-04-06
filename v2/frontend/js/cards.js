@@ -400,7 +400,17 @@ function cpSlotHTML(slotIdx, span, hasHero) {
   var toolbar = '<div class="slot-toolbar"></div>';
 
   if (slot.dataUrl || slot.file) {
-    var src = slot.dataUrl || slot.thumbUrl || '';
+    /* Версионно-зависимый src: ищем pv-объект и берём актуальное превью */
+    var src = '';
+    if (slot.file && proj.previews && typeof pvGetPreview === 'function') {
+      for (var pi = 0; pi < proj.previews.length; pi++) {
+        if (proj.previews[pi].name === slot.file) {
+          src = pvGetPreview(proj.previews[pi]) || pvGetThumb(proj.previews[pi]) || '';
+          break;
+        }
+      }
+    }
+    if (!src) src = slot.dataUrl || slot.thumbUrl || '';
     /* Если нет ни dataUrl ни thumbUrl — показать пустой слот (не битую картинку) */
     if (!src && slot.file && typeof slot.file === 'string') {
       src = 'images/' + slot.file;
@@ -640,7 +650,18 @@ function cpShowFullscreen(slotIdx, e) {
   _cpFullscreenActive = true;
 
   /* Для начала показываем то что есть (preview/thumb), потом догружаем оригинал */
-  var src = slot.dataUrl || ('images/' + slot.file);
+  /* Версионно-зависимый src */
+  var src = '';
+  var proj = getActiveProject();
+  if (slot.file && proj && proj.previews && typeof pvGetPreview === 'function') {
+    for (var pi = 0; pi < proj.previews.length; pi++) {
+      if (proj.previews[pi].name === slot.file) {
+        src = pvGetPreview(proj.previews[pi]) || '';
+        break;
+      }
+    }
+  }
+  if (!src) src = slot.dataUrl || ('images/' + slot.file);
   var rot = slot.rotation || 0;
   var rotStyle = rot ? 'transform:rotate(' + rot + 'deg)' : '';
 

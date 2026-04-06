@@ -573,15 +573,6 @@ function renderPipeline() {
   for (var i = 0; i < PIPELINE_STAGES.length; i++) {
     var s = PIPELINE_STAGES[i];
 
-    /* Скрыть не-beta этапы: показать только заглушку "скоро" */
-    if (s.beta === false) {
-      /* Первый не-beta этап — показать разделитель */
-      if (i > 0 && PIPELINE_STAGES[i - 1].beta !== false) {
-        html += '<div class="pipeline-coming-soon">Следующие этапы -- скоро</div>';
-      }
-      continue;
-    }
-
     var cls = '';
     if (i < stage) cls = 'done';
     else if (i === stage) cls = 'active';
@@ -862,9 +853,7 @@ function advanceStage() {
   var proj = App.projects[App.selectedProject];
   if (proj._stage >= PIPELINE_STAGES.length) return;
 
-  /* Если текущий этап не beta — не давать завершить (не должно произойти) */
   var currentStageObj = PIPELINE_STAGES[proj._stage];
-  if (currentStageObj && currentStageObj.beta === false) return;
 
   /* Записать время завершения этапа */
   if (!proj._stageHistory) proj._stageHistory = {};
