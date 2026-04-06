@@ -1156,6 +1156,12 @@ function _sbDoLoadByToken(token) {
           setTimeout(function() { pvRenderGallery(); }, 200);
         }
 
+        /* Запустить авто-обновление из облака (каждые 30 сек) */
+        if (typeof sbStartAutoPull === 'function') sbStartAutoPull();
+
+        /* Подписаться на realtime-обновления версий */
+        if (typeof sbSubscribeVersions === 'function') sbSubscribeVersions(data.project_id);
+
         console.log('Проект загружен по share-ссылке:', proj.brand, 'роль:', proj._role);
       });
     });
@@ -1610,6 +1616,97 @@ function sbPullProject(callback) {
   _sbPullRunning = true;
   var cloudId = proj._cloudId;
   console.log('sbPullProject: подтягиваем данные из облака...');
+
+  /* Клиент по share-ссылке: pull через RPC (прямой SELECT заблокирован RLS) */
+  if (isClient && window._shareToken) {
+    sbClient.rpc('get_project_by_token', { share_token: window._shareToken }).then(function(res) {
+      _sbPullRunning = false;
+      if (res.error || !res.data || !res.data.project_id) {
+        callback(res.error ? res.error.message : 'no data');
+        return;
+      }
+      var data = res.data;
+      var pvByName = {};
+      if (proj.previews) {
+        for (var pi = 0; pi < proj.previews.length; pi++) {
+          pvByName[proj.previews[pi].name] = proj.previews[pi];
+        }
+      }
+
+      /* Обновить карточки */
+      var newCards = [];
+      var _rpcCards = data.cards || [];
+      for (var c = 0; c < _rpcCards.length; c++) {
+        var rc = _rpcCards[c];
+        var card = {
+          id: rc.id, status: rc.status || 'draft',
+          _hasHero: rc.has_hero, _hAspect: rc.h_aspect || '3/2',
+          _vAspect: rc.v_aspect || '2/3', _lockRows: rc.lock_rows || false,
+          slots: []
+        };
+        if (rc.slots && Array.isArray(rc.slots)) {
+          for (var s = 0; s < rc.slots.length; s++) {
+            var rs = rc.slots[s];
+            var fn = rs.file_name || null;
+            var pv = fn ? pvByName[fn] : null;
+            var imgUrl = pv ? (pv.preview || pv.thumb || null) : (rs.preview_path || rs.thumb_path || null);
+            card.slots.push({
+              orient: rs.orient || 'v', weight: rs.weight || 1,
+              row: rs.row_num, rotation: rs.rotation || 0,
+              file: fn, dataUrl: imgUrl,
+              thumbUrl: pv ? (pv.thumb || null) : (rs.thumb_path || null), path: null
+            });
+          }
+        }
+        newCards.push(card);
+      }
+
+      /* Обновить OC */
+      var ocRaw = data.other_content || '[]';
+      var ocNames = (typeof ocRaw === 'string') ? JSON.parse(ocRaw) : (ocRaw || []);
+      var newOC = [];
+      for (var oi = 0; oi < ocNames.length; oi++) {
+        var ocPv = pvByName[ocNames[oi]];
+        if (ocPv) newOC.push({ name: ocPv.name, path: '', thumb: ocPv.thumb, preview: ocPv.preview || '' });
+      }
+
+      /* Обновить контейнеры */
+      var cntRaw = data.oc_containers || '[]';
+      var cntArr = (typeof cntRaw === 'string') ? JSON.parse(cntRaw) : (cntRaw || []);
+      var newContainers = [];
+      for (var ci = 0; ci < cntArr.length; ci++) {
+        var rawCnt = cntArr[ci];
+        var cnt = { id: rawCnt.id, name: rawCnt.name, items: [] };
+        var rawItems = rawCnt.items || [];
+        for (var ri = 0; ri < rawItems.length; ri++) {
+          var cntPv = pvByName[rawItems[ri]];
+          if (cntPv) cnt.items.push({ name: cntPv.name, path: '', thumb: cntPv.thumb, preview: cntPv.preview || '' });
+        }
+        newContainers.push(cnt);
+      }
+
+      proj.cards = newCards;
+      proj.otherContent = newOC;
+      proj.ocContainers = newContainers;
+      proj._stage = data.stage || 0;
+
+      /* Обновить UI */
+      if (typeof renderPipeline === 'function') renderPipeline();
+      if (typeof cpRenderList === 'function') cpRenderList();
+      if (typeof cpRenderCard === 'function') cpRenderCard();
+      if (typeof acRenderField === 'function') acRenderField();
+      if (typeof ocRenderField === 'function') ocRenderField();
+      if (typeof pvRenderAll === 'function') pvRenderAll();
+      if (typeof shAutoSave === 'function') shAutoSave();
+
+      console.log('sbPullProject (client): обновлено — ' + newCards.length + ' карт., ' + newOC.length + ' OC');
+      callback(null);
+    })['catch'](function(err) {
+      _sbPullRunning = false;
+      callback(String(err));
+    });
+    return;
+  }
 
   /* 1. Загрузить проект (stage, other_content) */
   sbClient.from('projects').select('stage, other_content, oc_containers, updated_at').eq('id', cloudId).single().then(function(projRes) {
