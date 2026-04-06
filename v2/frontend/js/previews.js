@@ -1602,6 +1602,32 @@ function pvCloseFullscreen() {
       screen.orientation.unlock();
     }
   } catch(e) {}
+
+  /* Обновить бейджи аннотаций в галерее (могли измениться в лайтбоксе) */
+  _pvRefreshAnnotBadges();
+}
+
+/**
+ * Обновить счётчики аннотаций на миниатюрах галереи.
+ * Вызывается при закрытии лайтбокса чтобы отразить добавленные/удалённые аннотации.
+ */
+function _pvRefreshAnnotBadges() {
+  var thumbs = document.querySelectorAll('.pv-thumb[data-pv-name]');
+  for (var i = 0; i < thumbs.length; i++) {
+    var name = thumbs[i].getAttribute('data-pv-name');
+    var badge = thumbs[i].querySelector('.pv-annot-badge');
+    var count = rtAnnotCount(name);
+    if (count > 0) {
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'pv-annot-badge';
+        thumbs[i].appendChild(badge);
+      }
+      badge.textContent = count;
+    } else if (badge) {
+      badge.remove();
+    }
+  }
 }
 
 /* Обратная совместимость */
