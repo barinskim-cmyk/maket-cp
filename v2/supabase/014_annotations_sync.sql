@@ -1,8 +1,12 @@
--- 014: Annotations sync — store annotations as JSONB on projects table
--- Format: { "photo_name.jpg": [ { shape, text, tags, x, y, rx, ry, points, ... } ] }
+-- 014: Annotations + Comments sync — store as JSONB on projects table
+-- Annotations format: { "photo_name.jpg": [ { shape, text, tags, x, y, rx, ry, points, ... } ] }
+-- Comments format: { "card:<card_id>": [ { id, text, author, created } ], "cnt:<cnt_id>": [...] }
 
 -- Add annotations column to projects
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS annotations jsonb DEFAULT '{}'::jsonb;
+
+-- Add comments column to projects
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS comments jsonb DEFAULT '{}'::jsonb;
 
 -- ══════════════════════════════════════════════
 --  Update save_cards_by_token to accept annotations
@@ -13,7 +17,8 @@ CREATE OR REPLACE FUNCTION save_cards_by_token(
   cards_data jsonb,
   oc_data text DEFAULT '[]',
   oc_containers_data text DEFAULT '[]',
-  annotations_data jsonb DEFAULT '{}'::jsonb
+  annotations_data jsonb DEFAULT '{}'::jsonb,
+  comments_data jsonb DEFAULT '{}'::jsonb
 )
 RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER AS $$
@@ -29,11 +34,12 @@ BEGIN
     RAISE EXCEPTION 'Invalid or expired share token';
   END IF;
 
-  -- Update project metadata (OC + containers + annotations)
+  -- Update project metadata (OC + containers + annotations + comments)
   UPDATE projects SET
     other_content = oc_data,
     oc_containers = oc_containers_data,
     annotations = COALESCE(annotations_data, '{}'::jsonb),
+    comments = COALESCE(comments_data, '{}'::jsonb),
     updated_at = now()
   WHERE id = pid;
 
@@ -99,7 +105,7 @@ BEGIN
     RETURN NULL;
   END IF;
 
-  SELECT id, name, stage, other_content, oc_containers, annotations
+  SELECT id, name, stage, other_content, oc_containers, annotations, comments
     INTO proj_row
     FROM projects
    WHERE id = pid;
@@ -141,6 +147,7 @@ BEGIN
     'other_content', proj_row.other_content,
     'oc_containers', proj_row.oc_containers,
     'annotations', COALESCE(proj_row.annotations, '{}'::jsonb),
+    'comments', COALESCE(proj_row.comments, '{}'::jsonb),
     'cards', cards_arr
   );
 

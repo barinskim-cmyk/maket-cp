@@ -1232,7 +1232,8 @@ function sbSaveCardsByToken(token, cards, callback) {
     cards_data: cardsJson,
     oc_data: JSON.stringify(ocNames),
     oc_containers_data: JSON.stringify(ocCntData),
-    annotations_data: (proj && proj._annotations) ? proj._annotations : {}
+    annotations_data: (proj && proj._annotations) ? proj._annotations : {},
+    comments_data: _sbCollectComments()
   }).then(function(res) {
     if (res.error) {
       console.error('save_cards_by_token:', res.error);
@@ -1584,6 +1585,63 @@ var SB_CARD_SYNC_DELAY = 3000; // 3 секунды после последнег
  * @param {Array} cards
  * @param {function} callback — callback(error)
  */
+/**
+ * Собрать все комментарии (карточки + контейнеры) в один объект для синхронизации.
+ * Формат: { "card:<id>": [...comments], "cnt:<id>": [...comments] }
+ * @returns {Object}
+ */
+function _sbCollectComments() {
+  var proj = getActiveProject();
+  if (!proj) return {};
+  var result = {};
+  /* Комментарии карточек */
+  if (proj.cards) {
+    for (var i = 0; i < proj.cards.length; i++) {
+      var c = proj.cards[i];
+      if (c.id && c._comments && c._comments.length > 0) {
+        result['card:' + c.id] = c._comments;
+      }
+    }
+  }
+  /* Комментарии контейнеров */
+  if (proj.ocContainers) {
+    for (var j = 0; j < proj.ocContainers.length; j++) {
+      var cnt = proj.ocContainers[j];
+      if (cnt.id && cnt._comments && cnt._comments.length > 0) {
+        result['cnt:' + cnt.id] = cnt._comments;
+      }
+    }
+  }
+  return result;
+}
+
+/**
+ * Применить комментарии из облака к локальным карточкам и контейнерам.
+ * @param {Object} proj — активный проект
+ * @param {Object} commentsMap — { "card:<id>": [...], "cnt:<id>": [...] }
+ */
+function _sbApplyComments(proj, commentsMap) {
+  if (!commentsMap || typeof commentsMap !== 'object') return;
+  /* Карточки */
+  if (proj.cards) {
+    for (var i = 0; i < proj.cards.length; i++) {
+      var key = 'card:' + proj.cards[i].id;
+      if (commentsMap[key] && commentsMap[key].length > 0) {
+        proj.cards[i]._comments = commentsMap[key];
+      }
+    }
+  }
+  /* Контейнеры */
+  if (proj.ocContainers) {
+    for (var j = 0; j < proj.ocContainers.length; j++) {
+      var cKey = 'cnt:' + proj.ocContainers[j].id;
+      if (commentsMap[cKey] && commentsMap[cKey].length > 0) {
+        proj.ocContainers[j]._comments = commentsMap[cKey];
+      }
+    }
+  }
+}
+
 function sbSyncCardsLight(projectId, cards, callback) {
   if (!sbClient) { callback('Supabase не подключён'); return; }
 
@@ -1603,6 +1661,7 @@ function sbSyncCardsLight(projectId, cards, callback) {
       template_config: proj._template || null,
       stage: proj._stage || 0,
       annotations: proj._annotations || {},
+      comments: _sbCollectComments(),
       updated_at: new Date().toISOString()
     }).eq('id', projectId).then(function() {});
   }
@@ -1868,6 +1927,13 @@ function sbPullProject(callback) {
       }
       proj._annotations = _remoteAnnot;
 
+      /* Обновить комментарии из облака */
+      var _remoteCmt = data.comments || {};
+      if (typeof _remoteCmt === 'string') {
+        try { _remoteCmt = JSON.parse(_remoteCmt); } catch(e) { _remoteCmt = {}; }
+      }
+      _sbApplyComments(proj, _remoteCmt);
+
       /* Восстановить выбор карточки после pull */
       if (_savedCardId && newCards.length > 0) {
         for (var sci = 0; sci < newCards.length; sci++) {
@@ -1895,7 +1961,7 @@ function sbPullProject(callback) {
   }
 
   /* 1. Загрузить проект (stage, other_content) */
-  sbClient.from('projects').select('stage, other_content, oc_containers, annotations, updated_at').eq('id', cloudId).single().then(function(projRes) {
+  sbClient.from('projects').select('stage, other_content, oc_containers, annotations, comments, updated_at').eq('id', cloudId).single().then(function(projRes) {
     if (projRes.error) { _sbPullRunning = false; callback(projRes.error.message); return; }
 
     var remote = projRes.data;
@@ -2035,6 +2101,13 @@ function sbPullProject(callback) {
           try { _remoteAnnot2 = JSON.parse(_remoteAnnot2); } catch(e) { _remoteAnnot2 = {}; }
         }
         proj._annotations = _remoteAnnot2;
+
+        /* Обновить комментарии из облака */
+        var _remoteCmt2 = remote.comments || {};
+        if (typeof _remoteCmt2 === 'string') {
+          try { _remoteCmt2 = JSON.parse(_remoteCmt2); } catch(e) { _remoteCmt2 = {}; }
+        }
+        _sbApplyComments(proj, _remoteCmt2);
 
         /* Восстановить выбор карточки после pull */
         if (_savedCardId2 && newCards.length > 0) {
