@@ -1836,14 +1836,7 @@ function _pvLbKeyHandler(e) {
   if (e.key === 'Escape') { pvCloseFullscreen(); return; }
   if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { _pvLbNav(1); return; }
   if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { _pvLbNav(-1); return; }
-  /* Пробел = переключить галочку (единая логика) */
-  if (e.key === ' ') {
-    e.preventDefault();
-    var pv = _pvLbList[_pvLbIdx];
-    if (!pv) return;
-    var done = pvToggleSelection(pv.name);
-    if (done) _pvLbOpen();
-  }
+  /* Пробел убран — мешает вводу комментариев и путает пользователей */
 }
 
 function pvCloseFullscreen() {
