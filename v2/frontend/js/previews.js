@@ -3160,11 +3160,12 @@ function pvToggleSelection(name, e, source) {
     if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
   }
 
-  /* Обновить все галереи */
+  /* Обновить десктопные панели (на мобильном не вызывать cpMobileRender —
+     он перестраивает ВСЮ страницу и сбрасывает скролл.
+     Лайтбокс сам обновляет свою галочку через _pvLbMobUpdateUI / _pvLbOpen,
+     а мобильная галерея — через cpMobileToggleOC.) */
   if (typeof acRenderField === 'function') acRenderField();
   if (typeof ocRenderField === 'function') ocRenderField();
-  /* Мобильный: обновить вкладку Other если открыта */
-  if (typeof cpMobileRender === 'function' && window.innerWidth < 768) cpMobileRender();
   return true;
 }
 
