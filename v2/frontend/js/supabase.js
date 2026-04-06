@@ -1595,6 +1595,17 @@ var _sbPullTimer = null;
 /** @type {number} Интервал авто-pull (мс) */
 var SB_PULL_INTERVAL = 30000; /* 30 сек */
 
+/** @type {number} Таймстемп последнего push — pull блокируется на 5 сек после push */
+var _sbLastPushTime = 0;
+
+/**
+ * Пометить что push отправлен — pull будет пропущен ближайшие 5 секунд.
+ * Вызывать из shCloudSyncExplicit / sbSaveCardsByToken callback.
+ */
+function sbMarkPushDone() {
+  _sbLastPushTime = Date.now();
+}
+
 /**
  * Подтянуть свежее состояние проекта из Supabase в локальный объект.
  * Обновляет: cards, slots, otherContent, stage, stageHistory.
@@ -1608,6 +1619,12 @@ function sbPullProject(callback) {
   if (!proj || !proj._cloudId) { callback('Нет облачного проекта'); return; }
   if (!sbClient) { callback('Supabase не подключён'); return; }
   if (_sbPullRunning) { callback('Pull уже идёт'); return; }
+
+  /* Пропустить pull если недавно был push (предотвращает гонку данных) */
+  if (_sbLastPushTime && (Date.now() - _sbLastPushTime) < 5000) {
+    callback('Пропущен: недавний push');
+    return;
+  }
 
   var isOwner = sbIsLoggedIn();
   var isClient = !!window._shareToken;

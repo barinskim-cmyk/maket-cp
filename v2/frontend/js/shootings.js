@@ -1035,6 +1035,7 @@ function shCloudSyncExplicit() {
     _shCloudSyncRunning = true;
     sbSaveCardsByToken(window._shareToken, proj.cards || [], function(err) {
       _shCloudSyncRunning = false;
+      if (typeof sbMarkPushDone === 'function') sbMarkPushDone();
       if (err) console.warn('cloud-sync (client): ошибка:', err);
       else console.log('cloud-sync (client): карточки синхронизированы');
     });
@@ -1061,6 +1062,7 @@ function shCloudSyncExplicit() {
   _shCloudSyncRunning = true;
   sbSyncCardsLight(proj._cloudId, proj.cards || [], function(err) {
     _shCloudSyncRunning = false;
+    if (typeof sbMarkPushDone === 'function') sbMarkPushDone();
     if (err) console.warn('cloud-sync: ошибка синхронизации карточек:', err);
     else console.log('cloud-sync: карточки синхронизированы');
   });
