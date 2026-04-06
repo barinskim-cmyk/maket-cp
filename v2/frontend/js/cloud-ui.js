@@ -181,6 +181,8 @@ function sbShowCloudProjects() {
         App.projects.push(proj);
         App.selectedProject = App.projects.length - 1;
         if (typeof renderProjects === 'function') renderProjects();
+        if (typeof sbStartAutoPull === 'function') sbStartAutoPull();
+        if (proj._cloudId && typeof sbSubscribeVersions === 'function') sbSubscribeVersions(proj._cloudId);
         if (statusEl) statusEl.textContent = 'Загружено из облака';
       }
     });
@@ -492,6 +494,15 @@ function sbLoadAllFromCloud() {
                   if (typeof pvRenderGallery === 'function') pvRenderGallery();
                 });
               }
+            }
+
+            /* Запустить авто-обновление из облака для выбранного проекта */
+            if (typeof sbStartAutoPull === 'function') sbStartAutoPull();
+
+            /* Подписаться на realtime-обновления версий */
+            var selProj = (App.selectedProject >= 0) ? App.projects[App.selectedProject] : null;
+            if (selProj && selProj._cloudId && typeof sbSubscribeVersions === 'function') {
+              sbSubscribeVersions(selProj._cloudId);
             }
 
             if (statusEl) statusEl.textContent = 'Загружено ' + projects.length + ' проектов';
