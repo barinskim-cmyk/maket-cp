@@ -1034,6 +1034,9 @@ function pvBuildHTML(store, used, from, to) {
     html += '<img src="' + thumbSrc + '" loading="lazy">';
     if (noVersion) html += '<span class="pv-no-version"></span>';
     if (inCard) html += '<span class="pv-check"></span>';
+    /* Счётчик аннотаций ретуши */
+    var aCount = rtAnnotCount(pv.name);
+    if (aCount > 0) html += '<span class="pv-annot-badge">' + aCount + '</span>';
     html += '<button class="pv-zoom" onclick="pvShowFullscreen(' + i + ',event)" title="На весь экран"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>';
     html += '<button class="pv-remove" onclick="pvRemoveByName(\'' + esc(pv.name).replace(/'/g, "\\'") + '\',event)">&times;</button>';
     html += '<span class="pv-name">' + esc(pvShortName(pv.name)) + '</span>';
