@@ -1400,15 +1400,65 @@ function _sbOcFallbackRemove(projectId, fileName, callback) {
 }
 
 /**
- * Fallback для клиента: полный push через save_cards_by_token.
+ * Fallback для клиента: прямой push ЛОКАЛЬНОГО OC через save_cards_by_token.
  * Используется, если RPC oc_*_by_token ещё не развёрнута.
+ * ВАЖНО: вызывает RPC напрямую с локальным OC, а не через sbSaveCardsByToken
+ * (который читает серверный OC и потерял бы локальные изменения).
  */
 function _sbOcFallbackPush(callback) {
   var proj = getActiveProject();
-  if (!proj || !window._shareToken) { callback && callback('no project/token'); return; }
-  sbSaveCardsByToken(window._shareToken, proj.cards || [], function(err) {
-    if (typeof sbMarkPushDone === 'function') sbMarkPushDone();
-    callback && callback(err);
+  if (!proj || !window._shareToken || !sbClient) { callback && callback('no project/token'); return; }
+
+  /* Собираем карточки */
+  var cardsJson = [];
+  var cards = proj.cards || [];
+  for (var c = 0; c < cards.length; c++) {
+    var card = cards[c];
+    var slotsJson = [];
+    if (card.slots) {
+      for (var s = 0; s < card.slots.length; s++) {
+        var slot = card.slots[s];
+        slotsJson.push({
+          position: s,
+          orient: slot.orient || 'v',
+          weight: slot.weight || 1,
+          row_num: (slot.row !== undefined) ? slot.row : null,
+          rotation: slot.rotation || 0,
+          file_name: slot.file || null
+        });
+      }
+    }
+    cardsJson.push({
+      position: c,
+      status: card.status || 'draft',
+      has_hero: card._hasHero !== undefined ? card._hasHero : true,
+      h_aspect: card._hAspect || '3/2',
+      v_aspect: card._vAspect || '2/3',
+      lock_rows: card._lockRows || false,
+      slots: slotsJson
+    });
+  }
+
+  /* ЛОКАЛЬНЫЙ OC — именно его и нужно сохранить */
+  var ocNames = (proj.otherContent || []).map(function(oc) { return oc.name; });
+  var ocCntData = (proj.ocContainers || []).map(function(cnt) {
+    return { id: cnt.id, name: cnt.name, items: (cnt.items || []).map(function(it) { return it.name; }) };
+  });
+
+  sbClient.rpc('save_cards_by_token', {
+    share_token: window._shareToken,
+    cards_data: cardsJson,
+    oc_data: JSON.stringify(ocNames),
+    oc_containers_data: JSON.stringify(ocCntData)
+  }).then(function(res) {
+    if (res.error) {
+      console.error('_sbOcFallbackPush:', res.error);
+      callback && callback(res.error.message);
+    } else {
+      console.log('supabase.js: клиент fallback push OK (' + ocNames.length + ' OC)');
+      if (typeof sbMarkPushDone === 'function') sbMarkPushDone();
+      callback && callback(null);
+    }
   });
 }
 
