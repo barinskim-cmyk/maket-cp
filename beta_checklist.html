@@ -714,6 +714,84 @@ tr:hover td { background: #fafafa; }
   <td contenteditable="true" class="my-comment"></td>
 </tr>
 
+<tr class="sprint-row"><td colspan="9">РЕТУШЬ -- комментарии и аннотации</td></tr>
+
+<tr class="section-row"><td colspan="9">Аннотации на фото</td></tr>
+
+<tr data-row="R1">
+  <td>R1</td>
+  <td><strong>Кружки + комментарии в лайтбоксе</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Превью</td>
+  <td>Кнопка "На ретушь" в лайтбоксе. Клик = кружок. Попап: тип (удалить/смягчить/обратить внимание) + теги + текст. Нумерация</td>
+  <td class="files">previews.js, style.css</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="R2">
+  <td>R2</td>
+  <td><strong>Бейджи аннотаций на миниатюрах</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Превью</td>
+  <td>Красный бейдж с количеством комментариев на фото в галерее</td>
+  <td class="files">previews.js, style.css</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="R3">
+  <td>R3</td>
+  <td><strong>Экспорт ТЗ на ретушь</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Ретушь</td>
+  <td>Сводка комментариев: фото + кружки + текст. Формат: PDF или HTML для передачи ретушёру</td>
+  <td class="files">previews.js</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="R4">
+  <td>R4</td>
+  <td><strong>Аннотации в облаке (Supabase)</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-todo">TODO</span></td>
+  <td>Облако</td>
+  <td>Таблица annotations в Supabase. Клиент тоже может оставлять кружки. Синхронизация</td>
+  <td class="files">supabase.js, migration</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr class="section-row"><td colspan="9">Экспорт/Импорт проектов</td></tr>
+
+<tr data-row="E1">
+  <td>E1</td>
+  <td><strong>Экспорт проекта в .maketcp файл</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Инфраструктура</td>
+  <td>Кнопка "Экспорт": скачивает JSON с карточками, превью (все версии), аннотациями, историей пайплайна</td>
+  <td class="files">shootings.js, index.html</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="E2">
+  <td>E2</td>
+  <td><strong>Импорт проекта из .maketcp файла</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td><span class="s-done">DONE</span></td>
+  <td>Инфраструктура</td>
+  <td>Кнопка "Импорт": открывает .maketcp файл, восстанавливает проект со всеми данными</td>
+  <td class="files">shootings.js, index.html</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
 <tr class="checkpoint-row" data-row="cp-final">
   <td></td>
   <td colspan="6"><strong>FINAL:</strong> Все DONE протестированы. Баги записаны. TODO приоритизированы. Бета готова.</td>
