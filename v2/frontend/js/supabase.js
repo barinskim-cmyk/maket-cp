@@ -1219,36 +1219,27 @@ function sbSaveCardsByToken(token, cards, callback) {
     });
   }
 
-  /* ВАЖНО: other_content НЕ передаём — он синхронизируется через дельта-операции.
-     Чтобы не перезатирать OC при параллельных вкладках, читаем текущий OC с сервера. */
+  /* Собираем доп. контент (имена файлов) */
   var proj = getActiveProject();
-
-  /* Контейнеры (пока синхронизируем полностью — они меняются редко) */
+  var ocNames = (proj && proj.otherContent) ? proj.otherContent.map(function(oc) { return oc.name; }) : [];
+  /* Контейнеры */
   var ocCntData = (proj && proj.ocContainers) ? proj.ocContainers.map(function(cnt) {
     return { id: cnt.id, name: cnt.name, items: (cnt.items || []).map(function(it) { return it.name; }) };
   }) : [];
 
-  /* Читаем актуальный OC с сервера чтобы не перезатереть дельта-изменения */
-  sbClient.rpc('get_project_by_token', { share_token: token }).then(function(projRes) {
-    var serverOC = '[]';
-    if (!projRes.error && projRes.data) {
-      serverOC = projRes.data.other_content || '[]';
+  sbClient.rpc('save_cards_by_token', {
+    share_token: token,
+    cards_data: cardsJson,
+    oc_data: JSON.stringify(ocNames),
+    oc_containers_data: JSON.stringify(ocCntData)
+  }).then(function(res) {
+    if (res.error) {
+      console.error('save_cards_by_token:', res.error);
+      callback('Ошибка сохранения: ' + res.error.message);
+    } else {
+      console.log('supabase.js: данные клиента сохранены (' + cards.length + ' карточек, ' + ocNames.length + ' доп. контент)');
+      callback(null);
     }
-
-    sbClient.rpc('save_cards_by_token', {
-      share_token: token,
-      cards_data: cardsJson,
-      oc_data: serverOC,
-      oc_containers_data: JSON.stringify(ocCntData)
-    }).then(function(res) {
-      if (res.error) {
-        console.error('save_cards_by_token:', res.error);
-        callback('Ошибка сохранения: ' + res.error.message);
-      } else {
-        console.log('supabase.js: данные клиента сохранены (' + cards.length + ' карточек)');
-        callback(null);
-      }
-    });
   });
 }
 
@@ -1270,47 +1261,33 @@ function sbSaveCardsByToken(token, cards, callback) {
  * @param {function} [callback] — callback(error)
  */
 function sbOcDeltaAdd(fileName, callback) {
-  if (!sbClient) { callback && callback('Supabase не подключён'); return; }
-  if (!fileName) { callback && callback('Нет имени файла'); return; }
+  if (!sbClient) { _sbOcFallbackFullSync(); callback && callback('no client'); return; }
+  if (!fileName) { callback && callback('no name'); return; }
 
   var proj = getActiveProject();
-  if (!proj || !proj._cloudId) { callback && callback('Нет облачного проекта'); return; }
+  if (!proj || !proj._cloudId) { _sbOcFallbackFullSync(); callback && callback('no project'); return; }
 
   var isClient = !!window._shareToken;
+  var rpcName = isClient ? 'oc_add_item_by_token' : 'oc_add_item';
+  var rpcArgs = isClient
+    ? { p_share_token: window._shareToken, p_file_name: fileName }
+    : { p_project_id: proj._cloudId, p_file_name: fileName };
 
-  if (isClient) {
-    /* Клиент: RPC по share_token */
-    sbClient.rpc('oc_add_item_by_token', {
-      p_share_token: window._shareToken,
-      p_file_name: fileName
-    }).then(function(res) {
-      if (res.error) {
-        console.warn('sbOcDeltaAdd (client RPC):', res.error.message);
-        /* Fallback: полный push через sbSaveCardsByToken */
-        _sbOcFallbackPush(callback);
-        return;
-      }
-      console.log('supabase.js: OC +', fileName, '(delta, client)');
-      if (typeof sbMarkPushDone === 'function') sbMarkPushDone();
+  sbClient.rpc(rpcName, rpcArgs).then(function(res) {
+    if (res.error) {
+      console.warn('sbOcDeltaAdd RPC failed, fallback to full sync:', res.error.message);
+      _sbOcFallbackFullSync();
       callback && callback(null);
-    });
-  } else {
-    /* Владелец: RPC по project_id */
-    sbClient.rpc('oc_add_item', {
-      p_project_id: proj._cloudId,
-      p_file_name: fileName
-    }).then(function(res) {
-      if (res.error) {
-        console.warn('sbOcDeltaAdd (owner RPC):', res.error.message);
-        /* Fallback: read-modify-write */
-        _sbOcFallbackAdd(proj._cloudId, fileName, callback);
-        return;
-      }
-      console.log('supabase.js: OC +', fileName, '(delta, owner)');
-      if (typeof sbMarkPushDone === 'function') sbMarkPushDone();
-      callback && callback(null);
-    });
-  }
+      return;
+    }
+    console.log('supabase.js: OC +', fileName, '(delta)');
+    if (typeof sbMarkPushDone === 'function') sbMarkPushDone();
+    callback && callback(null);
+  })['catch'](function(err) {
+    console.warn('sbOcDeltaAdd exception, fallback:', err);
+    _sbOcFallbackFullSync();
+    callback && callback(null);
+  });
 }
 
 /**
@@ -1320,146 +1297,44 @@ function sbOcDeltaAdd(fileName, callback) {
  * @param {function} [callback] — callback(error)
  */
 function sbOcDeltaRemove(fileName, callback) {
-  if (!sbClient) { callback && callback('Supabase не подключён'); return; }
-  if (!fileName) { callback && callback('Нет имени файла'); return; }
+  if (!sbClient) { _sbOcFallbackFullSync(); callback && callback('no client'); return; }
+  if (!fileName) { callback && callback('no name'); return; }
 
   var proj = getActiveProject();
-  if (!proj || !proj._cloudId) { callback && callback('Нет облачного проекта'); return; }
+  if (!proj || !proj._cloudId) { _sbOcFallbackFullSync(); callback && callback('no project'); return; }
 
   var isClient = !!window._shareToken;
+  var rpcName = isClient ? 'oc_remove_item_by_token' : 'oc_remove_item';
+  var rpcArgs = isClient
+    ? { p_share_token: window._shareToken, p_file_name: fileName }
+    : { p_project_id: proj._cloudId, p_file_name: fileName };
 
-  if (isClient) {
-    sbClient.rpc('oc_remove_item_by_token', {
-      p_share_token: window._shareToken,
-      p_file_name: fileName
-    }).then(function(res) {
-      if (res.error) {
-        console.warn('sbOcDeltaRemove (client RPC):', res.error.message);
-        _sbOcFallbackPush(callback);
-        return;
-      }
-      console.log('supabase.js: OC -', fileName, '(delta, client)');
-      if (typeof sbMarkPushDone === 'function') sbMarkPushDone();
-      callback && callback(null);
-    });
-  } else {
-    sbClient.rpc('oc_remove_item', {
-      p_project_id: proj._cloudId,
-      p_file_name: fileName
-    }).then(function(res) {
-      if (res.error) {
-        console.warn('sbOcDeltaRemove (owner RPC):', res.error.message);
-        _sbOcFallbackRemove(proj._cloudId, fileName, callback);
-        return;
-      }
-      console.log('supabase.js: OC -', fileName, '(delta, owner)');
-      if (typeof sbMarkPushDone === 'function') sbMarkPushDone();
-      callback && callback(null);
-    });
-  }
-}
-
-/**
- * Fallback для владельца: read-modify-write (добавление).
- * Используется, если RPC oc_add_item ещё не развёрнута.
- */
-function _sbOcFallbackAdd(projectId, fileName, callback) {
-  sbClient.from('projects').select('other_content').eq('id', projectId).single().then(function(res) {
-    if (res.error) { callback && callback(res.error.message); return; }
-    var arr = [];
-    try { arr = JSON.parse(res.data.other_content || '[]'); } catch(e) { arr = []; }
-    if (arr.indexOf(fileName) === -1) arr.push(fileName);
-    sbClient.from('projects').update({
-      other_content: JSON.stringify(arr),
-      updated_at: new Date().toISOString()
-    }).eq('id', projectId).then(function(upd) {
-      if (typeof sbMarkPushDone === 'function') sbMarkPushDone();
-      callback && callback(upd.error ? upd.error.message : null);
-    });
-  });
-}
-
-/**
- * Fallback для владельца: read-modify-write (удаление).
- */
-function _sbOcFallbackRemove(projectId, fileName, callback) {
-  sbClient.from('projects').select('other_content').eq('id', projectId).single().then(function(res) {
-    if (res.error) { callback && callback(res.error.message); return; }
-    var arr = [];
-    try { arr = JSON.parse(res.data.other_content || '[]'); } catch(e) { arr = []; }
-    var idx = arr.indexOf(fileName);
-    if (idx >= 0) arr.splice(idx, 1);
-    sbClient.from('projects').update({
-      other_content: JSON.stringify(arr),
-      updated_at: new Date().toISOString()
-    }).eq('id', projectId).then(function(upd) {
-      if (typeof sbMarkPushDone === 'function') sbMarkPushDone();
-      callback && callback(upd.error ? upd.error.message : null);
-    });
-  });
-}
-
-/**
- * Fallback для клиента: прямой push ЛОКАЛЬНОГО OC через save_cards_by_token.
- * Используется, если RPC oc_*_by_token ещё не развёрнута.
- * ВАЖНО: вызывает RPC напрямую с локальным OC, а не через sbSaveCardsByToken
- * (который читает серверный OC и потерял бы локальные изменения).
- */
-function _sbOcFallbackPush(callback) {
-  var proj = getActiveProject();
-  if (!proj || !window._shareToken || !sbClient) { callback && callback('no project/token'); return; }
-
-  /* Собираем карточки */
-  var cardsJson = [];
-  var cards = proj.cards || [];
-  for (var c = 0; c < cards.length; c++) {
-    var card = cards[c];
-    var slotsJson = [];
-    if (card.slots) {
-      for (var s = 0; s < card.slots.length; s++) {
-        var slot = card.slots[s];
-        slotsJson.push({
-          position: s,
-          orient: slot.orient || 'v',
-          weight: slot.weight || 1,
-          row_num: (slot.row !== undefined) ? slot.row : null,
-          rotation: slot.rotation || 0,
-          file_name: slot.file || null
-        });
-      }
-    }
-    cardsJson.push({
-      position: c,
-      status: card.status || 'draft',
-      has_hero: card._hasHero !== undefined ? card._hasHero : true,
-      h_aspect: card._hAspect || '3/2',
-      v_aspect: card._vAspect || '2/3',
-      lock_rows: card._lockRows || false,
-      slots: slotsJson
-    });
-  }
-
-  /* ЛОКАЛЬНЫЙ OC — именно его и нужно сохранить */
-  var ocNames = (proj.otherContent || []).map(function(oc) { return oc.name; });
-  var ocCntData = (proj.ocContainers || []).map(function(cnt) {
-    return { id: cnt.id, name: cnt.name, items: (cnt.items || []).map(function(it) { return it.name; }) };
-  });
-
-  sbClient.rpc('save_cards_by_token', {
-    share_token: window._shareToken,
-    cards_data: cardsJson,
-    oc_data: JSON.stringify(ocNames),
-    oc_containers_data: JSON.stringify(ocCntData)
-  }).then(function(res) {
+  sbClient.rpc(rpcName, rpcArgs).then(function(res) {
     if (res.error) {
-      console.error('_sbOcFallbackPush:', res.error);
-      callback && callback(res.error.message);
-    } else {
-      console.log('supabase.js: клиент fallback push OK (' + ocNames.length + ' OC)');
-      if (typeof sbMarkPushDone === 'function') sbMarkPushDone();
+      console.warn('sbOcDeltaRemove RPC failed, fallback to full sync:', res.error.message);
+      _sbOcFallbackFullSync();
       callback && callback(null);
+      return;
     }
+    console.log('supabase.js: OC -', fileName, '(delta)');
+    if (typeof sbMarkPushDone === 'function') sbMarkPushDone();
+    callback && callback(null);
+  })['catch'](function(err) {
+    console.warn('sbOcDeltaRemove exception, fallback:', err);
+    _sbOcFallbackFullSync();
+    callback && callback(null);
   });
+}
+
+/**
+ * Fallback: если RPC дельта-синхронизации не развёрнуты (миграция 013),
+ * вызываем проверенный полный sync — shCloudSyncExplicit.
+ * Он пишет ВСЁ: карточки + OC + контейнеры (через sbSyncCardsLight или sbSaveCardsByToken).
+ */
+function _sbOcFallbackFullSync() {
+  if (typeof shCloudSyncExplicit === 'function') {
+    shCloudSyncExplicit();
+  }
 }
 
 /**
@@ -1470,26 +1345,9 @@ function _sbOcFallbackPush(callback) {
  * @param {function} [callback] — callback(error)
  */
 function sbOcWriteFull(callback) {
-  if (!sbClient) { callback && callback('Supabase не подключён'); return; }
-  var proj = getActiveProject();
-  if (!proj || !proj._cloudId) { callback && callback('Нет проекта'); return; }
-
-  var ocNames = (proj.otherContent || []).map(function(oc) { return oc.name; });
-
-  var isClient = !!window._shareToken;
-  if (isClient) {
-    /* Клиент: полный push (включает и карточки — неизбежно) */
-    _sbOcFallbackPush(callback);
-  } else {
-    /* Владелец: прямой update поля other_content */
-    sbClient.from('projects').update({
-      other_content: JSON.stringify(ocNames),
-      updated_at: new Date().toISOString()
-    }).eq('id', proj._cloudId).then(function(res) {
-      if (typeof sbMarkPushDone === 'function') sbMarkPushDone();
-      callback && callback(res.error ? res.error.message : null);
-    });
-  }
+  /* Для массовых OC-операций: полный sync отправит всё включая OC */
+  _sbOcFallbackFullSync();
+  callback && callback(null);
 }
 
 // ══════════════════════════════════════════════
@@ -1724,16 +1582,18 @@ var SB_CARD_SYNC_DELAY = 3000; // 3 секунды после последнег
 function sbSyncCardsLight(projectId, cards, callback) {
   if (!sbClient) { callback('Supabase не подключён'); return; }
 
-  /* Обновить oc_containers + stage + template в проекте.
-     ВАЖНО: other_content НЕ пишем здесь — он синхронизируется
-     через дельта-операции sbOcDeltaAdd/Remove (атомарно).
-     Это предотвращает перезатирание OC при параллельных вкладках. */
+  /* Обновить other_content + oc_containers + stage в проекте.
+     Когда миграция 013 (delta OC RPCs) будет развёрнута —
+     дельта-операции sbOcDeltaAdd/Remove возьмут приоритет,
+     а этот полный push останется только для карточных изменений. */
   var proj = getActiveProject();
   if (proj) {
+    var ocNames = (proj.otherContent || []).map(function(oc) { return oc.name; });
     var ocCntData = (proj.ocContainers || []).map(function(cnt) {
       return { id: cnt.id, name: cnt.name, items: (cnt.items || []).map(function(it) { return it.name; }) };
     });
     sbClient.from('projects').update({
+      other_content: JSON.stringify(ocNames),
       oc_containers: JSON.stringify(ocCntData),
       template_config: proj._template || null,
       stage: proj._stage || 0,
