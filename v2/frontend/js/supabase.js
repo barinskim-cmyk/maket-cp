@@ -1267,11 +1267,14 @@ function sbOcDeltaAdd(fileName, callback) {
   var proj = getActiveProject();
   if (!proj || !proj._cloudId) { _sbOcFallbackFullSync(); callback && callback('no project'); return; }
 
-  var isClient = !!window._shareToken;
-  var rpcName = isClient ? 'oc_add_item_by_token' : 'oc_add_item';
-  var rpcArgs = isClient
-    ? { p_share_token: window._shareToken, p_file_name: fileName }
-    : { p_project_id: proj._cloudId, p_file_name: fileName };
+  /* Залогиненный пользователь ВСЕГДА использует owner RPC (по project_id).
+     Клиентский RPC (по token) — только для анонимных. */
+  var isLoggedIn = (typeof sbIsLoggedIn === 'function') && sbIsLoggedIn();
+  var useOwnerPath = isLoggedIn;
+  var rpcName = useOwnerPath ? 'oc_add_item' : 'oc_add_item_by_token';
+  var rpcArgs = useOwnerPath
+    ? { p_project_id: proj._cloudId, p_file_name: fileName }
+    : { p_share_token: window._shareToken, p_file_name: fileName };
 
   sbClient.rpc(rpcName, rpcArgs).then(function(res) {
     if (res.error) {
@@ -1303,11 +1306,12 @@ function sbOcDeltaRemove(fileName, callback) {
   var proj = getActiveProject();
   if (!proj || !proj._cloudId) { _sbOcFallbackFullSync(); callback && callback('no project'); return; }
 
-  var isClient = !!window._shareToken;
-  var rpcName = isClient ? 'oc_remove_item_by_token' : 'oc_remove_item';
-  var rpcArgs = isClient
-    ? { p_share_token: window._shareToken, p_file_name: fileName }
-    : { p_project_id: proj._cloudId, p_file_name: fileName };
+  var isLoggedIn = (typeof sbIsLoggedIn === 'function') && sbIsLoggedIn();
+  var useOwnerPath = isLoggedIn;
+  var rpcName = useOwnerPath ? 'oc_remove_item' : 'oc_remove_item_by_token';
+  var rpcArgs = useOwnerPath
+    ? { p_project_id: proj._cloudId, p_file_name: fileName }
+    : { p_share_token: window._shareToken, p_file_name: fileName };
 
   sbClient.rpc(rpcName, rpcArgs).then(function(res) {
     if (res.error) {

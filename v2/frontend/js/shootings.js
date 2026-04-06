@@ -1046,14 +1046,28 @@ function _shDoCloudSync() {
   var proj = getActiveProject();
   if (!proj) return;
 
-  /* Клиент по share-ссылке — синхронизация через RPC */
-  if (isClient && proj._cloudId) {
+  /* Если пользователь залогинен — ВСЕГДА используем owner-путь (прямой доступ к таблицам).
+     Это надёжнее чем RPC save_cards_by_token (которая может не существовать).
+     Owner-путь работает через RLS: залогиненный пользователь = владелец проекта. */
+  if (isOwner && proj._cloudId) {
+    _shCloudSyncRunning = true;
+    sbSyncCardsLight(proj._cloudId, proj.cards || [], function(err) {
+      _shCloudSyncRunning = false;
+      if (typeof sbMarkPushDone === 'function') sbMarkPushDone();
+      if (err) console.warn('cloud-sync: ошибка:', err);
+      else console.log('cloud-sync: синхронизировано (owner path)');
+    });
+    return;
+  }
+
+  /* Анонимный клиент по share-ссылке — синхронизация через RPC */
+  if (isClient && !isOwner && proj._cloudId) {
     _shCloudSyncRunning = true;
     sbSaveCardsByToken(window._shareToken, proj.cards || [], function(err) {
       _shCloudSyncRunning = false;
       if (typeof sbMarkPushDone === 'function') sbMarkPushDone();
       if (err) console.warn('cloud-sync (client): ошибка:', err);
-      else console.log('cloud-sync (client): карточки синхронизированы');
+      else console.log('cloud-sync (client): синхронизировано');
     });
     return;
   }
@@ -1072,16 +1086,6 @@ function _shDoCloudSync() {
     });
     return;
   }
-
-  /* Фотограф: проект уже в облаке — лёгкая синхронизация карточек напрямую.
-     НЕ через sbAutoSyncCards (он отключён) — вызываем sbSyncCardsLight. */
-  _shCloudSyncRunning = true;
-  sbSyncCardsLight(proj._cloudId, proj.cards || [], function(err) {
-    _shCloudSyncRunning = false;
-    if (typeof sbMarkPushDone === 'function') sbMarkPushDone();
-    if (err) console.warn('cloud-sync: ошибка синхронизации карточек:', err);
-    else console.log('cloud-sync: карточки синхронизированы');
-  });
 }
 
 /**
