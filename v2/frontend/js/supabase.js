@@ -1595,12 +1595,15 @@ var _sbPullTimer = null;
 /** @type {number} Интервал авто-pull (мс) */
 var SB_PULL_INTERVAL = 30000; /* 30 сек */
 
-/** @type {number} Таймстемп последнего push — pull блокируется на 5 сек после push */
+/** @type {number} Таймстемп последнего локального изменения — pull блокируется на 10 сек */
 var _sbLastPushTime = 0;
 
+/** @type {number} Окно блокировки pull после локальных изменений (мс) */
+var SB_PULL_BLOCK_WINDOW = 10000; /* 10 сек: 3 сек debounce + сетевая задержка */
+
 /**
- * Пометить что push отправлен — pull будет пропущен ближайшие 5 секунд.
- * Вызывать из shCloudSyncExplicit / sbSaveCardsByToken callback.
+ * Пометить локальное изменение — pull будет пропущен ближайшие 10 секунд.
+ * Вызывается из shCloudSyncExplicit (начало debounce) и из callback push.
  */
 function sbMarkPushDone() {
   _sbLastPushTime = Date.now();
@@ -1620,9 +1623,10 @@ function sbPullProject(callback) {
   if (!sbClient) { callback('Supabase не подключён'); return; }
   if (_sbPullRunning) { callback('Pull уже идёт'); return; }
 
-  /* Пропустить pull если недавно был push (предотвращает гонку данных) */
-  if (_sbLastPushTime && (Date.now() - _sbLastPushTime) < 5000) {
-    callback('Пропущен: недавний push');
+  /* Пропустить pull если есть свежие локальные изменения (предотвращает гонку данных).
+     Окно: 10 сек — debounce (3с) + сетевая задержка + запас. Как в v0.9. */
+  if (_sbLastPushTime && (Date.now() - _sbLastPushTime) < SB_PULL_BLOCK_WINDOW) {
+    callback('Пропущен: локальные изменения');
     return;
   }
 
@@ -1702,10 +1706,22 @@ function sbPullProject(callback) {
         newContainers.push(cnt);
       }
 
+      /* Сохранить текущий выбор карточки по id */
+      var _savedCardId = (App.currentCardIdx >= 0 && proj.cards && proj.cards[App.currentCardIdx])
+        ? proj.cards[App.currentCardIdx].id : null;
+
       proj.cards = newCards;
       proj.otherContent = newOC;
       proj.ocContainers = newContainers;
       proj._stage = data.stage || 0;
+
+      /* Восстановить выбор карточки после pull */
+      if (_savedCardId && newCards.length > 0) {
+        for (var sci = 0; sci < newCards.length; sci++) {
+          if (newCards[sci].id === _savedCardId) { App.currentCardIdx = sci; break; }
+        }
+      }
+      if (App.currentCardIdx >= newCards.length) App.currentCardIdx = Math.max(0, newCards.length - 1);
 
       /* Обновить UI */
       if (typeof renderPipeline === 'function') renderPipeline();
@@ -1820,11 +1836,23 @@ function sbPullProject(callback) {
           newContainers.push(newCnt);
         }
 
+        /* Сохранить текущий выбор карточки по id */
+        var _savedCardId2 = (App.currentCardIdx >= 0 && proj.cards && proj.cards[App.currentCardIdx])
+          ? proj.cards[App.currentCardIdx].id : null;
+
         /* Применить обновления к локальному проекту */
         proj.cards = newCards;
         proj.otherContent = newOC;
         proj.ocContainers = newContainers;
         proj._stage = remote.stage || 0;
+
+        /* Восстановить выбор карточки после pull */
+        if (_savedCardId2 && newCards.length > 0) {
+          for (var sci2 = 0; sci2 < newCards.length; sci2++) {
+            if (newCards[sci2].id === _savedCardId2) { App.currentCardIdx = sci2; break; }
+          }
+        }
+        if (App.currentCardIdx >= newCards.length) App.currentCardIdx = Math.max(0, newCards.length - 1);
 
         /* Загрузить историю этапов */
         sbLoadStageHistory(cloudId, function(history) {

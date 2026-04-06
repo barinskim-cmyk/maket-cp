@@ -1003,6 +1003,12 @@ function shAutoSave() {
 /** @type {boolean} Блокировка: не запускать новый cloud sync пока старый идёт */
 var _shCloudSyncRunning = false;
 
+/** @type {number|null} Таймер debounce для явной синхронизации */
+var _shExplicitSyncTimer = null;
+
+/** @type {number} Задержка debounce для явной синхронизации (мс) — как в v0.9 */
+var SH_EXPLICIT_SYNC_DELAY = 3000;
+
 /**
  * ОТКЛЮЧЕНА. Автосинхронизация вызывала перезапись облачных данных.
  * Оставлена как заглушка — вызовы из старого кода не сломаются.
@@ -1012,15 +1018,25 @@ function shAutoCloudSync() {
 }
 
 /**
- * Явная синхронизация с облаком — вызывать ТОЛЬКО из действий пользователя:
- * - drop фото в слот карточки
- * - добавление/удаление карточки
- * - смена этапа пайплайна
- * - soft delete / restore проекта
- *
- * НЕ вызывать из: автосохранения, рендера, загрузки из облака.
+ * Явная синхронизация с облаком (debounced 3 сек, как в v0.9).
+ * Несколько быстрых действий собираются в один sync.
+ * Блокирует pull на время работы.
  */
 function shCloudSyncExplicit() {
+  /* Пометить что есть локальные изменения — pull будет пропущен */
+  if (typeof sbMarkPushDone === 'function') sbMarkPushDone();
+
+  if (_shExplicitSyncTimer) clearTimeout(_shExplicitSyncTimer);
+  _shExplicitSyncTimer = setTimeout(function() {
+    _shExplicitSyncTimer = null;
+    _shDoCloudSync();
+  }, SH_EXPLICIT_SYNC_DELAY);
+}
+
+/**
+ * Внутренняя: выполнить облачную синхронизацию.
+ */
+function _shDoCloudSync() {
   if (_shCloudSyncRunning) return;
 
   var isOwner = (typeof sbIsLoggedIn === 'function') && sbIsLoggedIn();
