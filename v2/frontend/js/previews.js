@@ -1157,6 +1157,9 @@ function pvRenderPanel(galleryId, toolbarId, countId, dropzoneId) {
   if (filterEl) {
     filterEl.style.display = 'flex';
     pvRenderFilterStars(panelKey, minRating);
+    /* Обновить состояние кнопки "С комм." */
+    var cmtBtn = document.getElementById(panelKey + '-comment-filter');
+    if (cmtBtn) cmtBtn.classList.toggle('active', !!PV_COMMENT_FILTER[panelKey]);
   }
 
   // Рендер фильтра по папке (только если > 1 папки)
