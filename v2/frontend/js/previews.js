@@ -1303,22 +1303,32 @@ function pvShowFullscreen(pvIdx, e) {
 
   /* Ищем имя файла через DOM */
   var pvName = '';
+  var galleryStore = null;
   if (e && e.target) {
     var thumb = e.target.closest('.pv-thumb');
     if (thumb) pvName = thumb.getAttribute('data-pv-name') || '';
+    /* Найти галерею-родителя для получения отфильтрованного списка */
+    var gallery = e.target.closest('.pv-gallery');
+    if (gallery && gallery._pvStore && gallery._pvStore.length > 0) {
+      galleryStore = gallery._pvStore;
+    }
   }
 
-  /* Определяем индекс в полном массиве */
+  /* Используем отфильтрованный список из галереи (если доступен) */
+  var sourceList = galleryStore || proj.previews;
+
+  /* Определяем индекс в списке */
   var startIdx = -1;
   if (pvName) {
-    for (var p = 0; p < proj.previews.length; p++) {
-      if (proj.previews[p].name === pvName) { startIdx = p; break; }
+    for (var p = 0; p < sourceList.length; p++) {
+      if (sourceList[p].name === pvName) { startIdx = p; break; }
     }
   }
   if (startIdx < 0) startIdx = pvIdx;
-  if (!proj.previews[startIdx]) return;
+  if (startIdx < 0 || startIdx >= sourceList.length) startIdx = 0;
+  if (!sourceList[startIdx]) return;
 
-  _pvLbList = proj.previews;
+  _pvLbList = sourceList;
   _pvLbIdx = startIdx;
   _pvLbOpen();
 }
