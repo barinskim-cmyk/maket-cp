@@ -3734,11 +3734,14 @@ document.addEventListener('DOMContentLoaded', function() {
 /** Режим аннотирования: 'circle' | 'line' | false */
 var _rtAnnotMode = false;
 
-/** Состояние перетаскивания кружка (drag для размера) */
+/** Состояние перетаскивания эллипса (drag для размера) */
 var _rtDragState = null; /* { startX, startY, imgRect, imgWrap } */
 
 /** Состояние рисования линии: массив точек [{x,y}] в % от фото */
 var _rtLinePoints = [];
+
+/** Состояние перетаскивания/ресайза существующего эллипса */
+var _rtEditDrag = null; /* { mode: 'move'|'resizeR'|'resizeB', annotId, photoName, imgWrap, startEvt, origAnnot } */
 
 /** Типы аннотаций: id → {label, color} */
 var RT_ANNOTATION_TYPES = {
@@ -3794,7 +3797,8 @@ function rtAddAnnotation(photoName, annotation) {
   } else if (hasCircle) {
     a.x = annotation.x;
     a.y = annotation.y;
-    a.r = annotation.r || 5;
+    a.rx = annotation.rx || annotation.r || 5;
+    a.ry = annotation.ry || annotation.r || 5;
   }
 
   proj._annotations[photoName].push(a);
@@ -3866,77 +3870,74 @@ function rtRenderAnnotations(photoName, imgWrap) {
   var layer = document.createElement('div');
   layer.className = 'rt-annot-layer';
 
+  /* Выровнять слой аннотаций точно по картинке */
+  _rtAlignLayer(layer, imgWrap);
+
   var graphicNum = 0;
-  /* SVG для линий */
-  var svgLines = '';
-  var svgClickAreas = []; /* {annot, idx, pathD} для кликабельных зон */
+  var svgNS = 'http://www.w3.org/2000/svg';
+
+  /* SVG для линий — создаём через DOM (не innerHTML, из-за namespace) */
+  var svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('viewBox', '0 0 100 100');
+  svg.setAttribute('preserveAspectRatio', 'none');
+  svg.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:4';
+  var hasSvgContent = false;
 
   for (var i = 0; i < annots.length; i++) {
     var a = annots[i];
 
-    /* Линия — рендерим в SVG */
+    /* ── Линия ── */
     if (a.shape === 'line' && a.points && a.points.length >= 2) {
       graphicNum++;
+      hasSvgContent = true;
       var typeInfo = RT_ANNOTATION_TYPES[a.type] || RT_ANNOTATION_TYPES.attention;
       var d = _rtBuildSmoothPath(a.points);
-      svgLines += '<path d="' + d + '" fill="none" stroke="' + typeInfo.border + '" stroke-width="0.6" stroke-linecap="round" opacity="0.8"/>';
-      /* Точки на линии */
+
+      /* Основная кривая */
+      var path = document.createElementNS(svgNS, 'path');
+      path.setAttribute('d', d);
+      path.setAttribute('fill', 'none');
+      path.setAttribute('stroke', typeInfo.border);
+      path.setAttribute('stroke-width', '0.6');
+      path.setAttribute('stroke-linecap', 'round');
+      path.setAttribute('opacity', '0.8');
+      svg.appendChild(path);
+
+      /* Точки */
       for (var pi = 0; pi < a.points.length; pi++) {
-        svgLines += '<circle cx="' + a.points[pi].x + '" cy="' + a.points[pi].y + '" r="0.6" fill="' + typeInfo.border + '"/>';
+        var dot = document.createElementNS(svgNS, 'circle');
+        dot.setAttribute('cx', a.points[pi].x);
+        dot.setAttribute('cy', a.points[pi].y);
+        dot.setAttribute('r', '0.6');
+        dot.setAttribute('fill', typeInfo.border);
+        svg.appendChild(dot);
       }
-      /* Номер посередине линии */
+
+      /* Номер посередине */
       var midIdx = Math.floor(a.points.length / 2);
-      svgLines += '<circle cx="' + a.points[midIdx].x + '" cy="' + a.points[midIdx].y + '" r="1.8" fill="' + typeInfo.color + '" stroke="' + typeInfo.border + '" stroke-width="0.3"/>';
-      svgLines += '<text x="' + a.points[midIdx].x + '" y="' + (a.points[midIdx].y + 0.5) + '" text-anchor="middle" dominant-baseline="middle" font-size="2" font-weight="700" fill="#fff">' + graphicNum + '</text>';
-      /* Широкая невидимая линия для клика */
-      svgClickAreas.push({ annot: a, idx: i, d: d });
-      continue;
-    }
+      var numBg = document.createElementNS(svgNS, 'circle');
+      numBg.setAttribute('cx', a.points[midIdx].x);
+      numBg.setAttribute('cy', a.points[midIdx].y);
+      numBg.setAttribute('r', '1.8');
+      numBg.setAttribute('fill', typeInfo.color);
+      numBg.setAttribute('stroke', typeInfo.border);
+      numBg.setAttribute('stroke-width', '0.3');
+      svg.appendChild(numBg);
 
-    /* Кружок */
-    if (!a.hasCircle && a.x === undefined) continue;
-    if (a.shape === 'line') continue; /* пропускаем неполные линии */
-    graphicNum++;
-    var typeInfo2 = RT_ANNOTATION_TYPES[a.type] || RT_ANNOTATION_TYPES.attention;
-    var circle = document.createElement('div');
-    circle.className = 'rt-circle';
-    circle.setAttribute('data-annot-id', a.id);
-    circle.style.left = a.x + '%';
-    circle.style.top = a.y + '%';
-    circle.style.width = ((a.r || 5) * 2) + '%';
-    circle.style.height = '0';
-    circle.style.paddingBottom = ((a.r || 5) * 2) + '%';
-    circle.style.background = typeInfo2.color;
-    circle.style.borderColor = typeInfo2.border;
+      var numText = document.createElementNS(svgNS, 'text');
+      numText.setAttribute('x', a.points[midIdx].x);
+      numText.setAttribute('y', a.points[midIdx].y);
+      numText.setAttribute('text-anchor', 'middle');
+      numText.setAttribute('dominant-baseline', 'central');
+      numText.setAttribute('font-size', '2');
+      numText.setAttribute('font-weight', '700');
+      numText.setAttribute('fill', '#fff');
+      numText.textContent = graphicNum;
+      svg.appendChild(numText);
 
-    var num = document.createElement('span');
-    num.className = 'rt-circle-num';
-    num.textContent = graphicNum;
-    circle.appendChild(num);
-
-    (function(annot, idx) {
-      circle.onclick = function(ev) {
-        ev.stopPropagation();
-        rtShowAnnotPopup(photoName, annot, idx, imgWrap);
-      };
-    })(a, i);
-
-    layer.appendChild(circle);
-  }
-
-  /* Добавить SVG для линий */
-  if (svgLines || svgClickAreas.length > 0) {
-    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('class', 'rt-line-svg');
-    svg.setAttribute('viewBox', '0 0 100 100');
-    svg.setAttribute('preserveAspectRatio', 'none');
-    svg.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:4';
-    svg.innerHTML = svgLines;
-
-    /* Кликабельные зоны поверх линий (толстый невидимый path) */
-    for (var si = 0; si < svgClickAreas.length; si++) {
-      var hitPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      hitPath.setAttribute('d', svgClickAreas[si].d);
+      /* Кликабельная зона (толстая невидимая линия) */
+      var hitPath = document.createElementNS(svgNS, 'path');
+      hitPath.setAttribute('d', d);
       hitPath.setAttribute('fill', 'none');
       hitPath.setAttribute('stroke', 'transparent');
       hitPath.setAttribute('stroke-width', '3');
@@ -3948,14 +3949,111 @@ function rtRenderAnnotations(photoName, imgWrap) {
           ev.stopPropagation();
           rtShowAnnotPopup(photoName, annot, idx, imgWrap);
         });
-      })(svgClickAreas[si].annot, svgClickAreas[si].idx);
+      })(a, i);
       svg.appendChild(hitPath);
+
+      continue;
     }
 
+    /* ── Эллипс ── */
+    if (!a.hasCircle && a.x === undefined) continue;
+    if (a.shape === 'line') continue;
+    graphicNum++;
+    var typeInfo2 = RT_ANNOTATION_TYPES[a.type] || RT_ANNOTATION_TYPES.attention;
+    var rx = a.rx || a.r || 5;
+    var ry = a.ry || a.r || 5;
+
+    var ellipse = document.createElement('div');
+    ellipse.className = 'rt-circle';
+    ellipse.setAttribute('data-annot-id', a.id);
+    ellipse.style.left = a.x + '%';
+    ellipse.style.top = a.y + '%';
+    ellipse.style.width = (rx * 2) + '%';
+    ellipse.style.height = (ry * 2) + '%';
+    ellipse.style.paddingBottom = '0';
+    ellipse.style.background = typeInfo2.color;
+    ellipse.style.borderColor = typeInfo2.border;
+
+    /* Номер */
+    var num = document.createElement('span');
+    num.className = 'rt-circle-num';
+    num.textContent = graphicNum;
+    ellipse.appendChild(num);
+
+    /* Перетаскивание эллипса (move) */
+    (function(annot, idx, annotId, pName) {
+      ellipse.addEventListener('mousedown', function(ev) {
+        if (ev.target.classList.contains('rt-resize-handle')) return;
+        ev.stopPropagation();
+        _rtStartEditDrag('move', annotId, pName, ev);
+      });
+      /* Клик: попап (только если не было drag) */
+      ellipse.addEventListener('click', function(ev) {
+        if (_rtEditDrag) return;
+        ev.stopPropagation();
+        rtShowAnnotPopup(pName, annot, idx, imgWrap);
+      });
+    })(a, i, a.id, photoName);
+
+    /* Ручки ресайза */
+    var handleR = document.createElement('div');
+    handleR.className = 'rt-resize-handle rt-h-right';
+    (function(annotId, pName) {
+      handleR.addEventListener('mousedown', function(ev) {
+        ev.stopPropagation();
+        _rtStartEditDrag('resizeR', annotId, pName, ev);
+      });
+    })(a.id, photoName);
+    ellipse.appendChild(handleR);
+
+    var handleB = document.createElement('div');
+    handleB.className = 'rt-resize-handle rt-h-bottom';
+    (function(annotId, pName) {
+      handleB.addEventListener('mousedown', function(ev) {
+        ev.stopPropagation();
+        _rtStartEditDrag('resizeB', annotId, pName, ev);
+      });
+    })(a.id, photoName);
+    ellipse.appendChild(handleB);
+
+    layer.appendChild(ellipse);
+  }
+
+  /* Добавить SVG если есть линии */
+  if (hasSvgContent) {
     layer.appendChild(svg);
   }
 
   imgWrap.appendChild(layer);
+}
+
+/**
+ * Выровнять слой аннотаций точно по картинке внутри imgWrap.
+ * Решает проблему: imgWrap может быть больше img.
+ */
+function _rtAlignLayer(layer, imgWrap) {
+  var img = imgWrap.querySelector('img');
+  if (!img || !img.complete || img.naturalWidth === 0) {
+    /* Картинка ещё не загружена — выровняем после загрузки */
+    if (img) {
+      img.addEventListener('load', function() {
+        _rtAlignLayerNow(layer, imgWrap);
+      }, { once: true });
+    }
+    return;
+  }
+  _rtAlignLayerNow(layer, imgWrap);
+}
+
+function _rtAlignLayerNow(layer, imgWrap) {
+  var img = imgWrap.querySelector('img');
+  if (!img) return;
+  var wRect = imgWrap.getBoundingClientRect();
+  var iRect = img.getBoundingClientRect();
+  layer.style.left = (iRect.left - wRect.left) + 'px';
+  layer.style.top = (iRect.top - wRect.top) + 'px';
+  layer.style.width = iRect.width + 'px';
+  layer.style.height = iRect.height + 'px';
 }
 
 /**
@@ -4168,10 +4266,11 @@ function rtPopupSave(photoName, annotId) {
       annData.x = Math.round((bx / newPos.points.length) * 10) / 10;
       annData.y = Math.round((by / newPos.points.length) * 10) / 10;
     } else if (newPos && newPos.x !== undefined && newPos.y !== undefined) {
-      /* Кружок */
+      /* Эллипс */
       annData.x = newPos.x;
       annData.y = newPos.y;
-      if (newPos.r) annData.r = newPos.r;
+      annData.rx = newPos.rx || newPos.r || 5;
+      annData.ry = newPos.ry || newPos.r || 5;
     }
     rtAddAnnotation(photoName, annData);
   }
@@ -4267,25 +4366,38 @@ function _rtUpdateModeButtons() {
 
 /**
  * Координаты клика → проценты от изображения.
- * @returns {{x: number, y: number, rect: DOMRect}} | null
+ * Использует слой аннотаций (или img) для точного позиционирования.
+ * @returns {{x: number, y: number, rect: DOMRect, imgW: number, imgH: number}} | null
  */
 function _rtEventToPercent(ev, imgWrap) {
+  /* Используем слой аннотаций если есть (он выровнен по img) */
+  var layer = imgWrap.querySelector('.rt-annot-layer');
   var img = imgWrap.querySelector('img');
   if (!img) return null;
-  var rect = img.getBoundingClientRect();
+  var ref = layer || img;
+  var rect = ref.getBoundingClientRect();
+  /* Если слоя нет — берём img rect */
+  if (!layer) rect = img.getBoundingClientRect();
   var x = Math.max(0, Math.min(100, ((ev.clientX - rect.left) / rect.width) * 100));
   var y = Math.max(0, Math.min(100, ((ev.clientY - rect.top) / rect.height) * 100));
-  return { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, rect: rect };
+  return {
+    x: Math.round(x * 10) / 10,
+    y: Math.round(y * 10) / 10,
+    rect: rect,
+    imgW: rect.width,
+    imgH: rect.height
+  };
 }
 
-/* ── Кружок: mousedown + drag ── */
+/* ── Эллипс: mousedown + drag (задаёт rx/ry отдельно) ── */
 
 /**
- * Начало рисования кружка: mousedown.
+ * Начало рисования эллипса: mousedown.
+ * Центр = точка клика, тянешь мышь → rx/ry по dx/dy.
  */
 function rtOnMouseDown(ev) {
   if (_rtAnnotMode !== 'circle') return;
-  if (ev.button !== 0) return; /* только левая кнопка */
+  if (ev.button !== 0) return;
 
   var imgWrap = ev.currentTarget;
   var pos = _rtEventToPercent(ev, imgWrap);
@@ -4294,85 +4406,139 @@ function rtOnMouseDown(ev) {
   ev.preventDefault();
   _rtDragState = {
     startX: pos.x, startY: pos.y,
-    imgRect: pos.rect, imgWrap: imgWrap
+    rect: pos.rect, imgWrap: imgWrap
   };
 
-  /* Показать превью кружка */
-  _rtShowCirclePreview(imgWrap, pos.x, pos.y, 0);
+  _rtShowEllipsePreview(imgWrap, pos.x, pos.y, 0, 0);
 
-  /* Слушатели на document для перетаскивания */
   document.addEventListener('mousemove', _rtOnDragMove);
   document.addEventListener('mouseup', _rtOnDragEnd);
 }
 
-/**
- * Движение мыши при рисовании кружка.
- */
 function _rtOnDragMove(ev) {
   if (!_rtDragState) return;
-  var rect = _rtDragState.imgRect;
-  var dx = ((ev.clientX - rect.left) / rect.width) * 100 - _rtDragState.startX;
-  var dy = ((ev.clientY - rect.top) / rect.height) * 100 - _rtDragState.startY;
-  var r = Math.sqrt(dx * dx + dy * dy);
-  r = Math.max(1, Math.min(50, r));
-  _rtShowCirclePreview(_rtDragState.imgWrap, _rtDragState.startX, _rtDragState.startY, r);
+  var rect = _rtDragState.rect;
+  var curX = ((ev.clientX - rect.left) / rect.width) * 100;
+  var curY = ((ev.clientY - rect.top) / rect.height) * 100;
+  var rx = Math.abs(curX - _rtDragState.startX);
+  var ry = Math.abs(curY - _rtDragState.startY);
+  rx = Math.max(1, Math.min(50, rx));
+  ry = Math.max(1, Math.min(50, ry));
+  _rtShowEllipsePreview(_rtDragState.imgWrap, _rtDragState.startX, _rtDragState.startY, rx, ry);
 }
 
-/**
- * Завершение рисования кружка: mouseup.
- */
 function _rtOnDragEnd(ev) {
   document.removeEventListener('mousemove', _rtOnDragMove);
   document.removeEventListener('mouseup', _rtOnDragEnd);
   if (!_rtDragState) return;
 
-  var rect = _rtDragState.imgRect;
-  var dx = ((ev.clientX - rect.left) / rect.width) * 100 - _rtDragState.startX;
-  var dy = ((ev.clientY - rect.top) / rect.height) * 100 - _rtDragState.startY;
-  var r = Math.sqrt(dx * dx + dy * dy);
-  r = Math.max(2, Math.min(50, r)); /* min 2% чтобы был видимым */
-  r = Math.round(r * 10) / 10;
+  var rect = _rtDragState.rect;
+  var curX = ((ev.clientX - rect.left) / rect.width) * 100;
+  var curY = ((ev.clientY - rect.top) / rect.height) * 100;
+  var rx = Math.abs(curX - _rtDragState.startX);
+  var ry = Math.abs(curY - _rtDragState.startY);
+  rx = Math.max(2, Math.min(50, rx));
+  ry = Math.max(2, Math.min(50, ry));
+  rx = Math.round(rx * 10) / 10;
+  ry = Math.round(ry * 10) / 10;
 
   var state = _rtDragState;
   _rtDragState = null;
-  _rtRemoveCirclePreview(state.imgWrap);
+  _rtRemoveEllipsePreview(state.imgWrap);
 
   var pv = _pvLbList[_pvLbIdx];
   if (!pv) return;
 
   rtShowAnnotPopup(pv.name, null, rtAnnotCount(pv.name), state.imgWrap,
-    { x: state.startX, y: state.startY, r: r });
+    { x: state.startX, y: state.startY, rx: rx, ry: ry });
 }
 
-/**
- * Показать превью кружка при перетаскивании.
- */
-function _rtShowCirclePreview(imgWrap, cx, cy, r) {
-  var el = imgWrap.querySelector('.rt-circle-preview');
+/** Превью эллипса при рисовании */
+function _rtShowEllipsePreview(imgWrap, cx, cy, rx, ry) {
+  var layer = imgWrap.querySelector('.rt-annot-layer');
+  if (!layer) return;
+  var el = layer.querySelector('.rt-circle-preview');
   if (!el) {
     el = document.createElement('div');
     el.className = 'rt-circle-preview';
-    var layer = imgWrap.querySelector('.rt-annot-layer');
-    if (!layer) {
-      layer = document.createElement('div');
-      layer.className = 'rt-annot-layer';
-      imgWrap.appendChild(layer);
-    }
     layer.appendChild(el);
   }
   el.style.left = cx + '%';
   el.style.top = cy + '%';
-  el.style.width = (r * 2) + '%';
-  el.style.height = '0';
-  el.style.paddingBottom = (r * 2) + '%';
+  el.style.width = (rx * 2) + '%';
+  el.style.height = (ry * 2) + '%';
+  el.style.paddingBottom = '0';
   el.style.display = 'block';
 }
 
-function _rtRemoveCirclePreview(imgWrap) {
+function _rtRemoveEllipsePreview(imgWrap) {
   if (!imgWrap) imgWrap = document.querySelector('.pv-lb-img-wrap');
   if (!imgWrap) return;
-  var el = imgWrap.querySelector('.rt-circle-preview');
+  var el = imgWrap ? imgWrap.querySelector('.rt-circle-preview') : null;
   if (el) el.remove();
+}
+
+/* ── Перетаскивание/ресайз существующего эллипса ── */
+
+function _rtStartEditDrag(mode, annotId, photoName, ev) {
+  ev.stopPropagation();
+  ev.preventDefault();
+  var imgWrap = document.querySelector('.pv-lb-img-wrap');
+  if (!imgWrap) return;
+  var annots = rtGetAnnotations(photoName);
+  var annot = null;
+  for (var i = 0; i < annots.length; i++) {
+    if (annots[i].id === annotId) { annot = annots[i]; break; }
+  }
+  if (!annot) return;
+
+  _rtEditDrag = {
+    mode: mode, annotId: annotId, photoName: photoName,
+    imgWrap: imgWrap,
+    startClientX: ev.clientX, startClientY: ev.clientY,
+    origX: annot.x, origY: annot.y,
+    origRx: annot.rx || annot.r || 5,
+    origRy: annot.ry || annot.r || 5
+  };
+  document.addEventListener('mousemove', _rtOnEditMove);
+  document.addEventListener('mouseup', _rtOnEditEnd);
+}
+
+function _rtOnEditMove(ev) {
+  if (!_rtEditDrag) return;
+  var d = _rtEditDrag;
+  var layer = d.imgWrap.querySelector('.rt-annot-layer');
+  if (!layer) return;
+  var rect = layer.getBoundingClientRect();
+  var dxPct = ((ev.clientX - d.startClientX) / rect.width) * 100;
+  var dyPct = ((ev.clientY - d.startClientY) / rect.height) * 100;
+
+  var annots = rtGetAnnotations(d.photoName);
+  var annot = null;
+  for (var i = 0; i < annots.length; i++) {
+    if (annots[i].id === d.annotId) { annot = annots[i]; break; }
+  }
+  if (!annot) return;
+
+  if (d.mode === 'move') {
+    annot.x = Math.max(0, Math.min(100, _rtR(d.origX + dxPct)));
+    annot.y = Math.max(0, Math.min(100, _rtR(d.origY + dyPct)));
+  } else if (d.mode === 'resizeR') {
+    annot.rx = Math.max(2, Math.min(50, _rtR(d.origRx + dxPct)));
+  } else if (d.mode === 'resizeB') {
+    annot.ry = Math.max(2, Math.min(50, _rtR(d.origRy + dyPct)));
+  }
+
+  rtRenderAnnotations(d.photoName, d.imgWrap);
+}
+
+function _rtOnEditEnd(ev) {
+  document.removeEventListener('mousemove', _rtOnEditMove);
+  document.removeEventListener('mouseup', _rtOnEditEnd);
+  if (_rtEditDrag) {
+    if (typeof shAutoSave === 'function') shAutoSave();
+    _rtEditDrag = null;
+  }
 }
 
 /* ── Линия: клики ставят точки, двойной клик завершает ── */
@@ -4460,37 +4626,56 @@ function _rtR(v) { return Math.round(v * 10) / 10; }
 
 /**
  * Отрисовать превью линии при рисовании (SVG поверх фото).
+ * Использует createElementNS для корректного SVG namespace.
  */
 function _rtRenderLinePreview(imgWrap) {
   if (!imgWrap) imgWrap = document.querySelector('.pv-lb-img-wrap');
   if (!imgWrap) return;
+  var svgNS = 'http://www.w3.org/2000/svg';
 
-  var svg = imgWrap.querySelector('.rt-line-preview-svg');
+  /* Ищем в annot-layer чтобы позиция совпадала с img */
+  var parent = imgWrap.querySelector('.rt-annot-layer') || imgWrap;
+
+  var svg = parent.querySelector('.rt-line-preview-svg');
   if (!svg) {
-    svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg = document.createElementNS(svgNS, 'svg');
     svg.setAttribute('class', 'rt-line-preview-svg');
     svg.setAttribute('viewBox', '0 0 100 100');
     svg.setAttribute('preserveAspectRatio', 'none');
     svg.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:6';
-    imgWrap.appendChild(svg);
+    parent.appendChild(svg);
   }
 
-  var html = '';
+  /* Очистить старое содержимое */
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+
   /* Точки */
   for (var i = 0; i < _rtLinePoints.length; i++) {
-    html += '<circle cx="' + _rtLinePoints[i].x + '" cy="' + _rtLinePoints[i].y + '" r="0.8" fill="#48c" stroke="#fff" stroke-width="0.3"/>';
+    var dot = document.createElementNS(svgNS, 'circle');
+    dot.setAttribute('cx', _rtLinePoints[i].x);
+    dot.setAttribute('cy', _rtLinePoints[i].y);
+    dot.setAttribute('r', '0.8');
+    dot.setAttribute('fill', '#48c');
+    dot.setAttribute('stroke', '#fff');
+    dot.setAttribute('stroke-width', '0.3');
+    svg.appendChild(dot);
   }
   /* Сглаженная кривая */
   if (_rtLinePoints.length >= 2) {
     var d = _rtBuildSmoothPath(_rtLinePoints);
-    html += '<path d="' + d + '" fill="none" stroke="rgba(50,130,220,0.7)" stroke-width="0.5" stroke-linecap="round"/>';
+    var path = document.createElementNS(svgNS, 'path');
+    path.setAttribute('d', d);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', 'rgba(50,130,220,0.7)');
+    path.setAttribute('stroke-width', '0.5');
+    path.setAttribute('stroke-linecap', 'round');
+    svg.appendChild(path);
   }
-  svg.innerHTML = html;
 }
 
 function _rtRemoveLinePreview() {
-  var svg = document.querySelector('.rt-line-preview-svg');
-  if (svg) svg.remove();
+  var svgs = document.querySelectorAll('.rt-line-preview-svg');
+  for (var i = 0; i < svgs.length; i++) svgs[i].remove();
 }
 
 /**
