@@ -252,6 +252,159 @@ function selectProject(idx) {
   if (typeof sbStartAutoPull === 'function') sbStartAutoPull();
 }
 
+// ══════════════════════════════════════════════
+//  Экспорт / импорт проекта (.maketcp файл)
+//
+//  .maketcp = JSON файл с полными данными проекта:
+//  - метаданные (brand, shoot_date, stage, template и т.д.)
+//  - карточки со слотами
+//  - превью (thumb + preview base64) включая все версии
+//  - аннотации ретуши
+//  - OC контейнеры
+//  - история пайплайна
+//
+//  Используется для:
+//  - Архивации проектов старше 3 месяцев (экономия облака)
+//  - Передачи проекта между устройствами
+//  - Бэкапа
+//  - Бета-тестирования (тестер присылает проект разработчику)
+// ══════════════════════════════════════════════
+
+/**
+ * Экспортировать текущий проект в .maketcp файл.
+ * Собирает все данные включая превью из IndexedDB.
+ */
+function shExportProject() {
+  var proj = getActiveProject();
+  if (!proj) { alert('Нет активного проекта'); return; }
+
+  /* Собрать полный snapshot проекта */
+  var exportData = {
+    _format: 'maketcp',
+    _version: 1,
+    _exportDate: new Date().toISOString(),
+    brand: proj.brand || '',
+    shoot_date: proj.shoot_date || '',
+    templateId: proj.templateId || '',
+    _template: proj._template || null,
+    _stage: proj._stage || 0,
+    _stageHistory: proj._stageHistory || {},
+    channels: proj.channels || [],
+    categories: proj.categories || [],
+    _annotations: proj._annotations || {},
+    cards: [],
+    previews: [],
+    ocContainers: proj.ocContainers || [],
+    otherContent: proj.otherContent || []
+  };
+
+  /* Карточки: полные данные */
+  if (proj.cards) {
+    for (var c = 0; c < proj.cards.length; c++) {
+      var card = proj.cards[c];
+      var cardCopy = {};
+      for (var k in card) {
+        if (card.hasOwnProperty(k)) cardCopy[k] = card[k];
+      }
+      exportData.cards.push(cardCopy);
+    }
+  }
+
+  /* Превью: включая все версии и полные base64 */
+  if (proj.previews) {
+    for (var p = 0; p < proj.previews.length; p++) {
+      var pv = proj.previews[p];
+      var pvCopy = {
+        name: pv.name,
+        path: pv.path || '',
+        thumb: pv.thumb || '',
+        preview: pv.preview || '',
+        rating: pv.rating || 0,
+        orient: pv.orient || 'v',
+        folders: pv.folders || []
+      };
+      if (pv.versions) pvCopy.versions = pv.versions;
+      exportData.previews.push(pvCopy);
+    }
+  }
+
+  /* Генерировать JSON и скачать */
+  var json = JSON.stringify(exportData);
+  var blob = new Blob([json], { type: 'application/json' });
+  var filename = (proj.brand || 'project').replace(/[^a-zA-Zа-яА-Я0-9_-]/g, '_') + '_' + (proj.shoot_date || 'export') + '.maketcp';
+
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  console.log('Экспорт: ' + filename + ' (' + Math.round(json.length / 1024) + ' KB)');
+}
+
+/**
+ * Импортировать проект из .maketcp файла.
+ * Открывает диалог выбора файла, парсит JSON, добавляет в App.projects.
+ */
+function shImportProject() {
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.maketcp,.json';
+  input.onchange = function() {
+    if (!input.files || !input.files[0]) return;
+    var file = input.files[0];
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      try {
+        var data = JSON.parse(ev.target.result);
+        if (data._format !== 'maketcp') {
+          alert('Неизвестный формат файла');
+          return;
+        }
+
+        /* Восстановить проект */
+        var proj = {
+          brand: data.brand || 'Импортированный',
+          shoot_date: data.shoot_date || '',
+          templateId: data.templateId || '',
+          _template: data._template || null,
+          _stage: data._stage || 0,
+          _stageHistory: data._stageHistory || {},
+          channels: data.channels || [],
+          categories: data.categories || [],
+          _annotations: data._annotations || {},
+          cards: data.cards || [],
+          previews: data.previews || [],
+          ocContainers: data.ocContainers || [],
+          otherContent: data.otherContent || []
+        };
+
+        App.projects.push(proj);
+        App.selectedProject = App.projects.length - 1;
+        renderProjects();
+
+        /* Сохранить превью в IndexedDB */
+        if (typeof pvDbSaveProjectPreviews === 'function') {
+          pvDbSaveProjectPreviews(proj);
+        }
+
+        /* Автосохранение */
+        if (typeof shAutoSave === 'function') shAutoSave();
+
+        console.log('Импорт: ' + proj.brand + ' (' + (proj.previews ? proj.previews.length : 0) + ' превью, ' + (proj.cards ? proj.cards.length : 0) + ' карточек)');
+        alert('Проект "' + proj.brand + '" импортирован');
+      } catch(e) {
+        alert('Ошибка чтения файла: ' + e.message);
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
 /**
  * Отрисовать список проектов и обновить пайплайн + карточки.
  */
