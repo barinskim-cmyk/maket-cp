@@ -588,56 +588,13 @@ function renderPipeline() {
     html += '</div>';
   }
 
-  html += '<div class="pipeline-steps">';
-  for (var i = 0; i < PIPELINE_STAGES.length; i++) {
-    var s = PIPELINE_STAGES[i];
-
-    var cls = '';
-    if (i < stage) cls = 'done';
-    else if (i === stage) cls = 'active';
-
-    /* Активный снимок-контекст: подсветить соответствующий этап */
-    var isSnapshotCtx = (typeof _snActiveSnapshot !== 'undefined' && _snActiveSnapshot &&
-      _snActiveSnapshot.stageId === s.id);
-    if (isSnapshotCtx) cls += ' sn-active-stage';
-
-    /* Завершённые этапы — кликабельны для загрузки снимка */
-    var clickable = (i < stage && proj._cloudId);
-    html += '<div class="pipeline-step ' + cls + (clickable ? ' step-clickable' : '') + '"' +
-      (clickable ? ' onclick="shLoadStageSnapshot(\'' + s.id + '\')" title="Посмотреть состояние на этом этапе"' : '') + '>';
-    html += '<div class="step-dot">' + (i < stage ? '&#10003;' : (i + 1)) + '</div>';
-    html += '<div class="step-info">';
-    html += '<div class="step-name">' + esc(s.name) + '</div>';
-
-    /* Показать время завершения этапа (если есть в истории) */
-    if (i < stage && proj._stageHistory && proj._stageHistory[i]) {
-      var ts = proj._stageHistory[i];
-      html += '<div class="step-note">' + ts + '</div>';
-    }
-
-    if (i === stage) {
-      html += '<button class="step-action" onclick="advanceStage()">Завершить этап</button>';
-      /* На этапе "Отбор фотографа" (1) -- кнопка отправки ссылки клиенту */
-      if (s.id === 'selection') {
-        html += '<button class="step-action" style="border-color:#333;color:#333;margin-left:6px" onclick="shSendClientLink()">Ссылка на преотбор</button>';
-      }
-      /* На этапах ЦК/Ретушь -- кнопка загрузки версии */
-      if (s.id === 'color') {
-        html += '<button class="step-action" style="border-color:#333;color:#333;margin-left:6px" onclick="pvOnLoadVersionSelect({value:\'color\'})" title="Загрузить ЦК версию для отбора">Загрузить ЦК</button>';
-      }
-      if (s.id === 'retouch') {
-        html += '<button class="step-action" style="border-color:#333;color:#333;margin-left:6px" onclick="pvOnLoadVersionSelect({value:\'retouch\'})" title="Загрузить ретушь версию для отбора">Загрузить ретушь</button>';
-      }
-    }
-
-    html += '</div>';
-    html += '</div>';
-  }
-  html += '</div>';
-
-  /* ── Параллельные процессы: комментирование ── */
+  /* ── Определяем параметры ветки комментирования ── */
+  var _cmtBranchStart = -1; /* индекс этапа, где ветка стартует */
+  var _cmtBranchEnd = -1;   /* индекс этапа, где ветка заканчивается (-1 = не завершена) */
+  var _cmtBranchActive = false;
   var _cmtCount = 0;
   var _annotCount = 0;
+
   if (proj.cards) {
     for (var ci = 0; ci < proj.cards.length; ci++) {
       if (proj.cards[ci]._comments && proj.cards[ci]._comments.length > 0) {
@@ -652,24 +609,125 @@ function renderPipeline() {
       }
     }
   }
-  if (_cmtCount > 0 || _annotCount > 0) {
-    html += '<div class="pipeline-parallel">';
-    var cmtDone = !!proj._commentingDone;
-    html += '<div class="pipeline-parallel-title">Параллельно: Комментирование' +
-      (cmtDone ? ' (завершено)' : '') + '</div>';
-    if (_cmtCount > 0) {
-      html += '<div class="pipeline-parallel-item">Комментарии к карточкам: ' + _cmtCount + '</div>';
+
+  if (proj._commentingStarted) {
+    _cmtBranchActive = true;
+    /* Определяем стартовый этап: сохранённый или текущий */
+    _cmtBranchStart = (typeof proj._commentingStartedStageIdx === 'number')
+      ? proj._commentingStartedStageIdx : (proj._stage || 0);
+    if (proj._commentingDone) {
+      _cmtBranchEnd = (typeof proj._commentingDoneStageIdx === 'number')
+        ? proj._commentingDoneStageIdx : (proj._stage || 0);
     }
-    if (_annotCount > 0) {
-      html += '<div class="pipeline-parallel-item">Аннотации к фото: ' + _annotCount + '</div>';
-    }
-    if (!cmtDone) {
-      html += '<div style="margin-top:6px">';
-      html += '<button class="btn btn-sm pipeline-cmt-done-btn" onclick="shFinishCommenting()">Готово</button>';
-      html += '</div>';
-    }
-    html += '</div>';
   }
+
+  /* ── Двухколоночный layout: основной пайплайн слева + ветки справа ── */
+  var hasBranch = _cmtBranchActive;
+  html += '<div class="pl-layout' + (hasBranch ? ' pl-has-branch' : '') + '">';
+
+  /* Колонка 1: стандартный pipeline-steps */
+  html += '<div class="pipeline-steps">';
+  for (var i = 0; i < PIPELINE_STAGES.length; i++) {
+    var s = PIPELINE_STAGES[i];
+
+    var cls = '';
+    if (i < stage) cls = 'done';
+    else if (i === stage) cls = 'active';
+
+    var isSnapshotCtx = (typeof _snActiveSnapshot !== 'undefined' && _snActiveSnapshot &&
+      _snActiveSnapshot.stageId === s.id);
+    if (isSnapshotCtx) cls += ' sn-active-stage';
+
+    var clickable = (i < stage && proj._cloudId);
+
+    html += '<div class="pipeline-step ' + cls + (clickable ? ' step-clickable' : '') + '"' +
+      (clickable ? ' onclick="shLoadStageSnapshot(\'' + s.id + '\')" title="Посмотреть состояние на этом этапе"' : '') + '>';
+    html += '<div class="step-dot">' + (i < stage ? '&#10003;' : (i + 1)) + '</div>';
+    html += '<div class="step-info">';
+    html += '<div class="step-name">' + esc(s.name) + '</div>';
+
+    if (i < stage && proj._stageHistory && proj._stageHistory[i]) {
+      var ts = proj._stageHistory[i];
+      html += '<div class="step-note">' + ts + '</div>';
+    }
+
+    if (i === stage) {
+      html += '<button class="step-action" onclick="advanceStage()">Завершить этап</button>';
+      if (s.id === 'selection') {
+        html += '<button class="step-action" style="border-color:#333;color:#333;margin-left:6px" onclick="shSendClientLink()">Ссылка на преотбор</button>';
+      }
+      if (s.id === 'color') {
+        html += '<button class="step-action" style="border-color:#333;color:#333;margin-left:6px" onclick="pvOnLoadVersionSelect({value:\'color\'})" title="Загрузить ЦК версию для отбора">Загрузить ЦК</button>';
+      }
+      if (s.id === 'retouch') {
+        html += '<button class="step-action" style="border-color:#333;color:#333;margin-left:6px" onclick="pvOnLoadVersionSelect({value:\'retouch\'})" title="Загрузить ретушь версию для отбора">Загрузить ретушь</button>';
+      }
+    }
+    html += '</div>'; /* /step-info */
+    html += '</div>'; /* /pipeline-step */
+  }
+  html += '</div>'; /* /pipeline-steps */
+
+  /* Колонка 2: ветки (рисуется отдельно, выравнивается по высоте) */
+  if (hasBranch) {
+    html += '<div class="pl-branch-col">';
+    for (var i = 0; i < PIPELINE_STAGES.length; i++) {
+      var bCls = 'pl-branch-cell';
+
+      /* Однострочная ветка (начало=конец) */
+      if (_cmtBranchEnd >= 0 && i === _cmtBranchStart && i === _cmtBranchEnd) {
+        html += '<div class="' + bCls + ' pl-cell-fork">';
+        html += '<div class="pl-h-line pl-h-done"></div>';
+        html += '<div class="pl-v-col"><div class="pl-dot pl-dot-done"></div></div>';
+        html += '<div class="pl-branch-text">Комментирование</div>';
+        html += '</div>';
+      }
+      /* Точка ответвления */
+      else if (i === _cmtBranchStart) {
+        html += '<div class="' + bCls + ' pl-cell-fork">';
+        html += '<div class="pl-h-line"></div>';
+        html += '<div class="pl-v-col">';
+        html += '<div class="pl-dot"></div>';
+        html += '<div class="pl-v-line pl-v-down"></div>';
+        html += '</div>';
+        html += '<div class="pl-branch-text">Комментирование</div>';
+        html += '</div>';
+      }
+      /* Параллельная вертикальная линия */
+      else if (i > _cmtBranchStart && (_cmtBranchEnd < 0 ? i <= stage : i < _cmtBranchEnd)) {
+        html += '<div class="' + bCls + ' pl-cell-line">';
+        html += '<div class="pl-h-spacer"></div>';
+        html += '<div class="pl-v-col"><div class="pl-v-line pl-v-full"></div></div>';
+        html += '</div>';
+      }
+      /* Точка слияния */
+      else if (_cmtBranchEnd >= 0 && i === _cmtBranchEnd) {
+        html += '<div class="' + bCls + ' pl-cell-merge">';
+        html += '<div class="pl-h-line pl-h-done"></div>';
+        html += '<div class="pl-v-col">';
+        html += '<div class="pl-v-line pl-v-up"></div>';
+        html += '<div class="pl-dot pl-dot-done"></div>';
+        html += '</div>';
+        html += '<div class="pl-branch-text">Завершено</div>';
+        html += '</div>';
+      }
+      /* Мёртвая ветка (не завершена, текущий этап) */
+      else if (_cmtBranchEnd < 0 && i === stage && i > _cmtBranchStart) {
+        html += '<div class="' + bCls + ' pl-cell-dead">';
+        html += '<div class="pl-h-spacer"></div>';
+        html += '<div class="pl-v-col"><div class="pl-v-line pl-v-up pl-v-dashed"></div></div>';
+        html += '<button class="pl-done-btn" onclick="shFinishCommenting()">Завершить</button>';
+        html += '</div>';
+      }
+      /* Пустая ячейка */
+      else {
+        html += '<div class="' + bCls + '"></div>';
+      }
+    }
+    html += '</div>'; /* /pl-branch-col */
+  }
+
+  html += '</div>'; /* /pl-layout */
 
   /* Кнопка сверки: если есть хотя бы 2 снимка */
   if (proj._cloudId && typeof _snCachedSnapshots !== 'undefined' && _snCachedSnapshots.length >= 2) {
@@ -756,37 +814,7 @@ function _shRenderTimeline(proj) {
     html += '</div>';
   }
 
-  /* ── Ветка комментирования на таймлайне ── */
-  if (proj._commentingStarted) {
-    var cmtStart = new Date(proj._commentingStarted);
-    var cmtStartStr = cmtStart.toLocaleDateString('ru-RU') + ' ' + cmtStart.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-    var cmtDoneNow = !!proj._commentingDone;
-    var branchClass = cmtDoneNow ? 'pipeline-branch done' : 'pipeline-branch active';
-
-    html += '<div class="' + branchClass + '">';
-    html += '<div class="pipeline-branch-line"></div>';
-    html += '<div class="pipeline-branch-content">';
-    html += '<div class="pipeline-branch-start">';
-    html += '<span class="pipeline-branch-dot"></span>';
-    html += '<span class="pipeline-branch-label">Комментирование</span>';
-    html += '<span class="pipeline-cp-date">' + cmtStartStr + '</span>';
-    html += '</div>';
-
-    if (cmtDoneNow) {
-      var cmtEnd = new Date(proj._commentingDone);
-      var cmtEndStr = cmtEnd.toLocaleDateString('ru-RU') + ' ' + cmtEnd.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-      /* Найти на каком этапе было завершено */
-      var stageAtDone = proj._commentingDoneStage || '';
-      var stageLabel = stageAtDone ? (' (' + stageAtDone + ')') : '';
-      html += '<div class="pipeline-branch-end">';
-      html += '<span class="pipeline-branch-dot done"></span>';
-      html += '<span class="pipeline-branch-label">Завершено' + stageLabel + '</span>';
-      html += '<span class="pipeline-cp-date">' + cmtEndStr + '</span>';
-      html += '</div>';
-    }
-
-    html += '</div></div>';
-  }
+  /* Ветка комментирования теперь рисуется inline в pipeline-steps, а не здесь */
 
   html += '</div>';
   return html;
@@ -806,6 +834,7 @@ function shFinishCommenting() {
   /* Записываем текущий этап для визуализации на таймлайне */
   var stageNames = ['Преотбор', 'Отбор', 'Клиент', 'ЦК', 'Ретушь (ТЗ)', 'Ретушь', 'Согласование', 'Адаптация'];
   proj._commentingDoneStage = stageNames[proj._stage || 0] || '';
+  proj._commentingDoneStageIdx = proj._stage || 0;
 
   /* Добавить контрольную точку */
   if (!proj._checkpoints) proj._checkpoints = [];

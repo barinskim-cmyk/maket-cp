@@ -228,12 +228,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .pipeline-panel .section-title { font-size: 16px; margin-bottom: 16px; }
 
 .pipeline-sync-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.pipeline-parallel {
-  margin-top: 12px; padding: 8px 12px; background: #fafafa; border: 1px solid #e0e0e0;
-  border-radius: 6px; font-size: 12px;
-}
-.pipeline-parallel-title { font-weight: 600; color: #333; margin-bottom: 4px; }
-.pipeline-parallel-item { color: #555; padding: 2px 0; }
+/* .pipeline-parallel — удалён, ветки теперь inline в пайплайне */
 .pipeline-steps { display: flex; flex-direction: column; gap: 0; }
 .pipeline-step {
   display: flex; align-items: flex-start; gap: 14px; padding: 10px 0;
@@ -303,36 +298,85 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   font-size: 11px; color: #666; margin-top: 2px;
 }
 
-/* Ветка комментирования на таймлайне */
-.pipeline-branch {
-  margin-top: 8px; padding: 8px 10px 8px 20px;
+/* ── Визуальная ветка (двухколоночный layout пайплайна) ── */
+
+/* Обёртка: две колонки рядом */
+.pl-layout {
+  display: flex;
+  gap: 0;
+}
+.pl-layout .pipeline-steps { flex: 1; min-width: 0; }
+
+/* Колонка веток — отдельный flex-столбец справа */
+.pl-branch-col {
+  width: 110px; flex-shrink: 0;
+  display: flex; flex-direction: column; gap: 0;
+  padding-left: 8px;
+}
+
+/* Ячейка ветки — высота синхронизируется с pipeline-step через flex */
+.pl-branch-cell {
+  display: flex; align-items: center;
   position: relative;
-  border-left: 2px dashed #ccc;
-  background: #fafafa; border-radius: 0 4px 4px 0;
+  padding: 10px 0; /* совпадает с pipeline-step padding */
+  min-height: 28px; /* совпадает с step-dot */
 }
-.pipeline-branch.done { border-left-style: solid; border-left-color: #333; }
-.pipeline-branch-line {
-  position: absolute; left: -8px; top: 0;
-  width: 6px; height: 100%;
+
+/* Горизонтальная линия (коннектор от основной линии к ветке) */
+.pl-h-line {
+  position: absolute;
+  left: -8px; top: 50%; transform: translateY(-50%);
+  width: 8px; height: 2px;
+  background: #ccc;
 }
-.pipeline-branch-content { display: flex; flex-direction: column; gap: 6px; }
-.pipeline-branch-start, .pipeline-branch-end {
-  display: flex; align-items: center; gap: 8px;
+.pl-h-done { background: #333; }
+.pl-h-spacer { width: 0; }
+
+/* Вертикальная колонка (содержит линию + точку) */
+.pl-v-col {
+  position: relative;
+  width: 12px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  align-self: stretch;
 }
-.pipeline-branch-dot {
-  width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+
+/* Вертикальная линия ветки */
+.pl-v-line {
+  position: absolute; left: 5px;
+  width: 2px; background: #999;
+}
+.pl-v-full { top: 0; bottom: 0; }
+.pl-v-down { top: 50%; bottom: -1px; }
+.pl-v-up   { top: -1px; bottom: 50%; }
+.pl-v-dashed {
+  background: none;
+  border-left: 2px dashed #bbb;
+  width: 0;
+}
+
+/* Точка на ветке */
+.pl-dot {
+  width: 10px; height: 10px; border-radius: 50%;
   background: #ddd; border: 2px solid #999;
+  position: relative; z-index: 2;
+  flex-shrink: 0;
 }
-.pipeline-branch-dot.done { background: #333; border-color: #333; }
-.pipeline-branch-label {
-  font-size: 12px; font-weight: 600; color: #333;
+.pl-dot-done { background: #333; border-color: #333; }
+
+/* Текст ветки */
+.pl-branch-text {
+  font-size: 10px; color: #888; white-space: nowrap;
+  margin-left: 4px;
 }
-/* Кнопка "Готово" для завершения комментирования */
-.pipeline-cmt-done-btn {
-  background: #333; color: #fff; border: none;
-  font-size: 11px; padding: 3px 12px; border-radius: 4px; cursor: pointer;
+
+/* Кнопка "Завершить" на мёртвой ветке */
+.pl-done-btn {
+  font-size: 10px; padding: 2px 8px;
+  background: #fff; color: #333; border: 1px solid #ccc;
+  border-radius: 3px; cursor: pointer; white-space: nowrap;
+  margin-left: 4px;
 }
-.pipeline-cmt-done-btn:hover { background: #555; }
+.pl-done-btn:hover { background: #333; color: #fff; border-color: #333; }
 
 /* ══════════════════════════════════════════════
    Карточки товара — редактор ([anchor client]-стиль)

@@ -3426,6 +3426,7 @@ function cpAddComment(cardIdx, text) {
   /* Отметить начало комментирования в проекте (для пайплайна) */
   if (!proj._commentingStarted) {
     proj._commentingStarted = new Date().toISOString();
+    proj._commentingStartedStageIdx = proj._stage || 0;
   }
 
   if (typeof shAutoSave === 'function') shAutoSave();
