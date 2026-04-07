@@ -1487,50 +1487,61 @@ function _pvLbOpenDesktop() {
   imgWrap.appendChild(img);
   imgWrap.appendChild(checkWrap);
 
-  /* ── Тулбар аннотаций: всегда видим, две кнопки ── */
-  var annotBar = document.createElement('div');
-  annotBar.className = 'rt-quick-bar';
-  annotBar.id = 'rt-quick-bar';
+  /* ── Панель комментариев: всегда видна, правый нижний угол ── */
+  var annotPanel = document.createElement('div');
+  annotPanel.className = 'rt-panel';
+  annotPanel.id = 'rt-panel';
 
-  /* Кнопка "+ Текст" */
+  /* Список комментариев к фото (аннотации) — всегда виден */
+  var cmtList = document.createElement('div');
+  cmtList.className = 'rt-cmt-list';
+  cmtList.id = 'rt-cmt-list';
+
+  /* Комментарии к карточке (если фото в карточке) */
+  var _cardCmts2 = _pvLbGetCardComments(pv.name);
+  if (_cardCmts2 && _cardCmts2.length > 0) {
+    var ccHtml = '';
+    for (var cci2 = 0; cci2 < _cardCmts2.length; cci2++) {
+      var cc2 = _cardCmts2[cci2];
+      var ccAuthor = cc2.author === 'client' ? 'Клиент' : 'Команда';
+      var ccText = cc2.text || '';
+      ccHtml += '<div class="rt-cmt-item rt-cmt-card">';
+      ccHtml += '<span class="rt-cmt-author">' + esc(ccAuthor) + '</span>';
+      ccHtml += '<span class="rt-cmt-preview">' + esc(ccText.substring(0, 80)) + '</span>';
+      ccHtml += '</div>';
+    }
+    var cardCmtDiv = document.createElement('div');
+    cardCmtDiv.className = 'rt-card-comments';
+    cardCmtDiv.innerHTML = ccHtml;
+    annotPanel.appendChild(cardCmtDiv);
+  }
+
+  /* Аннотации к фото */
+  annotPanel.appendChild(cmtList);
+
+  /* Кнопки действий */
+  var btnRow = document.createElement('div');
+  btnRow.className = 'rt-quick-btns';
+
   var addTextBtn = document.createElement('button');
   addTextBtn.className = 'rt-quick-btn';
   addTextBtn.textContent = '+ Текст';
   addTextBtn.onclick = function(ev) { ev.stopPropagation(); rtShowAnnotPopup(pv.name, null, rtAnnotCount(pv.name), imgWrap, null); };
 
-  /* Кнопка "+ Нарисовать" (режим карандаша) */
   var pencilBtn = document.createElement('button');
   pencilBtn.className = 'rt-quick-btn rt-pencil-btn';
   pencilBtn.id = 'rt-pencil-btn';
   pencilBtn.textContent = '+ Нарисовать';
   pencilBtn.onclick = function(ev) { ev.stopPropagation(); rtTogglePencilMode(); };
 
-  annotBar.appendChild(addTextBtn);
-  annotBar.appendChild(pencilBtn);
+  btnRow.appendChild(addTextBtn);
+  btnRow.appendChild(pencilBtn);
+  annotPanel.appendChild(btnRow);
 
-  /* Счётчик аннотаций (если есть) */
-  var ac = rtAnnotCount(pv.name);
-  if (ac > 0) {
-    var badge = document.createElement('span');
-    badge.className = 'rt-quick-badge';
-    badge.id = 'rt-annot-badge';
-    badge.textContent = ac;
-    badge.title = 'Аннотаций: ' + ac;
-    annotBar.appendChild(badge);
-  }
+  overlay.appendChild(annotPanel);
 
-  /* Список аннотаций — скрыт, открывается по клику на бейдж */
-  var cmtBar = document.createElement('div');
-  cmtBar.className = 'rt-cmt-bar';
-  cmtBar.id = 'rt-cmt-bar';
-  cmtBar.style.display = 'none';
-  var cmtList = document.createElement('div');
-  cmtList.className = 'rt-cmt-list';
-  cmtList.id = 'rt-cmt-list';
-  cmtBar.appendChild(cmtList);
-
-  overlay.appendChild(annotBar);
-  overlay.appendChild(cmtBar);
+  /* Заполнить список аннотаций */
+  rtRenderCmtList(pv.name, imgWrap);
 
   /* Обработчик клика для линий и маршрутизации */
   imgWrap.addEventListener('click', function(ev) {
@@ -1551,23 +1562,7 @@ function _pvLbOpenDesktop() {
   /* Отрисовать существующие аннотации */
   rtRenderAnnotations(pv.name, imgWrap);
 
-  /* ── Комментарии карточки (если фото принадлежит карточке) ── */
-  var _cardCmts = _pvLbGetCardComments(pv.name);
-  if (_cardCmts && _cardCmts.length > 0) {
-    var ccDiv = document.createElement('div');
-    ccDiv.className = 'lb-card-comments';
-    var ccHtml = '<div class="lb-cc-title">Комментарии к карточке (' + _cardCmts.length + ')</div>';
-    for (var cci = 0; cci < _cardCmts.length; cci++) {
-      var cc = _cardCmts[cci];
-      var ccDate = cc.created ? new Date(cc.created).toLocaleDateString('ru-RU') : '';
-      var ccAuthor = cc.author === 'client' ? 'Клиент' : 'Команда';
-      ccHtml += '<div class="lb-cc-item"><span class="lb-cc-author">' + ccAuthor + '</span> ';
-      ccHtml += '<span class="lb-cc-text">' + (typeof esc === 'function' ? esc(cc.text) : cc.text) + '</span>';
-      ccHtml += '<span class="lb-cc-date">' + ccDate + '</span></div>';
-    }
-    ccDiv.innerHTML = ccHtml;
-    overlay.appendChild(ccDiv);
-  }
+  /* Комментарии к карточке теперь внутри rt-panel (правый нижний угол) */
 
   overlay.appendChild(imgWrap);
   overlay.appendChild(closeBtn);
@@ -4257,10 +4252,6 @@ function rtRenderCmtList(photoName, imgWrap) {
     html += '</div>';
   }
   listEl.innerHTML = html;
-
-  /* Обновить счётчик на кнопке */
-  var btn = document.getElementById('rt-annot-toggle');
-  if (btn) btn.textContent = 'Комментарии (' + annots.length + ')';
 }
 
 /**

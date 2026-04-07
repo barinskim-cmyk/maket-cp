@@ -1091,11 +1091,37 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .rt-line-hit { cursor: pointer; }
 .rt-line-hit:hover { stroke: rgba(50,130,220,0.3) !important; }
 
-/* Быстрый тулбар аннотаций — всегда виден внизу лайтбокса */
-.rt-quick-bar {
-  position: absolute; bottom: 20px; right: 20px;
-  display: flex; gap: 8px; align-items: center;
+/* ── Панель комментариев/аннотаций — правый нижний угол лайтбокса ── */
+.rt-panel {
+  position: absolute; bottom: 16px; right: 16px;
+  display: flex; flex-direction: column; gap: 6px;
+  max-width: 300px; max-height: 50vh;
   z-index: 20;
+}
+/* Список аннотаций к фото */
+.rt-panel .rt-cmt-list {
+  display: flex; flex-direction: column; gap: 3px;
+  overflow-y: auto; max-height: 30vh;
+}
+.rt-panel .rt-cmt-list:empty { display: none; }
+.rt-panel .rt-cmt-empty { display: none; } /* скрыть "Нет комментариев" */
+/* Комментарии к карточке */
+.rt-card-comments {
+  display: flex; flex-direction: column; gap: 3px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(255,255,255,0.15);
+  margin-bottom: 2px;
+}
+.rt-cmt-author {
+  font-size: 10px; color: rgba(255,255,255,0.5);
+  margin-right: 4px;
+}
+.rt-cmt-item.rt-cmt-card {
+  background: rgba(60,60,60,0.85);
+}
+/* Ряд кнопок */
+.rt-quick-btns {
+  display: flex; gap: 8px;
 }
 .rt-quick-btn {
   padding: 7px 14px; font-size: 12px; font-weight: 600;
@@ -1108,27 +1134,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   background: rgba(220,50,50,0.8);
   border-color: rgba(255,100,100,0.5);
 }
-.rt-quick-badge {
-  display: inline-flex; align-items: center; justify-content: center;
-  min-width: 22px; height: 22px; padding: 0 5px;
-  background: rgba(255,255,255,0.2); color: #fff;
-  font-size: 11px; font-weight: 600; border-radius: 11px;
-}
 /* Старая кнопка "Комментарии" — скрыть если осталась в DOM */
 .rt-annot-btn { display: none; }
 
-/* ── Комментарии карточки в лайтбоксе ── */
-.lb-card-comments {
-  position: absolute; top: 20px; left: 20px; max-width: 320px; max-height: 40vh;
-  overflow-y: auto; background: rgba(30,30,30,0.9); border-radius: 8px;
-  padding: 10px 14px; z-index: 20; color: #ddd; font-size: 13px;
-}
-.lb-cc-title { font-weight: 600; color: #fff; margin-bottom: 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
-.lb-cc-item { margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-.lb-cc-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
-.lb-cc-author { font-weight: 600; color: #8cf; }
-.lb-cc-text { color: #eee; }
-.lb-cc-date { color: #888; font-size: 11px; margin-left: 8px; }
+/* Старые стили lb-card-comments — перенесены в rt-panel */
+.lb-card-comments { display: none; }
 
 /* ── Тулбар комментариев в лайтбоксе ── */
 .rt-cmt-bar {
@@ -2034,7 +2044,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     gap: 8px;
   }
   /* Аннотации: кнопка и счётчик ближе к краю */
-  .rt-quick-bar { bottom: 12px !important; right: 12px !important; }
+  .rt-panel { bottom: 10px !important; right: 10px !important; max-width: 260px !important; }
   .rt-quick-btn { padding: 5px 10px !important; font-size: 11px !important; }
   .rt-annot-count { bottom: 14px !important; right: 120px !important; font-size: 11px !important; }
   /* Попап аннотации на мобильном: прижать к низу экрана */
