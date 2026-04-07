@@ -1466,19 +1466,19 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 }
 .ac-check:hover { border-color: #fff; background: rgba(0,0,0,0.5); }
 .ac-check-on {
-  background: rgba(0,0,0,0.45); border-color: rgba(255,255,255,0.7);
-  font-size: 14px; line-height: 16px; color: rgba(255,255,255,0.85);
+  background: rgba(255,255,255,0.25); border-color: rgba(255,255,255,0.5);
   text-align: center;
 }
 .ac-check-on::after {
   content: '\00d7';
   position: absolute; top: 50%; left: 50%;
   transform: translate(-50%, -50%);
-  font-size: 15px; font-weight: bold; color: #fff;
+  font-size: 15px; font-weight: bold; color: rgba(255,255,255,0.75);
 }
 .ac-check-on:hover {
-  background: rgba(180,40,40,0.75); border-color: #e57373;
+  background: rgba(180,40,40,0.6); border-color: #e57373;
 }
+.ac-check-on:hover::after { color: #fff; }
 /* Лейбл источника рядом с галочкой */
 .ac-check-label {
   position: absolute; top: 3px; right: 28px;
