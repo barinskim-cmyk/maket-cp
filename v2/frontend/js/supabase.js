@@ -1794,23 +1794,53 @@ function sbMarkPushDone() {
  * @param {function} [callback] — callback(error)
  */
 /**
- * Проверить, что пользователь сейчас вводит текст в поле комментария.
- * Если да — UI перерисовку нужно пропустить (иначе поле сбросится).
- * @returns {boolean}
+ * Быстрый fingerprint данных проекта для сравнения до/после pull.
+ * Сравниваем: количество карточек, слоты (файлы), OC, контейнеры, stage,
+ * аннотации, комментарии, чекпоинты.
+ * @param {Object} proj
+ * @returns {string}
  */
-function _sbIsUserTypingComment() {
-  var active = document.activeElement;
-  if (!active) return false;
-  var tag = active.tagName.toLowerCase();
-  if (tag !== 'input' && tag !== 'textarea') return false;
-  /* Мобильные комментарии */
-  if (active.classList.contains('mob-comment-input')) return true;
-  /* Десктопные комментарии */
-  if (active.classList.contains('cp-comment-textarea')) return true;
-  /* Любой input/textarea внутри карточки */
-  var id = active.id || '';
-  if (id.indexOf('mob-cmt-input') === 0 || id.indexOf('cp-comment-text') === 0) return true;
-  return false;
+function _sbProjectFingerprint(proj) {
+  if (!proj) return '';
+  var parts = [];
+  /* stage */
+  parts.push('s:' + (proj._stage || 0));
+  /* cards: id + slot files */
+  var cards = proj.cards || [];
+  parts.push('c:' + cards.length);
+  for (var i = 0; i < cards.length; i++) {
+    var slotFiles = [];
+    var slots = cards[i].slots || [];
+    for (var j = 0; j < slots.length; j++) {
+      slotFiles.push(slots[j].file || '');
+    }
+    parts.push(cards[i].id + ':' + slotFiles.join(','));
+  }
+  /* OC */
+  var oc = proj.otherContent || [];
+  var ocNames = [];
+  for (var k = 0; k < oc.length; k++) ocNames.push(oc[k].name || '');
+  parts.push('oc:' + ocNames.join(','));
+  /* Containers */
+  var cnts = proj.ocContainers || [];
+  parts.push('cnt:' + cnts.length);
+  for (var m = 0; m < cnts.length; m++) {
+    var items = cnts[m].items || [];
+    var itemNames = [];
+    for (var n = 0; n < items.length; n++) itemNames.push(items[n].name || '');
+    parts.push(cnts[m].id + ':' + itemNames.join(','));
+  }
+  /* Annotations count */
+  var annKeys = proj._annotations ? Object.keys(proj._annotations) : [];
+  parts.push('ann:' + annKeys.length);
+  /* Comments: count per card */
+  for (var ci = 0; ci < cards.length; ci++) {
+    var cmts = cards[ci]._comments || [];
+    if (cmts.length > 0) parts.push('cmt:' + cards[ci].id + ':' + cmts.length);
+  }
+  /* Checkpoints count */
+  parts.push('cpk:' + (proj._checkpoints ? proj._checkpoints.length : 0));
+  return parts.join('|');
 }
 
 function sbPullProject(callback) {
@@ -1933,6 +1963,9 @@ function sbPullProject(callback) {
         }
       }
 
+      /* Fingerprint ДО применения — для сравнения */
+      var _fpBefore = _sbProjectFingerprint(proj);
+
       /* Сохранить текущий выбор карточки по id */
       var _savedCardId = (App.currentCardIdx >= 0 && proj.cards && proj.cards[App.currentCardIdx])
         ? proj.cards[App.currentCardIdx].id : null;
@@ -1963,6 +1996,10 @@ function sbPullProject(callback) {
       }
       if (_remoteCpk.length > 0) proj._checkpoints = _remoteCpk;
 
+      /* Fingerprint ПОСЛЕ — сравниваем */
+      var _fpAfter = _sbProjectFingerprint(proj);
+      var _hasChanges = (_fpBefore !== _fpAfter);
+
       /* Восстановить выбор карточки после pull */
       if (_savedCardId && newCards.length > 0) {
         for (var sci = 0; sci < newCards.length; sci++) {
@@ -1971,25 +2008,19 @@ function sbPullProject(callback) {
       }
       if (App.currentCardIdx >= newCards.length) App.currentCardIdx = Math.max(0, newCards.length - 1);
 
-      /* Обновить UI.
-         На мобилке (share-ссылка) НЕ вызываем cpRenderList/cpRenderCard —
-         они перестраивают всю страницу, вызывая мерцание и сброс полей ввода.
-         Данные уже обновлены в памяти; UI подхватит при следующем явном рендере
-         (переключение вкладки, отправка комментария и т.д.).
-         На десктопе: если пользователь печатает комментарий — тоже пропускаем. */
-      var _isMobileClient = !!window._shareToken;
-      var _isTyping = _sbIsUserTypingComment();
-      if (!_isMobileClient && !_isTyping) {
+      /* Обновить UI только если данные реально изменились.
+         Если ничего не изменилось — не трогаем DOM, не мерцаем, не сбрасываем поля ввода. */
+      if (_hasChanges) {
         if (typeof renderPipeline === 'function') renderPipeline();
         if (typeof cpRenderList === 'function') cpRenderList();
         if (typeof cpRenderCard === 'function') cpRenderCard();
         if (typeof acRenderField === 'function') acRenderField();
         if (typeof ocRenderField === 'function') ocRenderField();
         if (typeof pvRenderAll === 'function') pvRenderAll();
+        if (typeof shAutoSave === 'function') shAutoSave();
       }
-      if (typeof shAutoSave === 'function') shAutoSave();
 
-      console.log('sbPullProject (client): обновлено — ' + newCards.length + ' карт., ' + newOC.length + ' OC' + (_isMobileClient ? ' (mob, no UI)' : (_isTyping ? ' (typing, no UI)' : '')));
+      console.log('sbPullProject (client): ' + (_hasChanges ? 'обновлено' : 'без изменений') + ' — ' + newCards.length + ' карт., ' + newOC.length + ' OC');
       callback(null);
     })['catch'](function(err) {
       _sbPullRunning = false;
@@ -2123,6 +2154,9 @@ function sbPullProject(callback) {
           }
         }
 
+        /* Fingerprint ДО применения */
+        var _fpBefore2 = _sbProjectFingerprint(proj);
+
         /* Сохранить текущий выбор карточки по id */
         var _savedCardId2 = (App.currentCardIdx >= 0 && proj.cards && proj.cards[App.currentCardIdx])
           ? proj.cards[App.currentCardIdx].id : null;
@@ -2154,6 +2188,10 @@ function sbPullProject(callback) {
         }
         if (_remoteCpk2.length > 0) proj._checkpoints = _remoteCpk2;
 
+        /* Fingerprint ПОСЛЕ — сравниваем */
+        var _fpAfter2 = _sbProjectFingerprint(proj);
+        var _hasChanges2 = (_fpBefore2 !== _fpAfter2);
+
         /* Восстановить выбор карточки после pull */
         if (_savedCardId2 && newCards.length > 0) {
           for (var sci2 = 0; sci2 < newCards.length; sci2++) {
@@ -2167,19 +2205,18 @@ function sbPullProject(callback) {
           proj._stageHistory = history;
           _sbPullRunning = false;
 
-          /* Обновить UI (пропускаем если пользователь печатает комментарий) */
-          if (!_sbIsUserTypingComment()) {
+          /* Обновить UI только если данные реально изменились */
+          if (_hasChanges2) {
             if (typeof renderPipeline === 'function') renderPipeline();
             if (typeof cpRenderList === 'function') cpRenderList();
             if (typeof acRenderField === 'function') acRenderField();
             if (typeof ocRenderField === 'function') ocRenderField();
             if (typeof pvRenderAll === 'function') pvRenderAll();
+            /* Сохранить в localStorage */
+            if (typeof shAutoSave === 'function') shAutoSave();
           }
 
-          /* Сохранить в localStorage */
-          if (typeof shAutoSave === 'function') shAutoSave();
-
-          console.log('sbPullProject: данные обновлены (' + newCards.length + ' карт., ' + newOC.length + ' OC, stage=' + proj._stage + ')');
+          console.log('sbPullProject: ' + (_hasChanges2 ? 'обновлено' : 'без изменений') + ' (' + newCards.length + ' карт., ' + newOC.length + ' OC, stage=' + proj._stage + ')');
           callback(null);
         });
       });
