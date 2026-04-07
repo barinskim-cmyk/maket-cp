@@ -424,6 +424,16 @@ function shImportProject() {
  */
 /** @type {boolean} Показывать ли скрытые (удалённые) проекты */
 var shShowHidden = false;
+/* Флаг: первичная загрузка из облака завершена (или облака нет).
+   Пока false — показываем "Загружаю проекты..." вместо "Нет проектов". */
+var _shCloudLoadDone = false;
+/* Таймаут: если через 10с проекты так и не загрузились — показать реальное сообщение */
+setTimeout(function() {
+  if (!_shCloudLoadDone) {
+    _shCloudLoadDone = true;
+    if (typeof renderProjects === 'function') renderProjects();
+  }
+}, 10000);
 
 /**
  * Переключить видимость скрытых проектов.
@@ -524,10 +534,10 @@ function renderProjects() {
   }
 
   if (filtered.length === 0) {
-    /* Если Supabase подключён, но ещё не авторизован — показать "Загружаю..."
-       чтобы пользователь не пугался пустого списка */
-    var _isLoading = (typeof sbIsConnected === 'function' && sbIsConnected() &&
-                      typeof sbIsLoggedIn === 'function' && !sbIsLoggedIn());
+    /* Если Supabase подключён (и ещё не авторизован, или авторизован но проекты ещё
+       не подгрузились) — показать "Загружаю..." чтобы не пугать пустым экраном.
+       После первой успешной загрузки _shCloudLoadDone станет true и покажется реальное сообщение. */
+    var _isLoading = (typeof sbIsConnected === 'function' && sbIsConnected() && !_shCloudLoadDone);
     var emptyMsg = hiddenCount > 0 ? 'Все проекты скрыты' :
                    (_isLoading ? 'Загружаю проекты...' : 'Нет открытых проектов');
     list.innerHTML = '<div class="empty-state">' + emptyMsg + '</div>';

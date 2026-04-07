@@ -480,6 +480,8 @@ function sbLoadAllFromCloud() {
 
             App.projects = projects;
             if (projects.length > 0) App.selectedProject = 0;
+            /* Облачная загрузка завершена — убрать заглушку "Загружаю..." */
+            if (typeof _shCloudLoadDone !== 'undefined') _shCloudLoadDone = true;
 
             /* Сохраняем лёгкий кэш в localStorage (без base64) */
             _authSaveLightCache(projects);

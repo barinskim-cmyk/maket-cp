@@ -3585,32 +3585,53 @@ function acOpenLightbox(idx, e) {
 }
 
 /**
- * Кнопка на плитке отбора — открывает лайтбокс со ВСЕМИ превью проекта,
- * начиная с фото по имени name.
+ * Кнопка на плитке отбора — открывает лайтбокс только с фото из отбора
+ * (карточки + доп. контент), начиная с фото по имени name.
+ * Листаем ТОЛЬКО то, что есть в отборе.
  * @param {string} name — имя файла от которого начать
  * @param {Event} e
  */
 function acViewFrom(name, e) {
   if (e) e.stopPropagation();
   var proj = getActiveProject();
-  if (!proj || !proj.previews || !proj.previews.length) return;
+  if (!proj) return;
 
-  var all = proj.previews;
+  /* Берём только фото из отбора (карточки + other), не весь пул превью */
+  var items = acGetAllContent();
+  if (!items.length) return;
+
+  /* Применить рейтинговый фильтр */
   var minR = _acRatingFilter || 0;
+  if (minR > 0) {
+    var filtered = [];
+    for (var f = 0; f < items.length; f++) {
+      var r = _pvGetRating(items[f].name);
+      if (r >= minR) filtered.push(items[f]);
+    }
+    items = filtered;
+  }
+  if (!items.length) return;
+
+  /* Собираем lbList, обогащаем orient/size из превью проекта */
+  var pvOrientMap = {};
+  if (proj.previews) {
+    for (var pm = 0; pm < proj.previews.length; pm++) {
+      pvOrientMap[proj.previews[pm].name] = proj.previews[pm];
+    }
+  }
   var lbList = [];
   var startIdx = 0;
-
-  for (var i = 0; i < all.length; i++) {
-    if (minR > 0 && (all[i].rating || 0) < minR) continue;
-    if (all[i].name === name) startIdx = lbList.length;
+  for (var i = 0; i < items.length; i++) {
+    if (items[i].name === name) startIdx = lbList.length;
+    var srcPv = pvOrientMap[items[i].name];
     lbList.push({
-      name: all[i].name,
-      thumb: all[i].thumb || '',
-      preview: all[i].preview || '',
-      path: all[i].path || '',
-      orient: all[i].orient || 'v',
-      width: all[i].width || 0,
-      height: all[i].height || 0
+      name: items[i].name,
+      thumb: items[i].thumb || '',
+      preview: items[i].preview || (srcPv ? srcPv.preview : '') || items[i].thumb || '',
+      path: srcPv ? (srcPv.path || '') : '',
+      orient: srcPv ? srcPv.orient : (items[i].orient || 'v'),
+      width: srcPv ? srcPv.width : 0,
+      height: srcPv ? srcPv.height : 0
     });
   }
   if (!lbList.length) return;

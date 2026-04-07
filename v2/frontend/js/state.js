@@ -560,8 +560,10 @@ window.addEventListener('DOMContentLoaded', function() {
 
   if (typeof shLoadAutoSaved === 'function' && App.projects.length === 0) {
     shLoadAutoSaved();
-    if (App.projects.length > 0 && typeof renderProjects === 'function') {
-      renderProjects();
+    if (App.projects.length > 0) {
+      /* Локальные проекты загрузились — убрать заглушку "Загружаю..." */
+      if (typeof _shCloudLoadDone !== 'undefined') _shCloudLoadDone = true;
+      if (typeof renderProjects === 'function') renderProjects();
 
       /* Восстановить превью из IndexedDB (thumb + 1200px preview) */
       if (typeof pvDbRestoreProjectPreviews === 'function') {
