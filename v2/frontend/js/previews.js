@@ -1450,25 +1450,20 @@ function _pvLbOpenDesktop() {
   cmtBar.id = 'rt-cmt-bar';
   cmtBar.style.display = 'none';
 
-  /* Кнопка "+ Текст" */
+  /* Кнопка "+ Текст" (текстовый комментарий без привязки к месту) */
   var addTextBtn = document.createElement('button');
   addTextBtn.className = 'rt-cmt-action';
   addTextBtn.textContent = '+ Текст';
   addTextBtn.onclick = function(ev) { ev.stopPropagation(); rtShowAnnotPopup(pv.name, null, rtAnnotCount(pv.name), imgWrap, null); };
 
-  /* Кнопка "+ Кружок" (режим рисования) */
-  var addCircleBtn = document.createElement('button');
-  addCircleBtn.className = 'rt-cmt-action';
-  addCircleBtn.id = 'rt-circle-mode-btn';
-  addCircleBtn.textContent = '+ Кружок';
-  addCircleBtn.onclick = function(ev) { ev.stopPropagation(); rtToggleAnnotMode(); };
-
-  /* Кнопка "+ Линия" (режим рисования кривой) */
-  var addLineBtn = document.createElement('button');
-  addLineBtn.className = 'rt-cmt-action';
-  addLineBtn.id = 'rt-line-mode-btn';
-  addLineBtn.textContent = '+ Рисовать';
-  addLineBtn.onclick = function(ev) { ev.stopPropagation(); rtToggleLineMode(); };
+  /* Кнопка-карандаш — единый режим рецензирования.
+     Рисуешь свободно → замкнул = кружок, не замкнул = линия.
+     Углы сохраняются, прямые сегменты выравниваются. */
+  var pencilBtn = document.createElement('button');
+  pencilBtn.className = 'rt-cmt-action rt-pencil-btn';
+  pencilBtn.id = 'rt-pencil-btn';
+  pencilBtn.textContent = 'Рецензирование';
+  pencilBtn.onclick = function(ev) { ev.stopPropagation(); rtTogglePencilMode(); };
 
   /* Список существующих комментариев */
   var cmtList = document.createElement('div');
@@ -1476,8 +1471,7 @@ function _pvLbOpenDesktop() {
   cmtList.id = 'rt-cmt-list';
 
   cmtBar.appendChild(addTextBtn);
-  cmtBar.appendChild(addCircleBtn);
-  cmtBar.appendChild(addLineBtn);
+  cmtBar.appendChild(pencilBtn);
   cmtBar.appendChild(cmtList);
 
   /* Главная кнопка открытия тулбара */
@@ -4440,15 +4434,9 @@ function rtPopupDelete(photoName, annotId) {
  * Включить/выключить режим аннотирования кружком.
  * В этом режиме mousedown+drag = рисование кружка с размером.
  */
+/* Обратная совместимость: перенаправление на единый режим */
 function rtToggleAnnotMode() {
-  if (_rtAnnotMode === 'circle') {
-    _rtAnnotMode = false;
-  } else {
-    _rtAnnotMode = 'circle';
-    _rtLinePoints = [];
-    _rtRemoveLinePreview();
-  }
-  _rtUpdateModeButtons();
+  rtTogglePencilMode();
 }
 
 /**
@@ -4472,18 +4460,35 @@ function rtToggleLineMode() {
 /**
  * Обновить внешний вид кнопок режимов в тулбаре.
  */
-function _rtUpdateModeButtons() {
-  var circleBtn = document.getElementById('rt-circle-mode-btn');
-  if (circleBtn) {
-    circleBtn.classList.toggle('rt-mode-active', _rtAnnotMode === 'circle');
-    circleBtn.textContent = _rtAnnotMode === 'circle' ? 'Готово' : '+ Кружок';
+/**
+ * Включить/выключить единый режим рецензирования (карандаш).
+ */
+function rtTogglePencilMode() {
+  if (_rtAnnotMode === 'pencil') {
+    _rtAnnotMode = false;
+    _rtLineDrawing = false;
+    _rtLinePoints = [];
+    _rtRemoveLinePreview();
+  } else {
+    _rtAnnotMode = 'pencil';
+    _rtLinePoints = [];
+    _rtRemoveLinePreview();
   }
+  _rtUpdateModeButtons();
+}
+
+function _rtUpdateModeButtons() {
+  /* Старые кнопки — поддержка на случай если ещё в DOM */
+  var circleBtn = document.getElementById('rt-circle-mode-btn');
+  if (circleBtn) circleBtn.style.display = 'none';
   var lineBtn = document.getElementById('rt-line-mode-btn');
-  if (lineBtn) {
-    lineBtn.classList.toggle('rt-mode-active', _rtAnnotMode === 'line');
-    lineBtn.textContent = _rtAnnotMode === 'line'
-      ? 'Готово'
-      : '+ Рисовать';
+  if (lineBtn) lineBtn.style.display = 'none';
+
+  /* Новая кнопка-карандаш */
+  var pencilBtn = document.getElementById('rt-pencil-btn');
+  if (pencilBtn) {
+    pencilBtn.classList.toggle('rt-mode-active', _rtAnnotMode === 'pencil');
+    pencilBtn.textContent = _rtAnnotMode === 'pencil' ? 'Готово' : 'Рецензирование';
   }
   var imgWrap = document.querySelector('.pv-lb-img-wrap');
   if (imgWrap) {
@@ -4523,8 +4528,8 @@ function _rtEventToPercent(ev, imgWrap) {
  * Центр = точка клика, тянешь мышь → rx/ry по dx/dy.
  */
 function rtOnMouseDown(ev) {
-  /* Линия: свободное рисование */
-  if (_rtAnnotMode === 'line') {
+  /* Единый режим рецензирования: свободное рисование */
+  if (_rtAnnotMode === 'pencil' || _rtAnnotMode === 'line') {
     rtOnLineMouseDown(ev);
     return;
   }
@@ -4685,7 +4690,7 @@ var _rtLineDrawing = false;
  * Начать рисование линии (mousedown).
  */
 function rtOnLineMouseDown(ev) {
-  if (_rtAnnotMode !== 'line') return;
+  if (_rtAnnotMode !== 'line' && _rtAnnotMode !== 'pencil') return;
   if (ev.button !== 0) return;
 
   var imgWrap = ev.currentTarget;
@@ -4767,7 +4772,84 @@ function _rtPointToLineDist(p, a, b) {
 }
 
 /**
- * Завершить свободное рисование: упростить, проверить замкнутость → кружок.
+ * Найти точки резкой смены направления (углы) в пути.
+ * Угол считается "настоящим" если:
+ * 1. Поворот > angleDeg (по умолчанию 45 градусов)
+ * 2. ОБА отрезка (до и после точки) длиннее minLen (по умолчанию 1.5%,
+ *    что при фото 1200px = ~18 пикселей)
+ * Это отсекает мелкие дрожания руки, но сохраняет реальные углы
+ * (например при обводке квадратного объекта).
+ * @param {Array} pts — [{x,y}]
+ * @param {number} angleDeg — порог угла поворота в градусах
+ * @param {number} minLen — минимальная длина плеча в % от фото
+ * @returns {Array<number>} — индексы угловых точек
+ */
+function _rtDetectCorners(pts, angleDeg, minLen) {
+  var corners = [];
+  if (pts.length < 3) return corners;
+  if (!minLen) minLen = 1.5; /* ~18px при 1200px фото */
+  var threshold = angleDeg * Math.PI / 180;
+  for (var i = 1; i < pts.length - 1; i++) {
+    var a = pts[i - 1], b = pts[i], c = pts[i + 1];
+    var dx1 = b.x - a.x, dy1 = b.y - a.y;
+    var dx2 = c.x - b.x, dy2 = c.y - b.y;
+    var len1 = Math.sqrt(dx1 * dx1 + dy1 * dy1);
+    var len2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+    /* Оба плеча должны быть достаточно длинными — иначе это дрожание руки */
+    if (len1 < minLen || len2 < minLen) continue;
+    /* Угол между векторами через dot product */
+    var dot = (dx1 * dx2 + dy1 * dy2) / (len1 * len2);
+    dot = Math.max(-1, Math.min(1, dot));
+    var angle = Math.acos(dot); /* 0 = прямо, PI = разворот */
+    if (angle > threshold) {
+      corners.push(i);
+    }
+  }
+  return corners;
+}
+
+/**
+ * Умное упрощение с сохранением углов:
+ * 1. Найти угловые точки (резкие повороты > 45 градусов)
+ * 2. Разбить путь на сегменты по углам
+ * 3. Каждый сегмент упростить отдельно (Douglas-Peucker)
+ * 4. Собрать обратно
+ * @param {Array} pts — сырые точки
+ * @returns {Array} — упрощённые точки
+ */
+function _rtSmartSimplify(pts) {
+  if (pts.length < 3) return pts;
+
+  /* Шаг 1: детектим углы (порог 50 градусов — примерно прямой угол) */
+  var corners = _rtDetectCorners(pts, 50);
+
+  /* Шаг 2: разбиваем на сегменты */
+  var segments = [];
+  var start = 0;
+  for (var ci = 0; ci < corners.length; ci++) {
+    segments.push(pts.slice(start, corners[ci] + 1));
+    start = corners[ci];
+  }
+  segments.push(pts.slice(start));
+
+  /* Шаг 3: упрощаем каждый сегмент */
+  var result = [];
+  for (var si = 0; si < segments.length; si++) {
+    var simplified = _rtSimplifyLine(segments[si], 1.5);
+    if (si === 0) {
+      result = simplified;
+    } else {
+      /* Пропускаем первую точку (дубликат от предыдущего сегмента) */
+      for (var pi = 1; pi < simplified.length; pi++) {
+        result.push(simplified[pi]);
+      }
+    }
+  }
+  return result;
+}
+
+/**
+ * Завершить свободное рисование: умное упрощение, проверить замкнутость → кружок.
  */
 function _rtFinishLineFreehand() {
   var pv = _pvLbList[_pvLbIdx];
@@ -4777,11 +4859,10 @@ function _rtFinishLineFreehand() {
   _rtLinePoints = [];
   _rtRemoveLinePreview();
 
-  /* Упростить линию (epsilon = 1.5% от фото) */
-  var simplified = _rtSimplifyLine(rawPoints, 1.5);
+  /* Умное упрощение: сохраняет углы, сглаживает плавные участки */
+  var simplified = _rtSmartSimplify(rawPoints);
   if (simplified.length < 2) {
-    _rtAnnotMode = false;
-    _rtUpdateModeButtons();
+    /* Режим карандаша остаётся включённым — можно рисовать ещё */
     return;
   }
 
@@ -4790,7 +4871,7 @@ function _rtFinishLineFreehand() {
   var last = simplified[simplified.length - 1];
   var closeDist = Math.sqrt((first.x - last.x) * (first.x - last.x) + (first.y - last.y) * (first.y - last.y));
 
-  if (closeDist < 5 && simplified.length >= 4) {
+  if (closeDist < 6 && simplified.length >= 4) {
     /* Замкнута → преобразовать в кружок (bounding box) */
     var minX = 100, maxX = 0, minY = 100, maxY = 0;
     for (var i = 0; i < simplified.length; i++) {
@@ -4803,15 +4884,11 @@ function _rtFinishLineFreehand() {
     var cy = (minY + maxY) / 2;
     var rx = (maxX - minX) / 2;
     var ry = (maxY - minY) / 2;
-    /* Показать попап для кружка */
-    _rtAnnotMode = false;
-    _rtUpdateModeButtons();
+    /* Показать попап для кружка — режим остаётся включён */
     rtShowAnnotPopup(pv.name, null, rtAnnotCount(pv.name), imgWrap,
       { x: cx, y: cy, rx: Math.max(rx, 1), ry: Math.max(ry, 1) });
   } else {
-    /* Не замкнута → обычная линия */
-    _rtAnnotMode = false;
-    _rtUpdateModeButtons();
+    /* Не замкнута → обычная линия — режим остаётся включён */
     rtShowAnnotPopup(pv.name, null, rtAnnotCount(pv.name), imgWrap,
       { shape: 'line', points: simplified });
   }
