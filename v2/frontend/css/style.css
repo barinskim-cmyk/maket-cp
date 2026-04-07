@@ -372,10 +372,17 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 }
 .lay-cell {
   min-width: 0; overflow: hidden;
+  position: relative;
   /* flex и aspect-ratio из inline style */
 }
 .lay-cell .photo-slot,
 .lay-cell .te-slot {
+  width: 100%; height: 100%;
+}
+/* Заполненный слот: img покрывает всю ячейку через absolute,
+   чтобы горизонтальные фото не сжимались в вертикальном ряду */
+.lay-cell .photo-slot.filled {
+  position: absolute; top: 0; left: 0;
   width: 100%; height: 100%;
 }
 
@@ -889,21 +896,19 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 }
 .pv-thumb:hover .pv-name { display: block; }
 
-/* Галочка — фото уже в карточке (в отборе) */
-.pv-check {
-  position: absolute; top: 4px; left: 4px;
-  width: 18px; height: 18px;
-  background: #4caf50; border-radius: 50%;
-  z-index: 2;
+/* Крестик «убрать из отбора» — полупрозрачный, появляется при наведении */
+.pv-deselect {
+  position: absolute; top: 4px; right: 4px;
+  width: 20px; height: 20px;
+  background: rgba(0,0,0,0.35); color: rgba(255,255,255,0.8);
+  border: none; border-radius: 50%; cursor: pointer;
+  font-size: 14px; line-height: 20px; text-align: center;
+  padding: 0; z-index: 3;
+  opacity: 0; transition: opacity 0.15s;
 }
-.pv-check::after {
-  content: '';
-  position: absolute; top: 3px; left: 5px;
-  width: 5px; height: 9px;
-  border: solid #fff; border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
-}
-.pv-in-card { opacity: 0.75; }
+.pv-thumb:hover .pv-deselect { opacity: 1; }
+.pv-deselect:hover { background: rgba(0,0,0,0.6); color: #fff; }
+.pv-in-card { /* фото в карточке — без затемнения, крестик по ховеру */ }
 
 /* Фильтр по рейтингу — sticky под тулбаром */
 .pv-filter {
@@ -1064,9 +1069,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 /* Режим рисования */
 .pv-lb-img-wrap.rt-annot-mode {
   cursor: crosshair;
+  -webkit-user-select: none; user-select: none;
 }
 .pv-lb-img-wrap.rt-annot-mode img {
   pointer-events: none;
+  -webkit-user-drag: none; user-drag: none;
 }
 
 /* Превью эллипса при перетаскивании */
@@ -1265,6 +1272,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .oc-item img {
   width: 100%; height: auto; display: block;
   pointer-events: none;
+  image-orientation: from-image; /* Учитывать EXIF-ориентацию */
 }
 .oc-item:hover .pv-remove { display: block; }
 .oc-item:hover .pv-name { display: block; }

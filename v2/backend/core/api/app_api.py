@@ -54,7 +54,7 @@ class AppAPI:
         if not self._window:
             return None
         result = self._window.create_file_dialog(
-            webview.FOLDER_DIALOG, directory="", allow_multiple=False
+            webview.FileDialog.FOLDER, directory="", allow_multiple=False
         )
         return result[0] if result else None
 
@@ -62,7 +62,7 @@ class AppAPI:
         if not self._window:
             return None
         result = self._window.create_file_dialog(
-            webview.OPEN_DIALOG, directory="", allow_multiple=False, file_types=file_types
+            webview.FileDialog.OPEN, directory="", allow_multiple=False, file_types=file_types
         )
         return result[0] if result else None
 
@@ -113,7 +113,7 @@ class AppAPI:
             return {"error": "Нет окна"}
         try:
             result = self._window.create_file_dialog(
-                webview.SAVE_DIALOG,
+                webview.FileDialog.SAVE,
                 directory="",
                 save_filename=suggested_name,
             )
@@ -217,7 +217,7 @@ class AppAPI:
         if not self._project or not self._window:
             return {"error": "Нет проекта"}
         result = self._window.create_file_dialog(
-            webview.SAVE_DIALOG,
+            webview.FileDialog.SAVE,
             directory="",
             save_filename=f"{self._project.brand}_{self._project.shoot_date}.json",
         )
@@ -232,7 +232,7 @@ class AppAPI:
         if not self._window:
             return {"error": "Нет окна"}
         result = self._window.create_file_dialog(
-            webview.OPEN_DIALOG,
+            webview.FileDialog.OPEN,
             directory="",
             allow_multiple=False,
             file_types=("JSON files (*.json)",),
@@ -266,7 +266,7 @@ class AppAPI:
             if not self._window:
                 return {"error": "Нет окна"}
             result = self._window.create_file_dialog(
-                webview.OPEN_DIALOG,
+                webview.FileDialog.OPEN,
                 directory="",
                 allow_multiple=False,
                 file_types=(
@@ -299,7 +299,7 @@ class AppAPI:
             if not self._window:
                 return {"error": "Нет окна"}
             result = self._window.create_file_dialog(
-                webview.OPEN_DIALOG,
+                webview.FileDialog.OPEN,
                 directory="",
                 allow_multiple=False,
                 file_types=(
@@ -369,7 +369,7 @@ class AppAPI:
         if not self._window:
             return {"error": "Нет окна"}
         result = self._window.create_file_dialog(
-            webview.OPEN_DIALOG,
+            webview.FileDialog.OPEN,
             directory="",
             allow_multiple=False,
             file_types=("JPEG images (*.jpg;*.jpeg)",),

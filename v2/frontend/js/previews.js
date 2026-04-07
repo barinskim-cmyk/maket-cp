@@ -1316,7 +1316,7 @@ function pvBuildHTML(store, used, from, to) {
     html += '<div class="pv-thumb' + orientCls + (inCard ? ' pv-in-card' : '') + '" draggable="true" data-pv-name="' + esc(pv.name) + '" data-pv-idx="' + i + '" title="' + esc(pv.name) + (noVersion ? ' [нет версии ' + PV_ACTIVE_VERSION + ']' : '') + '" onclick="pvShowFullscreen(' + i + ',event)">';
     html += '<img src="' + thumbSrc + '" loading="lazy">';
     if (noVersion) html += '<span class="pv-no-version"></span>';
-    if (inCard) html += '<span class="pv-check"></span>';
+    if (inCard) html += '<button class="pv-deselect" onclick="pvToggleSelection(\'' + esc(pv.name).replace(/'/g, "\\'") + '\',event)" title="Убрать из отбора">&times;</button>';
     /* Счётчик аннотаций ретуши */
     var aCount = rtAnnotCount(pv.name);
     if (aCount > 0) html += '<span class="pv-annot-badge">' + aCount + '</span>';
@@ -1419,6 +1419,7 @@ function _pvLbOpenDesktop() {
   var img = document.createElement('img');
   img.src = src;
   img.className = 'cp-fullscreen-img';
+  img.draggable = false; /* Запрет браузерного drag — иначе мешает рисованию линий */
 
   var closeBtn = document.createElement('button');
   closeBtn.className = 'cp-fullscreen-close';
@@ -4443,18 +4444,9 @@ function rtToggleAnnotMode() {
  * Включить/выключить режим рисования линии.
  * Клики ставят точки, двойной клик завершает.
  */
+/* Обратная совместимость: перенаправление на единый режим */
 function rtToggleLineMode() {
-  if (_rtAnnotMode === 'line') {
-    _rtAnnotMode = false;
-    _rtLineDrawing = false;
-    _rtLinePoints = [];
-    _rtRemoveLinePreview();
-  } else {
-    _rtAnnotMode = 'line';
-    _rtLinePoints = [];
-    _rtRemoveLinePreview();
-  }
-  _rtUpdateModeButtons();
+  rtTogglePencilMode();
 }
 
 /**
