@@ -1685,7 +1685,9 @@ function sbSyncCardsLight(projectId, cards, callback) {
 
       for (var c = 0; c < cards.length; c++) {
         var card = cards[c];
-        var cardId = crypto.randomUUID ? crypto.randomUUID() : ('card_' + projectId.slice(0,8) + '_' + c + '_' + Date.now());
+        /* Сохраняем card.id из JS — иначе комментарии теряются при перезагрузке
+           (ключи "card:<id>" в comments не совпадут с новыми UUID) */
+        var cardId = card.id || (crypto.randomUUID ? crypto.randomUUID() : ('card_' + projectId.slice(0,8) + '_' + c + '_' + Date.now()));
 
         cardRows.push({
           id: cardId,
