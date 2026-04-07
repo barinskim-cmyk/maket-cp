@@ -115,6 +115,6 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.get_project_by_token(text) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public._find_project_by_share_token(text) TO anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.save_cards_by_token(text, jsonb) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.save_cards_by_token(text, jsonb, text, text, jsonb, jsonb, jsonb) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.oc_add_item_by_token(text, text) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.oc_remove_item_by_token(text, text) TO anon, authenticated;
