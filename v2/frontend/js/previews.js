@@ -3165,6 +3165,26 @@ function acRenderField() {
     items = filtered;
   }
 
+  /* Применить фильтр по этапу пайплайна если задан */
+  if (_acStageFilter >= 0) {
+    var stProj = getActiveProject();
+    if (stProj && stProj.previews && typeof shEnsurePhotoStages === 'function') {
+      shEnsurePhotoStages(stProj);
+      var _pvStageMap = {};
+      for (var sp = 0; sp < stProj.previews.length; sp++) {
+        _pvStageMap[stProj.previews[sp].name] = stProj.previews[sp]._stage || 0;
+      }
+      var stFiltered = [];
+      for (var sf3 = 0; sf3 < items.length; sf3++) {
+        var itemStage = _pvStageMap[items[sf3].name];
+        if (typeof itemStage === 'number' && itemStage === _acStageFilter) {
+          stFiltered.push(items[sf3]);
+        }
+      }
+      items = stFiltered;
+    }
+  }
+
   if (items.length === 0) {
     gallery.innerHTML = '';
     if (toolbar) toolbar.style.display = 'none';
@@ -3223,6 +3243,9 @@ function acRenderField() {
 
   /* Обновить звёздочный фильтр */
   acRenderFilterStars();
+
+  /* Обновить кнопки фильтра по этапам */
+  acRenderStageFilter();
 }
 
 /* ── Тогл аннотаций в галерее отбора ── */
@@ -3513,6 +3536,77 @@ function acRenderFilterStars() {
 function acSetRatingFilter(minRating) {
   if (_acRatingFilter === minRating) minRating = 0;
   _acRatingFilter = minRating;
+  acRenderField();
+}
+
+// ── «Весь контент»: фильтр по этапу пайплайна ──
+
+/** @type {number} Фильтр по этапу: -1 = все, 0+ = конкретный этап */
+var _acStageFilter = -1;
+
+/**
+ * Отрисовать кнопки фильтра по этапам в тулбаре «Весь контент».
+ * Показывает только этапы, на которых реально есть фото в отборе.
+ */
+function acRenderStageFilter() {
+  var container = document.getElementById('ac-stage-filter');
+  if (!container) return;
+
+  var proj = getActiveProject();
+  if (!proj || !proj.previews || typeof shEnsurePhotoStages !== 'function') {
+    container.innerHTML = '';
+    return;
+  }
+
+  shEnsurePhotoStages(proj);
+
+  /* Собрать этапы, на которых есть фото из отбора */
+  var items = acGetAllContent();
+  var pvStageMap = {};
+  for (var p = 0; p < proj.previews.length; p++) {
+    pvStageMap[proj.previews[p].name] = proj.previews[p]._stage || 0;
+  }
+
+  var stageCounts = {};
+  for (var i = 0; i < items.length; i++) {
+    var st = pvStageMap[items[i].name];
+    if (typeof st === 'number') {
+      stageCounts[st] = (stageCounts[st] || 0) + 1;
+    }
+  }
+
+  /* Если все фото на одном этапе — фильтр не нужен */
+  var stageKeys = [];
+  for (var k in stageCounts) {
+    if (stageCounts.hasOwnProperty(k)) stageKeys.push(parseInt(k));
+  }
+  if (stageKeys.length <= 1) {
+    container.innerHTML = '';
+    _acStageFilter = -1;
+    return;
+  }
+
+  stageKeys.sort(function(a, b) { return a - b; });
+
+  var html = '<button class="ac-stage-btn' + (_acStageFilter === -1 ? ' ac-stage-active' : '') +
+    '" onclick="acSetStageFilter(-1)">Все этапы</button>';
+  for (var si = 0; si < stageKeys.length; si++) {
+    var idx = stageKeys[si];
+    var stageName = (typeof PIPELINE_STAGES !== 'undefined' && PIPELINE_STAGES[idx])
+      ? PIPELINE_STAGES[idx].name : ('Этап ' + idx);
+    var cnt = stageCounts[idx];
+    html += '<button class="ac-stage-btn' + (_acStageFilter === idx ? ' ac-stage-active' : '') +
+      '" onclick="acSetStageFilter(' + idx + ')">' + stageName + ' (' + cnt + ')</button>';
+  }
+  container.innerHTML = html;
+}
+
+/**
+ * Установить фильтр по этапу пайплайна для «Весь контент».
+ * @param {number} stageIdx — индекс этапа или -1 для всех
+ */
+function acSetStageFilter(stageIdx) {
+  _acStageFilter = stageIdx;
   acRenderField();
 }
 

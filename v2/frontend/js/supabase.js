@@ -1017,14 +1017,22 @@ function sbLoadByShareToken(token) {
 function _sbDoLoadByToken(token) {
   sbClient.rpc('get_project_by_token', { share_token: token }).then(function(res) {
     if (res.error) {
-      console.error('get_project_by_token:', res.error);
-      alert('Ссылка недействительна или истекла');
+      console.error('get_project_by_token error:', res.error.code, res.error.message, res.error);
+      /* Показать конкретную ошибку для отладки (в проде заменить на общее сообщение) */
+      var errMsg = 'Ссылка недействительна или истекла';
+      if (res.error.code === '42883') errMsg = 'RPC-функция не найдена. Выполните миграцию 015 в Supabase Dashboard.';
+      else if (res.error.code === '42501') errMsg = 'Нет доступа к RPC. Выполните GRANT из миграции 015.';
+      else if (res.error.message) errMsg += '\n(' + res.error.message + ')';
+      alert(errMsg);
+      if (typeof _hideShareLoader === 'function') _hideShareLoader();
       return;
     }
 
     var data = res.data;
     if (!data || !data.project_id) {
+      console.warn('get_project_by_token: пустой ответ, data=', data);
       alert('Ссылка недействительна или истекла');
+      if (typeof _hideShareLoader === 'function') _hideShareLoader();
       return;
     }
 
