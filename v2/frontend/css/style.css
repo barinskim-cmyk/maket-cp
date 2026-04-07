@@ -301,82 +301,50 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 /* ── Визуальная ветка (двухколоночный layout пайплайна) ── */
 
 /* Обёртка: две колонки рядом */
-.pl-layout {
-  display: flex;
-  gap: 0;
-}
-.pl-layout .pipeline-steps { flex: 1; min-width: 0; }
-
-/* Колонка веток — отдельный flex-столбец справа */
-.pl-branch-col {
-  width: 110px; flex-shrink: 0;
-  display: flex; flex-direction: column; gap: 0;
-  padding-left: 8px;
+/* ── Ветка процесса (встроена внутрь pipeline-step) ── */
+.pl-branch {
+  display: flex; align-items: center; gap: 6px;
+  margin-top: 6px; padding: 4px 0 2px 28px; /* 28px = отступ от step-dot */
 }
 
-/* Ячейка ветки — высота синхронизируется с pipeline-step через flex */
-.pl-branch-cell {
-  display: flex; align-items: center;
-  position: relative;
-  padding: 10px 0; /* совпадает с pipeline-step padding */
-  min-height: 28px; /* совпадает с step-dot */
+/* Горизонтальная линия-коннектор от основной ветки */
+.pl-branch-line {
+  display: inline-block;
+  width: 20px; height: 2px;
+  background: #bbb;
+  flex-shrink: 0;
 }
-
-/* Горизонтальная линия (коннектор от основной линии к ветке) */
-.pl-h-line {
-  position: absolute;
-  left: -8px; top: 50%; transform: translateY(-50%);
-  width: 8px; height: 2px;
-  background: #ccc;
-}
-.pl-h-done { background: #333; }
-.pl-h-spacer { width: 0; }
-
-/* Вертикальная колонка (содержит линию + точку) */
-.pl-v-col {
-  position: relative;
-  width: 12px; flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
-  align-self: stretch;
-}
-
-/* Вертикальная линия ветки */
-.pl-v-line {
-  position: absolute; left: 5px;
-  width: 2px; background: #999;
-}
-.pl-v-full { top: 0; bottom: 0; }
-.pl-v-down { top: 50%; bottom: -1px; }
-.pl-v-up   { top: -1px; bottom: 50%; }
-.pl-v-dashed {
+.pl-branch-line.pl-branch-done { background: #333; }
+.pl-branch-line.pl-branch-cont { background: #ccc; }
+.pl-branch-line.pl-branch-dashed {
   background: none;
-  border-left: 2px dashed #bbb;
-  width: 0;
+  border-top: 2px dashed #bbb;
+  height: 0;
 }
 
 /* Точка на ветке */
-.pl-dot {
-  width: 10px; height: 10px; border-radius: 50%;
+.pl-branch-dot {
+  display: inline-block;
+  width: 8px; height: 8px; border-radius: 50%;
   background: #ddd; border: 2px solid #999;
-  position: relative; z-index: 2;
   flex-shrink: 0;
 }
-.pl-dot-done { background: #333; border-color: #333; }
+.pl-branch-dot-done { background: #333; border-color: #333; }
 
-/* Текст ветки */
-.pl-branch-text {
-  font-size: 10px; color: #888; white-space: nowrap;
-  margin-left: 4px;
+/* Текст-метка ветки */
+.pl-branch-label {
+  font-size: 11px; color: #888;
+  white-space: nowrap;
 }
 
-/* Кнопка "Завершить" на мёртвой ветке */
-.pl-done-btn {
-  font-size: 10px; padding: 2px 8px;
+/* Кнопка "Отправить комментарии" */
+.pl-send-btn {
+  font-size: 11px; padding: 3px 10px;
   background: #fff; color: #333; border: 1px solid #ccc;
   border-radius: 3px; cursor: pointer; white-space: nowrap;
-  margin-left: 4px;
+  margin-left: 2px;
 }
-.pl-done-btn:hover { background: #333; color: #fff; border-color: #333; }
+.pl-send-btn:hover { background: #333; color: #fff; border-color: #333; }
 
 /* ══════════════════════════════════════════════
    Карточки товара — редактор ([anchor client]-стиль)

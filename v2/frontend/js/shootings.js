@@ -632,11 +632,9 @@ function renderPipeline() {
     }
   }
 
-  /* ── Двухколоночный layout: основной пайплайн слева + ветки справа ── */
+  /* ── Пайплайн: этапы + ветки встроены в каждый шаг ── */
   var hasBranch = _cmtBranchActive;
-  html += '<div class="pl-layout' + (hasBranch ? ' pl-has-branch' : '') + '">';
 
-  /* Колонка 1: стандартный pipeline-steps */
   html += '<div class="pipeline-steps">';
   for (var i = 0; i < PIPELINE_STAGES.length; i++) {
     var s = PIPELINE_STAGES[i];
@@ -675,70 +673,16 @@ function renderPipeline() {
       }
     }
     html += '</div>'; /* /step-info */
+
+    /* ── Встроенная ветка (комментирование) ── */
+    if (hasBranch) {
+      var branchHtml = _shRenderBranchCell(i, stage, _cmtBranchStart, _cmtBranchEnd, _cmtCount, _annotCount);
+      if (branchHtml) html += branchHtml;
+    }
+
     html += '</div>'; /* /pipeline-step */
   }
   html += '</div>'; /* /pipeline-steps */
-
-  /* Колонка 2: ветки (рисуется отдельно, выравнивается по высоте) */
-  if (hasBranch) {
-    html += '<div class="pl-branch-col">';
-    for (var i = 0; i < PIPELINE_STAGES.length; i++) {
-      var bCls = 'pl-branch-cell';
-
-      /* Однострочная ветка (начало=конец) */
-      if (_cmtBranchEnd >= 0 && i === _cmtBranchStart && i === _cmtBranchEnd) {
-        html += '<div class="' + bCls + ' pl-cell-fork">';
-        html += '<div class="pl-h-line pl-h-done"></div>';
-        html += '<div class="pl-v-col"><div class="pl-dot pl-dot-done"></div></div>';
-        html += '<div class="pl-branch-text">Комментирование</div>';
-        html += '</div>';
-      }
-      /* Точка ответвления */
-      else if (i === _cmtBranchStart) {
-        html += '<div class="' + bCls + ' pl-cell-fork">';
-        html += '<div class="pl-h-line"></div>';
-        html += '<div class="pl-v-col">';
-        html += '<div class="pl-dot"></div>';
-        html += '<div class="pl-v-line pl-v-down"></div>';
-        html += '</div>';
-        html += '<div class="pl-branch-text">Комментирование</div>';
-        html += '</div>';
-      }
-      /* Параллельная вертикальная линия */
-      else if (i > _cmtBranchStart && (_cmtBranchEnd < 0 ? i <= stage : i < _cmtBranchEnd)) {
-        html += '<div class="' + bCls + ' pl-cell-line">';
-        html += '<div class="pl-h-spacer"></div>';
-        html += '<div class="pl-v-col"><div class="pl-v-line pl-v-full"></div></div>';
-        html += '</div>';
-      }
-      /* Точка слияния */
-      else if (_cmtBranchEnd >= 0 && i === _cmtBranchEnd) {
-        html += '<div class="' + bCls + ' pl-cell-merge">';
-        html += '<div class="pl-h-line pl-h-done"></div>';
-        html += '<div class="pl-v-col">';
-        html += '<div class="pl-v-line pl-v-up"></div>';
-        html += '<div class="pl-dot pl-dot-done"></div>';
-        html += '</div>';
-        html += '<div class="pl-branch-text">Завершено</div>';
-        html += '</div>';
-      }
-      /* Мёртвая ветка (не завершена, текущий этап) */
-      else if (_cmtBranchEnd < 0 && i === stage && i > _cmtBranchStart) {
-        html += '<div class="' + bCls + ' pl-cell-dead">';
-        html += '<div class="pl-h-spacer"></div>';
-        html += '<div class="pl-v-col"><div class="pl-v-line pl-v-up pl-v-dashed"></div></div>';
-        html += '<button class="pl-done-btn" onclick="shFinishCommenting()">Завершить</button>';
-        html += '</div>';
-      }
-      /* Пустая ячейка */
-      else {
-        html += '<div class="' + bCls + '"></div>';
-      }
-    }
-    html += '</div>'; /* /pl-branch-col */
-  }
-
-  html += '</div>'; /* /pl-layout */
 
   /* Кнопка сверки: если есть хотя бы 2 снимка */
   if (proj._cloudId && typeof _snCachedSnapshots !== 'undefined' && _snCachedSnapshots.length >= 2) {
@@ -751,6 +695,71 @@ function renderPipeline() {
   html += _shRenderTimeline(proj);
 
   container.innerHTML = html;
+}
+
+/**
+ * Рендерить ячейку ветки комментирования для данного этапа пайплайна.
+ * Встраивается прямо внутрь pipeline-step для идеальной синхронизации высот.
+ *
+ * @param {number} i — индекс этапа
+ * @param {number} stage — текущий активный этап
+ * @param {number} branchStart — этап начала ветки
+ * @param {number} branchEnd — этап конца ветки (-1 = не завершена)
+ * @param {number} cmtCount — кол-во комментариев к карточкам
+ * @param {number} annotCount — кол-во аннотаций к фото
+ * @returns {string|null} HTML или null если нет ветки на этом этапе
+ */
+function _shRenderBranchCell(i, stage, branchStart, branchEnd, cmtCount, annotCount) {
+  /* Этап вне диапазона ветки — ничего не рисуем */
+  if (i < branchStart) return null;
+  if (branchEnd >= 0 && i > branchEnd) return null;
+  if (branchEnd < 0 && i > stage) return null;
+
+  var html = '<div class="pl-branch">';
+
+  /* Счётчик комментариев/аннотаций (только на стартовом этапе) */
+  var stats = '';
+  if (i === branchStart) {
+    var parts = [];
+    if (cmtCount > 0) parts.push(cmtCount + ' комм.');
+    if (annotCount > 0) parts.push(annotCount + ' аннот.');
+    stats = parts.length > 0 ? ' (' + parts.join(', ') + ')' : '';
+  }
+
+  /* Однострочная ветка (начало=конец на одном этапе, уже завершена) */
+  if (branchEnd >= 0 && i === branchStart && i === branchEnd) {
+    html += '<span class="pl-branch-line pl-branch-done"></span>';
+    html += '<span class="pl-branch-dot pl-branch-dot-done"></span>';
+    html += '<span class="pl-branch-label">Комментарии отправлены' + stats + '</span>';
+  }
+  /* Старт ветки (ответвление) */
+  else if (i === branchStart) {
+    html += '<span class="pl-branch-line"></span>';
+    html += '<span class="pl-branch-dot"></span>';
+    html += '<span class="pl-branch-label">Комментирование' + stats + '</span>';
+    /* Кнопка "Отправить" — на стартовом этапе, если ветка не завершена */
+    if (branchEnd < 0) {
+      html += '<button class="pl-send-btn" onclick="event.stopPropagation();shFinishCommenting()">Отправить комментарии</button>';
+    }
+  }
+  /* Промежуточные этапы (параллельная линия) */
+  else if (i > branchStart && (branchEnd < 0 ? i < stage : i < branchEnd)) {
+    html += '<span class="pl-branch-line pl-branch-cont"></span>';
+  }
+  /* Точка слияния (конец ветки) */
+  else if (branchEnd >= 0 && i === branchEnd) {
+    html += '<span class="pl-branch-line pl-branch-done"></span>';
+    html += '<span class="pl-branch-dot pl-branch-dot-done"></span>';
+    html += '<span class="pl-branch-label">Комментарии отправлены</span>';
+  }
+  /* Текущий активный этап, ветка ещё идёт (пунктирное окончание) */
+  else if (branchEnd < 0 && i === stage && i > branchStart) {
+    html += '<span class="pl-branch-line pl-branch-dashed"></span>';
+    html += '<button class="pl-send-btn" onclick="event.stopPropagation();shFinishCommenting()">Отправить комментарии</button>';
+  }
+
+  html += '</div>';
+  return html;
 }
 
 /**
@@ -853,7 +862,7 @@ function shFinishCommenting() {
     trigger: 'retouch_comments',
     stage: 'retouch_task',
     date: proj._commentingDone,
-    note: 'Комментирование завершено'
+    note: 'Комментарии отправлены'
   });
 
   /* Автосохранение + перерисовка */
