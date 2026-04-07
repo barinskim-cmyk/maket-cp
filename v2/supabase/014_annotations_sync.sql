@@ -8,6 +8,9 @@ ALTER TABLE projects ADD COLUMN IF NOT EXISTS annotations jsonb DEFAULT '{}'::js
 -- Add comments column to projects
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS comments jsonb DEFAULT '{}'::jsonb;
 
+-- Add checkpoints column to projects (pipeline timeline events)
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS checkpoints jsonb DEFAULT '[]'::jsonb;
+
 -- ══════════════════════════════════════════════
 --  Update save_cards_by_token to accept annotations
 -- ══════════════════════════════════════════════
@@ -18,7 +21,8 @@ CREATE OR REPLACE FUNCTION save_cards_by_token(
   oc_data text DEFAULT '[]',
   oc_containers_data text DEFAULT '[]',
   annotations_data jsonb DEFAULT '{}'::jsonb,
-  comments_data jsonb DEFAULT '{}'::jsonb
+  comments_data jsonb DEFAULT '{}'::jsonb,
+  checkpoints_data jsonb DEFAULT '[]'::jsonb
 )
 RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER AS $$
@@ -40,6 +44,7 @@ BEGIN
     oc_containers = oc_containers_data,
     annotations = COALESCE(annotations_data, '{}'::jsonb),
     comments = COALESCE(comments_data, '{}'::jsonb),
+    checkpoints = COALESCE(checkpoints_data, '[]'::jsonb),
     updated_at = now()
   WHERE id = pid;
 
@@ -105,7 +110,7 @@ BEGIN
     RETURN NULL;
   END IF;
 
-  SELECT id, name, stage, other_content, oc_containers, annotations, comments
+  SELECT id, name, stage, other_content, oc_containers, annotations, comments, checkpoints
     INTO proj_row
     FROM projects
    WHERE id = pid;
@@ -148,6 +153,7 @@ BEGIN
     'oc_containers', proj_row.oc_containers,
     'annotations', COALESCE(proj_row.annotations, '{}'::jsonb),
     'comments', COALESCE(proj_row.comments, '{}'::jsonb),
+    'checkpoints', COALESCE(proj_row.checkpoints, '[]'::jsonb),
     'cards', cards_arr
   );
 

@@ -739,6 +739,36 @@ window.onPreviewDone = function(data) {
     /* Обновить превью во всех экранах */
     pvUpdateCardSlotsForVersion();
   }
+
+  /* ── Checkpoint: фиксация контрольной точки ── */
+  if (typeof cpkCreate === 'function') {
+    if (loadStage && versionCount > 0) {
+      /* Загрузка версии (ЦК/ретушь) — собираем имена загруженных фото */
+      var _cpkPhotos = [];
+      for (var _vi = 0; _vi < proj.previews.length; _vi++) {
+        if (proj.previews[_vi].versions && proj.previews[_vi].versions[loadStage]) {
+          _cpkPhotos.push(proj.previews[_vi].name);
+        }
+      }
+      var _cpkTrigger = (loadStage === 'color') ? 'cc_loaded' : 'retouch_loaded';
+      cpkCreate(_cpkTrigger, {
+        stage: loadStage,
+        photos: _cpkPhotos,
+        note: versionCount + ' фото загружено' + (skippedNotInSelection > 0 ? ', ' + skippedNotInSelection + ' пропущено (не в отборе)' : '')
+      });
+    } else if (!loadStage && items.length > 0) {
+      /* Обычная загрузка превью */
+      var _cpkPvNames = [];
+      for (var _pi = 0; _pi < items.length; _pi++) {
+        if (items[_pi].name) _cpkPvNames.push(items[_pi].name);
+      }
+      cpkCreate('preview_loaded', {
+        stage: 'preselect',
+        photos: _cpkPvNames,
+        note: items.length + ' превью загружено'
+      });
+    }
+  }
 };
 
 /**

@@ -637,7 +637,86 @@ function renderPipeline() {
     html += '</div>';
   }
 
+  /* ── Таймлайн контрольных точек ── */
+  html += _shRenderTimeline(proj);
+
   container.innerHTML = html;
+}
+
+/**
+ * Отрисовать таймлайн контрольных точек для пайплайна.
+ * @param {Object} proj — проект
+ * @returns {string} HTML
+ */
+function _shRenderTimeline(proj) {
+  var checkpoints = proj._checkpoints || [];
+  if (checkpoints.length === 0) return '';
+
+  /* Человекочитаемые названия триггеров */
+  var triggerLabelsMap = {
+    'preview_loaded': 'Превью загружены',
+    'selection_done': 'Отбор отправлен клиенту',
+    'client_received': 'Клиент открыл',
+    'client_saved': 'Клиент сохранил изменения',
+    'client_approved': 'Клиент согласовал',
+    'client_returned': 'Возврат на доработку',
+    'photo_killed': 'Фото удалено из отбора',
+    'cc_loaded': 'ЦК загружена',
+    'cc_confirmed': 'ЦК подтверждена',
+    'retouch_comments': 'Комментарии завершены',
+    'retouch_loaded': 'Ретушь загружена',
+    'retouch_approved': 'Ретушь согласована',
+    'retouch_returned': 'Ретушь возвращена',
+    'manual': 'Ручная фиксация',
+    'adaptation_done': 'Финал'
+  };
+
+  /* Цвета по этапам */
+  var stageColors = {
+    'preselect': '#e3f2fd',
+    'selection': '#e8f5e9',
+    'client': '#fffde7',
+    'color': '#fff3e0',
+    'retouch_task': '#f3e5f5',
+    'retouch': '#fce4ec',
+    'retouch_ok': '#e0f7fa',
+    'adaptation': '#f5f5f5'
+  };
+
+  var html = '<div class="pipeline-timeline">';
+  html += '<div class="pipeline-timeline-title">Контрольные точки</div>';
+
+  for (var i = 0; i < checkpoints.length; i++) {
+    var cp = checkpoints[i];
+    var d = new Date(cp.date);
+    var dateStr = d.toLocaleDateString('ru-RU') + ' ' + d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    var label = triggerLabelsMap[cp.trigger] || cp.trigger;
+    var bgColor = stageColors[cp.stage] || '#f5f5f5';
+    var photoCount = cp.photos ? cp.photos.length : 0;
+
+    html += '<div class="pipeline-cp" style="border-left-color:' + bgColor + '">';
+    html += '<div class="pipeline-cp-header">';
+    html += '<span class="pipeline-cp-label">' + esc(label) + '</span>';
+    html += '<span class="pipeline-cp-date">' + dateStr + '</span>';
+    html += '</div>';
+
+    /* Инфо-строка: кол-во фото + примечание */
+    var infoParts = [];
+    if (photoCount > 0) infoParts.push(photoCount + ' фото');
+    if (cp.added && cp.added.length > 0) infoParts.push('+' + cp.added.length + ' добавлено');
+    if (cp.removed && cp.removed.length > 0) infoParts.push('-' + cp.removed.length + ' убрано');
+    if (cp.iteration > 0) infoParts.push('итерация ' + cp.iteration);
+    if (cp.note) infoParts.push(cp.note);
+
+    if (infoParts.length > 0) {
+      html += '<div class="pipeline-cp-info">' + esc(infoParts.join(' / ')) + '</div>';
+    }
+
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
 }
 
 /**
@@ -882,6 +961,15 @@ function advanceStage() {
   var timeStr = now.toLocaleDateString('ru-RU') + ' ' + now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
   proj._stageHistory[proj._stage] = timeStr;
 
+  /* Checkpoint: ручная фиксация */
+  if (typeof cpkCreate === 'function') {
+    cpkCreate('manual', {
+      stage: currentStageObj.id,
+      photos: (typeof cpkGetSelectionList === 'function') ? cpkGetSelectionList() : [],
+      note: 'Этап "' + currentStageObj.name + '" завершён вручную'
+    });
+  }
+
   proj._stage++;
   renderPipeline();
   shAutoSave();
@@ -928,6 +1016,15 @@ function shSendClientLink() {
 
       /* Синхронизация этапа с облаком */
       if (typeof sbSyncStage === 'function') sbSyncStage('send_client_link', timeStr);
+
+      /* Checkpoint: отправка клиенту */
+      if (typeof cpkCreate === 'function') {
+        cpkCreate('selection_done', {
+          stage: 'selection',
+          photos: (typeof cpkGetSelectionList === 'function') ? cpkGetSelectionList() : [],
+          note: 'Ссылка отправлена клиенту'
+        });
+      }
 
       /* Показать ссылку */
       var url = data.url;

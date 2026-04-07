@@ -292,15 +292,189 @@ loadUserTemplates();
  * @type {Array<{id: string, name: string}>}
  */
 var PIPELINE_STAGES = [
-  { id: 'preselect',    name: 'Преотбор и превью',    beta: true },
-  { id: 'selection',    name: 'Отбор фотографа',      beta: true },
-  { id: 'client',       name: 'Отбор клиента',        beta: true },
-  { id: 'color',        name: 'Цветокоррекция',       beta: false },
-  { id: 'retouch_task', name: 'Комментарии на ретушь', beta: false },
-  { id: 'retouch',      name: 'Ретушь',               beta: false },
-  { id: 'retouch_ok',   name: 'Согласование ретуши',  beta: false },
-  { id: 'adaptation',   name: 'Адаптация к каналам',  beta: false },
+  { id: 'preselect',    name: 'Превью (преотбор)',      beta: true },
+  { id: 'selection',    name: 'Отбор команды',          beta: true },
+  { id: 'client',       name: 'Отбор клиента',          beta: true },
+  { id: 'color',        name: 'Цветокоррекция',         beta: false },
+  { id: 'retouch_task', name: 'Комментарии на ретушь',  beta: false },
+  { id: 'retouch',      name: 'Ретушь',                 beta: false },
+  { id: 'retouch_ok',   name: 'Согласование ретуши',    beta: false },
+  { id: 'adaptation',   name: 'Адаптация к каналам',    beta: false },
 ];
+
+/* ──────────────────────────────────────────────
+   Checkpoint (контрольная точка пайплайна)
+   ──────────────────────────────────────────────
+   Каждый checkpoint фиксирует событие + список затронутых фото.
+   proj._checkpoints = [ { id, date, stage, trigger, photos, iteration, note } ]
+
+   trigger types:
+     'preview_loaded'     — загружена папка с превью
+     'selection_done'     — отбор сформирован (отправка клиенту)
+     'client_received'    — клиент открыл ссылку
+     'client_saved'       — клиент сохранил изменения (дельта вычисляется)
+     'client_approved'    — клиент согласовал (группу фото)
+     'client_returned'    — клиент вернул на доработку
+     'photo_killed'       — фото удалено из отбора
+     'cc_loaded'          — загружена ЦК-версия
+     'cc_confirmed'       — подтверждение "ЦК финальная"
+     'retouch_comments'   — завершено комментирование
+     'retouch_loaded'     — загружена ретушь-версия
+     'retouch_approved'   — клиент согласовал ретушь
+     'retouch_returned'   — клиент вернул ретушь
+     'manual'             — ручная фиксация состояния
+     'adaptation_done'    — финал
+   ────────────────────────────────────────────── */
+
+/**
+ * Создать контрольную точку на пайплайне.
+ * @param {string} trigger — тип триггера (см. список выше)
+ * @param {Object} opts — доп. параметры:
+ *   {string}   stage     — id этапа (если не указан, берётся текущий)
+ *   {string[]} photos    — список имён затронутых фото
+ *   {number}   iteration — номер итерации (для ЦК/ретушь)
+ *   {string}   note      — комментарий
+ *   {string[]} added     — фото добавленные в отбор (для client_saved)
+ *   {string[]} removed   — фото убранные из отбора (для client_saved)
+ * @returns {Object|null} созданный checkpoint или null
+ */
+function cpkCreate(trigger, opts) {
+  var proj = getActiveProject();
+  if (!proj) return null;
+  if (!proj._checkpoints) proj._checkpoints = [];
+  opts = opts || {};
+
+  var stageId = opts.stage || '';
+  if (!stageId && typeof proj._stage === 'number' && PIPELINE_STAGES[proj._stage]) {
+    stageId = PIPELINE_STAGES[proj._stage].id;
+  }
+
+  var cp = {
+    id: 'cpk_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+    date: new Date().toISOString(),
+    stage: stageId,
+    trigger: trigger,
+    photos: opts.photos || [],
+    iteration: opts.iteration || 0,
+    note: opts.note || ''
+  };
+
+  /* Дельта для client_saved: добавленные и удалённые фото */
+  if (opts.added && opts.added.length > 0) cp.added = opts.added;
+  if (opts.removed && opts.removed.length > 0) cp.removed = opts.removed;
+
+  proj._checkpoints.push(cp);
+
+  /* Автосохранение */
+  if (typeof shAutoSave === 'function') shAutoSave();
+
+  console.log('cpkCreate: ' + trigger + ' (' + cp.photos.length + ' фото, stage=' + stageId + ')');
+  return cp;
+}
+
+/**
+ * Получить все чекпоинты проекта.
+ * @returns {Array}
+ */
+function cpkGetAll() {
+  var proj = getActiveProject();
+  return (proj && proj._checkpoints) ? proj._checkpoints : [];
+}
+
+/**
+ * Получить путь конкретного фото по чекпоинтам.
+ * @param {string} photoName — имя файла
+ * @returns {Array} чекпоинты где это фото упомянуто
+ */
+function cpkPhotoHistory(photoName) {
+  var all = cpkGetAll();
+  var result = [];
+  for (var i = 0; i < all.length; i++) {
+    var cp = all[i];
+    if (cp.photos && cp.photos.indexOf(photoName) >= 0) {
+      result.push(cp);
+    }
+    if (cp.added && cp.added.indexOf(photoName) >= 0) {
+      result.push(cp);
+    }
+    if (cp.removed && cp.removed.indexOf(photoName) >= 0) {
+      result.push(cp);
+    }
+  }
+  return result;
+}
+
+/**
+ * Получить текущее состояние отбора: список имён фото в карточках + OC.
+ * @returns {string[]}
+ */
+function cpkGetSelectionList() {
+  var proj = getActiveProject();
+  if (!proj) return [];
+  var list = [];
+  var seen = {};
+  if (proj.cards) {
+    for (var c = 0; c < proj.cards.length; c++) {
+      var slots = proj.cards[c].slots || [];
+      for (var s = 0; s < slots.length; s++) {
+        if (slots[s].file && !seen[slots[s].file]) {
+          list.push(slots[s].file);
+          seen[slots[s].file] = true;
+        }
+      }
+    }
+  }
+  if (proj.otherContent) {
+    for (var o = 0; o < proj.otherContent.length; o++) {
+      var n = proj.otherContent[o].name;
+      if (n && !seen[n]) { list.push(n); seen[n] = true; }
+    }
+  }
+  if (proj.ocContainers) {
+    for (var ci = 0; ci < proj.ocContainers.length; ci++) {
+      var items = proj.ocContainers[ci].items || [];
+      for (var it = 0; it < items.length; it++) {
+        if (items[it].name && !seen[items[it].name]) {
+          list.push(items[it].name);
+          seen[items[it].name] = true;
+        }
+      }
+    }
+  }
+  return list;
+}
+
+/**
+ * Вычислить дельту между текущим отбором и последним чекпоинтом.
+ * @returns {Object} { added: string[], removed: string[], unchanged: string[] }
+ */
+function cpkCalcDelta() {
+  var current = cpkGetSelectionList();
+  var currentSet = {};
+  for (var i = 0; i < current.length; i++) currentSet[current[i]] = true;
+
+  /* Найти последний чекпоинт с photos */
+  var all = cpkGetAll();
+  var prevPhotos = [];
+  for (var j = all.length - 1; j >= 0; j--) {
+    if (all[j].photos && all[j].photos.length > 0) {
+      prevPhotos = all[j].photos;
+      break;
+    }
+  }
+  var prevSet = {};
+  for (var k = 0; k < prevPhotos.length; k++) prevSet[prevPhotos[k]] = true;
+
+  var added = [], removed = [], unchanged = [];
+  for (var a = 0; a < current.length; a++) {
+    if (prevSet[current[a]]) unchanged.push(current[a]);
+    else added.push(current[a]);
+  }
+  for (var r = 0; r < prevPhotos.length; r++) {
+    if (!currentSet[prevPhotos[r]]) removed.push(prevPhotos[r]);
+  }
+  return { added: added, removed: removed, unchanged: unchanged };
+}
 
 
 /* ──────────────────────────────────────────────
