@@ -578,8 +578,9 @@ function authCheckOnLoad() {
     /* Скрыть пайплайн и показать лоадер пока проект грузится */
     _showShareLoader();
     sbLoadByShareToken(shareToken);
-    /* Safety: если через 20 сек проект не загрузился — показать ошибку */
+    /* Safety: если через 45 сек проект не загрузился — показать ошибку */
     window._shareLoadTimeout = setTimeout(function() {
+      if (window._shareDotsTimer) { clearInterval(window._shareDotsTimer); window._shareDotsTimer = null; }
       var loader = document.getElementById('share-loader');
       if (loader) {
         loader.innerHTML = 'Не удалось загрузить проект.<br><br>' +
@@ -587,7 +588,15 @@ function authCheckOnLoad() {
           'background:#333;color:#fff;border:none;border-radius:8px;cursor:pointer">' +
           'Попробовать снова</button>';
       }
-    }, 20000);
+    }, 45000);
+    /* Анимация точек чтобы пользователь видел что загрузка идёт */
+    window._shareDotsTimer = setInterval(function() {
+      var loader = document.getElementById('share-loader');
+      if (!loader || loader.querySelector('button')) { clearInterval(window._shareDotsTimer); return; }
+      var txt = loader.textContent || '';
+      if (txt.indexOf('...') >= 0) loader.textContent = 'Загрузка';
+      else loader.textContent = txt + '.';
+    }, 600);
     return;
   }
 
@@ -623,10 +632,14 @@ function _showShareLoader() {
 /** Убрать лоадер share-ссылки и восстановить видимость дочерних элементов.
  *  Вызывается из shEnterClientMode перед переключением страницы. */
 function _hideShareLoader() {
-  /* Отменить safety-таймаут */
+  /* Отменить safety-таймаут и анимацию точек */
   if (window._shareLoadTimeout) {
     clearTimeout(window._shareLoadTimeout);
     window._shareLoadTimeout = null;
+  }
+  if (window._shareDotsTimer) {
+    clearInterval(window._shareDotsTimer);
+    window._shareDotsTimer = null;
   }
   var loader = document.getElementById('share-loader');
   if (loader) loader.remove();

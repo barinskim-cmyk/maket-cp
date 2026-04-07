@@ -1158,8 +1158,13 @@ function _shDoCloudSync() {
     sbSyncCardsLight(proj._cloudId, proj.cards || [], function(err) {
       _shCloudSyncRunning = false;
       if (typeof sbMarkPushDone === 'function') sbMarkPushDone();
-      if (err) console.warn('cloud-sync: ошибка:', err);
-      else console.log('cloud-sync: синхронизировано (owner path)');
+      if (err) {
+        console.warn('cloud-sync: ошибка:', err);
+        if (typeof _sbShowSyncStatus === 'function') _sbShowSyncStatus('Ошибка синхронизации', true);
+      } else {
+        console.log('cloud-sync: синхронизировано (owner path)');
+        if (typeof _sbShowSyncStatus === 'function') _sbShowSyncStatus('Сохранено');
+      }
     });
     return;
   }
@@ -1170,8 +1175,13 @@ function _shDoCloudSync() {
     sbSaveCardsByToken(window._shareToken, proj.cards || [], function(err) {
       _shCloudSyncRunning = false;
       if (typeof sbMarkPushDone === 'function') sbMarkPushDone();
-      if (err) console.warn('cloud-sync (client): ошибка:', err);
-      else console.log('cloud-sync (client): синхронизировано');
+      if (err) {
+        console.warn('cloud-sync (client): ошибка:', err);
+        if (typeof _sbShowSyncStatus === 'function') _sbShowSyncStatus('Ошибка сохранения', true);
+      } else {
+        console.log('cloud-sync (client): синхронизировано');
+        if (typeof _sbShowSyncStatus === 'function') _sbShowSyncStatus('Сохранено');
+      }
     });
     return;
   }

@@ -2157,11 +2157,37 @@ function sbPullProject(callback) {
 }
 
 /**
+ * Показать краткий статус синхронизации (появляется и исчезает через 3 сек).
+ * @param {string} text — текст
+ * @param {boolean} [isError] — если true, красный цвет
+ */
+function _sbShowSyncStatus(text, isError) {
+  var el = document.getElementById('sb-sync-status');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'sb-sync-status';
+    el.style.cssText = 'position:fixed;bottom:12px;right:12px;padding:6px 14px;border-radius:6px;' +
+      'font-size:12px;z-index:9999;transition:opacity 0.3s;pointer-events:none;';
+    document.body.appendChild(el);
+  }
+  el.style.background = isError ? '#c0392b' : '#27ae60';
+  el.style.color = '#fff';
+  el.textContent = text;
+  el.style.opacity = '1';
+  if (el._hideTimer) clearTimeout(el._hideTimer);
+  el._hideTimer = setTimeout(function() { el.style.opacity = '0'; }, 3000);
+}
+
+/** Счётчик последовательных ошибок pull */
+var _sbPullFailCount = 0;
+
+/**
  * Запустить периодический авто-pull из облака.
  * Вызывается при выборе облачного проекта.
  */
 function sbStartAutoPull() {
   sbStopAutoPull();
+  _sbPullFailCount = 0;
   var proj = getActiveProject();
   if (!proj || !proj._cloudId) return;
 
@@ -2175,7 +2201,19 @@ function sbStartAutoPull() {
     var p = getActiveProject();
     if (!p || !p._cloudId) { sbStopAutoPull(); return; }
     sbPullProject(function(err) {
-      if (err) console.warn('sbAutoPull:', err);
+      if (err) {
+        _sbPullFailCount++;
+        console.warn('sbAutoPull:', err);
+        /* Показать предупреждение после 3 подряд неудачных pull */
+        if (_sbPullFailCount >= 3) {
+          _sbShowSyncStatus('Нет связи с облаком', true);
+        }
+      } else {
+        if (_sbPullFailCount >= 3) {
+          _sbShowSyncStatus('Связь восстановлена');
+        }
+        _sbPullFailCount = 0;
+      }
     });
   }, SB_PULL_INTERVAL);
 }

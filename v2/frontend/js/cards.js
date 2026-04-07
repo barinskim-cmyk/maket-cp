@@ -2556,7 +2556,7 @@ function cpMobileRenderFeed() {
     html += '</div>'; /* mob-card-slots */
 
     /* Комментарии к карточке (мобильная версия) */
-    html += _cpMobileCommentsHTML(ci, card);
+    try { html += _cpMobileCommentsHTML(ci, card); } catch(e) { console.error('mob-comments render:', e); }
 
     html += '</div>'; /* mob-card-block */
   }
@@ -3514,5 +3514,7 @@ function cpMobileSendComment(cardIdx) {
     created: new Date().toISOString()
   });
   if (typeof shAutoSave === 'function') shAutoSave();
+  /* Синхронизировать комментарий в облако немедленно */
+  if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
   cpMobileRender();
 }
