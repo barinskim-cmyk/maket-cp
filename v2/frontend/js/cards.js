@@ -675,13 +675,18 @@ function cpShowFullscreen(slotIdx, e) {
   var slot = card.slots[slotIdx];
   if (!slot || (!slot.file && !slot.dataUrl)) return;
 
-  /* Перенаправить в основной лайтбокс (с аннотациями, навигацией, комментариями) */
-  if (slot.file && proj.previews && typeof pvShowFullscreen === 'function') {
+  /* Одно фото в лайтбоксе — без листания (как в мобильной версии).
+     Слот карточки всегда открывает только свою фотографию. */
+  if (slot.file && proj.previews && typeof _pvLbOpen === 'function') {
+    var pv = null;
     for (var pi = 0; pi < proj.previews.length; pi++) {
-      if (proj.previews[pi].name === slot.file) {
-        pvShowFullscreen(pi);
-        return;
-      }
+      if (proj.previews[pi].name === slot.file) { pv = proj.previews[pi]; break; }
+    }
+    if (pv) {
+      _pvLbList = [pv];
+      _pvLbIdx = 0;
+      _pvLbOpen();
+      return;
     }
   }
 
