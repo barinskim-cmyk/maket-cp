@@ -1492,31 +1492,10 @@ function _pvLbOpenDesktop() {
   annotPanel.className = 'rt-panel';
   annotPanel.id = 'rt-panel';
 
-  /* Список комментариев к фото (аннотации) — всегда виден */
+  /* Единый список ВСЕХ комментариев из всех источников */
   var cmtList = document.createElement('div');
   cmtList.className = 'rt-cmt-list';
   cmtList.id = 'rt-cmt-list';
-
-  /* Комментарии к карточке (если фото в карточке) */
-  var _cardCmts2 = _pvLbGetCardComments(pv.name);
-  if (_cardCmts2 && _cardCmts2.length > 0) {
-    var ccHtml = '';
-    for (var cci2 = 0; cci2 < _cardCmts2.length; cci2++) {
-      var cc2 = _cardCmts2[cci2];
-      var ccAuthor = cc2.author === 'client' ? 'Клиент' : 'Команда';
-      var ccText = cc2.text || '';
-      ccHtml += '<div class="rt-cmt-item rt-cmt-card">';
-      ccHtml += '<span class="rt-cmt-author">' + esc(ccAuthor) + '</span>';
-      ccHtml += '<span class="rt-cmt-preview">' + esc(ccText.substring(0, 80)) + '</span>';
-      ccHtml += '</div>';
-    }
-    var cardCmtDiv = document.createElement('div');
-    cardCmtDiv.className = 'rt-card-comments';
-    cardCmtDiv.innerHTML = ccHtml;
-    annotPanel.appendChild(cardCmtDiv);
-  }
-
-  /* Аннотации к фото */
   annotPanel.appendChild(cmtList);
 
   /* Кнопки действий */
@@ -1540,7 +1519,7 @@ function _pvLbOpenDesktop() {
 
   overlay.appendChild(annotPanel);
 
-  /* Заполнить список аннотаций */
+  /* Заполнить список комментариев из всех источников */
   rtRenderCmtList(pv.name, imgWrap);
 
   /* Обработчик клика для линий и маршрутизации */
@@ -1548,7 +1527,7 @@ function _pvLbOpenDesktop() {
     if (ev.target.closest('.rt-circle') || ev.target.closest('.rt-line-hit') || ev.target.closest('.rt-popup') || ev.target.closest('button')) return;
     rtOnImageClick(ev);
   });
-  /* Mousedown для кружков (drag-to-resize) */
+  /* Mousedown для кружков (drag-to-resize) и рисования линий */
   imgWrap.addEventListener('mousedown', function(ev) {
     if (ev.target.closest('.rt-circle') || ev.target.closest('.rt-line-hit') || ev.target.closest('.rt-popup') || ev.target.closest('button')) return;
     rtOnMouseDown(ev);
@@ -1559,17 +1538,16 @@ function _pvLbOpenDesktop() {
     rtOnLineDblClick(ev);
   });
 
-  /* Отрисовать существующие аннотации */
-  rtRenderAnnotations(pv.name, imgWrap);
-
-  /* Комментарии к карточке теперь внутри rt-panel (правый нижний угол) */
-
   overlay.appendChild(imgWrap);
   overlay.appendChild(closeBtn);
   overlay.appendChild(nameEl);
   overlay.appendChild(prevBtn);
   overlay.appendChild(nextBtn);
   document.body.appendChild(overlay);
+
+  /* Отрисовать аннотации ПОСЛЕ добавления в DOM — иначе getBoundingClientRect()
+     возвращает нули и слой аннотаций невидим (0x0), рисование не работает */
+  rtRenderAnnotations(pv.name, imgWrap);
 
   document.addEventListener('keydown', _pvLbKeyHandler);
 
@@ -1580,7 +1558,15 @@ function _pvLbOpenDesktop() {
         var lb = document.getElementById('pv-lightbox');
         if (lb) {
           var fullImg = lb.querySelector('.cp-fullscreen-img');
-          if (fullImg) fullImg.src = result.data_url;
+          if (fullImg) {
+            fullImg.src = result.data_url;
+            /* Перевыровнять слой аннотаций после загрузки полного изображения */
+            fullImg.addEventListener('load', function() {
+              var iw = lb.querySelector('.pv-lb-img-wrap');
+              var ly = iw ? iw.querySelector('.rt-annot-layer') : null;
+              if (ly && iw) _rtAlignLayerNow(ly, iw);
+            }, { once: true });
+          }
         }
       }
     });
@@ -3992,6 +3978,84 @@ function _pvLbGetCardComments(photoName) {
   return null;
 }
 
+/**
+ * Собрать ВСЕ комментарии к фото из всех источников.
+ * Возвращает массив { source: string, text: string, created: string }.
+ * Источники: карточка, контейнер, фото-аннотации.
+ * @param {string} photoName
+ * @returns {Array}
+ */
+function _pvLbGetAllComments(photoName) {
+  var proj = getActiveProject();
+  if (!proj) return [];
+  var result = [];
+
+  /* 1. Комментарии к карточке, в которой лежит фото */
+  if (proj.cards) {
+    for (var ci = 0; ci < proj.cards.length; ci++) {
+      var card = proj.cards[ci];
+      if (!card.slots) continue;
+      var inCard = false;
+      for (var si = 0; si < card.slots.length; si++) {
+        if (card.slots[si].file === photoName) { inCard = true; break; }
+      }
+      if (inCard && card._comments) {
+        var cardLabel = (card.name && card.name.trim()) ? card.name.trim() : ('Карточка ' + (ci + 1));
+        for (var cc = 0; cc < card._comments.length; cc++) {
+          var cmt = card._comments[cc];
+          result.push({
+            source: cardLabel,
+            author: cmt.author === 'client' ? 'Клиент' : 'Команда',
+            text: cmt.text || '',
+            created: cmt.created || ''
+          });
+        }
+      }
+    }
+  }
+
+  /* 2. Комментарии к контейнеру, в котором лежит фото (доп. контент) */
+  if (proj.ocContainers) {
+    for (var oi = 0; oi < proj.ocContainers.length; oi++) {
+      var cnt = proj.ocContainers[oi];
+      var items = cnt.items || [];
+      var inCnt = false;
+      for (var ii = 0; ii < items.length; ii++) {
+        if (items[ii].name === photoName) { inCnt = true; break; }
+      }
+      if (inCnt && cnt._comments) {
+        var cntLabel = (cnt.name && cnt.name.trim()) ? cnt.name.trim() : ('Контейнер ' + (oi + 1));
+        for (var cci = 0; cci < cnt._comments.length; cci++) {
+          var ccmt = cnt._comments[cci];
+          result.push({
+            source: cntLabel,
+            author: ccmt.author === 'client' ? 'Клиент' : 'Команда',
+            text: ccmt.text || '',
+            created: ccmt.created || ''
+          });
+        }
+      }
+    }
+  }
+
+  /* 3. Аннотации к самой фотографии (текстовые) */
+  var annots = rtGetAnnotations(photoName);
+  for (var ai = 0; ai < annots.length; ai++) {
+    var a = annots[ai];
+    if (!a.text) continue;
+    var typeInfo = RT_ANNOTATION_TYPES[a.type] || RT_ANNOTATION_TYPES.attention;
+    var tag = a.tags && a.tags.length > 0 ? a.tags[0] : '';
+    var src = tag ? tag : typeInfo.label;
+    result.push({
+      source: src,
+      text: a.text,
+      created: a.created || ''
+    });
+  }
+
+  return result;
+}
+
 // ── Рендер аннотаций на лайтбоксе ──
 
 /**
@@ -4225,6 +4289,10 @@ function _rtAlignLayerNow(layer, imgWrap) {
 
 /**
  * Обновить список комментариев в тулбаре лайтбокса.
+ * Показывает ВСЕ комментарии из всех источников:
+ *   - Комментарии к карточке (формат: "Имя карточки: текст")
+ *   - Комментарии к контейнеру (формат: "Имя контейнера: текст")
+ *   - Аннотации к фото (формат: "тег: текст" или "тип: текст")
  * @param {string} photoName
  * @param {HTMLElement} imgWrap
  */
@@ -4232,23 +4300,23 @@ function rtRenderCmtList(photoName, imgWrap) {
   var listEl = document.getElementById('rt-cmt-list');
   if (!listEl) return;
 
-  var annots = rtGetAnnotations(photoName);
-  if (annots.length === 0) {
-    listEl.innerHTML = '<div class="rt-cmt-empty">Нет комментариев</div>';
+  var allComments = _pvLbGetAllComments(photoName);
+
+  if (allComments.length === 0) {
+    listEl.innerHTML = '';
     return;
   }
 
   var html = '';
-  for (var i = 0; i < annots.length; i++) {
-    var a = annots[i];
-    var typeInfo = RT_ANNOTATION_TYPES[a.type] || RT_ANNOTATION_TYPES.attention;
-    var hasGraphic = a.hasCircle || a.shape === 'line';
-    var shapeLabel = a.shape === 'line' ? '~' : '';
-    var icon = hasGraphic ? '<span class="rt-cmt-icon" style="background:' + typeInfo.border + '">' + shapeLabel + '</span>' : '';
-    var preview = a.text ? a.text.substring(0, 60) : (hasGraphic ? typeInfo.label : 'Пустой');
-    html += '<div class="rt-cmt-item" data-annot-id="' + a.id + '" onclick="rtCmtItemClick(\'' + esc(photoName) + '\',\'' + a.id + '\')">';
-    html += icon;
-    html += '<span class="rt-cmt-preview">' + esc(preview) + '</span>';
+  for (var i = 0; i < allComments.length; i++) {
+    var c = allComments[i];
+    /* Формат: "Источник (Автор): текст" или "Источник: текст" */
+    var prefix = '';
+    if (c.source) prefix += c.source;
+    if (c.author) prefix += prefix ? ' (' + c.author + ')' : c.author;
+    var displayText = prefix ? (prefix + ': ' + c.text) : c.text;
+    html += '<div class="rt-cmt-item">';
+    html += '<span class="rt-cmt-preview">' + esc(displayText.substring(0, 140)) + '</span>';
     html += '</div>';
   }
   listEl.innerHTML = html;

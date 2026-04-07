@@ -335,16 +335,9 @@ function cpRenderCard() {
 
   html += layBuildLayout(card, layTmpl, function(si) { return cpSlotHTML(si, undefined, cardHasHero); });
 
-  /* ── Имена файлов ── */
-  html += '<div class="cp-file-names">';
-  for (var fi = 0; fi < totalSlots; fi++) {
-    var sl = card.slots[fi];
-    if (sl && sl.file) html += '<span>' + esc(sl.file) + '</span>';
-  }
-  html += '</div>';
-
-  /* ── Аннотации к фотографиям в слотах ── */
-  html += _cpRenderSlotAnnotations(card);
+  /* Имена файлов и аннотации к фото убраны из вида карточки:
+     — имена создают визуальный шум
+     — аннотации к фото видны в лайтбоксе (единый список из всех источников) */
 
   /* ── Комментарии к карточке ── */
   html += cpRenderComments(idx);
@@ -3509,6 +3502,7 @@ function cpSaveNewComment(cardIdx, e) {
   if (!ta) return;
   var text = ta.value.trim();
   if (!text) return;
+  ta.value = '';
   cpAddComment(cardIdx, text);
 }
 
@@ -3559,6 +3553,7 @@ function cpMobileSendComment(cardIdx) {
   if (!input) return;
   var text = input.value.trim();
   if (!text) return;
+  input.value = '';
   var author = window._shareToken ? 'client' : 'team';
   var proj = getActiveProject();
   if (!proj || !proj.cards || !proj.cards[cardIdx]) return;

@@ -523,10 +523,15 @@ function renderProjects() {
   }
 
   if (filtered.length === 0) {
-    list.innerHTML = '<div class="empty-state">' +
-      (hiddenCount > 0 ? 'Все проекты скрыты' : 'Нет открытых проектов') + '</div>';
+    /* Если Supabase подключён, но ещё не авторизован — показать "Загружаю..."
+       чтобы пользователь не пугался пустого списка */
+    var _isLoading = (typeof sbIsConnected === 'function' && sbIsConnected() &&
+                      typeof sbIsLoggedIn === 'function' && !sbIsLoggedIn());
+    var emptyMsg = hiddenCount > 0 ? 'Все проекты скрыты' :
+                   (_isLoading ? 'Загружаю проекты...' : 'Нет открытых проектов');
+    list.innerHTML = '<div class="empty-state">' + emptyMsg + '</div>';
     document.getElementById('pipeline-container').innerHTML =
-      '<div class="empty-state">Выберите съёмку</div>';
+      '<div class="empty-state">' + (_isLoading ? '' : 'Выберите съёмку') + '</div>';
     return;
   }
 
