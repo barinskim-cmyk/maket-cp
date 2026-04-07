@@ -1111,44 +1111,86 @@ function pvReadXmpRating(file, callback) {
 function pvMakeThumbnail(file, callback) {
   // Сначала читаем рейтинг из XMP, потом делаем миниатюру
   pvReadXmpRating(file, function(rating) {
-    var reader = new FileReader();
-    reader.onload = function(ev) {
-      var img = new Image();
-      img.onload = function() {
-        var w = img.width, h = img.height;
-        var orient = (w > h) ? 'h' : 'v';
+    /* Рисуем миниатюры на canvas.
+       createImageBitmap с imageOrientation: 'from-image' гарантирует
+       что EXIF-поворот применяется к пикселям ДО отрисовки на canvas.
+       Фолбэк: new Image() (в Chrome 81+ тоже учитывает EXIF). */
+    var _drawThumbs = function(source, w, h) {
+      var orient = (w > h) ? 'h' : 'v';
 
-        /* 1. Маленький thumb (300px) для галереи */
-        var scale = Math.min(PV_THUMB_MAX / w, PV_THUMB_MAX / h, 1);
-        var tw = Math.round(w * scale), th = Math.round(h * scale);
-        var canvas = document.createElement('canvas');
-        canvas.width = tw; canvas.height = th;
-        canvas.getContext('2d').drawImage(img, 0, 0, tw, th);
-        var thumbUrl = canvas.toDataURL('image/jpeg', PV_THUMB_QUALITY);
+      /* 1. Маленький thumb (300px) для галереи */
+      var scale = Math.min(PV_THUMB_MAX / w, PV_THUMB_MAX / h, 1);
+      var tw = Math.round(w * scale), th = Math.round(h * scale);
+      var canvas = document.createElement('canvas');
+      canvas.width = tw; canvas.height = th;
+      canvas.getContext('2d').drawImage(source, 0, 0, tw, th);
+      var thumbUrl = canvas.toDataURL('image/jpeg', PV_THUMB_QUALITY);
 
-        /* 2. Большой preview (1200px) для карточек */
-        var pScale = Math.min(PV_PREVIEW_MAX / w, PV_PREVIEW_MAX / h, 1);
-        var pw = Math.round(w * pScale), ph = Math.round(h * pScale);
-        var pCanvas = document.createElement('canvas');
-        pCanvas.width = pw; pCanvas.height = ph;
-        pCanvas.getContext('2d').drawImage(img, 0, 0, pw, ph);
-        var previewUrl = pCanvas.toDataURL('image/jpeg', PV_PREVIEW_QUALITY);
+      /* 2. Большой preview (1200px) для карточек */
+      var pScale = Math.min(PV_PREVIEW_MAX / w, PV_PREVIEW_MAX / h, 1);
+      var pw = Math.round(w * pScale), ph = Math.round(h * pScale);
+      var pCanvas = document.createElement('canvas');
+      pCanvas.width = pw; pCanvas.height = ph;
+      pCanvas.getContext('2d').drawImage(source, 0, 0, pw, ph);
+      var previewUrl = pCanvas.toDataURL('image/jpeg', PV_PREVIEW_QUALITY);
 
-        /* Освободить canvas-память (b11: canvas memory leak) */
-        canvas.width = 0; canvas.height = 0;
-        pCanvas.width = 0; pCanvas.height = 0;
+      /* Освободить canvas-память (b11: canvas memory leak) */
+      canvas.width = 0; canvas.height = 0;
+      pCanvas.width = 0; pCanvas.height = 0;
 
-        callback({
-          name: file.name, path: '', thumb: thumbUrl,
-          preview: previewUrl, rating: rating, orient: orient
-        });
-      };
-      img.onerror = function() { callback(null); };
-      img.src = ev.target.result;
+      callback({
+        name: file.name, path: '', thumb: thumbUrl,
+        preview: previewUrl, rating: rating, orient: orient
+      });
     };
-    reader.onerror = function() { callback(null); };
-    reader.readAsDataURL(file);
+
+    /* Предпочитаем createImageBitmap: гарантированно учитывает EXIF */
+    if (typeof createImageBitmap === 'function') {
+      createImageBitmap(file, { imageOrientation: 'from-image' }).then(function(bmp) {
+        _drawThumbs(bmp, bmp.width, bmp.height);
+        bmp.close();
+      }).catch(function() {
+        /* Фолбэк через Image если createImageBitmap не поддерживает опции */
+        _pvMakeThumbnailFallback(file, rating, callback);
+      });
+    } else {
+      _pvMakeThumbnailFallback(file, rating, callback);
+    }
   });
+}
+
+/** Фолбэк: генерация миниатюры через new Image + FileReader */
+function _pvMakeThumbnailFallback(file, rating, callback) {
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    var img = new Image();
+    img.onload = function() {
+      var w = img.width, h = img.height;
+      var orient = (w > h) ? 'h' : 'v';
+      var scale = Math.min(PV_THUMB_MAX / w, PV_THUMB_MAX / h, 1);
+      var tw = Math.round(w * scale), th = Math.round(h * scale);
+      var canvas = document.createElement('canvas');
+      canvas.width = tw; canvas.height = th;
+      canvas.getContext('2d').drawImage(img, 0, 0, tw, th);
+      var thumbUrl = canvas.toDataURL('image/jpeg', PV_THUMB_QUALITY);
+      var pScale = Math.min(PV_PREVIEW_MAX / w, PV_PREVIEW_MAX / h, 1);
+      var pw = Math.round(w * pScale), ph = Math.round(h * pScale);
+      var pCanvas = document.createElement('canvas');
+      pCanvas.width = pw; pCanvas.height = ph;
+      pCanvas.getContext('2d').drawImage(img, 0, 0, pw, ph);
+      var previewUrl = pCanvas.toDataURL('image/jpeg', PV_PREVIEW_QUALITY);
+      canvas.width = 0; canvas.height = 0;
+      pCanvas.width = 0; pCanvas.height = 0;
+      callback({
+        name: file.name, path: '', thumb: thumbUrl,
+        preview: previewUrl, rating: rating, orient: orient
+      });
+    };
+    img.onerror = function() { callback(null); };
+    img.src = ev.target.result;
+  };
+  reader.onerror = function() { callback(null); };
+  reader.readAsDataURL(file);
 }
 
 // ══════════════════════════════════════════════

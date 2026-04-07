@@ -20,7 +20,7 @@ from pathlib import Path
 
 # Pillow — опциональная зависимость, фолбэк через base64 без ресайза
 try:
-    from PIL import Image
+    from PIL import Image, ImageOps
 
     HAS_PIL = True
 except ImportError:
@@ -181,6 +181,15 @@ class PreviewService:
         try:
             img = Image.open(filepath)
             img.load()
+
+            # Применить EXIF-ориентацию (поворот/отражение) чтобы
+            # миниатюра соответствовала тому что видит пользователь.
+            # Без этого горизонтальные фото могут отображаться боком.
+            try:
+                img = ImageOps.exif_transpose(img)
+            except Exception:
+                pass  # Если нет EXIF — оставляем как есть
+
             orig_w, orig_h = img.size
 
             # Конвертируем в RGB один раз (для JPEG)
