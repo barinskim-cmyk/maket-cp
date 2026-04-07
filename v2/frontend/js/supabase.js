@@ -347,15 +347,17 @@ function sbUploadCards(projectId, cards, callback) {
 
       for (var c = 0; c < cards.length; c++) {
         var card = cards[c];
-        /* Генерируем новый UUID чтобы избежать конфликта PK при перезаписи */
-        var cardId = crypto.randomUUID ? crypto.randomUUID() : ('card_' + projectId.slice(0,8) + '_' + c + '_' + Date.now());
+        /* Для кристаллизованных карточек — строго card.id (стабильный).
+           Для черновиков — card.id или новый UUID. */
+        var cardId = card.id || (crypto.randomUUID ? crypto.randomUUID() : ('card_' + projectId.slice(0,8) + '_' + c + '_' + Date.now()));
+        var cardStatus = card._crystallized ? 'crystallized' : (card.status || 'draft');
 
         cardRows.push({
           id: cardId,
           project_id: projectId,
           position: c,
           name: card.name || null,
-          status: card.status || 'draft',
+          status: cardStatus,
           has_hero: card._hasHero !== undefined ? card._hasHero : true,
           h_aspect: card._hAspect || '3/2',
           v_aspect: card._vAspect || '2/3',
@@ -745,6 +747,7 @@ function sbDownloadProject(cloudId, callback) {
               id: rc.id,
               name: rc.name || '',
               status: rc.status,
+              _crystallized: rc.status === 'crystallized',
               _hasHero: rc.has_hero,
               _hAspect: rc.h_aspect,
               _vAspect: rc.v_aspect,
@@ -1686,15 +1689,19 @@ function sbSyncCardsLight(projectId, cards, callback) {
       for (var c = 0; c < cards.length; c++) {
         var card = cards[c];
         /* Сохраняем card.id из JS — иначе комментарии теряются при перезагрузке
-           (ключи "card:<id>" в comments не совпадут с новыми UUID) */
+           (ключи "card:<id>" в comments не совпадут с новыми UUID).
+           Для кристаллизованных карточек ID строго обязателен. */
         var cardId = card.id || (crypto.randomUUID ? crypto.randomUUID() : ('card_' + projectId.slice(0,8) + '_' + c + '_' + Date.now()));
+
+        /* Статус: кристаллизованная карточка → 'crystallized', иначе 'draft' */
+        var cardStatus = card._crystallized ? 'crystallized' : (card.status || 'draft');
 
         cardRows.push({
           id: cardId,
           project_id: projectId,
           position: c,
           name: card.name || null,
-          status: card.status || 'draft',
+          status: cardStatus,
           has_hero: card._hasHero !== undefined ? card._hasHero : true,
           h_aspect: card._hAspect || '3/2',
           v_aspect: card._vAspect || '2/3',
@@ -1890,6 +1897,7 @@ function sbPullProject(callback) {
         var rc = _rpcCards[c];
         var card = {
           id: rc.id, status: rc.status || 'draft',
+          _crystallized: rc.status === 'crystallized',
           _hasHero: rc.has_hero, _hAspect: rc.h_aspect || '3/2',
           _vAspect: rc.v_aspect || '2/3', _lockRows: rc.lock_rows || false,
           slots: []
@@ -2067,6 +2075,7 @@ function sbPullProject(callback) {
           var card = {
             id: rc.id,
             status: rc.status || 'draft',
+            _crystallized: rc.status === 'crystallized',
             _hasHero: rc.has_hero,
             _hAspect: rc.h_aspect || '3/2',
             _vAspect: rc.v_aspect || '2/3',

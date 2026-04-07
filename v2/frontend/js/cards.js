@@ -3339,6 +3339,56 @@ function cpOpenAnnotInLightbox(fileName) {
 }
 
 // ══════════════════════════════════════════════
+//  Кристаллизация карточки
+//
+//  Карточка рождается как черновик (draft): лёгкая структура
+//  с временным 8-символьным ID. Можно свободно менять слоты,
+//  перекраивать раскладку — ID при этом не гарантирован.
+//
+//  Кристаллизация фиксирует card.id навсегда. Триггеры:
+//    1. Добавление комментария к карточке
+//    2. Подтверждение привязки артикула (TODO: articles.js)
+//
+//  После кристаллизации ID не меняется при sync,
+//  комментарии надёжно привязаны к карточке.
+// ══════════════════════════════════════════════
+
+/**
+ * Кристаллизовать карточку — зафиксировать стабильный ID.
+ * Идемпотентна: повторный вызов ничего не делает.
+ * @param {number} cardIdx — индекс карточки в проекте
+ * @returns {boolean} true если кристаллизация произошла (или уже была)
+ */
+function cpCrystallizeCard(cardIdx) {
+  var proj = getActiveProject();
+  if (!proj || !proj.cards || !proj.cards[cardIdx]) return false;
+  var card = proj.cards[cardIdx];
+
+  if (card._crystallized) return true; /* уже кристаллизована */
+
+  /* Фиксируем ID: если текущий — короткий (8 символов), оставляем.
+     Главное — пометить что этот ID стабилен и не подлежит замене. */
+  card._crystallized = true;
+  card._crystallizedAt = new Date().toISOString();
+
+  console.log('cpCrystallizeCard: карточка ' + (cardIdx + 1) +
+    ' кристаллизована, id=' + card.id);
+
+  return true;
+}
+
+/**
+ * Проверить, кристаллизована ли карточка.
+ * @param {number} cardIdx
+ * @returns {boolean}
+ */
+function cpIsCardCrystallized(cardIdx) {
+  var proj = getActiveProject();
+  if (!proj || !proj.cards || !proj.cards[cardIdx]) return false;
+  return !!proj.cards[cardIdx]._crystallized;
+}
+
+// ══════════════════════════════════════════════
 //  Комментарии к карточкам
 //
 //  Модель: card._comments = [
@@ -3376,6 +3426,10 @@ function cpAddComment(cardIdx, text) {
     author: 'team',
     created: new Date().toISOString()
   });
+
+  /* Кристаллизация: комментарий сохранён → фиксируем ID карточки */
+  cpCrystallizeCard(cardIdx);
+
   if (typeof shAutoSave === 'function') shAutoSave();
   cpRenderCard();
 }
@@ -3516,6 +3570,10 @@ function cpMobileSendComment(cardIdx) {
     author: author,
     created: new Date().toISOString()
   });
+
+  /* Кристаллизация: комментарий сохранён → фиксируем ID карточки */
+  cpCrystallizeCard(cardIdx);
+
   if (typeof shAutoSave === 'function') shAutoSave();
   /* Синхронизировать комментарий в облако немедленно */
   if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
