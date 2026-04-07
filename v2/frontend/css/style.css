@@ -1091,20 +1091,31 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .rt-line-hit { cursor: pointer; }
 .rt-line-hit:hover { stroke: rgba(50,130,220,0.3) !important; }
 
-/* Кнопка "На ретушь" в лайтбоксе */
-.rt-annot-btn {
+/* Быстрый тулбар аннотаций — всегда виден внизу лайтбокса */
+.rt-quick-bar {
   position: absolute; bottom: 20px; right: 20px;
-  padding: 8px 16px; font-size: 13px; font-weight: 600;
-  background: rgba(50,50,50,0.85); color: #fff;
-  border: 1px solid rgba(255,255,255,0.3); border-radius: 6px;
-  cursor: pointer; z-index: 20;
-  transition: background 0.15s;
+  display: flex; gap: 8px; align-items: center;
+  z-index: 20;
 }
-.rt-annot-btn:hover { background: rgba(80,80,80,0.9); }
-.rt-annot-btn.rt-mode-active {
-  background: rgba(220,50,50,0.85);
+.rt-quick-btn {
+  padding: 7px 14px; font-size: 12px; font-weight: 600;
+  background: rgba(50,50,50,0.8); color: #fff;
+  border: 1px solid rgba(255,255,255,0.25); border-radius: 6px;
+  cursor: pointer; transition: background 0.15s;
+}
+.rt-quick-btn:hover { background: rgba(80,80,80,0.9); }
+.rt-quick-btn.rt-mode-active {
+  background: rgba(220,50,50,0.8);
   border-color: rgba(255,100,100,0.5);
 }
+.rt-quick-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 22px; height: 22px; padding: 0 5px;
+  background: rgba(255,255,255,0.2); color: #fff;
+  font-size: 11px; font-weight: 600; border-radius: 11px;
+}
+/* Старая кнопка "Комментарии" — скрыть если осталась в DOM */
+.rt-annot-btn { display: none; }
 
 /* ── Комментарии карточки в лайтбоксе ── */
 .lb-card-comments {
@@ -2023,7 +2034,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     gap: 8px;
   }
   /* Аннотации: кнопка и счётчик ближе к краю */
-  .rt-annot-btn { bottom: 12px !important; right: 12px !important; padding: 6px 12px !important; font-size: 12px !important; }
+  .rt-quick-bar { bottom: 12px !important; right: 12px !important; }
+  .rt-quick-btn { padding: 5px 10px !important; font-size: 11px !important; }
   .rt-annot-count { bottom: 14px !important; right: 120px !important; font-size: 11px !important; }
   /* Попап аннотации на мобильном: прижать к низу экрана */
   .rt-popup {

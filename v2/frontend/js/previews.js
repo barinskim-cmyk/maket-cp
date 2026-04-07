@@ -1445,45 +1445,49 @@ function _pvLbOpenDesktop() {
   imgWrap.appendChild(img);
   imgWrap.appendChild(checkWrap);
 
-  /* ── Тулбар комментариев ── */
+  /* ── Тулбар аннотаций: всегда видим, две кнопки ── */
+  var annotBar = document.createElement('div');
+  annotBar.className = 'rt-quick-bar';
+  annotBar.id = 'rt-quick-bar';
+
+  /* Кнопка "+ Текст" */
+  var addTextBtn = document.createElement('button');
+  addTextBtn.className = 'rt-quick-btn';
+  addTextBtn.textContent = '+ Текст';
+  addTextBtn.onclick = function(ev) { ev.stopPropagation(); rtShowAnnotPopup(pv.name, null, rtAnnotCount(pv.name), imgWrap, null); };
+
+  /* Кнопка "+ Нарисовать" (режим карандаша) */
+  var pencilBtn = document.createElement('button');
+  pencilBtn.className = 'rt-quick-btn rt-pencil-btn';
+  pencilBtn.id = 'rt-pencil-btn';
+  pencilBtn.textContent = '+ Нарисовать';
+  pencilBtn.onclick = function(ev) { ev.stopPropagation(); rtTogglePencilMode(); };
+
+  annotBar.appendChild(addTextBtn);
+  annotBar.appendChild(pencilBtn);
+
+  /* Счётчик аннотаций (если есть) */
+  var ac = rtAnnotCount(pv.name);
+  if (ac > 0) {
+    var badge = document.createElement('span');
+    badge.className = 'rt-quick-badge';
+    badge.id = 'rt-annot-badge';
+    badge.textContent = ac;
+    badge.title = 'Аннотаций: ' + ac;
+    annotBar.appendChild(badge);
+  }
+
+  /* Список аннотаций — скрыт, открывается по клику на бейдж */
   var cmtBar = document.createElement('div');
   cmtBar.className = 'rt-cmt-bar';
   cmtBar.id = 'rt-cmt-bar';
   cmtBar.style.display = 'none';
-
-  /* Кнопка "+ Текст" (текстовый комментарий без привязки к месту) */
-  var addTextBtn = document.createElement('button');
-  addTextBtn.className = 'rt-cmt-action';
-  addTextBtn.textContent = '+ Текст';
-  addTextBtn.onclick = function(ev) { ev.stopPropagation(); rtShowAnnotPopup(pv.name, null, rtAnnotCount(pv.name), imgWrap, null); };
-
-  /* Кнопка-карандаш — единый режим рецензирования.
-     Рисуешь свободно → замкнул = кружок, не замкнул = линия.
-     Углы сохраняются, прямые сегменты выравниваются. */
-  var pencilBtn = document.createElement('button');
-  pencilBtn.className = 'rt-cmt-action rt-pencil-btn';
-  pencilBtn.id = 'rt-pencil-btn';
-  pencilBtn.textContent = 'Рецензирование';
-  pencilBtn.onclick = function(ev) { ev.stopPropagation(); rtTogglePencilMode(); };
-
-  /* Список существующих комментариев */
   var cmtList = document.createElement('div');
   cmtList.className = 'rt-cmt-list';
   cmtList.id = 'rt-cmt-list';
-
-  cmtBar.appendChild(addTextBtn);
-  cmtBar.appendChild(pencilBtn);
   cmtBar.appendChild(cmtList);
 
-  /* Главная кнопка открытия тулбара */
-  var annotBtn = document.createElement('button');
-  annotBtn.className = 'rt-annot-btn';
-  annotBtn.id = 'rt-annot-toggle';
-  var ac = rtAnnotCount(pv.name);
-  annotBtn.textContent = 'Комментарии' + (ac > 0 ? ' (' + ac + ')' : '');
-  annotBtn.onclick = function(ev) { ev.stopPropagation(); rtToggleCmtBar(pv.name, imgWrap); };
-
-  overlay.appendChild(annotBtn);
+  overlay.appendChild(annotBar);
   overlay.appendChild(cmtBar);
 
   /* Обработчик клика для линий и маршрутизации */
@@ -4476,11 +4480,11 @@ function _rtUpdateModeButtons() {
   var lineBtn = document.getElementById('rt-line-mode-btn');
   if (lineBtn) lineBtn.style.display = 'none';
 
-  /* Новая кнопка-карандаш */
+  /* Кнопка-карандаш */
   var pencilBtn = document.getElementById('rt-pencil-btn');
   if (pencilBtn) {
     pencilBtn.classList.toggle('rt-mode-active', _rtAnnotMode === 'pencil');
-    pencilBtn.textContent = _rtAnnotMode === 'pencil' ? 'Готово' : 'Рецензирование';
+    pencilBtn.textContent = _rtAnnotMode === 'pencil' ? 'Готово' : '+ Нарисовать';
   }
   var imgWrap = document.querySelector('.pv-lb-img-wrap');
   if (imgWrap) {
@@ -4494,6 +4498,8 @@ function _rtUpdateModeButtons() {
  * @returns {{x: number, y: number, rect: DOMRect, imgW: number, imgH: number}} | null
  */
 function _rtEventToPercent(ev, imgWrap) {
+  if (!imgWrap) imgWrap = document.querySelector('.pv-lb-img-wrap');
+  if (!imgWrap) return null;
   /* Используем слой аннотаций если есть (он выровнен по img) */
   var layer = imgWrap.querySelector('.rt-annot-layer');
   var img = imgWrap.querySelector('img');
@@ -4522,7 +4528,7 @@ function _rtEventToPercent(ev, imgWrap) {
 function rtOnMouseDown(ev) {
   /* Единый режим рецензирования: свободное рисование */
   if (_rtAnnotMode === 'pencil' || _rtAnnotMode === 'line') {
-    rtOnLineMouseDown(ev);
+    rtOnLineMouseDown(ev, ev.currentTarget);
     return;
   }
   if (_rtAnnotMode !== 'circle') return;
@@ -4681,11 +4687,11 @@ var _rtLineDrawing = false;
 /**
  * Начать рисование линии (mousedown).
  */
-function rtOnLineMouseDown(ev) {
+function rtOnLineMouseDown(ev, _passedWrap) {
   if (_rtAnnotMode !== 'line' && _rtAnnotMode !== 'pencil') return;
   if (ev.button !== 0) return;
 
-  var imgWrap = ev.currentTarget;
+  var imgWrap = _passedWrap || ev.currentTarget || document.querySelector('.pv-lb-img-wrap');
   var pos = _rtEventToPercent(ev, imgWrap);
   if (!pos) return;
 
