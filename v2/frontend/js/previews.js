@@ -1467,7 +1467,7 @@ function _pvLbOpenDesktop() {
   var addLineBtn = document.createElement('button');
   addLineBtn.className = 'rt-cmt-action';
   addLineBtn.id = 'rt-line-mode-btn';
-  addLineBtn.textContent = '+ Линия';
+  addLineBtn.textContent = '+ Рисовать';
   addLineBtn.onclick = function(ev) { ev.stopPropagation(); rtToggleLineMode(); };
 
   /* Список существующих комментариев */
@@ -4457,14 +4457,10 @@ function rtToggleAnnotMode() {
  */
 function rtToggleLineMode() {
   if (_rtAnnotMode === 'line') {
-    /* Если есть точки — завершить линию */
-    if (_rtLinePoints.length >= 2) {
-      _rtFinishLine();
-    } else {
-      _rtAnnotMode = false;
-      _rtLinePoints = [];
-      _rtRemoveLinePreview();
-    }
+    _rtAnnotMode = false;
+    _rtLineDrawing = false;
+    _rtLinePoints = [];
+    _rtRemoveLinePreview();
   } else {
     _rtAnnotMode = 'line';
     _rtLinePoints = [];
@@ -4486,8 +4482,8 @@ function _rtUpdateModeButtons() {
   if (lineBtn) {
     lineBtn.classList.toggle('rt-mode-active', _rtAnnotMode === 'line');
     lineBtn.textContent = _rtAnnotMode === 'line'
-      ? (_rtLinePoints.length >= 2 ? 'Завершить' : 'Готово')
-      : '+ Линия';
+      ? 'Готово'
+      : '+ Рисовать';
   }
   var imgWrap = document.querySelector('.pv-lb-img-wrap');
   if (imgWrap) {
@@ -4527,6 +4523,11 @@ function _rtEventToPercent(ev, imgWrap) {
  * Центр = точка клика, тянешь мышь → rx/ry по dx/dy.
  */
 function rtOnMouseDown(ev) {
+  /* Линия: свободное рисование */
+  if (_rtAnnotMode === 'line') {
+    rtOnLineMouseDown(ev);
+    return;
+  }
   if (_rtAnnotMode !== 'circle') return;
   if (ev.button !== 0) return;
 
@@ -4672,13 +4673,20 @@ function _rtOnEditEnd(ev) {
   }
 }
 
-/* ── Линия: клики ставят точки, двойной клик завершает ── */
+/* ── Линия: свободное рисование мышкой ── */
+/* Mousedown начинает, mousemove рисует, mouseup завершает.
+   Путь автоматически упрощается (Douglas-Peucker).
+   Если начало и конец рядом — превращается в кружок. */
+
+/** Флаг: идёт ли рисование линии прямо сейчас */
+var _rtLineDrawing = false;
 
 /**
- * Обработчик клика по фото в режиме линии.
+ * Начать рисование линии (mousedown).
  */
-function rtOnLineClick(ev) {
+function rtOnLineMouseDown(ev) {
   if (_rtAnnotMode !== 'line') return;
+  if (ev.button !== 0) return;
 
   var imgWrap = ev.currentTarget;
   var pos = _rtEventToPercent(ev, imgWrap);
@@ -4687,40 +4695,140 @@ function rtOnLineClick(ev) {
   ev.preventDefault();
   ev.stopPropagation();
 
-  _rtLinePoints.push({ x: pos.x, y: pos.y });
+  _rtLineDrawing = true;
+  _rtLinePoints = [{ x: pos.x, y: pos.y }];
   _rtRenderLinePreview(imgWrap);
-  _rtUpdateModeButtons();
+
+  /* Слушатели на document чтобы не терять при выходе за imgWrap */
+  var _imgWrap = imgWrap;
+  var _moveHandler = function(moveEv) {
+    if (!_rtLineDrawing) return;
+    var mp = _rtEventToPercent(moveEv, _imgWrap);
+    if (!mp) return;
+    /* Сэмплинг: добавлять точку только если далеко от предыдущей */
+    var last = _rtLinePoints[_rtLinePoints.length - 1];
+    var dx = mp.x - last.x;
+    var dy = mp.y - last.y;
+    if (dx * dx + dy * dy > 1.5) { /* ~1.2% расстояние */
+      _rtLinePoints.push({ x: mp.x, y: mp.y });
+      _rtRenderLinePreview(_imgWrap);
+    }
+  };
+  var _upHandler = function(upEv) {
+    document.removeEventListener('mousemove', _moveHandler);
+    document.removeEventListener('mouseup', _upHandler);
+    _rtLineDrawing = false;
+    if (_rtLinePoints.length >= 2) {
+      _rtFinishLineFreehand();
+    } else {
+      _rtLinePoints = [];
+      _rtRemoveLinePreview();
+    }
+  };
+  document.addEventListener('mousemove', _moveHandler);
+  document.addEventListener('mouseup', _upHandler);
 }
 
 /**
- * Двойной клик — завершить линию.
+ * Douglas-Peucker упрощение линии.
+ * @param {Array} pts — [{x,y}]
+ * @param {number} epsilon — порог (в % от фото)
+ * @returns {Array}
  */
-function rtOnLineDblClick(ev) {
-  if (_rtAnnotMode !== 'line') return;
-  ev.preventDefault();
-  ev.stopPropagation();
-  if (_rtLinePoints.length >= 2) {
-    _rtFinishLine();
+function _rtSimplifyLine(pts, epsilon) {
+  if (pts.length <= 2) return pts;
+  /* Найти самую дальнюю точку от линии first-last */
+  var first = pts[0];
+  var last = pts[pts.length - 1];
+  var maxDist = 0;
+  var maxIdx = 0;
+  for (var i = 1; i < pts.length - 1; i++) {
+    var d = _rtPointToLineDist(pts[i], first, last);
+    if (d > maxDist) { maxDist = d; maxIdx = i; }
   }
+  if (maxDist > epsilon) {
+    var left = _rtSimplifyLine(pts.slice(0, maxIdx + 1), epsilon);
+    var right = _rtSimplifyLine(pts.slice(maxIdx), epsilon);
+    return left.slice(0, left.length - 1).concat(right);
+  }
+  return [first, last];
+}
+
+/** Расстояние точки до линии AB */
+function _rtPointToLineDist(p, a, b) {
+  var dx = b.x - a.x;
+  var dy = b.y - a.y;
+  var lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return Math.sqrt((p.x - a.x) * (p.x - a.x) + (p.y - a.y) * (p.y - a.y));
+  var t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq;
+  t = Math.max(0, Math.min(1, t));
+  var proj = { x: a.x + t * dx, y: a.y + t * dy };
+  return Math.sqrt((p.x - proj.x) * (p.x - proj.x) + (p.y - proj.y) * (p.y - proj.y));
 }
 
 /**
- * Завершить линию: создать аннотацию.
+ * Завершить свободное рисование: упростить, проверить замкнутость → кружок.
  */
-function _rtFinishLine() {
+function _rtFinishLineFreehand() {
   var pv = _pvLbList[_pvLbIdx];
   if (!pv) return;
   var imgWrap = document.querySelector('.pv-lb-img-wrap');
-  var points = _rtLinePoints.slice(); /* копия */
+  var rawPoints = _rtLinePoints.slice();
   _rtLinePoints = [];
-  _rtAnnotMode = false;
   _rtRemoveLinePreview();
-  _rtUpdateModeButtons();
 
-  /* Показать попап для линии */
-  rtShowAnnotPopup(pv.name, null, rtAnnotCount(pv.name), imgWrap,
-    { shape: 'line', points: points });
+  /* Упростить линию (epsilon = 1.5% от фото) */
+  var simplified = _rtSimplifyLine(rawPoints, 1.5);
+  if (simplified.length < 2) {
+    _rtAnnotMode = false;
+    _rtUpdateModeButtons();
+    return;
+  }
+
+  /* Проверить: замкнута ли линия? (начало и конец ближе 5%) */
+  var first = simplified[0];
+  var last = simplified[simplified.length - 1];
+  var closeDist = Math.sqrt((first.x - last.x) * (first.x - last.x) + (first.y - last.y) * (first.y - last.y));
+
+  if (closeDist < 5 && simplified.length >= 4) {
+    /* Замкнута → преобразовать в кружок (bounding box) */
+    var minX = 100, maxX = 0, minY = 100, maxY = 0;
+    for (var i = 0; i < simplified.length; i++) {
+      if (simplified[i].x < minX) minX = simplified[i].x;
+      if (simplified[i].x > maxX) maxX = simplified[i].x;
+      if (simplified[i].y < minY) minY = simplified[i].y;
+      if (simplified[i].y > maxY) maxY = simplified[i].y;
+    }
+    var cx = (minX + maxX) / 2;
+    var cy = (minY + maxY) / 2;
+    var rx = (maxX - minX) / 2;
+    var ry = (maxY - minY) / 2;
+    /* Показать попап для кружка */
+    _rtAnnotMode = false;
+    _rtUpdateModeButtons();
+    rtShowAnnotPopup(pv.name, null, rtAnnotCount(pv.name), imgWrap,
+      { x: cx, y: cy, rx: Math.max(rx, 1), ry: Math.max(ry, 1) });
+  } else {
+    /* Не замкнута → обычная линия */
+    _rtAnnotMode = false;
+    _rtUpdateModeButtons();
+    rtShowAnnotPopup(pv.name, null, rtAnnotCount(pv.name), imgWrap,
+      { shape: 'line', points: simplified });
+  }
 }
+
+/* Оставляем старые обработчики для обратной совместимости */
+function rtOnLineClick(ev) {
+  /* В новом режиме free-draw клик ничего не делает — рисование через mousedown */
+  return;
+}
+
+function rtOnLineDblClick(ev) {
+  /* В новом режиме free-draw двойной клик не нужен */
+  return;
+}
+
+/* _rtFinishLine удалена — заменена на _rtFinishLineFreehand (свободное рисование) */
 
 /**
  * Построить SVG path из массива точек с авто-сглаживанием (Catmull-Rom → cubic Bezier).
@@ -4815,11 +4923,6 @@ function _rtRemoveLinePreview() {
  */
 function rtOnImageClick(ev) {
   if (!_rtAnnotMode) return;
-
-  /* Линия: обрабатывается через click (не mousedown) */
-  if (_rtAnnotMode === 'line') {
-    rtOnLineClick(ev);
-    return;
-  }
-  /* Кружок обрабатывается через mousedown (rtOnMouseDown), не через click */
+  /* Линия: обрабатывается через mousedown (свободное рисование), click не нужен */
+  /* Кружок: обрабатывается через mousedown (rtOnMouseDown), click не нужен */
 }
