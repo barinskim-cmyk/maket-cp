@@ -32,7 +32,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .auth-error { color: #c62828; font-size: 12px; margin-bottom: 8px; min-height: 16px; }
 .auth-error.success { color: #2e7d32; }
 .auth-btn {
-  width: 100%; padding: 10px; font-size: 14px; font-family: inherit;
+  width: 100%; padding: 10px; font-size: 13px; font-family: inherit;
   border: 1.5px solid #ddd; border-radius: 6px; cursor: pointer;
   background: #fff; color: #333; margin-bottom: 8px; transition: all 0.15s;
 }
@@ -49,7 +49,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   padding: 0 20px; position: sticky; top: 0; z-index: 50;
 }
 .nav-btn {
-  padding: 14px 24px; font-size: 14px; font-weight: 500;
+  padding: 14px 24px; font-size: 13px; font-weight: normal;
   border: none; background: none; cursor: pointer; color: #888;
   border-bottom: 3px solid transparent; transition: all 0.15s;
 }
@@ -62,7 +62,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   padding: 0 20px;
 }
 .subtab {
-  padding: 10px 20px; font-size: 13px; font-weight: 500;
+  padding: 10px 20px; font-size: 13px; font-weight: normal;
   border: none; background: none; cursor: pointer; color: #999;
   border-bottom: 2px solid transparent; transition: all 0.15s;
 }
@@ -80,7 +80,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .section-title { font-size: 18px; font-weight: 600; margin-bottom: 16px; }
 
 .btn {
-  padding: 8px 18px; font-size: 13px; font-weight: 500;
+  padding: 8px 18px; font-size: 13px; font-weight: normal;
   border: 1px solid #ccc; background: #fff; border-radius: 6px;
   cursor: pointer; transition: all 0.15s;
 }
@@ -217,7 +217,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .project-item.project-deleted { opacity: 0.5; }
 .project-restore-btn { font-size: 11px; padding: 2px 8px; color: #666; border: 1px solid #ccc; background: transparent; cursor: pointer; }
 .project-restore-btn:hover { color: #333; border-color: #333; }
-.project-shared-tag { font-size: 10px; color: #1565c0; background: #e3f2fd; padding: 1px 6px; border-radius: 3px; font-weight: 500; }
+.project-shared-tag { font-size: 10px; color: #fff; background: #333; padding: 1px 6px; border-radius: 3px; font-weight: normal; }
 
 .shootings-layout { display: flex; gap: 24px; }
 .shootings-left { flex: 1; min-width: 0; }
@@ -229,10 +229,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
 .pipeline-sync-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .pipeline-parallel {
-  margin-top: 12px; padding: 8px 12px; background: #f8f5ff; border: 1px solid #e0d5f0;
+  margin-top: 12px; padding: 8px 12px; background: #fafafa; border: 1px solid #e0e0e0;
   border-radius: 6px; font-size: 12px;
 }
-.pipeline-parallel-title { font-weight: 600; color: #7c3aed; margin-bottom: 4px; }
+.pipeline-parallel-title { font-weight: 600; color: #333; margin-bottom: 4px; }
 .pipeline-parallel-item { color: #555; padding: 2px 0; }
 .pipeline-steps { display: flex; flex-direction: column; gap: 0; }
 .pipeline-step {
@@ -307,10 +307,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .pipeline-branch {
   margin-top: 8px; padding: 8px 10px 8px 20px;
   position: relative;
-  border-left: 2px dashed #c4b5fd;
-  background: #faf8ff; border-radius: 0 4px 4px 0;
+  border-left: 2px dashed #ccc;
+  background: #fafafa; border-radius: 0 4px 4px 0;
 }
-.pipeline-branch.done { border-left-style: solid; border-left-color: #7c3aed; }
+.pipeline-branch.done { border-left-style: solid; border-left-color: #333; }
 .pipeline-branch-line {
   position: absolute; left: -8px; top: 0;
   width: 6px; height: 100%;
@@ -321,18 +321,18 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 }
 .pipeline-branch-dot {
   width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
-  background: #c4b5fd; border: 2px solid #7c3aed;
+  background: #ddd; border: 2px solid #999;
 }
-.pipeline-branch-dot.done { background: #7c3aed; }
+.pipeline-branch-dot.done { background: #333; border-color: #333; }
 .pipeline-branch-label {
-  font-size: 12px; font-weight: 600; color: #7c3aed;
+  font-size: 12px; font-weight: 600; color: #333;
 }
 /* Кнопка "Готово" для завершения комментирования */
 .pipeline-cmt-done-btn {
-  background: #7c3aed; color: #fff; border: none;
+  background: #333; color: #fff; border: none;
   font-size: 11px; padding: 3px 12px; border-radius: 4px; cursor: pointer;
 }
-.pipeline-cmt-done-btn:hover { background: #6d28d9; }
+.pipeline-cmt-done-btn:hover { background: #555; }
 
 /* ══════════════════════════════════════════════
    Карточки товара — редактор ([anchor client]-стиль)
@@ -558,7 +558,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   width: 24px; height: 24px;
   background: rgba(0,0,0,0.55); color: #fff;
   border: none; border-radius: 4px;
-  font-size: 11px; font-weight: 600; line-height: 24px; text-align: center;
+  font-size: 11px; font-weight: normal; line-height: 24px; text-align: center;
   cursor: pointer; transition: background 0.15s;
 }
 .slot-btn:hover { background: rgba(0,0,0,0.8); }
@@ -590,11 +590,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .slot-carousel-arrow {
   pointer-events: auto;
   width: 36px; height: 36px;
-  background: rgba(0,0,0,0.35); color: #fff;
+  background: rgba(0,0,0,0.35); color: rgba(255,255,255,0.8);
   border: none; border-radius: 50%;
-  font-size: 18px; line-height: 36px; text-align: center;
-  cursor: pointer; transition: background 0.15s;
+  font-size: 18px; cursor: pointer; transition: background 0.15s;
   padding: 0; margin: 0 8px;
+  display: flex; align-items: center; justify-content: center;
+  line-height: 1;
 }
 .slot-carousel-arrow:hover { background: rgba(0,0,0,0.6); }
 
@@ -667,7 +668,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   background: none; border: none; cursor: pointer; color: #ccc;
   font-size: 14px; padding: 0 4px; transition: color 0.15s;
 }
-.cp-comment-del:hover { color: #c33; }
+.cp-comment-del:hover { color: #333; }
 
 .cp-nav-row { display: flex; justify-content: center; align-items: center; gap: 16px; margin-top: 16px; }
 .cp-nav-btn {
@@ -771,19 +772,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   transform: rotate(45deg);
 }
 
-.undo-btn {
-  padding: 8px 16px; background: #fff3e0; color: #e65100;
-  border: 2px solid #e65100; border-radius: 6px; cursor: pointer;
-  font-size: 13px; font-weight: 500; transition: all 0.15s;
-}
-.undo-btn:hover { background: #e65100; color: #fff; }
-.undo-btn:disabled { opacity: 0.3; cursor: default; background: #f5f5f5; color: #999; border-color: #ccc; }
+/* .undo-btn удалена — атавизм */
 
 .layout-toggle { display: flex; align-items: center; gap: 6px; }
 .layout-toggle span.label { font-size: 12px; color: #999; }
 .toggle-btn {
   padding: 4px 12px; border: 1.5px solid #ddd; background: #fff;
-  border-radius: 5px; font-size: 12px; cursor: pointer; transition: all 0.15s; color: #666;
+  border-radius: 5px; font-size: 13px; cursor: pointer; transition: all 0.15s; color: #666;
 }
 .toggle-btn:hover { border-color: #999; }
 .toggle-btn.active { background: #333; color: #fff; border-color: #333; }
@@ -792,10 +787,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .tmpl-info { font-size: 11px; color: #999; font-style: italic; }
 
 .delete-card-btn {
-  padding: 4px 10px; border: 1.5px solid #e57373; background: #fff;
-  border-radius: 5px; font-size: 12px; cursor: pointer; color: #e57373; transition: all 0.15s;
+  padding: 4px 10px; border: 1px solid #ccc; background: #fff;
+  border-radius: 5px; font-size: 13px; cursor: pointer; color: #333; transition: all 0.15s;
 }
-.delete-card-btn:hover { background: #e57373; color: #fff; }
+.delete-card-btn:hover { background: #333; color: #fff; border-color: #333; }
 
 .cp-empty { color: #aaa; font-size: 14px; text-align: center; padding: 60px 20px; }
 
@@ -970,16 +965,16 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   border-radius: 3px; transition: all 0.15s;
 }
 .pv-filter-reset:hover { color: #333; background: #eee; }
-.pv-filter-reset.active { color: #333; font-weight: 600; }
+.pv-filter-reset.active { color: #333; font-weight: normal; }
 .pv-filter-comment {
   margin-left: 8px;
   font-size: 11px; color: #666; cursor: pointer;
   border: 1px solid #ccc; background: #f5f5f5; padding: 3px 10px;
   border-radius: 4px; transition: all 0.15s;
-  font-weight: 500;
+  font-weight: normal;
 }
 .pv-filter-comment:hover { color: #333; background: #e8e8e8; border-color: #aaa; }
-.pv-filter-comment.active { color: #fff; background: #48c; border-color: #48c; font-weight: 600; }
+.pv-filter-comment.active { color: #fff; background: #333; border-color: #333; font-weight: normal; }
 
 /* Фильтр по папке — sticky под фильтром рейтинга */
 .pv-folder-filter {
@@ -1152,15 +1147,15 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   display: flex; gap: 8px;
 }
 .rt-quick-btn {
-  padding: 7px 14px; font-size: 12px; font-weight: 600;
+  padding: 7px 14px; font-size: 13px; font-weight: normal;
   background: rgba(50,50,50,0.8); color: #fff;
   border: 1px solid rgba(255,255,255,0.25); border-radius: 6px;
   cursor: pointer; transition: background 0.15s;
 }
 .rt-quick-btn:hover { background: rgba(80,80,80,0.9); }
 .rt-quick-btn.rt-mode-active {
-  background: rgba(220,50,50,0.8);
-  border-color: rgba(255,100,100,0.5);
+  background: rgba(0,0,0,0.85);
+  border-color: rgba(255,255,255,0.5);
 }
 /* Старая кнопка "Комментарии" — скрыть если осталась в DOM */
 .rt-annot-btn { display: none; }
@@ -1177,13 +1172,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   max-height: 60vh; overflow-y: auto;
 }
 .rt-cmt-action {
-  padding: 6px 14px; font-size: 12px; font-weight: 600;
+  padding: 6px 14px; font-size: 13px; font-weight: normal;
   background: rgba(255,255,255,0.15); color: #fff;
   border: 1px solid rgba(255,255,255,0.25); border-radius: 6px;
   cursor: pointer; transition: background 0.15s; text-align: left;
 }
 .rt-cmt-action:hover { background: rgba(255,255,255,0.25); }
-.rt-cmt-action.rt-mode-active { background: rgba(220,50,50,0.7); border-color: rgba(255,100,100,0.5); }
+.rt-cmt-action.rt-mode-active { background: rgba(0,0,0,0.85); border-color: rgba(255,255,255,0.5); }
 .rt-cmt-list { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
 .rt-cmt-item {
   display: flex; align-items: center; gap: 6px;
@@ -1225,7 +1220,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   display: flex; gap: 6px; margin-bottom: 10px;
 }
 .rt-type-btn {
-  flex: 1; padding: 6px 8px; font-size: 11px; font-weight: 600;
+  flex: 1; padding: 6px 8px; font-size: 11px; font-weight: normal;
   border: 2px solid #ddd; border-radius: 6px;
   background: #f8f8f8; color: #555; cursor: pointer;
   transition: all 0.15s;
@@ -1264,17 +1259,17 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   display: flex; justify-content: space-between; gap: 8px;
 }
 .rt-popup-save {
-  flex: 1; padding: 8px; font-size: 13px; font-weight: 600;
+  flex: 1; padding: 8px; font-size: 13px; font-weight: normal;
   background: #333; color: #fff; border: none; border-radius: 6px;
   cursor: pointer;
 }
 .rt-popup-save:hover { background: #555; }
 .rt-popup-del {
   padding: 8px 12px; font-size: 12px;
-  background: none; color: #c33; border: 1px solid #c33; border-radius: 6px;
+  background: #fff; color: #333; border: 1px solid #ccc; border-radius: 6px;
   cursor: pointer;
 }
-.rt-popup-del:hover { background: #fdd; }
+.rt-popup-del:hover { background: #333; color: #fff; border-color: #333; }
 
 /* ══════════════════════════════════════════════
    Доп. контент — свободное поле + превью справа
@@ -1366,7 +1361,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   font-size: 16px; color: #bbb; border-radius: 4px;
   transition: color 0.15s, background 0.15s;
 }
-.oc-cnt-del:hover { color: #e57373; background: #fef0f0; }
+.oc-cnt-del:hover { color: #333; background: #f0f0f0; }
 
 .oc-cnt-gallery {
   display: flex; flex-wrap: wrap; gap: 6px;
@@ -1401,19 +1396,19 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
 /* Мультивыбор — выделение */
 .oc-item.oc-selected {
-  border-color: #1976d2;
-  box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.3);
+  border-color: #333;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.15);
 }
 
 /* Панель группировки */
 .oc-group-bar {
   display: flex; align-items: center; gap: 8px;
-  background: #e3f2fd; border-radius: 8px;
+  background: #f0f0f0; border-radius: 8px;
   padding: 8px 14px; margin-bottom: 12px;
   flex-wrap: wrap;
 }
 .oc-group-count {
-  font-size: 13px; font-weight: 600; color: #1565c0;
+  font-size: 13px; font-weight: normal; color: #333;
   margin-right: 4px;
 }
 
@@ -1433,7 +1428,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   transition: background 0.15s, color 0.15s;
 }
 .ac-annot-toggle:hover { color: #ccc; border-color: #777; }
-.ac-annot-toggle.ac-annot-on { background: rgba(72,140,204,0.25); color: #8cf; border-color: #48c; }
+.ac-annot-toggle.ac-annot-on { background: #333; color: #fff; border-color: #333; }
 /* Миниатюрный SVG аннотаций поверх тайла */
 .ac-tile { position: relative; }
 .ac-tile .ac-annot-svg {
@@ -1652,18 +1647,18 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .client-bar-subtitle { font-size: 13px; color: #888; margin-top: 2px; }
 .client-bar-buttons { display: flex; gap: 10px; }
 .client-btn-extra {
-  border: 1px solid #ff9800;
-  color: #e65100;
+  border: 1px solid #ccc;
+  color: #333;
   background: #fff;
   padding: 8px 18px;
-  font-size: 14px;
+  font-size: 13px;
   border-radius: 6px;
   cursor: pointer;
 }
-.client-btn-extra:hover { background: #fff3e0; }
+.client-btn-extra:hover { background: #f0f0f0; }
 .client-btn-approve {
   padding: 8px 18px;
-  font-size: 14px;
+  font-size: 13px;
   border-radius: 6px;
 }
 
@@ -1762,7 +1757,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   font-size: 12px; color: #999; margin-top: 2px;
 }
 .mob-header-btn {
-  padding: 8px 14px; font-size: 13px; font-weight: 500;
+  padding: 8px 14px; font-size: 13px; font-weight: normal;
   background: #333; color: #fff; border: none; border-radius: 6px;
   cursor: pointer; white-space: nowrap;
 }
@@ -1771,7 +1766,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   display: flex; gap: 4px;
 }
 .mob-tab-btn {
-  padding: 6px 12px; font-size: 12px; font-weight: 500;
+  padding: 6px 12px; font-size: 13px; font-weight: normal;
   background: #f0f0f0; color: #666; border: none; border-radius: 5px;
   cursor: pointer; white-space: nowrap;
 }
@@ -1849,10 +1844,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .mob-slot-remove {
   position: absolute; top: 6px; left: 6px;
   width: 28px; height: 28px;
-  background: rgba(0,0,0,0.5); color: #fff;
+  background: rgba(0,0,0,0.35); color: rgba(255,255,255,0.8);
   border: none; border-radius: 50%;
-  font-size: 18px; line-height: 28px; text-align: center;
-  cursor: pointer; z-index: 2;
+  font-size: 18px; cursor: pointer; z-index: 2;
+  display: flex; align-items: center; justify-content: center;
+  line-height: 1;
 }
 
 /* --- Карусель (навигация по фото в слоте) --- */
@@ -1879,10 +1875,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .mob-carousel-arrow {
   pointer-events: auto;
   width: 36px; height: 36px;
-  background: rgba(0,0,0,0.35); color: #fff;
+  background: rgba(0,0,0,0.35); color: rgba(255,255,255,0.8);
   border: none; border-radius: 50%;
-  font-size: 18px; line-height: 36px; text-align: center;
-  cursor: pointer; margin: 0 6px;
+  font-size: 18px; cursor: pointer; margin: 0 6px;
+  display: flex; align-items: center; justify-content: center;
+  line-height: 1;
 }
 .mob-carousel-arrow:active { background: rgba(0,0,0,0.6); }
 
@@ -1923,7 +1920,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   border-color: #999;
 }
 .mob-comment-send {
-  padding: 8px 14px; font-size: 13px; font-weight: 600;
+  padding: 8px 14px; font-size: 13px; font-weight: normal;
   background: #333; color: #fff; border: none;
   border-radius: 6px; cursor: pointer;
 }
@@ -1939,17 +1936,17 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   text-align: center; margin-bottom: 4px;
 }
 .mob-btn-approve {
-  width: 100%; padding: 14px; font-size: 15px; font-weight: 600;
+  width: 100%; padding: 14px; font-size: 15px; font-weight: normal;
   background: #333; color: #fff; border: none; border-radius: 8px;
   cursor: pointer;
 }
 .mob-btn-approve:active { background: #555; }
 .mob-btn-reject {
-  width: 100%; padding: 14px; font-size: 15px; font-weight: 500;
-  background: #fff; color: #e65100; border: 1px solid #ff9800;
+  width: 100%; padding: 14px; font-size: 15px; font-weight: normal;
+  background: #fff; color: #333; border: 1px solid #ccc;
   border-radius: 8px; cursor: pointer;
 }
-.mob-btn-reject:active { background: #fff3e0; }
+.mob-btn-reject:active { background: #f0f0f0; }
 
 /* --- Мобильная галерея с галочками --- */
 .mob-gallery {
@@ -2019,26 +2016,27 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   background: none; color: #bbb; font-size: 18px;
   cursor: pointer; border-radius: 4px;
 }
-.mob-oc-cnt-del:active { color: #e57373; background: #fef0f0; }
+.mob-oc-cnt-del:active { color: #333; background: #f0f0f0; }
 .mob-other-count {
   font-size: 13px; font-weight: 600; color: #888;
 }
 .mob-other-options-btn {
   background: #333; color: #fff; border: none; border-radius: 6px;
-  padding: 6px 14px; font-size: 12px; font-weight: 500; cursor: pointer;
+  padding: 6px 14px; font-size: 13px; font-weight: normal; cursor: pointer;
 }
 .mob-other-options-btn:active { background: #555; }
 .mob-other-go-options {
   margin-top: 16px; background: #333; color: #fff; border: none;
-  border-radius: 8px; padding: 10px 20px; font-size: 14px; cursor: pointer;
+  border-radius: 8px; padding: 10px 20px; font-size: 15px; cursor: pointer;
 }
 .mob-other-go-options:active { background: #555; }
 .mob-oc-remove {
   position: absolute; top: 4px; right: 4px;
   width: 24px; height: 24px; border: none; border-radius: 50%;
-  background: rgba(0,0,0,0.5); color: #fff; font-size: 16px;
-  line-height: 24px; text-align: center; cursor: pointer;
-  padding: 0;
+  background: rgba(0,0,0,0.35); color: rgba(255,255,255,0.8); font-size: 16px;
+  cursor: pointer; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  line-height: 1;
 }
 
 /* --- Мобильный фильтр по звёздочкам (Options) --- */
@@ -2193,7 +2191,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   box-sizing: border-box; overflow: hidden; position: relative;
 }
 .ar-match-cell:hover { border-color: #bbb; background: #fafafa; }
-.ar-match-cell.ar-selected { border-color: #2196f3; background: #e3f2fd; }
+.ar-match-cell.ar-selected { border-color: #333; background: #f0f0f0; }
 
 /* Placeholder напротив карточки без привязки */
 .ar-sku-placeholder {
@@ -2209,7 +2207,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   cursor: pointer; transition: border-color 0.15s, background 0.15s;
 }
 .ar-free-item:hover { border-color: #bbb; background: #fafafa; }
-.ar-free-item.ar-selected { border-color: #2196f3; background: #e3f2fd; }
+.ar-free-item.ar-selected { border-color: #333; background: #f0f0f0; }
 
 /* Полоска фото карточки (все слоты) */
 .ar-card-photos {
@@ -2232,7 +2230,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .ar-match-info { min-width: 0; flex: 1; }
 .ar-match-num { font-size: 13px; font-weight: 600; }
 .ar-match-cat { font-size: 11px; color: #999; }
-.ar-match-sku { font-size: 11px; color: #2196f3; font-family: monospace; margin-top: 2px; }
+.ar-match-sku { font-size: 11px; color: #666; font-family: monospace; margin-top: 2px; }
 
 /* Кнопка сопоставления */
 .ar-match-btn {
@@ -2240,16 +2238,16 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   padding: 8px; margin-bottom: 12px;
 }
 .ar-match-btn button {
-  padding: 8px 24px; font-size: 13px; font-weight: 600;
+  padding: 8px 24px; font-size: 13px; font-weight: normal;
 }
 .ar-match-btn button:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* Кнопка отвязки */
 .ar-unmatch-btn {
-  background: none; border: 1px solid #e57373; color: #e57373; font-size: 11px;
+  background: none; border: 1px solid #ccc; color: #333; font-size: 11px;
   padding: 2px 8px; border-radius: 3px; cursor: pointer; margin-left: auto; flex-shrink: 0;
 }
-.ar-unmatch-btn:hover { background: #ffebee; }
+.ar-unmatch-btn:hover { background: #f0f0f0; }
 
 /* ── Блок 3: Верификация ── */
 .ar-verify-item {
@@ -2325,7 +2323,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 }
 .ar-card-item { position: relative; }
 .ar-card-item:hover .ar-zoom-btn { opacity: 1; }
-.ar-zoom-btn:hover { background: #2196f3; color: #fff; border-color: #2196f3; }
+.ar-zoom-btn:hover { background: #333; color: #fff; border-color: #333; }
 
 /* ── Полуэкранный просмотр карточки ── */
 .ar-card-overlay {
