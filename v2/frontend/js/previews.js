@@ -685,6 +685,7 @@ window.onPreviewDone = function(data) {
         rating: incoming.rating || 0,
         orient: pvOrient,
         folders: folderLabel ? [folderLabel] : [],
+        _stage: proj._stage || 0, /* Per-photo pipeline: новое фото попадает на текущий этап проекта */
         versions: {
           preselect: {
             thumb: incoming.thumb,

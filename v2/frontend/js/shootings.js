@@ -303,6 +303,8 @@ function shExportProject() {
     _template: proj._template || null,
     _stage: proj._stage || 0,
     _stageHistory: proj._stageHistory || {},
+    _stageDates: proj._stageDates || {},
+    _stageBatches: proj._stageBatches || [],
     channels: proj.channels || [],
     categories: proj.categories || [],
     _annotations: proj._annotations || {},
@@ -579,6 +581,62 @@ function renderProjects() {
  * Отрисовать визуальный пайплайн (8 этапов) для выбранного проекта.
  * Этапы: done → active → будущие. Активный этап имеет кнопку "Завершить".
  */
+/**
+ * Проставить _stage каждому фото, если ещё нет.
+ * Backward-compatible: новые фото получают proj._stage, старые проекты — тоже.
+ * @param {Object} proj
+ */
+function shEnsurePhotoStages(proj) {
+  var defaultStage = proj._stage || 0;
+  if (!proj.previews) return;
+  var needsInit = false;
+  for (var i = 0; i < proj.previews.length; i++) {
+    if (typeof proj.previews[i]._stage !== 'number') {
+      proj.previews[i]._stage = defaultStage;
+      needsInit = true;
+    }
+  }
+  /* При первой инициализации — зафиксировать дату начала текущего этапа */
+  if (needsInit && proj.previews.length > 0) {
+    if (!proj._stageDates) proj._stageDates = {};
+    if (!proj._stageDates[defaultStage]) {
+      proj._stageDates[defaultStage] = { firstEnter: new Date().toISOString() };
+    }
+  }
+}
+
+/**
+ * Подсчитать количество фотографий на каждом этапе пайплайна.
+ * @param {Object} proj
+ * @returns {number[]} массив длиной PIPELINE_STAGES.length, counts[i] = кол-во фото на этапе i
+ */
+function shPhotosPerStage(proj) {
+  var counts = [];
+  for (var i = 0; i < PIPELINE_STAGES.length; i++) counts.push(0);
+  if (!proj.previews) return counts;
+  for (var p = 0; p < proj.previews.length; p++) {
+    var s = proj.previews[p]._stage || 0;
+    if (s >= 0 && s < counts.length) counts[s]++;
+  }
+  return counts;
+}
+
+/**
+ * Определить «текущий фронт» проекта — самый ранний этап, на котором ещё есть фото.
+ * Все этапы до него считаются завершёнными.
+ * @param {Object} proj
+ * @returns {number} индекс этапа-фронта (или PIPELINE_STAGES.length если всё завершено)
+ */
+function shProjectFront(proj) {
+  var counts = shPhotosPerStage(proj);
+  /* Если на этапе 0 фото — этап завершён. Ищем первый непустой. */
+  for (var i = 0; i < counts.length; i++) {
+    if (counts[i] > 0) return i;
+  }
+  /* Все этапы пусты — либо нет фото, либо всё завершено */
+  return (proj.previews && proj.previews.length > 0) ? counts.length : 0;
+}
+
 function renderPipeline() {
   var container = document.getElementById('pipeline-container');
   if (App.selectedProject < 0 || App.selectedProject >= App.projects.length) {
@@ -587,7 +645,10 @@ function renderPipeline() {
   }
 
   var proj = App.projects[App.selectedProject];
+  shEnsurePhotoStages(proj);
   var stage = proj._stage || 0;
+  var photoCounts = shPhotosPerStage(proj);
+  var totalPhotos = proj.previews ? proj.previews.length : 0;
 
   /* Кнопка синхронизации (если проект в облаке) */
   var html = '';
@@ -638,30 +699,56 @@ function renderPipeline() {
   html += '<div class="pipeline-steps">';
   for (var i = 0; i < PIPELINE_STAGES.length; i++) {
     var s = PIPELINE_STAGES[i];
+    var cnt = photoCounts[i];
+    var pct = totalPhotos > 0 ? Math.round(cnt / totalPhotos * 100) : 0;
 
+    /* Определяем состояние этапа:
+       done = на этапе 0 фото И хотя бы на одном следующем есть фото (значит прошли мимо)
+       active = на этапе есть фото
+       future = этап впереди, фото ещё не дошли */
     var cls = '';
-    if (i < stage) cls = 'done';
-    else if (i === stage) cls = 'active';
+    var hasPhotosAfter = false;
+    for (var j = i + 1; j < PIPELINE_STAGES.length; j++) {
+      if (photoCounts[j] > 0) { hasPhotosAfter = true; break; }
+    }
+    if (cnt === 0 && hasPhotosAfter) cls = 'done';
+    else if (cnt > 0) cls = 'active';
+    /* else: future — пустой, нет фото после — cls остаётся '' */
+
+    /* Fallback для проектов без фото: используем старую логику proj._stage */
+    if (totalPhotos === 0) {
+      if (i < stage) cls = 'done';
+      else if (i === stage) cls = 'active';
+    }
 
     var isSnapshotCtx = (typeof _snActiveSnapshot !== 'undefined' && _snActiveSnapshot &&
       _snActiveSnapshot.stageId === s.id);
     if (isSnapshotCtx) cls += ' sn-active-stage';
 
-    var clickable = (i < stage && proj._cloudId);
+    var clickable = (cls === 'done' && proj._cloudId);
 
     html += '<div class="pipeline-step ' + cls + (clickable ? ' step-clickable' : '') + '"' +
       (clickable ? ' onclick="shLoadStageSnapshot(\'' + s.id + '\')" title="Посмотреть состояние на этом этапе"' : '') + '>';
-    html += '<div class="step-dot">' + (i < stage ? '&#10003;' : (i + 1)) + '</div>';
+    html += '<div class="step-dot">' + (cls === 'done' ? '&#10003;' : (i + 1)) + '</div>';
     html += '<div class="step-info">';
-    html += '<div class="step-name">' + esc(s.name) + '</div>';
+    html += '<div class="step-name">' + esc(s.name);
+    /* Счётчик фото на этапе */
+    if (totalPhotos > 0 && cnt > 0) {
+      html += '<span class="step-photo-count">' + cnt + ' фото (' + pct + '%)</span>';
+    }
+    html += '</div>';
 
-    if (i < stage && proj._stageHistory && proj._stageHistory[i]) {
-      var ts = proj._stageHistory[i];
-      html += '<div class="step-note">' + ts + '</div>';
+    /* Даты этапа */
+    if (cls === 'done' && proj._stageHistory && proj._stageHistory[i]) {
+      html += '<div class="step-note">' + proj._stageHistory[i] + '</div>';
+    } else if (cls === 'active' && proj._stageDates && proj._stageDates[i] && proj._stageDates[i].firstEnter) {
+      var enterDate = new Date(proj._stageDates[i].firstEnter);
+      html += '<div class="step-note">c ' + enterDate.toLocaleDateString('ru-RU') + '</div>';
     }
 
-    if (i === stage) {
-      html += '<button class="step-action" onclick="advanceStage()">Завершить этап</button>';
+    /* Кнопки действий — только на этапах с фото (active) */
+    if (cls === 'active') {
+      html += '<button class="step-action" onclick="advanceStage(' + i + ')">Завершить этап</button>';
       if (s.id === 'selection') {
         html += '<button class="step-action" style="border-color:#333;color:#333;margin-left:6px" onclick="shSendClientLink()">Ссылка на преотбор</button>';
       }
@@ -1096,33 +1183,84 @@ function _shRunDiff() {
 }
 
 /**
- * Перейти к следующему этапу пайплайна.
- * Записывает время завершения в _stageHistory.
- * TODO (задача 1.12): добавить проверку триггеров перед переходом.
+ * Перевести все фотографии с этапа stageIdx на следующий этап.
+ * Записывает batch event в proj._stageBatches, обновляет _stageHistory.
+ *
+ * @param {number} [stageIdx] — индекс этапа, с которого двигаем фото.
+ *   Если не указан, используется proj._stage (backward compatible).
  */
-function advanceStage() {
+function advanceStage(stageIdx) {
   if (App.selectedProject < 0) return;
   var proj = App.projects[App.selectedProject];
-  if (proj._stage >= PIPELINE_STAGES.length) return;
+  shEnsurePhotoStages(proj);
 
-  var currentStageObj = PIPELINE_STAGES[proj._stage];
+  /* Определяем этап */
+  if (typeof stageIdx !== 'number') stageIdx = proj._stage || 0;
+  if (stageIdx >= PIPELINE_STAGES.length - 1) return; /* последний этап — некуда двигать */
 
-  /* Записать время завершения этапа */
-  if (!proj._stageHistory) proj._stageHistory = {};
+  var currentStageObj = PIPELINE_STAGES[stageIdx];
+  var nextStageIdx = stageIdx + 1;
+
+  /* Собираем фото на этом этапе */
+  var movedPhotos = [];
+  if (proj.previews) {
+    for (var i = 0; i < proj.previews.length; i++) {
+      if (proj.previews[i]._stage === stageIdx) {
+        proj.previews[i]._stage = nextStageIdx;
+        movedPhotos.push(proj.previews[i].name);
+      }
+    }
+  }
+
+  if (movedPhotos.length === 0 && proj.previews && proj.previews.length > 0) {
+    /* На этапе нет фото — нечего двигать */
+    return;
+  }
+
   var now = new Date();
   var timeStr = now.toLocaleDateString('ru-RU') + ' ' + now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-  proj._stageHistory[proj._stage] = timeStr;
+
+  /* ── Даты этапов ── */
+  if (!proj._stageHistory) proj._stageHistory = {};
+  if (!proj._stageDates) proj._stageDates = {};
+
+  /* Дата первого попадания фото на следующий этап */
+  if (!proj._stageDates[nextStageIdx]) {
+    proj._stageDates[nextStageIdx] = { firstEnter: now.toISOString() };
+  }
+
+  /* Дата завершения этапа: перезаписывается каждый раз, когда этап становится пустым.
+     Если клиент вернул фото — этап "откроется", а дата перезапишется когда они снова уйдут. */
+  var remaining = shPhotosPerStage(proj);
+  if (remaining[stageIdx] === 0) {
+    proj._stageHistory[stageIdx] = timeStr;
+    if (!proj._stageDates[stageIdx]) proj._stageDates[stageIdx] = {};
+    proj._stageDates[stageIdx].lastLeave = now.toISOString();
+  }
+
+  /* Batch event: группа фото переехала */
+  if (!proj._stageBatches) proj._stageBatches = [];
+  proj._stageBatches.push({
+    photos: movedPhotos,
+    fromStage: stageIdx,
+    toStage: nextStageIdx,
+    date: now.toISOString(),
+    trigger: 'manual',
+    count: movedPhotos.length
+  });
+
+  /* Обновить проектный этап (для backward compat) — минимальный этап с фото */
+  proj._stage = shProjectFront(proj);
 
   /* Checkpoint: ручная фиксация */
   if (typeof cpkCreate === 'function') {
     cpkCreate('manual', {
       stage: currentStageObj.id,
-      photos: (typeof cpkGetSelectionList === 'function') ? cpkGetSelectionList() : [],
-      note: 'Этап "' + currentStageObj.name + '" завершён вручную'
+      photos: movedPhotos,
+      note: movedPhotos.length + ' фото: "' + currentStageObj.name + '" -> "' + PIPELINE_STAGES[nextStageIdx].name + '"'
     });
   }
 
-  proj._stage++;
   renderPipeline();
   shAutoSave();
 
@@ -1155,11 +1293,19 @@ function shSendClientLink() {
     sbCreateShareLink(cloudId, 'client', 'Преотбор для клиента', function(err, data) {
       if (err) { alert('Ошибка создания ссылки: ' + err); return; }
 
-      /* Шаг 3: зафиксировать этап + время */
+      /* Шаг 3: зафиксировать этап + время, переместить все фото на этап "client" */
       if (!proj._stageHistory) proj._stageHistory = {};
       var now = new Date();
       var timeStr = now.toLocaleDateString('ru-RU') + ' ' + now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
       proj._stageHistory[proj._stage] = timeStr;
+
+      /* Переместить все фото до этапа client (2) — на client */
+      shEnsurePhotoStages(proj);
+      if (proj.previews) {
+        for (var _pi = 0; _pi < proj.previews.length; _pi++) {
+          if (proj.previews[_pi]._stage < 2) proj.previews[_pi]._stage = 2;
+        }
+      }
 
       /* Шаг 4: перейти к этапу "Отбор клиента" */
       proj._stage = 2; /* client */
@@ -1874,7 +2020,13 @@ function shClientRequestExtra() {
     });
   }
 
-  /* Вернуть на этап 1 (Отбор фотографа) */
+  /* Вернуть все фото на этап 1 (Отбор фотографа) — клиент хочет дополнительные кадры */
+  shEnsurePhotoStages(proj);
+  if (proj.previews) {
+    for (var _pi = 0; _pi < proj.previews.length; _pi++) {
+      proj.previews[_pi]._stage = 1;
+    }
+  }
   proj._stage = 1;
 
   /* Синхронизировать этап с облаком */
@@ -1918,7 +2070,13 @@ function shClientApprove() {
     });
   }
 
-  /* Перейти на этап 3 (Цветокоррекция) */
+  /* Переместить все фото на этап 3 (Цветокоррекция) */
+  shEnsurePhotoStages(proj);
+  if (proj.previews) {
+    for (var _pi = 0; _pi < proj.previews.length; _pi++) {
+      if (proj.previews[_pi]._stage < 3) proj.previews[_pi]._stage = 3;
+    }
+  }
   proj._stage = 3;
 
   /* Синхронизировать этап с облаком */
