@@ -509,6 +509,7 @@ function shRestoreProject(originalIdx) {
 function renderProjects() {
   var list = document.getElementById('project-list');
   var filtered = shFilteredProjects();
+  console.log('[renderProjects] App.projects:', App.projects.length, 'filtered:', filtered.length);
 
   /* Обновить счётчик скрытых */
   var hiddenCount = 0;
@@ -555,7 +556,7 @@ function renderProjects() {
   }
   list.innerHTML = html;
 
-  renderPipeline();
+  try { renderPipeline(); } catch(e) { console.error('renderPipeline error:', e); }
   cpRenderList();
 }
 
