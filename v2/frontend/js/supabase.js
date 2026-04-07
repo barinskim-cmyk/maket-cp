@@ -1051,13 +1051,8 @@ function _sbDoLoadByToken(token) {
     /* Временно сохраняем карточки из RPC — соберём после загрузки превью */
     var _rpcCards = data.cards || [];
 
-    /* ── Сначала загружаем превью — единственный источник правды о фото ── */
-    sbDownloadPreviews(data.project_id, function(pvErr, pvList) {
-      if (!pvErr && pvList && pvList.length > 0) {
-        proj.previews = pvList;
-        console.log('supabase.js: загружено ' + pvList.length + ' превью по share-ссылке');
-      }
-
+    /* ── Общая функция после загрузки превью ── */
+    var _onPreviewsReady = function() {
       /* Карта превью по имени файла */
       var pvByName = {};
       if (proj.previews) {
@@ -1073,6 +1068,7 @@ function _sbDoLoadByToken(token) {
           var card = {
             id: rc.id,
             status: rc.status || 'draft',
+            name: rc.name || '',
             _hasHero: rc.has_hero,
             _hAspect: rc.h_aspect || '3/2',
             _vAspect: rc.v_aspect || '2/3',
@@ -1165,9 +1161,43 @@ function _sbDoLoadByToken(token) {
         /* Подписаться на realtime-обновления версий */
         if (typeof sbSubscribeVersions === 'function') sbSubscribeVersions(data.project_id);
 
-        console.log('Проект загружен по share-ссылке:', proj.brand, 'роль:', proj._role);
+        console.log('Проект загружен по share-ссылке:', proj.brand, 'роль:', proj._role,
+          'превью:', proj.previews.length, 'карточек:', proj.cards.length);
       });
-    });
+    };
+
+    /* ── Превью: берём из RPC-ответа (обходит RLS) или fallback на прямой запрос ── */
+    var rpcPreviews = data.previews || [];
+    if (rpcPreviews.length > 0) {
+      /* Новый формат: превью уже в ответе RPC (миграция 015) */
+      for (var rpi = 0; rpi < rpcPreviews.length; rpi++) {
+        var rp = rpcPreviews[rpi];
+        proj.previews.push({
+          name: rp.file_name,
+          thumb: rp.thumb_path || '',
+          preview: rp.preview_path || rp.thumb_path || '',
+          width: rp.width || 0,
+          height: rp.height || 0,
+          rating: rp.rating || 0,
+          orient: rp.orient || 'v',
+          path: '',
+          folders: []
+        });
+      }
+      console.log('supabase.js: ' + proj.previews.length + ' превью из RPC (share-ссылка)');
+      _onPreviewsReady();
+    } else {
+      /* Fallback: прямой запрос (для старых версий RPC без превью) */
+      sbDownloadPreviews(data.project_id, function(pvErr, pvList) {
+        if (!pvErr && pvList && pvList.length > 0) {
+          proj.previews = pvList;
+          console.log('supabase.js: ' + pvList.length + ' превью через прямой запрос (share-ссылка)');
+        } else {
+          console.warn('supabase.js: не удалось загрузить превью:', pvErr || 'пустой список');
+        }
+        _onPreviewsReady();
+      });
+    }
   })['catch'](function(err) {
     console.error('_sbDoLoadByToken catch:', err);
     alert('Ошибка загрузки: ' + (err.message || 'сетевая ошибка'));
