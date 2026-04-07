@@ -1510,6 +1510,24 @@ function _pvLbOpenDesktop() {
   /* Отрисовать существующие аннотации */
   rtRenderAnnotations(pv.name, imgWrap);
 
+  /* ── Комментарии карточки (если фото принадлежит карточке) ── */
+  var _cardCmts = _pvLbGetCardComments(pv.name);
+  if (_cardCmts && _cardCmts.length > 0) {
+    var ccDiv = document.createElement('div');
+    ccDiv.className = 'lb-card-comments';
+    var ccHtml = '<div class="lb-cc-title">Комментарии к карточке (' + _cardCmts.length + ')</div>';
+    for (var cci = 0; cci < _cardCmts.length; cci++) {
+      var cc = _cardCmts[cci];
+      var ccDate = cc.created ? new Date(cc.created).toLocaleDateString('ru-RU') : '';
+      var ccAuthor = cc.author === 'client' ? 'Клиент' : 'Команда';
+      ccHtml += '<div class="lb-cc-item"><span class="lb-cc-author">' + ccAuthor + '</span> ';
+      ccHtml += '<span class="lb-cc-text">' + (typeof esc === 'function' ? esc(cc.text) : cc.text) + '</span>';
+      ccHtml += '<span class="lb-cc-date">' + ccDate + '</span></div>';
+    }
+    ccDiv.innerHTML = ccHtml;
+    overlay.appendChild(ccDiv);
+  }
+
   overlay.appendChild(imgWrap);
   overlay.appendChild(closeBtn);
   overlay.appendChild(nameEl);
@@ -3864,8 +3882,9 @@ function rtAddAnnotation(photoName, annotation) {
 
   proj._annotations[photoName].push(a);
 
-  /* Автосохранение */
+  /* Автосохранение + синхронизация с облаком */
   if (typeof shAutoSave === 'function') shAutoSave();
+  if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
   return a;
 }
 
@@ -3884,6 +3903,7 @@ function rtRemoveAnnotation(photoName, annotId) {
     delete proj._annotations[photoName];
   }
   if (typeof shAutoSave === 'function') shAutoSave();
+  if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
 }
 
 /**
@@ -3903,6 +3923,7 @@ function rtUpdateAnnotation(photoName, annotId, updates) {
     }
   }
   if (typeof shAutoSave === 'function') shAutoSave();
+  if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
 }
 
 /**
@@ -3912,6 +3933,27 @@ function rtUpdateAnnotation(photoName, annotId, updates) {
  */
 function rtAnnotCount(photoName) {
   return rtGetAnnotations(photoName).length;
+}
+
+/**
+ * Найти комментарии карточки, к которой принадлежит фото (по имени файла в слотах).
+ * Возвращает массив комментариев или null если фото не в карточке.
+ * @param {string} photoName
+ * @returns {Array|null}
+ */
+function _pvLbGetCardComments(photoName) {
+  var proj = getActiveProject();
+  if (!proj || !proj.cards) return null;
+  for (var ci = 0; ci < proj.cards.length; ci++) {
+    var card = proj.cards[ci];
+    if (!card.slots) continue;
+    for (var si = 0; si < card.slots.length; si++) {
+      if (card.slots[si].file === photoName) {
+        return card._comments || [];
+      }
+    }
+  }
+  return null;
 }
 
 // ── Рендер аннотаций на лайтбоксе ──

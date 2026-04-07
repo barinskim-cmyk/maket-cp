@@ -228,6 +228,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .pipeline-panel .section-title { font-size: 16px; margin-bottom: 16px; }
 
 .pipeline-sync-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.pipeline-parallel {
+  margin-top: 12px; padding: 8px 12px; background: #f8f5ff; border: 1px solid #e0d5f0;
+  border-radius: 6px; font-size: 12px;
+}
+.pipeline-parallel-title { font-weight: 600; color: #7c3aed; margin-bottom: 4px; }
+.pipeline-parallel-item { color: #555; padding: 2px 0; }
 .pipeline-steps { display: flex; flex-direction: column; gap: 0; }
 .pipeline-step {
   display: flex; align-items: flex-start; gap: 14px; padding: 10px 0;
@@ -625,13 +631,22 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 }
 .cp-comment-del:hover { color: #c33; }
 
-.cp-nav-row { display: flex; justify-content: space-between; margin-top: 16px; }
+.cp-nav-row { display: flex; justify-content: center; align-items: center; gap: 16px; margin-top: 16px; }
 .cp-nav-btn {
   padding: 8px 20px; background: #f5f5f5; border: 1px solid #ddd;
   border-radius: 6px; cursor: pointer; font-size: 13px;
 }
 .cp-nav-btn:hover { background: #eee; }
 .cp-nav-btn:disabled { opacity: 0.3; cursor: default; }
+.cp-nav-counter { font-size: 13px; color: #999; min-width: 50px; text-align: center; }
+
+/* Стрелка undo в тулбаре */
+.cp-undo-arrow {
+  background: none; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;
+  font-size: 18px; padding: 2px 8px; color: #666; line-height: 1; margin-right: 4px;
+}
+.cp-undo-arrow:hover { background: #f0f0f0; color: #333; }
+.cp-undo-arrow:disabled { opacity: 0.2; cursor: default; }
 
 /* Полноэкранный просмотр фото */
 .cp-fullscreen-overlay {
@@ -1083,6 +1098,19 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   background: rgba(220,50,50,0.85);
   border-color: rgba(255,100,100,0.5);
 }
+
+/* ── Комментарии карточки в лайтбоксе ── */
+.lb-card-comments {
+  position: absolute; top: 20px; left: 20px; max-width: 320px; max-height: 40vh;
+  overflow-y: auto; background: rgba(30,30,30,0.9); border-radius: 8px;
+  padding: 10px 14px; z-index: 20; color: #ddd; font-size: 13px;
+}
+.lb-cc-title { font-weight: 600; color: #fff; margin-bottom: 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+.lb-cc-item { margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+.lb-cc-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+.lb-cc-author { font-weight: 600; color: #8cf; }
+.lb-cc-text { color: #eee; }
+.lb-cc-date { color: #888; font-size: 11px; margin-left: 8px; }
 
 /* ── Тулбар комментариев в лайтбоксе ── */
 .rt-cmt-bar {

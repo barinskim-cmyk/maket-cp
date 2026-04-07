@@ -630,6 +630,35 @@ function renderPipeline() {
   }
   html += '</div>';
 
+  /* ── Параллельные процессы: комментирование ── */
+  var _cmtCount = 0;
+  var _annotCount = 0;
+  if (proj.cards) {
+    for (var ci = 0; ci < proj.cards.length; ci++) {
+      if (proj.cards[ci]._comments && proj.cards[ci]._comments.length > 0) {
+        _cmtCount += proj.cards[ci]._comments.length;
+      }
+    }
+  }
+  if (proj._annotations) {
+    for (var aKey in proj._annotations) {
+      if (proj._annotations.hasOwnProperty(aKey)) {
+        _annotCount += proj._annotations[aKey].length;
+      }
+    }
+  }
+  if (_cmtCount > 0 || _annotCount > 0) {
+    html += '<div class="pipeline-parallel">';
+    html += '<div class="pipeline-parallel-title">Параллельно:</div>';
+    if (_cmtCount > 0) {
+      html += '<div class="pipeline-parallel-item">Комментарии к карточкам: ' + _cmtCount + '</div>';
+    }
+    if (_annotCount > 0) {
+      html += '<div class="pipeline-parallel-item">Аннотации к фото: ' + _annotCount + '</div>';
+    }
+    html += '</div>';
+  }
+
   /* Кнопка сверки: если есть хотя бы 2 снимка */
   if (proj._cloudId && typeof _snCachedSnapshots !== 'undefined' && _snCachedSnapshots.length >= 2) {
     html += '<div style="margin-top:8px">';

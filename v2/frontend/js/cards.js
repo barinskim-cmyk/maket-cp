@@ -269,6 +269,10 @@ function cpRenderCard() {
   html += '<span class="num cp-card-name" onclick="cpEditCardName()" title="Нажмите чтобы переименовать">' + esc(cardLabel) + '</span>';
   html += '<div class="cp-toolbar">';
 
+  /* Стрелка назад (undo) — минималистичная, слева в тулбаре */
+  var histLen = (card._history && card._history.length) || 0;
+  html += '<button class="cp-undo-arrow" onclick="cpUndo()" title="Отменить последнее действие"' + (histLen === 0 ? ' disabled' : '') + '>&larr;</button>';
+
   /* Выбор шаблона из библиотеки — dropdown прямо в карточке */
   html += _cpTemplateSelectHTML();
 
@@ -346,11 +350,10 @@ function cpRenderCard() {
   html += cpRenderComments(idx);
 
   /* ── Навигация ── */
-  var histLen = (card._history && card._history.length) || 0;
   var total = proj.cards.length;
   html += '<div class="cp-nav-row">';
   html += '<button class="cp-nav-btn" onclick="cpShowCard(' + (idx - 1) + ')"' + (idx === 0 ? ' disabled' : '') + '>Назад</button>';
-  html += '<button class="undo-btn" onclick="cpUndo()"' + (histLen === 0 ? ' disabled' : '') + '>Отменить' + (histLen ? ' (' + histLen + ')' : '') + '</button>';
+  html += '<span class="cp-nav-counter">' + (idx + 1) + ' / ' + total + '</span>';
   html += '<button class="cp-nav-btn" onclick="cpShowCard(' + (idx + 1) + ')"' + (idx >= total - 1 ? ' disabled' : '') + '>Вперёд</button>';
   html += '</div>';
 
