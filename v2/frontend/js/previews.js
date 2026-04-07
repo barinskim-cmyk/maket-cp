@@ -566,8 +566,16 @@ function pvPickFolderInternal() {
     pvShowProgress('oc-pv-dropzone', 0, 0, true);
     window.pywebview.api.scan_preview_folder();
   } else {
-    // Browser: показать подсказку
-    alert('В браузерной версии перетащите файлы или папку на область превью');
+    // Browser: показать подсказку (с учётом версии)
+    if (_pvLoadAsStage) {
+      var stLabel = _pvLoadAsStage;
+      for (var vi = 0; vi < PV_VERSION_STAGES.length; vi++) {
+        if (PV_VERSION_STAGES[vi].id === _pvLoadAsStage) { stLabel = PV_VERSION_STAGES[vi].label; break; }
+      }
+      alert('Перетащите папку с версией "' + stLabel + '" на область превью.\nФайлы будут сопоставлены по имени.');
+    } else {
+      alert('В браузерной версии перетащите файлы или папку на область превью');
+    }
   }
 }
 
@@ -1019,8 +1027,64 @@ function pvLoadFilesWithProgress(files, store, dzId, folderName) {
     }
   }
 
+  /* Если _pvLoadAsStage установлен — это загрузка версии (ЦК/Ретушь) */
+  var _loadAsVersion = _pvLoadAsStage || '';
+  if (_loadAsVersion) {
+    _pvLoadAsStage = ''; /* Сбросить сразу чтобы следующий drop был обычный */
+    /* Проверка лимита версий */
+    var _verProj = getActiveProject();
+    if (_verProj) {
+      if (!_verProj._versionLoadCount) _verProj._versionLoadCount = 0;
+      if (_verProj._versionLoadCount >= 5) {
+        alert('Достигнут лимит версий (5) на проект.');
+        _loadAsVersion = '';
+      } else {
+        _verProj._versionLoadCount++;
+      }
+    }
+  }
+
+  /* Индекс превью по имени (для версий) */
+  var _storeIdx = {};
+  if (_loadAsVersion) {
+    for (var si = 0; si < store.length; si++) {
+      _storeIdx[store[si].name] = si;
+    }
+  }
+  /* Набор отбора (для версий — матч только с отбором) */
+  var _selSet = _loadAsVersion ? pvGetSelectionSet() : null;
+  var _versionCount = 0;
+
   function loadOne(file) {
-    // Дубликат? — мерджим папку
+    if (_loadAsVersion) {
+      /* ── Загрузка версии: матч по имени ── */
+      if (!_storeIdx.hasOwnProperty(file.name)) {
+        /* Нет такого RAW-превью — пропускаем */
+        onDone();
+        return;
+      }
+      if (_selSet && !_selSet[file.name]) {
+        /* Не в отборе — пропускаем */
+        onDone();
+        return;
+      }
+      pvMakeThumbnail(file, function(result) {
+        if (result) {
+          var pvObj = store[_storeIdx[file.name]];
+          if (!pvObj.versions) pvObj.versions = {};
+          pvObj.versions[_loadAsVersion] = {
+            thumb: result.thumb,
+            preview: result.preview || result.thumb,
+            path: ''
+          };
+          _versionCount++;
+        }
+        onDone();
+      });
+      return;
+    }
+
+    /* ── Обычная загрузка: дубликат? мерджим папку ── */
     for (var k = 0; k < store.length; k++) {
       if (store[k].name === file.name) {
         if (folderName && store[k].folders && store[k].folders.indexOf(folderName) < 0) {
@@ -1050,6 +1114,15 @@ function pvLoadFilesWithProgress(files, store, dzId, folderName) {
       pvShowProgress(dzId, 0, 0, false);
       pvShowProgress('pv-dropzone', 0, 0, false);
       pvShowProgress('oc-pv-dropzone', 0, 0, false);
+
+      /* Если это была загрузка версии — переключить активную версию */
+      if (_loadAsVersion && _versionCount > 0) {
+        PV_ACTIVE_VERSION = _loadAsVersion;
+        var verProj = getActiveProject();
+        if (verProj) verProj._activeVersion = PV_ACTIVE_VERSION;
+        console.log('pvVersion (browser): загружено ' + _versionCount + ' версий "' + _loadAsVersion + '"');
+      }
+
       pvRenderAll();
       /* Сохранить превью в IndexedDB */
       var proj = getActiveProject();
@@ -1066,7 +1139,7 @@ function pvLoadFilesWithProgress(files, store, dzId, folderName) {
         });
       }
       /* Авто-фиксация этапа 0 ("Преотбор и превью") при завершении загрузки */
-      pvAutoAdvancePreselect();
+      if (!_loadAsVersion) pvAutoAdvancePreselect();
       return;
     }
     next();
