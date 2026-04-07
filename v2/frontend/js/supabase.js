@@ -1793,6 +1793,26 @@ function sbMarkPushDone() {
  *
  * @param {function} [callback] — callback(error)
  */
+/**
+ * Проверить, что пользователь сейчас вводит текст в поле комментария.
+ * Если да — UI перерисовку нужно пропустить (иначе поле сбросится).
+ * @returns {boolean}
+ */
+function _sbIsUserTypingComment() {
+  var active = document.activeElement;
+  if (!active) return false;
+  var tag = active.tagName.toLowerCase();
+  if (tag !== 'input' && tag !== 'textarea') return false;
+  /* Мобильные комментарии */
+  if (active.classList.contains('mob-comment-input')) return true;
+  /* Десктопные комментарии */
+  if (active.classList.contains('cp-comment-textarea')) return true;
+  /* Любой input/textarea внутри карточки */
+  var id = active.id || '';
+  if (id.indexOf('mob-cmt-input') === 0 || id.indexOf('cp-comment-text') === 0) return true;
+  return false;
+}
+
 function sbPullProject(callback) {
   if (!callback) callback = function() {};
   var proj = getActiveProject();
@@ -1951,16 +1971,25 @@ function sbPullProject(callback) {
       }
       if (App.currentCardIdx >= newCards.length) App.currentCardIdx = Math.max(0, newCards.length - 1);
 
-      /* Обновить UI */
-      if (typeof renderPipeline === 'function') renderPipeline();
-      if (typeof cpRenderList === 'function') cpRenderList();
-      if (typeof cpRenderCard === 'function') cpRenderCard();
-      if (typeof acRenderField === 'function') acRenderField();
-      if (typeof ocRenderField === 'function') ocRenderField();
-      if (typeof pvRenderAll === 'function') pvRenderAll();
+      /* Обновить UI.
+         На мобилке (share-ссылка) НЕ вызываем cpRenderList/cpRenderCard —
+         они перестраивают всю страницу, вызывая мерцание и сброс полей ввода.
+         Данные уже обновлены в памяти; UI подхватит при следующем явном рендере
+         (переключение вкладки, отправка комментария и т.д.).
+         На десктопе: если пользователь печатает комментарий — тоже пропускаем. */
+      var _isMobileClient = !!window._shareToken;
+      var _isTyping = _sbIsUserTypingComment();
+      if (!_isMobileClient && !_isTyping) {
+        if (typeof renderPipeline === 'function') renderPipeline();
+        if (typeof cpRenderList === 'function') cpRenderList();
+        if (typeof cpRenderCard === 'function') cpRenderCard();
+        if (typeof acRenderField === 'function') acRenderField();
+        if (typeof ocRenderField === 'function') ocRenderField();
+        if (typeof pvRenderAll === 'function') pvRenderAll();
+      }
       if (typeof shAutoSave === 'function') shAutoSave();
 
-      console.log('sbPullProject (client): обновлено — ' + newCards.length + ' карт., ' + newOC.length + ' OC');
+      console.log('sbPullProject (client): обновлено — ' + newCards.length + ' карт., ' + newOC.length + ' OC' + (_isMobileClient ? ' (mob, no UI)' : (_isTyping ? ' (typing, no UI)' : '')));
       callback(null);
     })['catch'](function(err) {
       _sbPullRunning = false;
@@ -2138,12 +2167,14 @@ function sbPullProject(callback) {
           proj._stageHistory = history;
           _sbPullRunning = false;
 
-          /* Обновить UI */
-          if (typeof renderPipeline === 'function') renderPipeline();
-          if (typeof cpRenderList === 'function') cpRenderList();
-          if (typeof acRenderField === 'function') acRenderField();
-          if (typeof ocRenderField === 'function') ocRenderField();
-          if (typeof pvRenderAll === 'function') pvRenderAll();
+          /* Обновить UI (пропускаем если пользователь печатает комментарий) */
+          if (!_sbIsUserTypingComment()) {
+            if (typeof renderPipeline === 'function') renderPipeline();
+            if (typeof cpRenderList === 'function') cpRenderList();
+            if (typeof acRenderField === 'function') acRenderField();
+            if (typeof ocRenderField === 'function') ocRenderField();
+            if (typeof pvRenderAll === 'function') pvRenderAll();
+          }
 
           /* Сохранить в localStorage */
           if (typeof shAutoSave === 'function') shAutoSave();
