@@ -4056,6 +4056,11 @@ function rtAddAnnotation(photoName, annotation) {
 
   proj._annotations[photoName].push(a);
 
+  /* Отметить начало комментирования в проекте (для пайплайна) */
+  if (!proj._commentingStarted) {
+    proj._commentingStarted = new Date().toISOString();
+  }
+
   /* Автосохранение + синхронизация с облаком */
   if (typeof shAutoSave === 'function') shAutoSave();
   if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();

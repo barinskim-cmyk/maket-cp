@@ -654,12 +654,19 @@ function renderPipeline() {
   }
   if (_cmtCount > 0 || _annotCount > 0) {
     html += '<div class="pipeline-parallel">';
-    html += '<div class="pipeline-parallel-title">Параллельно:</div>';
+    var cmtDone = !!proj._commentingDone;
+    html += '<div class="pipeline-parallel-title">Параллельно: Комментирование' +
+      (cmtDone ? ' (завершено)' : '') + '</div>';
     if (_cmtCount > 0) {
       html += '<div class="pipeline-parallel-item">Комментарии к карточкам: ' + _cmtCount + '</div>';
     }
     if (_annotCount > 0) {
       html += '<div class="pipeline-parallel-item">Аннотации к фото: ' + _annotCount + '</div>';
+    }
+    if (!cmtDone) {
+      html += '<div style="margin-top:6px">';
+      html += '<button class="btn btn-sm pipeline-cmt-done-btn" onclick="shFinishCommenting()">Готово</button>';
+      html += '</div>';
     }
     html += '</div>';
   }
@@ -749,8 +756,70 @@ function _shRenderTimeline(proj) {
     html += '</div>';
   }
 
+  /* ── Ветка комментирования на таймлайне ── */
+  if (proj._commentingStarted) {
+    var cmtStart = new Date(proj._commentingStarted);
+    var cmtStartStr = cmtStart.toLocaleDateString('ru-RU') + ' ' + cmtStart.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    var cmtDoneNow = !!proj._commentingDone;
+    var branchClass = cmtDoneNow ? 'pipeline-branch done' : 'pipeline-branch active';
+
+    html += '<div class="' + branchClass + '">';
+    html += '<div class="pipeline-branch-line"></div>';
+    html += '<div class="pipeline-branch-content">';
+    html += '<div class="pipeline-branch-start">';
+    html += '<span class="pipeline-branch-dot"></span>';
+    html += '<span class="pipeline-branch-label">Комментирование</span>';
+    html += '<span class="pipeline-cp-date">' + cmtStartStr + '</span>';
+    html += '</div>';
+
+    if (cmtDoneNow) {
+      var cmtEnd = new Date(proj._commentingDone);
+      var cmtEndStr = cmtEnd.toLocaleDateString('ru-RU') + ' ' + cmtEnd.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+      /* Найти на каком этапе было завершено */
+      var stageAtDone = proj._commentingDoneStage || '';
+      var stageLabel = stageAtDone ? (' (' + stageAtDone + ')') : '';
+      html += '<div class="pipeline-branch-end">';
+      html += '<span class="pipeline-branch-dot done"></span>';
+      html += '<span class="pipeline-branch-label">Завершено' + stageLabel + '</span>';
+      html += '<span class="pipeline-cp-date">' + cmtEndStr + '</span>';
+      html += '</div>';
+    }
+
+    html += '</div></div>';
+  }
+
   html += '</div>';
   return html;
+}
+
+/**
+ * Завершить процесс комментирования: отметить проект как "комменты завершены",
+ * записать дату и текущий этап в проект, перерисовать пайплайн.
+ */
+function shFinishCommenting() {
+  var proj = getActiveProject();
+  if (!proj) return;
+  if (proj._commentingDone) return; /* Уже завершено */
+
+  proj._commentingDone = new Date().toISOString();
+
+  /* Записываем текущий этап для визуализации на таймлайне */
+  var stageNames = ['Преотбор', 'Отбор', 'Клиент', 'ЦК', 'Ретушь (ТЗ)', 'Ретушь', 'Согласование', 'Адаптация'];
+  proj._commentingDoneStage = stageNames[proj._stage || 0] || '';
+
+  /* Добавить контрольную точку */
+  if (!proj._checkpoints) proj._checkpoints = [];
+  proj._checkpoints.push({
+    trigger: 'retouch_comments',
+    stage: 'retouch_task',
+    date: proj._commentingDone,
+    note: 'Комментирование завершено'
+  });
+
+  /* Автосохранение + перерисовка */
+  if (typeof shAutoSave === 'function') shAutoSave();
+  if (typeof renderPipeline === 'function') renderPipeline();
+  if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
 }
 
 /**

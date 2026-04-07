@@ -3423,6 +3423,11 @@ function cpAddComment(cardIdx, text) {
   /* Кристаллизация: комментарий сохранён → фиксируем ID карточки */
   cpCrystallizeCard(cardIdx);
 
+  /* Отметить начало комментирования в проекте (для пайплайна) */
+  if (!proj._commentingStarted) {
+    proj._commentingStarted = new Date().toISOString();
+  }
+
   if (typeof shAutoSave === 'function') shAutoSave();
   cpRenderCard();
 }
