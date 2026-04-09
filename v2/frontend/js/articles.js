@@ -1489,87 +1489,100 @@ function _arFindSkuItems(textItems, canvasHeight) {
 /**
  * Вырезать референс-фото для каждого артикула.
  *
- * Логика:
- * - Сортируем SKU по Y (сверху вниз)
- * - Разбиваем на колонки по X
- * - Для каждого SKU: фото = область выше текста до верхней границы его блока
+ * Автоматически определяет тип раскладки:
+ *
+ * ТАБЛИЧНАЯ (Portal-стиль): SKU слева, фото справа в той же строке
+ *   ┌──────────────┬──────────┐
+ *   │ PL01056CN... │  [фото]  │
+ *   ├──────────────┼──────────┤
+ *   │ PL01350CN... │  [фото]  │
+ *   └──────────────┴──────────┘
+ *   Признак: все SKU X < 50% ширины страницы
+ *
+ * СЕТОЧНАЯ: фото сверху, SKU снизу каждого блока
+ *   ┌────┬────┐
+ *   │фото│фото│
+ *   │SKU │SKU │
+ *   └────┴────┘
  */
 function _arCropArticleImages(skuItems, canvas, allTextItems) {
   if (skuItems.length === 0) return [];
 
-  /* Сортируем по Y (сверху вниз) */
   var sorted = skuItems.slice().sort(function(a, b) { return a.y - b.y; });
 
-  /* Определяем количество колонок по распределению X */
-  var xValues = sorted.map(function(s) { return s.x; }).sort(function(a, b) { return a - b; });
-  var cols = _arDetectColumns(xValues, canvas.width);
+  /* Определяем тип раскладки: если все SKU в левой половине — табличная */
+  var maxSkuX = 0;
+  for (var si = 0; si < sorted.length; si++) {
+    if (sorted[si].x > maxSkuX) maxSkuX = sorted[si].x;
+  }
+  var isTableLayout = maxSkuX < canvas.width * 0.5;
+
+  if (isTableLayout) {
+    return _arCropTableLayout(sorted, canvas, allTextItems);
+  } else {
+    return _arCropGridLayout(sorted, canvas);
+  }
+}
+
+
+/**
+ * Кроп для ТАБЛИЧНОЙ раскладки (SKU слева, фото справа).
+ * Разделитель: правая граница SKU-текста + отступ.
+ * Строки: полосы между Y-позициями соседних SKU.
+ */
+function _arCropTableLayout(sorted, canvas, allTextItems) {
+  /* Ищем правую границу SKU-зоны: берём 75-й перцентиль правых краёв */
+  var rightEdges = sorted.map(function(s) {
+    return s.x + s.sku.length * (s.fontSize || 12) * 0.55;
+  }).sort(function(a, b) { return a - b; });
+  var p75idx = Math.floor(rightEdges.length * 0.75);
+  var skuZoneRight = rightEdges[p75idx] * 1.15; /* +15% зазор */
+
+  /* Ограничиваем: разделитель не меньше 25% и не больше 55% ширины */
+  skuZoneRight = Math.max(canvas.width * 0.25, Math.min(canvas.width * 0.55, skuZoneRight));
+
+  /*
+   * Правая граница таблицы.
+   * Ищем текстовые элементы правее SKU-зоны (заголовки столбцов, плейсхолдеры).
+   * Если не нашли — берём 55% ширины (типично для A4 портрет с одним фото-столбцом).
+   */
+  var tableRight = canvas.width * 0.55; /* разумный дефолт */
+  if (allTextItems) {
+    var rightItems = allTextItems.filter(function(t) { return t.x > skuZoneRight; });
+    if (rightItems.length > 0) {
+      var maxRX = 0;
+      for (var ri = 0; ri < rightItems.length; ri++) {
+        var t = rightItems[ri];
+        var rx = t.x + t.str.length * (t.fontSize || 12) * 0.6;
+        if (rx > maxRX) maxRX = rx;
+      }
+      /* Берём правый край текстов + 30% padding, но не больше 70% ширины страницы */
+      tableRight = Math.min(canvas.width * 0.70, maxRX * 1.3);
+    }
+  }
+  /* Не давать tableRight быть меньше skuZoneRight + 50px */
+  tableRight = Math.max(tableRight, skuZoneRight + 50);
 
   var articles = [];
 
   for (var i = 0; i < sorted.length; i++) {
     var item = sorted[i];
-    var col = _arGetColumn(item.x, cols);
 
-    /* Предыдущий SKU в той же колонке → его Y = верхняя граница нашего блока */
-    var topY = 0;
-    for (var j = i - 1; j >= 0; j--) {
-      if (_arGetColumn(sorted[j].x, cols) === col) {
-        topY = sorted[j].y + (sorted[j].fontSize || 14);
-        break;
-      }
-    }
+    /* Границы строки по Y — для первой/последней строки берём край canvas */
+    var rowTop    = i === 0
+      ? 0
+      : (sorted[i - 1].y + item.y) / 2;
+    var rowBottom = i === sorted.length - 1
+      ? canvas.height
+      : (item.y + sorted[i + 1].y) / 2;
 
-    /* Нижняя граница блока = позиция самой нижней текстовой строки под SKU в том же блоке */
-    var bottomY = item.y + (item.fontSize || 14) * 2;
+    /* Небольшой отступ внутри строки */
+    var cropX = Math.round(skuZoneRight);
+    var cropY = Math.round(rowTop + 2);
+    var cropW = Math.round(tableRight - skuZoneRight - 2);
+    var cropH = Math.round(rowBottom - rowTop - 4);
 
-    /* Граница фото = немного выше текста SKU */
-    var photoBottom = item.y - 4;
-    var photoTop = topY + 4;
-
-    if (photoBottom - photoTop < 20) continue; /* слишком маленькая область */
-
-    /* Горизонтальные границы колонки */
-    var colLeft = col.left;
-    var colRight = col.right;
-    var cropW = Math.round(colRight - colLeft);
-    var cropH = Math.round(photoBottom - photoTop);
-
-    if (cropW < 20 || cropH < 20) continue;
-
-    try {
-      var cropCanvas = document.createElement('canvas');
-      /* Ограничиваем размер: не больше 800x1000 */
-      var scaleDown = Math.min(1, 800 / cropW, 1000 / cropH);
-      cropCanvas.width = Math.round(cropW * scaleDown);
-      cropCanvas.height = Math.round(cropH * scaleDown);
-      cropCanvas.getContext('2d').drawImage(
-        canvas,
-        Math.round(colLeft), Math.round(photoTop), cropW, cropH,
-        0, 0, cropCanvas.width, cropCanvas.height
-      );
-      var refImage = cropCanvas.toDataURL('image/jpeg', 0.85);
-
-      articles.push({
-        id: 'ar_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
-        sku: item.sku,
-        category: '',
-        color: '',
-        refImage: refImage,
-        status: 'unmatched',
-        cardIdx: -1
-      });
-    } catch(e) {
-      /* Кроп не получился — добавляем без фото */
-      articles.push({
-        id: 'ar_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
-        sku: item.sku,
-        category: '',
-        color: '',
-        refImage: '',
-        status: 'unmatched',
-        cardIdx: -1
-      });
-    }
+    articles.push(_arMakeCroppedArticle(item.sku, canvas, cropX, cropY, cropW, cropH));
   }
 
   return articles;
@@ -1577,13 +1590,72 @@ function _arCropArticleImages(skuItems, canvas, allTextItems) {
 
 
 /**
- * Определить колонки по X-координатам SKU.
- * Возвращает массив {left, right, center}.
+ * Кроп для СЕТОЧНОЙ раскладки (фото выше SKU).
+ */
+function _arCropGridLayout(sorted, canvas) {
+  /* Кластеризуем SKU по X → определяем колонки */
+  var xValues = sorted.map(function(s) { return s.x; }).sort(function(a, b) { return a - b; });
+  var cols = _arDetectColumns(xValues, canvas.width);
+  var articles = [];
+
+  for (var i = 0; i < sorted.length; i++) {
+    var item = sorted[i];
+    var col = _arGetColumn(item.x, cols);
+    var fs = item.fontSize || 14;
+
+    /* Верх блока = низ предыдущего SKU в той же колонке */
+    var topY = 0;
+    for (var j = i - 1; j >= 0; j--) {
+      if (_arGetColumn(sorted[j].x, cols) === col) {
+        topY = sorted[j].y + fs;
+        break;
+      }
+    }
+
+    var cropX = Math.round(col.left + 2);
+    var cropY = Math.round(topY + 2);
+    var cropW = Math.round(col.right - col.left - 4);
+    var cropH = Math.round(item.y - topY - 4);
+
+    articles.push(_arMakeCroppedArticle(item.sku, canvas, cropX, cropY, cropW, cropH));
+  }
+
+  return articles;
+}
+
+
+/**
+ * Вырезать прямоугольник из canvas и вернуть Article-объект.
+ */
+function _arMakeCroppedArticle(sku, canvas, cropX, cropY, cropW, cropH) {
+  var refImage = '';
+  if (cropW > 20 && cropH > 20) {
+    try {
+      var scaleDown = Math.min(1, 600 / cropW, 800 / cropH);
+      var cc = document.createElement('canvas');
+      cc.width  = Math.round(cropW * scaleDown);
+      cc.height = Math.round(cropH * scaleDown);
+      cc.getContext('2d').drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, cc.width, cc.height);
+      refImage = cc.toDataURL('image/jpeg', 0.88);
+    } catch(e) { /* тихо игнорируем */ }
+  }
+  return {
+    id: 'ar_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+    sku: sku,
+    category: '',
+    color: '',
+    refImage: refImage,
+    status: 'unmatched',
+    cardIdx: -1
+  };
+}
+
+
+/**
+ * Определить колонки сетки по X-координатам SKU.
  */
 function _arDetectColumns(xValues, canvasWidth) {
   if (xValues.length === 0) return [{ left: 0, right: canvasWidth, center: canvasWidth / 2 }];
-
-  /* Кластеризация: группируем X с допуском canvasWidth/6 */
   var tolerance = canvasWidth / 6;
   var clusters = [];
   for (var i = 0; i < xValues.length; i++) {
@@ -1593,30 +1665,21 @@ function _arDetectColumns(xValues, canvasWidth) {
       if (Math.abs(clusters[c].center - x) < tolerance) {
         clusters[c].values.push(x);
         clusters[c].center = clusters[c].values.reduce(function(a, b) { return a + b; }, 0) / clusters[c].values.length;
-        found = true;
-        break;
+        found = true; break;
       }
     }
     if (!found) clusters.push({ center: x, values: [x] });
   }
-
   clusters.sort(function(a, b) { return a.center - b.center; });
-
-  /* Назначить left/right для каждой колонки */
   var result = [];
   for (var ci = 0; ci < clusters.length; ci++) {
-    var prevRight = ci > 0 ? clusters[ci - 1].center + (clusters[ci].center - clusters[ci - 1].center) / 2 : 0;
-    var nextLeft = ci < clusters.length - 1 ? clusters[ci].center + (clusters[ci + 1].center - clusters[ci].center) / 2 : canvasWidth;
-    result.push({ left: prevRight, right: nextLeft, center: clusters[ci].center });
+    var left  = ci > 0 ? (clusters[ci - 1].center + clusters[ci].center) / 2 : 0;
+    var right = ci < clusters.length - 1 ? (clusters[ci].center + clusters[ci + 1].center) / 2 : canvasWidth;
+    result.push({ left: left, right: right, center: clusters[ci].center });
   }
-
   return result;
 }
 
-
-/**
- * Определить индекс колонки для X-координаты.
- */
 function _arGetColumn(x, cols) {
   for (var i = 0; i < cols.length; i++) {
     if (x >= cols[i].left && x < cols[i].right) return cols[i];
