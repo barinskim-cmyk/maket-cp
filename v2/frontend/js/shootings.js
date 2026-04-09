@@ -1870,6 +1870,156 @@ function shSetSaveStatus(status) {
 /** @type {boolean} Флаг: приложение открыто клиентом по share-ссылке */
 var _appClientMode = false;
 
+/** @type {boolean} Флаг: мобильный режим владельца (зарегистрированный пользователь на мобиле) */
+var _appMobileOwner = false;
+
+/**
+ * Проверить, нужен ли мобильный режим для залогиненного пользователя.
+ * Вызывается после загрузки проектов из облака.
+ * @returns {boolean} true если активирован мобильный режим
+ */
+function shCheckMobileOwner() {
+  if (window.innerWidth >= 768) return false;
+  if (window._isShareLink) return false;
+  /* Desktop (pywebview) — никогда не переключать на мобильный режим */
+  if (window.pywebview && window.pywebview.api) return false;
+
+  _appMobileOwner = true;
+  _appClientMode = true; /* чтобы cpIsMobileClient() и мобильный UI работали */
+
+  /* Показать экран выбора проекта */
+  _mobShowProjectPicker();
+  return true;
+}
+
+/**
+ * Показать мобильный экран выбора проекта.
+ * Полноэкранный список проектов из облака.
+ */
+function _mobShowProjectPicker() {
+  var appMain = document.getElementById('app-main');
+  if (!appMain) return;
+
+  /* Убрать лоадер если был */
+  var mobLoader = document.getElementById('mob-loader');
+  if (mobLoader) mobLoader.remove();
+
+  /* Скрыть всё десктопное */
+  for (var i = 0; i < appMain.children.length; i++) {
+    var child = appMain.children[i];
+    if (child.id !== 'mob-wrap') child.style.display = 'none';
+  }
+
+  /* Создать мобильный контейнер */
+  var mobWrap = document.getElementById('mob-wrap');
+  if (!mobWrap) {
+    mobWrap = document.createElement('div');
+    mobWrap.id = 'mob-wrap';
+    appMain.appendChild(mobWrap);
+  }
+
+  var projects = App.projects || [];
+  var html = '';
+
+  /* Шапка */
+  html += '<div class="mob-picker-header">';
+  html += '<div class="mob-picker-title">Maket CP</div>';
+  if (typeof sbUser !== 'undefined' && sbUser && sbUser.email) {
+    html += '<div class="mob-picker-user">' + esc(sbUser.email) + '</div>';
+  }
+  html += '</div>';
+
+  /* Список проектов */
+  html += '<div class="mob-picker-list">';
+
+  if (projects.length === 0) {
+    html += '<div class="mob-picker-empty">Нет проектов</div>';
+  } else {
+    for (var p = 0; p < projects.length; p++) {
+      var proj = projects[p];
+      if (proj._deletedAt) continue; /* скрытые не показываем */
+      var brandName = esc(shProjectDisplayName(proj));
+      var cardsCount = proj.cards ? proj.cards.length : 0;
+      var pvCount = proj.previews ? proj.previews.length : 0;
+      var stageText = '';
+      if (typeof PIPELINE_STAGES !== 'undefined' && PIPELINE_STAGES[proj._stage || 0]) {
+        stageText = PIPELINE_STAGES[proj._stage || 0].name || '';
+      }
+
+      html += '<div class="mob-picker-item" onclick="_mobSelectProject(' + p + ')">';
+      html += '<div class="mob-picker-brand">' + (brandName || 'Без названия') + '</div>';
+      html += '<div class="mob-picker-meta">';
+      if (proj.shoot_date) html += '<span>' + esc(proj.shoot_date) + '</span>';
+      html += '<span>' + cardsCount + ' карт.</span>';
+      html += '<span>' + pvCount + ' фото</span>';
+      if (stageText) html += '<span>' + esc(stageText) + '</span>';
+      html += '</div>';
+      html += '</div>';
+    }
+  }
+  html += '</div>';
+
+  mobWrap.innerHTML = html;
+}
+
+/**
+ * Выбрать проект в мобильном режиме владельца.
+ * Переключает на мобильный UI с карточками (как у клиента, но с правами owner).
+ * @param {number} idx — индекс проекта в App.projects
+ */
+function _mobSelectProject(idx) {
+  App.selectedProject = idx;
+  App.currentCardIdx = -1;
+
+  var proj = getActiveProject();
+  if (proj) {
+    proj._role = 'owner';
+    /* Восстановить активную версию превью */
+    if (proj._activeVersion && typeof PV_ACTIVE_VERSION !== 'undefined') {
+      PV_ACTIVE_VERSION = proj._activeVersion;
+    }
+  }
+
+  /* Скрыть навигацию, шапку и прочее десктопное */
+  var navbar = document.querySelector('.nav');
+  if (navbar) navbar.style.display = 'none';
+  var projHeader = document.querySelector('.projects-header');
+  if (projHeader) projHeader.style.display = 'none';
+  var projList = document.querySelector('.shootings-left');
+  if (projList) projList.style.display = 'none';
+  var pipelinePanel = document.querySelector('.pipeline-panel');
+  if (pipelinePanel) pipelinePanel.style.display = 'none';
+
+  /* Запустить синхронизацию для выбранного проекта */
+  if (typeof sbStartAutoPull === 'function') sbStartAutoPull();
+  if (proj && proj._cloudId && typeof sbSubscribeVersions === 'function') {
+    sbSubscribeVersions(proj._cloudId);
+  }
+  /* Подтянуть превью из IndexedDB если ещё не загружены */
+  if (proj && typeof pvDbRestoreProjectPreviews === 'function') {
+    pvDbRestoreProjectPreviews(proj, function() {
+      if (typeof cpMobileInit === 'function') cpMobileInit();
+    });
+  } else {
+    if (typeof cpMobileInit === 'function') cpMobileInit();
+  }
+}
+
+/**
+ * Вернуться к экрану выбора проектов (мобильный режим владельца).
+ */
+function _mobBackToProjects() {
+  /* Сбросить выбор проекта */
+  App.selectedProject = -1;
+  App.currentCardIdx = -1;
+
+  /* Выйти из мобильного фида */
+  if (typeof cpMobileExitFeed === 'function') cpMobileExitFeed();
+
+  /* Показать пикер заново */
+  _mobShowProjectPicker();
+}
+
 /**
  * Активировать клиентский режим.
  * Скрывает элементы фотографа, показывает кнопки клиента.

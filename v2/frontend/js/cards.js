@@ -2280,7 +2280,7 @@ var _mobViewMode = 'cards';
  * @returns {boolean}
  */
 function cpIsMobileClient() {
-  return _appClientMode && window.innerWidth < 768;
+  return (_appClientMode || _appMobileOwner) && window.innerWidth < 768;
 }
 
 /**
@@ -2349,6 +2349,12 @@ function cpMobileRender() {
   /* Sticky-шапка: бургер-кнопка + название + табы */
   html += '<div class="mob-header">';
   html += '<div class="mob-header-left">';
+  /* Кнопка «назад к списку проектов» для мобильного владельца */
+  if (typeof _appMobileOwner !== 'undefined' && _appMobileOwner) {
+    html += '<button class="mob-back-btn" onclick="_mobBackToProjects()" title="К проектам">';
+    html += '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>';
+    html += '</button>';
+  }
   html += '<button class="mob-burger" onclick="cpMobileToggleCardMenu()" title="Список карточек">';
   html += '<span></span><span></span><span></span>';
   html += '</button>';

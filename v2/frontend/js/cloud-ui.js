@@ -436,6 +436,22 @@ function authUnlock() {
   if (app) app.style.display = '';
   sbUpdateUI();
 
+  /* Мобильный режим: пока проекты грузятся, показать лоадер
+     чтобы не мелькал десктопный UI */
+  var _isMobileCandidate = window.innerWidth < 768 && !window._isShareLink
+    && !(window.pywebview && window.pywebview.api) && sbIsLoggedIn();
+  if (_isMobileCandidate && app) {
+    /* Скрыть десктопный контент, показать лоадер */
+    for (var mi = 0; mi < app.children.length; mi++) {
+      app.children[mi].style.display = 'none';
+    }
+    var mobLoader = document.createElement('div');
+    mobLoader.id = 'mob-loader';
+    mobLoader.style.cssText = 'display:flex;align-items:center;justify-content:center;height:100vh;font-size:16px;color:#888;';
+    mobLoader.textContent = 'Загрузка проектов...';
+    app.appendChild(mobLoader);
+  }
+
   /* Загружаем проекты из облака (desktop + browser).
      Пропускаем для share-ссылок (там загрузка идёт через sbLoadByShareToken). */
   if (!window._isShareLink && sbIsLoggedIn() && !window._cloudLoaded) {
@@ -486,8 +502,14 @@ function sbLoadAllFromCloud() {
             /* Сохраняем лёгкий кэш в localStorage (без base64) */
             _authSaveLightCache(projects);
 
-            if (typeof renderProjects === 'function') renderProjects();
-            if (typeof cpRenderList === 'function') cpRenderList();
+            /* Мобильный режим для залогиненного пользователя:
+               показать экран выбора проекта вместо десктопного UI */
+            if (typeof shCheckMobileOwner === 'function' && shCheckMobileOwner()) {
+              /* Мобильный пикер показан — пропускаем десктопный рендер */
+            } else {
+              if (typeof renderProjects === 'function') renderProjects();
+              if (typeof cpRenderList === 'function') cpRenderList();
+            }
 
             /* Подтянуть превью из IndexedDB */
             if (typeof pvDbRestoreProjectPreviews === 'function') {
