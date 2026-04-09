@@ -622,6 +622,65 @@ function _arLoadViaBrowser(proj) {
    ────────────────────────────────────────────── */
 
 /**
+ * Inline-форма ввода OpenAI API key для веб-режима.
+ * Показывает карточку под блоком артикулов, без prompt().
+ * @param {function} onSave — callback(key) после сохранения
+ */
+function _arShowKeyInput(onSave) {
+  /* Не дублировать */
+  if (document.getElementById('ar-key-input-box')) return;
+
+  var box = document.createElement('div');
+  box.id = 'ar-key-input-box';
+  box.className = 'ar-key-input-box';
+  box.innerHTML = ''
+    + '<div class="ar-key-input-title">Нужен ключ OpenAI для AI-сопоставления</div>'
+    + '<div class="ar-key-input-hint">Получить ключ: <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</a></div>'
+    + '<div class="ar-key-input-row">'
+    +   '<input type="password" id="ar-key-input-field" class="ar-key-input-field" placeholder="sk-..." autocomplete="off">'
+    +   '<button class="btn" onclick="_arSaveKeyFromInput()">Сохранить</button>'
+    + '</div>'
+    + '<div class="ar-key-input-note">Ключ сохраняется в браузере (localStorage) и не отправляется на сервер.</div>';
+
+  /* Вставить после блока ar-block-1 (чеклист) */
+  var anchor = document.getElementById('ar-block-2') || document.getElementById('ar-checklist') || document.body;
+  if (anchor.parentNode) {
+    anchor.parentNode.insertBefore(box, anchor);
+  } else {
+    document.body.appendChild(box);
+  }
+
+  /* Сохранить callback для использования в _arSaveKeyFromInput */
+  box._onSave = onSave;
+
+  /* Фокус */
+  var field = document.getElementById('ar-key-input-field');
+  if (field) setTimeout(function() { field.focus(); }, 100);
+}
+
+/**
+ * Сохранить ключ из inline-формы и запустить AI.
+ */
+function _arSaveKeyFromInput() {
+  var field = document.getElementById('ar-key-input-field');
+  var box   = document.getElementById('ar-key-input-box');
+  if (!field) return;
+  var key = field.value.trim();
+  if (!key || key.length < 20) {
+    field.style.borderColor = '#c00';
+    return;
+  }
+  localStorage.setItem('openai_api_key', key);
+  _arOpenAIKey = key;
+  if (box) {
+    var cb = box._onSave;
+    box.parentNode && box.parentNode.removeChild(box);
+    if (typeof cb === 'function') cb(key);
+  }
+}
+
+
+/**
  * Настроить API-ключ OpenAI. Сохраняется в localStorage.
  */
 function arSetOpenAIKey() {
@@ -726,6 +785,31 @@ function _arProcessPdfWithOpenAI(proj, file, apiKey) {
               if (statusEl) statusEl.textContent = 'AI: обработка ' + processed + '/' + totalPages + ' страниц...';
 
               if (!err && pageArticles && pageArticles.length > 0) {
+                /* Вырезать референс-фото из canvas по bounding box */
+                for (var ai = 0; ai < pageArticles.length; ai++) {
+                  var a = pageArticles[ai];
+                  if (a.img && typeof a.img.x === 'number' && typeof a.img.y === 'number'
+                      && typeof a.img.w === 'number' && typeof a.img.h === 'number'
+                      && a.img.w > 0.02 && a.img.h > 0.02) {
+                    try {
+                      var bx = Math.round(a.img.x * canvas.width);
+                      var by = Math.round(a.img.y * canvas.height);
+                      var bw = Math.round(a.img.w * canvas.width);
+                      var bh = Math.round(a.img.h * canvas.height);
+                      /* Ограничиваем размер: не больше 600x800 */
+                      var scaleDown = Math.min(1, 600 / bw, 800 / bh);
+                      var outW = Math.round(bw * scaleDown);
+                      var outH = Math.round(bh * scaleDown);
+                      var cropCanvas = document.createElement('canvas');
+                      cropCanvas.width = outW;
+                      cropCanvas.height = outH;
+                      cropCanvas.getContext('2d').drawImage(canvas, bx, by, bw, bh, 0, 0, outW, outH);
+                      a.refImage = cropCanvas.toDataURL('image/jpeg', 0.82);
+                    } catch(cropErr) {
+                      console.warn('articles.js: crop error', cropErr);
+                    }
+                  }
+                }
                 allArticles = allArticles.concat(pageArticles);
               }
 
@@ -757,8 +841,10 @@ function _arCallOpenAIVision(apiKey, base64Image, pageNum, totalPages, callback)
     + '- "sku": the article/SKU code (e.g. "PL01056CN-13-black-26S")\n'
     + '- "category": product category if visible (shoes, bag, glasses, accessory, or empty)\n'
     + '- "color": color if visible in the SKU or near it\n'
-    + '- "description": brief visual description of the product (1-2 words, e.g. "black heels", "red bag")\n\n'
-    + 'Return ONLY valid JSON array: [{"sku":"...","category":"...","color":"...","description":"..."}]\n'
+    + '- "description": brief visual description of the product (1-2 words, e.g. "black heels", "red bag")\n'
+    + '- "img": bounding box of the PRODUCT PHOTO on the page as relative coords 0.0-1.0: {"x":0.1,"y":0.1,"w":0.3,"h":0.4}. '
+    +   'If the product has no photo on this page, omit "img".\n\n'
+    + 'Return ONLY valid JSON array: [{"sku":"...","category":"...","color":"...","description":"...","img":{"x":...,"y":...,"w":...,"h":...}}]\n'
     + 'If no articles found on this page, return empty array: []\n'
     + 'Do NOT include any text before or after the JSON array.';
 
@@ -844,7 +930,7 @@ function _arConvertOpenAIResult(rawArticles) {
       sku: sku,
       category: a.category || '',
       color: a.color || '',
-      refImage: '',  /* OpenAI не возвращает картинки, только текст */
+      refImage: a.refImage || '',  /* заполняется при кропе из PDF-страницы */
       status: 'unmatched',
       cardIdx: -1
     });
@@ -955,8 +1041,15 @@ function _arAutoMatchIfReady(proj) {
     if (attempts < maxAttempts) {
       setTimeout(tryLoadAndRun, 500);
     } else {
-      if (statusEl) statusEl.textContent = 'Ключ OpenAI не найден. Проверьте config.json';
       console.log('articles.js: ключ не найден после ' + maxAttempts + ' попыток');
+      /* Веб-режим: показываем inline-форму для ввода ключа */
+      _arShowKeyInput(function(key) {
+        if (key) {
+          _arOpenAIKey = key;
+          if (statusEl) statusEl.textContent = 'AI расставляет артикулы...';
+          arAutoMatchAll();
+        }
+      });
     }
   }
 
