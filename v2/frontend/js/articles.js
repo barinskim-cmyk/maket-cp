@@ -715,8 +715,9 @@ function arLoadViaOpenAI() {
   var proj = getActiveProject();
   if (!proj) { alert('Сначала выберите съёмку'); return; }
 
-  var apiKey = _arGetOpenAIKey();
-  if (!apiKey) {
+  var _isWeb = !window.pywebview && typeof sbClient !== 'undefined' && sbClient;
+  var apiKey = _isWeb ? '' : _arGetOpenAIKey();
+  if (!_isWeb && !apiKey) {
     alert('Для распознавания PDF через AI нужен ключ OpenAI.\n\nНажмите кнопку "API Key" чтобы ввести ключ.');
     return;
   }
@@ -1682,8 +1683,9 @@ function arAIFindForCard(cardIdx) {
   var proj = getActiveProject();
   if (!proj) return;
 
-  var apiKey = _arGetOpenAIKey();
-  if (!apiKey) {
+  var _isWeb2 = !window.pywebview && typeof sbClient !== 'undefined' && sbClient;
+  var apiKey = _isWeb2 ? '' : _arGetOpenAIKey();
+  if (!_isWeb2 && !apiKey) {
     alert('Нужен ключ OpenAI. Нажмите "API Key".');
     return;
   }
@@ -1812,8 +1814,10 @@ function arAutoMatchAll() {
   var proj = getActiveProject();
   if (!proj || !proj.cards) return;
 
-  var apiKey = _arGetOpenAIKey();
-  if (!apiKey) {
+  /* В веб-режиме ключ хранится в Supabase Secrets — не нужен в браузере */
+  var isWeb = !window.pywebview && typeof sbClient !== 'undefined' && sbClient;
+  var apiKey = isWeb ? '' : _arGetOpenAIKey();
+  if (!isWeb && !apiKey) {
     var s = document.getElementById('ar-stats');
     if (s) s.textContent = 'AI: ключ не найден';
     return;
@@ -2272,8 +2276,9 @@ function arAutoMatchAI() {
   var proj = getActiveProject();
   if (!proj) { alert('Сначала выберите съёмку'); return; }
 
-  var apiKey = _arGetOpenAIKey();
-  if (!apiKey) {
+  var _isWeb3 = !window.pywebview && typeof sbClient !== 'undefined' && sbClient;
+  var apiKey = _isWeb3 ? '' : _arGetOpenAIKey();
+  if (!_isWeb3 && !apiKey) {
     alert('Для авто-сопоставления нужен ключ OpenAI.\nНажмите "API Key" чтобы ввести ключ.');
     return;
   }
