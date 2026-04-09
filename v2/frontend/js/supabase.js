@@ -1184,9 +1184,8 @@ function _sbDoLoadByToken(token) {
           name: rp.file_name,
           thumb: rp.thumb_path || '',
           preview: rp.preview_path || rp.thumb_path || '',
-          width: rp.width || 0,
-          height: rp.height || 0,
           rating: rp.rating || 0,
+          rotation: rp.rotation || 0,
           orient: rp.orient || 'v',
           path: '',
           folders: []

@@ -75,10 +75,9 @@ BEGIN
       'file_name', p.file_name,
       'thumb_path', p.thumb_path,
       'preview_path', p.preview_path,
-      'width', p.width,
-      'height', p.height,
       'rating', p.rating,
       'orient', p.orient,
+      'rotation', p.rotation,
       'position', p.position
     ) ORDER BY p.position
   ), '[]'::jsonb)
