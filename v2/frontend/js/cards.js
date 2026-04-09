@@ -1833,6 +1833,26 @@ function cpBindSlotEvents() {
       /* 2. Файл из ОС */
       if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
         var file = e.dataTransfer.files[0];
+
+        /* Видео: захватить первый кадр с плашкой «ВИДЕО», добавить как фото */
+        if (file.type.startsWith('video/')) {
+          _cpVideoToThumb(file, function(thumbDataUrl, thumbOrient) {
+            cpSaveHistory();
+            slot.file = file.name;
+            slot.dataUrl = thumbDataUrl;
+            slot.path = '';
+            slot._isVideo = true; /* маркер: исходный файл — видео */
+            if (thumbOrient && slot.orient !== thumbOrient) slot.orient = thumbOrient;
+            if (typeof sbStampActor === 'function') sbStampActor(slot);
+            if (typeof sbLogAction === 'function') sbLogAction('add_video_to_slot', 'card', card.id, card.name, file.name);
+            cpSyncFiles(card);
+            cpRenderCard();
+            cpRenderList();
+            if (typeof shAutoSave === 'function') shAutoSave();
+          });
+          return;
+        }
+
         if (!file.type.startsWith('image/')) return;
         var reader = new FileReader();
         reader.onload = function(ev) {
@@ -1866,6 +1886,127 @@ function cpBindSlotEvents() {
       }
     });
   });
+}
+
+// ══════════════════════════════════════════════
+//  Видео → превью-кадр с плашкой «ВИДЕО»
+//
+//  При дропе видеофайла в слот: захватываем первый кадр через Canvas,
+//  рисуем плашку, сохраняем dataUrl как обычную картинку.
+//  Клиент видит превью и может расставить видео по карточкам,
+//  а потом переименовать через артикулы.
+// ══════════════════════════════════════════════
+
+/**
+ * Получить превью-кадр из видеофайла с плашкой «ВИДЕО».
+ * @param {File} file — видеофайл (.mp4, .mov, .avi и т.д.)
+ * @param {function} callback — callback(dataUrl, orient)
+ *   dataUrl — base64 PNG с кадром и плашкой
+ *   orient  — 'h' если горизонтальное, 'v' если вертикальное
+ */
+function _cpVideoToThumb(file, callback) {
+  var video = document.createElement('video');
+  video.muted = true;
+  video.playsInline = true;
+  video.preload = 'metadata';
+
+  var objUrl = URL.createObjectURL(file);
+  video.src = objUrl;
+
+  /* Переходим к 0.5 сек чтобы пропустить возможно чёрный первый кадр */
+  video.addEventListener('loadeddata', function() {
+    video.currentTime = Math.min(0.5, video.duration * 0.1 || 0);
+  });
+
+  video.addEventListener('seeked', function() {
+    var vw = video.videoWidth || 1280;
+    var vh = video.videoHeight || 720;
+    var orient = vw >= vh ? 'h' : 'v';
+
+    /* Масштабируем до 1200px по длинной стороне */
+    var maxSide = 1200;
+    var scale = Math.min(maxSide / vw, maxSide / vh, 1);
+    var cw = Math.round(vw * scale);
+    var ch = Math.round(vh * scale);
+
+    var canvas = document.createElement('canvas');
+    canvas.width = cw;
+    canvas.height = ch;
+    var ctx = canvas.getContext('2d');
+
+    /* Кадр */
+    ctx.drawImage(video, 0, 0, cw, ch);
+
+    /* Плашка «ВИДЕО» — полупрозрачный прямоугольник + текст */
+    var badgeH = Math.round(ch * 0.12);
+    var badgeW = Math.round(cw * 0.35);
+    var badgeX = Math.round(cw * 0.04);
+    var badgeY = Math.round(ch * 0.04);
+    var fontSize = Math.round(badgeH * 0.55);
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.62)';
+    _cpRoundRect(ctx, badgeX, badgeY, badgeW, badgeH, 6);
+    ctx.fill();
+
+    /* Треугольник-«play» */
+    var triSize = Math.round(badgeH * 0.45);
+    var triX = badgeX + Math.round(badgeH * 0.35);
+    var triY = badgeY + Math.round(badgeH * 0.5);
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.moveTo(triX, triY - triSize / 2);
+    ctx.lineTo(triX + triSize * 0.85, triY);
+    ctx.lineTo(triX, triY + triSize / 2);
+    ctx.closePath();
+    ctx.fill();
+
+    /* Текст */
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold ' + fontSize + 'px -apple-system, Arial, sans-serif';
+    ctx.textBaseline = 'middle';
+    var textX = triX + triSize + Math.round(badgeH * 0.2);
+    var textY = badgeY + Math.round(badgeH * 0.5);
+    ctx.fillText('ВИДЕО', textX, textY);
+
+    var dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+    URL.revokeObjectURL(objUrl);
+    callback(dataUrl, orient);
+  });
+
+  video.addEventListener('error', function() {
+    /* Не удалось декодировать — вернуть заглушку */
+    URL.revokeObjectURL(objUrl);
+    var canvas = document.createElement('canvas');
+    canvas.width = 1200; canvas.height = 800;
+    var ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#111';
+    ctx.fillRect(0, 0, 1200, 800);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 80px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('ВИДЕО', 600, 400);
+    callback(canvas.toDataURL('image/jpeg', 0.8), 'h');
+  });
+
+  video.load();
+}
+
+/**
+ * Вспомогательная: нарисовать закруглённый прямоугольник на Canvas.
+ */
+function _cpRoundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
 }
 
 /* Prevent browser from opening dropped files */

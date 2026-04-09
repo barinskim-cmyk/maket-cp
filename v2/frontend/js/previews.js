@@ -990,7 +990,23 @@ function pvProcessEntries(entries, store, dzId, folderName) {
       checking++;
       (function(entry) {
         entry.file(function(file) {
-          if (file.type.startsWith('image/')) imageEntries.push(file);
+          if (file.type.startsWith('image/')) {
+            imageEntries.push(file);
+          } else if (file.type.startsWith('video/')) {
+            /* Видео: захватить кадр с плашкой, обернуть в псевдо-File объект */
+            checking++;
+            if (typeof _cpVideoToThumb === 'function') {
+              _cpVideoToThumb(file, function(dataUrl, orient) {
+                /* Создать объект совместимый с File для pvLoadFilesWithProgress */
+                imageEntries.push({ _videoThumb: true, name: file.name, dataUrl: dataUrl, orient: orient, type: 'image/jpeg' });
+                checked++;
+                if (checked >= checking) pvLoadFilesWithProgress(imageEntries, store, dzId, folderName);
+              });
+            } else {
+              checked++;
+              if (checked >= checking) pvLoadFilesWithProgress(imageEntries, store, dzId, folderName);
+            }
+          }
           checked++;
           if (checked >= checking) pvLoadFilesWithProgress(imageEntries, store, dzId, folderName);
         });
@@ -1004,12 +1020,35 @@ function pvProcessEntries(entries, store, dzId, folderName) {
 // ── Загрузка с прогрессом (browser) ──
 
 function pvLoadFilesWithProgress(files, store, dzId, folderName) {
+  /* Сначала обрабатываем видео-файлы — конвертируем в превью асинхронно,
+     потом передаём всё вместе в основной поток загрузки */
+  var videoFiles = [];
   var imageFiles = [];
   for (var i = 0; i < files.length; i++) {
     var f = files[i];
-    if (f.type && f.type.startsWith('image/')) imageFiles.push(f);
+    if (f._videoThumb) { imageFiles.push(f); continue; } /* уже обработано */
+    if (f.type && f.type.startsWith('video/')) videoFiles.push(f);
+    else if (f.type && f.type.startsWith('image/')) imageFiles.push(f);
     else if (!f.type) imageFiles.push(f);
   }
+
+  /* Если есть необработанные видео и функция конвертации доступна */
+  if (videoFiles.length > 0 && typeof _cpVideoToThumb === 'function') {
+    var done = 0;
+    for (var vi = 0; vi < videoFiles.length; vi++) {
+      (function(vf) {
+        _cpVideoToThumb(vf, function(dataUrl, orient) {
+          imageFiles.push({ _videoThumb: true, name: vf.name, dataUrl: dataUrl, orient: orient, type: 'image/jpeg' });
+          done++;
+          if (done >= videoFiles.length) {
+            pvLoadFilesWithProgress(imageFiles, store, dzId, folderName);
+          }
+        });
+      })(videoFiles[vi]);
+    }
+    return; /* ждём пока все видео обработаются */
+  }
+
   if (imageFiles.length === 0) { pvRenderAll(); return; }
 
   var total = imageFiles.length;
@@ -1095,6 +1134,24 @@ function pvLoadFilesWithProgress(files, store, dzId, folderName) {
         return;
       }
     }
+
+    /* ── Видео: dataUrl уже готов из _cpVideoToThumb ── */
+    if (file._videoThumb && file.dataUrl) {
+      var result = {
+        name: file.name,
+        path: '',
+        thumb: file.dataUrl,
+        preview: file.dataUrl,
+        rating: 0,
+        orient: file.orient || 'h',
+        _isVideo: true,
+        folders: folderName ? [folderName] : []
+      };
+      store.push(result);
+      onDone();
+      return;
+    }
+
     pvMakeThumbnail(file, function(result) {
       if (result) {
         result.folders = folderName ? [folderName] : [];
