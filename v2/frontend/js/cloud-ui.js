@@ -436,6 +436,15 @@ function authUnlock() {
   if (app) app.style.display = '';
   sbUpdateUI();
 
+  /* Показать кнопку выхода только в web-режиме для залогиненного пользователя
+     (не share-ссылка, не desktop) */
+  var btn = document.getElementById('btn-logout');
+  if (btn) {
+    var showLogout = sbIsLoggedIn() && !window._isShareLink
+      && !(window.pywebview && window.pywebview.api);
+    btn.style.display = showLogout ? '' : 'none';
+  }
+
   /* Мобильный режим: пока проекты грузятся, показать лоадер
      чтобы не мелькал десктопный UI */
   var _isMobileCandidate = window.innerWidth < 768 && !window._isShareLink
@@ -584,6 +593,41 @@ function authLock() {
   var app = document.getElementById('app-main');
   if (gate) gate.classList.remove('hidden');
   if (app) app.style.display = 'none';
+  /* Скрыть кнопку выхода */
+  var btn = document.getElementById('btn-logout');
+  if (btn) btn.style.display = 'none';
+}
+
+/**
+ * Выйти из аккаунта.
+ * Сбрасывает Supabase-сессию, очищает состояние, возвращает на экран входа.
+ */
+function authLogout() {
+  if (!confirm('Выйти из аккаунта?')) return;
+
+  /* Сбросить все данные сессии */
+  window._cloudLoaded = false;
+  window._isShareLink = false;
+  window._shareToken = null;
+  if (typeof sbUser !== 'undefined') sbUser = null;
+  if (typeof App !== 'undefined') {
+    App.projects = [];
+    App.selectedProject = -1;
+  }
+
+  /* Остановить авто-пул и realtime */
+  if (typeof sbStopAutoPull === 'function') sbStopAutoPull();
+
+  /* Выйти из Supabase */
+  if (typeof sbClient !== 'undefined' && sbClient && sbClient.auth) {
+    sbClient.auth.signOut().then(function() {
+      authLock();
+    })['catch'](function() {
+      authLock(); /* даже при ошибке — заблокировать */
+    });
+  } else {
+    authLock();
+  }
 }
 
 /**
