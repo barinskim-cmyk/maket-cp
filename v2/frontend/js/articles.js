@@ -1349,15 +1349,16 @@ function _arParseXlsx(data) {
  */
 
 /**
- * Гибридный парсинг PDF: pdf.js даёт точные координаты текста,
- * canvas — пиксели для кропа референс-фото.
+ * Основной PDF парсер.
  *
- * Алгоритм для типичного каталога (фото сверху, SKU снизу блока):
- * 1. Рендерим страницу в canvas (высокое разрешение)
- * 2. Извлекаем текстовые элементы с координатами
- * 3. Находим строки похожие на артикулы
- * 4. Для каждого артикула вырезаем изображение — область выше текста
- * 5. Возвращаем articles[] с refImage
+ * Стратегия (приоритет → надёжность):
+ *
+ * 1. JPEG-сканер (primary): читает сырой PDF-буфер, находит JPEG-потоки
+ *    (FFD8FF...FFD9) — именно так хранятся embedded фото в PDF.
+ *    pdf.js для текста, JPEG-потоки для изображений. Порядок совпадает.
+ *
+ * 2. Canvas-кроп (fallback): если JPEG не нашлись — рендерит страницу
+ *    в canvas и вырезает фото по координатам (для PDF с SVG/векторными картинками).
  *
  * @param {File}     file     — PDF файл
  * @param {function} callback — callback(articles|null)
@@ -1372,82 +1373,235 @@ function _arParsePdfHybrid(file, callback) {
   var reader = new FileReader();
 
   reader.onload = function(ev) {
-    var data = new Uint8Array(ev.target.result);
-    pdfjsLib.getDocument({ data: data }).promise.then(function(pdf) {
+    var buffer = ev.target.result;
+    var uint8  = new Uint8Array(buffer);
 
-      var allArticles = [];
+    if (statusEl) statusEl.textContent = 'PDF: поиск изображений...';
+
+    /* ── ШАГ 1: Извлечь JPEG-потоки из бинарного PDF ── */
+    var jpegImages = _arExtractJpegsFromBuffer(uint8);
+
+    /* ── ШАГ 2: Извлечь SKU из текста через pdf.js ── */
+    pdfjsLib.getDocument({ data: uint8 }).promise.then(function(pdf) {
+
+      var allSkus = [];
       var pagesTotal = pdf.numPages;
-      var pagesDone = 0;
 
-      /* Обрабатываем каждую страницу */
       function processPage(pageNum) {
         if (pageNum > pagesTotal) {
-          /* Готово */
-          callback(allArticles.length > 0 ? allArticles : null);
+          /* ── ШАГ 3: Сопоставить SKU ↔ JPEG по индексу ── */
+          var articles = _arPairSkusWithImages(allSkus, jpegImages);
+
+          /* Fallback: если JPEG не нашлись — пробуем canvas-кроп */
+          var hasImages = articles.some(function(a) { return !!a.refImage; });
+          if (!hasImages && jpegImages.length === 0) {
+            if (statusEl) statusEl.textContent = 'PDF: рендер страниц...';
+            _arParsePdfCanvas(buffer, callback);
+            return;
+          }
+
+          callback(articles.length > 0 ? articles : null);
           return;
         }
 
-        if (statusEl) statusEl.textContent = 'PDF: страница ' + pageNum + '/' + pagesTotal + '...';
+        if (statusEl) statusEl.textContent = 'PDF: текст стр. ' + pageNum + '/' + pagesTotal + '...';
 
         pdf.getPage(pageNum).then(function(page) {
-          var scale = 2.5; /* высокое разрешение для качественного кропа */
-          var viewport = page.getViewport({ scale: scale });
-          var canvas = document.createElement('canvas');
-          canvas.width = Math.round(viewport.width);
-          canvas.height = Math.round(viewport.height);
-          var ctx = canvas.getContext('2d');
-
-          /* Рендер и текст параллельно */
-          var renderDone = false, textDone = false;
-          var textItems = [];
-
-          function onBothDone() {
-            if (!renderDone || !textDone) return;
-
-            /* Найти SKU-строки с их Y-координатами на canvas */
-            var skuItems = _arFindSkuItems(textItems, canvas.height);
-
-            /* Вырезать фото для каждого SKU */
-            var pageArticles = _arCropArticleImages(skuItems, canvas, textItems);
-            allArticles = allArticles.concat(pageArticles);
-            processPage(pageNum + 1);
-          }
-
-          page.render({ canvasContext: ctx, viewport: viewport }).promise.then(function() {
-            renderDone = true;
-            onBothDone();
-          });
-
           page.getTextContent().then(function(content) {
-            /* Собираем текстовые элементы с координатами в пространстве canvas */
-            for (var k = 0; k < content.items.length; k++) {
-              var item = content.items[k];
-              var str = item.str.trim();
-              if (!str) continue;
-              /* pdf.js: Y от низа страницы, canvas: Y от верха */
-              var pdfX = item.transform[4];
-              var pdfY = item.transform[5];
-              var canvasX = pdfX * scale;
-              var canvasY = canvas.height - pdfY * scale;
-              var fontSize = Math.abs(item.transform[3]) * scale;
-              textItems.push({ str: str, x: canvasX, y: canvasY, fontSize: fontSize });
+            var pageSkus = _arExtractSkusFromTextItems(content.items);
+            for (var si = 0; si < pageSkus.length; si++) {
+              allSkus.push(pageSkus[si]);
             }
-            textDone = true;
-            onBothDone();
+            processPage(pageNum + 1);
           });
-
         }).catch(function() { processPage(pageNum + 1); });
       }
 
       processPage(1);
 
     }).catch(function(e) {
-      console.error('articles.js: PDF hybrid error:', e);
+      console.error('articles.js: PDF parse error:', e);
       callback(null);
     });
   };
 
   reader.readAsArrayBuffer(file);
+}
+
+
+/**
+ * Сканирует Uint8Array PDF-файла на JPEG-потоки (FFD8FF…FFD9).
+ * Embedded JPEG хранятся как-есть (DCTDecode), что позволяет извлечь их
+ * напрямую без рендеринга.
+ *
+ * @param  {Uint8Array} uint8
+ * @returns {string[]}  массив data-URL jpeg
+ */
+function _arExtractJpegsFromBuffer(uint8) {
+  var jpegs = [];
+  var i = 0;
+  while (i < uint8.length - 3) {
+    /* JPEG SOI = FF D8, за которым любой маркер FF */
+    if (uint8[i] === 0xFF && uint8[i+1] === 0xD8 && uint8[i+2] === 0xFF) {
+      var start = i;
+      i += 2;
+      /* Ищем EOI: FF D9 */
+      while (i < uint8.length - 1) {
+        if (uint8[i] === 0xFF && uint8[i+1] === 0xD9) {
+          i += 2;
+          jpegs.push('data:image/jpeg;base64,' + _arUint8ToBase64(uint8.slice(start, i)));
+          break;
+        }
+        i++;
+      }
+    } else {
+      i++;
+    }
+  }
+  return jpegs;
+}
+
+
+/**
+ * Конвертирует Uint8Array в base64-строку (чанками, без переполнения стека).
+ */
+function _arUint8ToBase64(bytes) {
+  var binary = '';
+  var CHUNK = 32768;
+  for (var off = 0; off < bytes.length; off += CHUNK) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(off, Math.min(off + CHUNK, bytes.length)));
+  }
+  return btoa(binary);
+}
+
+
+/**
+ * Извлечь артикулы из массива pdf.js text items.
+ * Дубли отфильтрованы. Порядок: страница за страницей, сверху вниз.
+ */
+function _arExtractSkusFromTextItems(items) {
+  var SKU_RE  = /^[A-Za-z0-9][A-Za-z0-9\-\_\.\/]{4,39}$/;
+  var SKIP_RE = /^(артикул|артикл|sku|article|category|color|код|code|наименование|размер|size|price|цена|qty|кол|итого|total|sum|описание|нет|фото)$/i;
+  var seen = {};
+  var result = [];
+  for (var i = 0; i < items.length; i++) {
+    var s = items[i].str.trim();
+    if (!s || s.length < 5 || s.length > 50) continue;
+    if (SKIP_RE.test(s)) continue;
+    if (SKU_RE.test(s) && !seen[s]) {
+      seen[s] = true;
+      result.push(s);
+    }
+  }
+  return result;
+}
+
+
+/**
+ * Сопоставить список SKU с массивом JPEG по индексу.
+ * SKU #i ↔ JPEG #i (в каталогах порядок вхождения совпадает).
+ */
+function _arPairSkusWithImages(skus, images) {
+  var articles = [];
+  for (var i = 0; i < skus.length; i++) {
+    var sku = skus[i];
+    articles.push({
+      id:       'ar_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+      sku:      sku,
+      category: '',
+      color:    _arExtractColorFromSku(sku),
+      refImage: i < images.length ? images[i] : '',
+      status:   'unmatched',
+      cardIdx:  -1
+    });
+  }
+  return articles;
+}
+
+
+/**
+ * Canvas-кроп fallback: рендер страниц + вырезание по координатам.
+ * Используется когда в PDF нет embedded JPEG (SVG, векторная графика).
+ */
+function _arParsePdfCanvas(buffer, callback) {
+  var statusEl = document.getElementById('ar-stats');
+  var uint8 = new Uint8Array(buffer);
+
+  pdfjsLib.getDocument({ data: uint8 }).promise.then(function(pdf) {
+    var allArticles = [];
+    var pagesTotal  = pdf.numPages;
+
+    function processPage(pageNum) {
+      if (pageNum > pagesTotal) {
+        callback(allArticles.length > 0 ? allArticles : null);
+        return;
+      }
+      if (statusEl) statusEl.textContent = 'PDF: рендер стр. ' + pageNum + '/' + pagesTotal + '...';
+
+      pdf.getPage(pageNum).then(function(page) {
+        var scale    = 2.5;
+        var viewport = page.getViewport({ scale: scale });
+        var canvas   = document.createElement('canvas');
+        canvas.width  = Math.round(viewport.width);
+        canvas.height = Math.round(viewport.height);
+        var ctx = canvas.getContext('2d');
+
+        var renderDone = false, textDone = false;
+        var textItems  = [];
+
+        function onBothDone() {
+          if (!renderDone || !textDone) return;
+          var skuItems    = _arFindSkuItems(textItems, canvas.height);
+          var pageArticles = _arCropArticleImages(skuItems, canvas, textItems);
+          allArticles = allArticles.concat(pageArticles);
+          processPage(pageNum + 1);
+        }
+
+        page.render({ canvasContext: ctx, viewport: viewport }).promise.then(function() {
+          renderDone = true;
+          onBothDone();
+        });
+
+        page.getTextContent().then(function(content) {
+          for (var k = 0; k < content.items.length; k++) {
+            var item = content.items[k];
+            var str = item.str.trim();
+            if (!str) continue;
+            textItems.push({
+              str:      str,
+              x:        item.transform[4] * scale,
+              y:        canvas.height - item.transform[5] * scale,
+              fontSize: Math.abs(item.transform[3]) * scale
+            });
+          }
+          textDone = true;
+          onBothDone();
+        });
+
+      }).catch(function() { processPage(pageNum + 1); });
+    }
+
+    processPage(1);
+  }).catch(function() { callback(null); });
+}
+
+
+/**
+ * Извлечь цвет из SKU (ищет стандартные цветовые слова через дефис).
+ */
+function _arExtractColorFromSku(sku) {
+  var COLORS = {
+    black:1, white:1, red:1, blue:1, green:1, brown:1, beige:1,
+    grey:1, gray:1, pink:1, navy:1, cream:1, tan:1, nude:1,
+    silver:1, gold:1, bordeaux:1, camel:1, ivory:1, cognac:1,
+    sand:1, taupe:1, olive:1, coral:1, mint:1, lavender:1,
+    citrus:1, nutella:1, starwhite:1, ecru:1, bone:1, clay:1
+  };
+  var parts = sku.toLowerCase().split('-');
+  for (var pi = parts.length - 1; pi >= 0; pi--) {
+    if (COLORS[parts[pi]]) return parts[pi];
+  }
+  return '';
 }
 
 
