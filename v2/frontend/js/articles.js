@@ -1089,11 +1089,20 @@ function _arAutoMatchIfReady(proj) {
   }
   if (!hasUnmatched) return;
 
+  var statusEl = document.getElementById('ar-stats');
+
+  /* Веб-режим с Edge Function: ключ хранится в Supabase Secrets, не нужен в браузере */
+  var isWebWithEdgeFunction = !window.pywebview && typeof sbClient !== 'undefined' && sbClient;
+  if (isWebWithEdgeFunction) {
+    if (statusEl) statusEl.textContent = 'AI расставляет артикулы...';
+    arAutoMatchAll();
+    return;
+  }
+
   /* Ключ может ещё загружаться (async) или pywebview ещё не готов.
      Активно пытаемся загрузить ключ при каждой попытке. */
   var attempts = 0;
   var maxAttempts = 12;
-  var statusEl = document.getElementById('ar-stats');
 
   function tryLoadAndRun() {
     attempts++;
