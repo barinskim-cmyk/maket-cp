@@ -831,10 +831,10 @@ function _arProcessPdfWithOpenAI(proj, file, apiKey) {
 
 
 /**
- * Отправить изображение страницы в OpenAI Vision API.
- * Просит GPT-4o извлечь артикулы, категории, цвета.
+ * Построить сообщение для OpenAI Vision (общее для обоих режимов).
+ * @returns {Array} messages-массив для OpenAI API
  */
-function _arCallOpenAIVision(apiKey, base64Image, pageNum, totalPages, callback) {
+function _arBuildVisionMessages(base64Image, pageNum, totalPages) {
   var prompt = 'This is page ' + pageNum + ' of ' + totalPages + ' of a product catalog PDF.\n'
     + 'Extract ALL product article codes (SKUs) visible on this page.\n'
     + 'For each article, provide:\n'
@@ -848,25 +848,148 @@ function _arCallOpenAIVision(apiKey, base64Image, pageNum, totalPages, callback)
     + 'If no articles found on this page, return empty array: []\n'
     + 'Do NOT include any text before or after the JSON array.';
 
-  var body = {
-    model: 'gpt-4o',
-    messages: [{
-      role: 'user',
-      content: [
-        { type: 'text', text: prompt },
-        {
-          type: 'image_url',
-          image_url: {
-            url: 'data:image/jpeg;base64,' + base64Image,
-            detail: 'high'
-          }
-        }
-      ]
-    }],
-    max_tokens: 4000,
-    temperature: 0.1
-  };
+  return [{
+    role: 'user',
+    content: [
+      { type: 'text', text: prompt },
+      {
+        type: 'image_url',
+        image_url: { url: 'data:image/jpeg;base64,' + base64Image, detail: 'high' }
+      }
+    ]
+  }];
+}
 
+/**
+ * Разобрать ответ OpenAI и вернуть callback(err, articles).
+ */
+function _arParseVisionResponse(responseText, status, callback) {
+  if (status !== 200) {
+    var errMsg = 'OpenAI API ошибка ' + status;
+    try {
+      var errData = JSON.parse(responseText);
+      if (errData.error && errData.error.message) errMsg = errData.error.message;
+    } catch(e) {}
+    callback(errMsg, null);
+    return;
+  }
+  try {
+    var resp = JSON.parse(responseText);
+    var content = resp.choices[0].message.content.trim();
+    var jsonStr = content;
+    var jsonMatch = content.match(/\[[\s\S]*\]/);
+    if (jsonMatch) jsonStr = jsonMatch[0];
+    var articles = JSON.parse(jsonStr);
+    callback(null, articles);
+  } catch(e) {
+    console.error('OpenAI parse error:', e, 'raw:', responseText);
+    callback('Ошибка разбора ответа AI', null);
+  }
+}
+
+/**
+ * Универсальный запрос к OpenAI Chat Completions.
+ * Автоматически выбирает путь:
+ * - Веб (sbClient доступен): Supabase Edge Function "openai-vision"
+ * - Desktop (pywebview): прямой XHR с apiKey
+ *
+ * @param {Array}    messages   — messages-массив для OpenAI
+ * @param {number}   maxTokens  — max_tokens
+ * @param {number}   timeoutMs  — timeout XHR (только для desktop)
+ * @param {string}   apiKey     — ключ (только для desktop)
+ * @param {function} callback   — callback(responseText, httpStatus)
+ */
+function _arOpenAIRequest(messages, maxTokens, timeoutMs, apiKey, callback) {
+  var isWeb = !window.pywebview && typeof sbClient !== 'undefined' && sbClient;
+
+  if (isWeb) {
+    sbClient.functions.invoke('openai-vision', {
+      body: { messages: messages, max_tokens: maxTokens, temperature: 0.1 }
+    }).then(function(result) {
+      if (result.error) {
+        var errText = result.error.message || String(result.error);
+        if (errText.indexOf('FunctionsFetchError') >= 0 || errText.indexOf('not found') >= 0) {
+          errText = 'Edge Function "openai-vision" не найдена. Задеплойте в Supabase.';
+        }
+        callback(JSON.stringify({ error: { message: errText } }), 500);
+        return;
+      }
+      var raw = result.data;
+      if (raw && raw.choices) {
+        callback(JSON.stringify(raw), 200);
+      } else if (raw && raw.error) {
+        callback(JSON.stringify(raw), 400);
+      } else {
+        callback(JSON.stringify(raw || {}), 200);
+      }
+    }).catch(function(e) {
+      callback(JSON.stringify({ error: { message: 'Network error: ' + e.message } }), 500);
+    });
+    return;
+  }
+
+  /* Desktop: прямой XHR */
+  var xhr = new XMLHttpRequest();
+  xhr.open('POST', 'https://api.openai.com/v1/chat/completions', true);
+  xhr.setRequestHeader('Content-Type', 'application/json');
+  xhr.setRequestHeader('Authorization', 'Bearer ' + apiKey);
+  xhr.timeout = timeoutMs || 60000;
+  xhr.onload = function() { callback(xhr.responseText, xhr.status); };
+  xhr.onerror = function() { callback(null, 0); };
+  xhr.ontimeout = function() { callback(null, -1); };
+  xhr.send(JSON.stringify({ model: 'gpt-4o', messages: messages, max_tokens: maxTokens, temperature: 0.1 }));
+}
+
+
+/**
+ * Отправить изображение страницы в OpenAI Vision API.
+ *
+ * Два режима:
+ * - Веб (нет pywebview + есть sbClient): через Supabase Edge Function "openai-vision"
+ *   Ключ хранится в Supabase Secrets, никогда не попадает в браузер.
+ * - Desktop (pywebview): прямой XHR, ключ из config.json.
+ */
+function _arCallOpenAIVision(apiKey, base64Image, pageNum, totalPages, callback) {
+  var messages = _arBuildVisionMessages(base64Image, pageNum, totalPages);
+  var isWeb = !window.pywebview && typeof sbClient !== 'undefined' && sbClient;
+
+  /* ── Веб-режим: Edge Function ── */
+  if (isWeb) {
+    sbClient.functions.invoke('openai-vision', {
+      body: { messages: messages, max_tokens: 4000, temperature: 0.1 }
+    }).then(function(result) {
+      if (result.error) {
+        /* Edge Function вернула HTTP-ошибку или сетевую ошибку */
+        var errText = result.error.message || String(result.error);
+        /* Если функция не задеплоена — показываем понятное сообщение */
+        if (errText.indexOf('FunctionsFetchError') >= 0 || errText.indexOf('not found') >= 0) {
+          errText = 'Edge Function не найдена. Задеплойте openai-vision в Supabase.';
+        }
+        callback(errText, null);
+        return;
+      }
+      /* result.data — уже распарсенный JSON от Edge Function (который сам отдаёт OpenAI-ответ) */
+      var raw = result.data;
+      var responseText, status;
+      if (raw && raw.choices) {
+        /* Edge Function вернула OpenAI-ответ напрямую */
+        responseText = JSON.stringify(raw);
+        status = 200;
+      } else if (raw && raw.error) {
+        responseText = JSON.stringify(raw);
+        status = 500;
+      } else {
+        responseText = JSON.stringify(raw);
+        status = 200;
+      }
+      _arParseVisionResponse(responseText, status, callback);
+    }).catch(function(e) {
+      callback('Сетевая ошибка Edge Function: ' + e.message, null);
+    });
+    return;
+  }
+
+  /* ── Desktop-режим: прямой XHR ── */
   var xhr = new XMLHttpRequest();
   xhr.open('POST', 'https://api.openai.com/v1/chat/completions', true);
   xhr.setRequestHeader('Content-Type', 'application/json');
@@ -874,43 +997,17 @@ function _arCallOpenAIVision(apiKey, base64Image, pageNum, totalPages, callback)
   xhr.timeout = 60000;
 
   xhr.onload = function() {
-    if (xhr.status !== 200) {
-      console.error('OpenAI API error:', xhr.status, xhr.responseText);
-      var errMsg = 'OpenAI API ошибка ' + xhr.status;
-      try {
-        var errData = JSON.parse(xhr.responseText);
-        if (errData.error && errData.error.message) errMsg = errData.error.message;
-      } catch(e) {}
-      callback(errMsg, null);
-      return;
-    }
-
-    try {
-      var resp = JSON.parse(xhr.responseText);
-      var content = resp.choices[0].message.content.trim();
-
-      /* Извлечь JSON из ответа (может быть обёрнут в ```json ... ```) */
-      var jsonStr = content;
-      var jsonMatch = content.match(/\[[\s\S]*\]/);
-      if (jsonMatch) jsonStr = jsonMatch[0];
-
-      var articles = JSON.parse(jsonStr);
-      callback(null, articles);
-    } catch(e) {
-      console.error('OpenAI parse error:', e, 'raw:', xhr.responseText);
-      callback('Ошибка разбора ответа AI', null);
-    }
+    _arParseVisionResponse(xhr.responseText, xhr.status, callback);
   };
+  xhr.onerror = function() { callback('Сетевая ошибка', null); };
+  xhr.ontimeout = function() { callback('Таймаут запроса', null); };
 
-  xhr.onerror = function() {
-    callback('Сетевая ошибка', null);
-  };
-
-  xhr.ontimeout = function() {
-    callback('Таймаут запроса', null);
-  };
-
-  xhr.send(JSON.stringify(body));
+  xhr.send(JSON.stringify({
+    model: 'gpt-4o',
+    messages: messages,
+    max_tokens: 4000,
+    temperature: 0.1
+  }));
 }
 
 
@@ -1653,29 +1750,16 @@ function arAIFindForCard(cardIdx) {
     msgContent.push({ type: 'image_url', image_url: { url: candidates[ai].refImage, detail: 'low' } });
   }
 
-  var body = {
-    model: 'gpt-4o',
-    messages: [{ role: 'user', content: msgContent }],
-    max_tokens: 200,
-    temperature: 0.1
-  };
-
-  var xhr = new XMLHttpRequest();
-  xhr.open('POST', 'https://api.openai.com/v1/chat/completions', true);
-  xhr.setRequestHeader('Content-Type', 'application/json');
-  xhr.setRequestHeader('Authorization', 'Bearer ' + apiKey);
-  xhr.timeout = 60000;
-
-  xhr.onload = function() {
+  _arOpenAIRequest([{ role: 'user', content: msgContent }], 200, 60000, apiKey, function(responseText, status) {
     if (statusEl) statusEl.textContent = '';
-    if (xhr.status !== 200) {
-      var errMsg = 'OpenAI ошибка ' + xhr.status;
-      try { errMsg = JSON.parse(xhr.responseText).error.message; } catch(e) {}
+    if (!responseText || status !== 200) {
+      var errMsg = 'OpenAI ошибка ' + status;
+      try { errMsg = JSON.parse(responseText).error.message; } catch(e) {}
       alert(errMsg);
       return;
     }
     try {
-      var resp = JSON.parse(xhr.responseText);
+      var resp = JSON.parse(responseText);
       var text = resp.choices[0].message.content.trim();
       var jsonMatch = text.match(/\{[\s\S]*\}/);
       var result = JSON.parse(jsonMatch ? jsonMatch[0] : text);
@@ -1693,11 +1777,7 @@ function arAIFindForCard(cardIdx) {
       console.error('AI find parse error:', e);
       alert('Ошибка разбора ответа AI');
     }
-  };
-
-  xhr.onerror = function() { if (statusEl) statusEl.textContent = ''; alert('Сетевая ошибка'); };
-  xhr.ontimeout = function() { if (statusEl) statusEl.textContent = ''; alert('Таймаут'); };
-  xhr.send(JSON.stringify(body));
+  });
 }
 
 
@@ -1889,21 +1969,16 @@ function _arMatchWithPdfPages(cards, skuList, pdfPages, apiKey, proj, statusEl) 
  */
 function _arSendWithRetry(body, apiKey, attempt, onDone) {
   var maxRetries = 3;
-  var xhr = new XMLHttpRequest();
-  xhr.open('POST', 'https://api.openai.com/v1/chat/completions', true);
-  xhr.setRequestHeader('Content-Type', 'application/json');
-  xhr.setRequestHeader('Authorization', 'Bearer ' + apiKey);
-  xhr.timeout = 90000;
 
-  xhr.onload = function() {
-    if (xhr.status === 200) {
+  _arOpenAIRequest(body.messages, body.max_tokens || 1000, 90000, apiKey, function(responseText, status) {
+    if (status === 200) {
       try {
-        var resp = JSON.parse(xhr.responseText);
+        var resp = JSON.parse(responseText);
         onDone(resp.choices[0].message.content.trim());
       } catch(e) { onDone(null); }
-    } else if (xhr.status === 429 && attempt < maxRetries) {
+    } else if (status === 429 && attempt < maxRetries) {
       /* Rate limit — ждём и пробуем снова */
-      var wait = (attempt + 1) * 5000; /* 5s, 10s, 15s */
+      var wait = (attempt + 1) * 5000;
       console.log('articles.js: 429 rate limit, retry in ' + (wait / 1000) + 's (attempt ' + (attempt + 1) + ')');
       var statusEl = document.getElementById('ar-stats');
       if (statusEl) statusEl.textContent = 'Rate limit, жду ' + (wait / 1000) + 'с...';
@@ -1911,13 +1986,10 @@ function _arSendWithRetry(body, apiKey, attempt, onDone) {
         _arSendWithRetry(body, apiKey, attempt + 1, onDone);
       }, wait);
     } else {
-      console.error('articles.js: API error ' + xhr.status);
+      console.error('articles.js: API error ' + status);
       onDone(null);
     }
-  };
-  xhr.onerror = function() { onDone(null); };
-  xhr.ontimeout = function() { onDone(null); };
-  xhr.send(JSON.stringify(body));
+  });
 }
 
 
@@ -2096,23 +2168,10 @@ function _arMatchOneCard(cardIdx, cardImgs, category, candidates, apiKey, onDone
     msgContent.push({ type: 'image_url', image_url: { url: cands[j].refImage, detail: 'high' } });
   }
 
-  var body = {
-    model: 'gpt-4o',
-    messages: [{ role: 'user', content: msgContent }],
-    max_tokens: 200,
-    temperature: 0.1
-  };
-
-  var xhr = new XMLHttpRequest();
-  xhr.open('POST', 'https://api.openai.com/v1/chat/completions', true);
-  xhr.setRequestHeader('Content-Type', 'application/json');
-  xhr.setRequestHeader('Authorization', 'Bearer ' + apiKey);
-  xhr.timeout = 60000;
-
-  xhr.onload = function() {
-    if (xhr.status === 200) {
+  _arOpenAIRequest([{ role: 'user', content: msgContent }], 200, 60000, apiKey, function(responseText, status) {
+    if (status === 200) {
       try {
-        var resp = JSON.parse(xhr.responseText);
+        var resp = JSON.parse(responseText);
         var text = resp.choices[0].message.content.trim();
         console.log('articles.js: card ' + cardIdx + ' batch AI response:', text);
         var jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -2130,13 +2189,10 @@ function _arMatchOneCard(cardIdx, cardImgs, category, candidates, apiKey, onDone
         console.error('articles.js: card ' + cardIdx + ' parse error:', e);
       }
     } else {
-      console.error('articles.js: card ' + cardIdx + ' API error ' + xhr.status);
+      console.error('articles.js: card ' + cardIdx + ' API error ' + status);
     }
     onDone(-1, null);
-  };
-  xhr.onerror = function() { onDone(-1, null); };
-  xhr.ontimeout = function() { onDone(-1, null); };
-  xhr.send(JSON.stringify(body));
+  });
 }
 
 /**
@@ -2332,33 +2388,21 @@ function _arSendMatchRequest(apiKey, arts, cards, proj, statusEl) {
     });
   }
 
-  var body = {
-    model: 'gpt-4o',
-    messages: [{ role: 'user', content: content }],
-    max_tokens: 2000,
-    temperature: 0.1
-  };
-
-  var xhr = new XMLHttpRequest();
-  xhr.open('POST', 'https://api.openai.com/v1/chat/completions', true);
-  xhr.setRequestHeader('Content-Type', 'application/json');
-  xhr.setRequestHeader('Authorization', 'Bearer ' + apiKey);
-  xhr.timeout = 120000; /* 2 минуты на много изображений */
-
-  xhr.onload = function() {
-    if (xhr.status !== 200) {
+  _arOpenAIRequest([{ role: 'user', content: content }], 2000, 120000, apiKey, function(responseText, status) {
+    if (!responseText || status !== 200) {
       if (statusEl) statusEl.textContent = '';
-      var errMsg = 'OpenAI ошибка ' + xhr.status;
+      var errMsg = 'OpenAI ошибка ' + status;
       try {
-        var errData = JSON.parse(xhr.responseText);
+        var errData = JSON.parse(responseText);
         if (errData.error && errData.error.message) errMsg = errData.error.message;
       } catch(e) {}
+      if (status === -1) errMsg = 'Таймаут (2 минуты). Попробуйте с меньшим количеством артикулов.';
       alert('AI сопоставление: ' + errMsg);
       return;
     }
 
     try {
-      var resp = JSON.parse(xhr.responseText);
+      var resp = JSON.parse(responseText);
       var text = resp.choices[0].message.content.trim();
 
       /* Извлечь JSON */
@@ -2371,7 +2415,6 @@ function _arSendMatchRequest(apiKey, arts, cards, proj, statusEl) {
         var match = matches[m];
         var artLabel = match.article || '';
         var cardLabel = match.card || '';
-        var confidence = match.confidence || 'low';
 
         /* Парсить индексы из A1, C3 и т.д. */
         var artNum = parseInt(artLabel.replace(/\D/g, ''), 10);
@@ -2382,7 +2425,6 @@ function _arSendMatchRequest(apiKey, arts, cards, proj, statusEl) {
         var cardEntry = cards[cardNum - 1];
         if (!artEntry || !cardEntry) continue;
 
-        /* Привязать */
         arDoMatch(artEntry.idx, cardEntry.idx);
         matched++;
       }
@@ -2396,22 +2438,10 @@ function _arSendMatchRequest(apiKey, arts, cards, proj, statusEl) {
 
     } catch(e) {
       if (statusEl) statusEl.textContent = '';
-      console.error('AI match parse error:', e, xhr.responseText);
+      console.error('AI match parse error:', e, responseText);
       alert('Ошибка разбора ответа AI');
     }
-  };
-
-  xhr.onerror = function() {
-    if (statusEl) statusEl.textContent = '';
-    alert('Сетевая ошибка при обращении к OpenAI');
-  };
-
-  xhr.ontimeout = function() {
-    if (statusEl) statusEl.textContent = '';
-    alert('Таймаут запроса к OpenAI (2 минуты). Попробуйте с меньшим количеством артикулов.');
-  };
-
-  xhr.send(JSON.stringify(body));
+  });
 }
 
 
