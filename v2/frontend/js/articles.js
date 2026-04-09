@@ -1563,24 +1563,39 @@ function _arCropTableLayout(sorted, canvas, allTextItems) {
   /* Не давать tableRight быть меньше skuZoneRight + 50px */
   tableRight = Math.max(tableRight, skuZoneRight + 50);
 
+  /*
+   * Высота строки: медианный интервал между соседними SKU.
+   * Используем для расчёта rowTop/rowBottom через пропорцию,
+   * а не через середину — это точнее, когда фото занимает всю высоту строки.
+   *
+   * Для Portal-стиля: фото начинается ~62% высоты строки ВЫШЕ текста SKU
+   * (в canvas-координатах: меньший Y = выше на странице).
+   */
+  var rowHeight = 120; /* разумный дефолт (px при scale=2.5) */
+  if (sorted.length > 1) {
+    var gaps = [];
+    for (var gi = 1; gi < sorted.length; gi++) {
+      gaps.push(sorted[gi].y - sorted[gi - 1].y);
+    }
+    gaps.sort(function(a, b) { return a - b; });
+    rowHeight = gaps[Math.floor(gaps.length / 2)]; /* медиана */
+  }
+
+  var topRatio    = 0.62; /* фото начинается за 62% высоты строки до текста SKU */
+  var bottomRatio = 0.38; /* фото заканчивается за 38% высоты строки после текста */
+
   var articles = [];
 
   for (var i = 0; i < sorted.length; i++) {
     var item = sorted[i];
 
-    /* Границы строки по Y — для первой/последней строки берём край canvas */
-    var rowTop    = i === 0
-      ? 0
-      : (sorted[i - 1].y + item.y) / 2;
-    var rowBottom = i === sorted.length - 1
-      ? canvas.height
-      : (item.y + sorted[i + 1].y) / 2;
+    var rowTop    = Math.max(0,             Math.round(item.y - rowHeight * topRatio));
+    var rowBottom = Math.min(canvas.height, Math.round(item.y + rowHeight * bottomRatio));
 
-    /* Небольшой отступ внутри строки */
     var cropX = Math.round(skuZoneRight);
-    var cropY = Math.round(rowTop + 2);
+    var cropY = rowTop + 1;
     var cropW = Math.round(tableRight - skuZoneRight - 2);
-    var cropH = Math.round(rowBottom - rowTop - 4);
+    var cropH = rowBottom - rowTop - 2;
 
     articles.push(_arMakeCroppedArticle(item.sku, canvas, cropX, cropY, cropW, cropH));
   }
