@@ -2338,8 +2338,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   display: flex; gap: 8px; margin-bottom: 12px; align-items: center;
 }
 .ar-verify-toolbar .ar-verify-progress {
-  font-size: 12px; color: #888; margin-left: auto;
+  font-size: 12px; color: #888;
 }
+
+/* ── Блок переименования ── */
+.ar-rename-info { font-size: 13px; color: #666; line-height: 1.5; margin-bottom: 12px; }
+.ar-rename-info p { margin: 4px 0; }
+.ar-rename-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 
 /* ── Референс-фото в таблице чек-листа ── */
 .ar-ref-cell { width: 44px; text-align: center; }

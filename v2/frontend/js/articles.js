@@ -2360,7 +2360,14 @@ function arRenderVerification() {
   var toolbarHtml = '<div class="ar-verify-toolbar">'
     + '<button class="btn btn-sm" onclick="arConfirmAll()">Подтвердить все</button>'
     + '<button class="btn btn-sm" onclick="arResetVerification()" style="color:#999">Сбросить</button>'
-    + '<span class="ar-verify-progress">' + verifiedCount + ' / ' + matchedItems.length + ' проверено</span>'
+    + '<span class="ar-verify-progress">' + verifiedCount + ' / ' + matchedItems.length + ' проверено</span>';
+  /* Кнопка формирования списка переименования (доступна после верификации) */
+  if (verifiedCount > 0) {
+    toolbarHtml += '<button class="btn btn-sm btn-primary" onclick="arGenerateRenameList()" '
+      + 'style="margin-left:auto" title="Скачать CSV-файл для переименования">'
+      + 'Список на переименование (' + verifiedCount + ')</button>';
+  }
+  toolbarHtml += '<span id="ar-rename-status" style="font-size:12px;margin-left:8px"></span>'
     + '</div>';
 
   var html = toolbarHtml;
@@ -2398,6 +2405,12 @@ function arRenderVerification() {
     html += '</div>';
   }
   el.innerHTML = html;
+
+  /* Показать блок переименования если есть верифицированные */
+  var renameSection = document.getElementById('ar-rename-section');
+  if (renameSection) {
+    renameSection.style.display = verifiedCount > 0 ? '' : 'none';
+  }
 }
 
 
@@ -2642,4 +2655,93 @@ function _shDoLegacyImport(old) {
   }
 
   console.log('Legacy import: ' + proj.cards.length + ' cards, ' + allPreviews.length + ' previews');
+}
+
+
+// ══════════════════════════════════════════════
+//  Блок 4: Формирование списка на переименование
+//
+//  После верификации артикулов генерируется CSV-файл
+//  с двумя колонками: исходное имя файла → новое имя (на основе SKU).
+//  Клиент скачивает CSV и запускает rename-скрипт на Windows.
+//
+//  Правила именования:
+//    SKU + "_" + порядковый номер фото в карточке (01, 02, 03...)
+//    Расширение сохраняется от оригинала.
+//    Пример: PL01056CN-13-black-26S_01.jpg, PL01056CN-13-black-26S_02.jpg
+// ══════════════════════════════════════════════
+
+/**
+ * Сформировать список переименования из верифицированных артикулов.
+ * Скачивает CSV-файл: old_name, new_name
+ * @param {boolean} [allMatched] — включить и matched (не только verified)
+ */
+function arGenerateRenameList(allMatched) {
+  var proj = getActiveProject();
+  if (!proj || !proj.articles || !proj.cards) {
+    alert('Нет данных для формирования списка');
+    return;
+  }
+
+  var lines = [];
+  var count = 0;
+
+  for (var i = 0; i < proj.articles.length; i++) {
+    var art = proj.articles[i];
+    /* Пропускаем несопоставленные и (опционально) неверифицированные */
+    if (art.cardIdx < 0) continue;
+    if (!allMatched && art.status !== 'verified') continue;
+
+    var card = proj.cards[art.cardIdx];
+    if (!card || !card.slots) continue;
+
+    var sku = art.sku || ('article_' + i);
+    var photoNum = 0;
+
+    for (var s = 0; s < card.slots.length; s++) {
+      var slot = card.slots[s];
+      if (!slot.file) continue;
+      photoNum++;
+
+      /* Расширение из оригинального файла */
+      var ext = '';
+      var dotPos = slot.file.lastIndexOf('.');
+      if (dotPos >= 0) ext = slot.file.substring(dotPos);
+
+      /* Номер фото: 01, 02, 03... */
+      var numStr = photoNum < 10 ? ('0' + photoNum) : ('' + photoNum);
+      var newName = sku + '_' + numStr + ext;
+
+      lines.push(slot.file + ',' + newName);
+      count++;
+    }
+  }
+
+  if (lines.length === 0) {
+    alert('Нет верифицированных артикулов с привязанными фотографиями.\n'
+      + 'Сначала загрузите чек-лист, сопоставьте артикулы с карточками и подтвердите.');
+    return;
+  }
+
+  /* Сформировать CSV */
+  var csv = 'old_name,new_name\n' + lines.join('\n') + '\n';
+
+  /* Скачать файл */
+  var blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  var brandSlug = (proj.brand || 'project').replace(/[^a-zA-Z0-9а-яА-Я_-]/g, '_');
+  a.download = 'rename_' + brandSlug + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  /* Обновить UI */
+  var statusEl = document.getElementById('ar-rename-status');
+  if (statusEl) {
+    statusEl.textContent = 'Список сформирован: ' + count + ' файлов';
+    statusEl.style.color = '#4caf50';
+  }
 }

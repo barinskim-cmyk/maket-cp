@@ -84,16 +84,17 @@ document.addEventListener('click', function(e) {
 
 /**
  * Скрыть вкладки, доступные только в desktop (pywebview).
- * Rate Setter (Синхронизация) и Артикулы не нужны в web.
+ * Rate Setter (Синхронизация) требует Python — скрываем в web.
+ * Артикулы работают и в web (загрузка чек-листа, сопоставление, экспорт списка).
  * Вызывается при загрузке; повторно при pywebviewready (чтобы показать если desktop).
  */
 function navUpdateTabVisibility() {
   var isDesktop = !!(window.pywebview && window.pywebview.api);
   var syncBtn = document.getElementById('nav-sync');
-  var articlesBtn = document.getElementById('nav-articles');
 
+  /* Синхронизация — только desktop (нужен Python для записи COS) */
   if (syncBtn) syncBtn.style.display = isDesktop ? '' : 'none';
-  if (articlesBtn) articlesBtn.style.display = isDesktop ? '' : 'none';
+  /* Артикулы — доступны и в web, и в desktop */
 }
 
 /* Запуск при DOMContentLoaded: скрыть для web */

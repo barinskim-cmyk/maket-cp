@@ -212,6 +212,7 @@
               <option value="color">+ ЦК</option>
               <option value="retouch">+ Ретушь</option>
             </select>
+            <span class="ac-stage-filter" id="ac-stage-filter"></span>
             <button class="ac-annot-toggle" id="ac-annot-toggle" onclick="acToggleAnnotOverlay()" title="Показать/скрыть аннотации">Аннотации</button>
             <button class="ac-view-all-btn" onclick="acViewAll()">Посмотреть все опции</button>
             <input type="range" id="ac-thumb-slider" min="2" max="8" value="4" class="pv-slider" title="Размер миниатюр" oninput="acSetColumns(this.value)">
@@ -265,6 +266,20 @@
       <div class="ar-section" id="ar-verify-section" style="display:none">
         <h3>Верификация</h3>
         <div class="ar-verify-list" id="ar-verify-list"></div>
+      </div>
+
+      <!-- Блок 4: Переименование -->
+      <div class="ar-section" id="ar-rename-section" style="display:none">
+        <h3>Переименование файлов</h3>
+        <div class="ar-rename-info">
+          <p>После верификации артикулов сформируйте CSV-список для переименования фотографий.</p>
+          <p>Скачайте скрипт <strong>maket_rename.exe</strong>, положите его в папку с фотографиями вместе с CSV-файлом и запустите.</p>
+        </div>
+        <div class="ar-rename-actions">
+          <button class="btn btn-primary" onclick="arGenerateRenameList()">Скачать список (CSV)</button>
+          <a class="btn" href="https://github.com/barinskim-cmyk/maket-cp/releases/download/rename-tool/maket_rename.exe" download>Скачать maket_rename.exe</a>
+          <span id="ar-rename-status2" style="font-size:12px;color:#888;margin-left:8px"></span>
+        </div>
       </div>
     </div>
   </div>
