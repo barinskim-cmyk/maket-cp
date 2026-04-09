@@ -577,10 +577,18 @@ function _arLoadViaBrowser(proj) {
     /* PDF — сначала текстовый парсинг, потом AI фолбэк */
     if (ext === 'pdf') {
       var statusEl = document.getElementById('ar-stats');
-      if (statusEl) statusEl.textContent = 'Парсинг PDF...';
+      var _pdfIsWeb = !window.pywebview && typeof sbClient !== 'undefined' && sbClient;
 
+      /* Веб-режим: всегда AI — нужны и артикулы, и референс-фото из PDF */
+      if (_pdfIsWeb) {
+        if (statusEl) statusEl.textContent = 'AI распознаёт PDF (артикулы + фото)...';
+        _arProcessPdfWithOpenAI(proj, file, '');
+        return;
+      }
+
+      /* Desktop: сначала текстовый парсинг, AI только если мало результатов */
+      if (statusEl) statusEl.textContent = 'Парсинг PDF...';
       _arParsePdf(file, function(articles) {
-        /* Проверить качество: мало результатов + есть AI ключ → фолбэк */
         if ((!articles || articles.length < 3) && _arGetOpenAIKey()) {
           console.log('articles.js: текстовый парсинг дал ' + (articles ? articles.length : 0) + ', пробую AI...');
           if (statusEl) statusEl.textContent = 'Текстовый парсинг: мало результатов, подключаю AI...';
