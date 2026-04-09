@@ -574,25 +574,21 @@ function _arLoadViaBrowser(proj) {
     if (!file) return;
     var ext = (file.name.split('.').pop() || '').toLowerCase();
 
-    /* PDF — сначала текстовый парсинг, потом AI фолбэк */
+    /* PDF — гибридный парсинг: текст+координаты из pdf.js + кроп фото из canvas */
     if (ext === 'pdf') {
       var statusEl = document.getElementById('ar-stats');
-      var _pdfIsWeb = !window.pywebview && typeof sbClient !== 'undefined' && sbClient;
-
-      /* Веб-режим: всегда AI — нужны и артикулы, и референс-фото из PDF */
-      if (_pdfIsWeb) {
-        if (statusEl) statusEl.textContent = 'AI распознаёт PDF (артикулы + фото)...';
-        _arProcessPdfWithOpenAI(proj, file, '');
-        return;
-      }
-
-      /* Desktop: сначала текстовый парсинг, AI только если мало результатов */
-      if (statusEl) statusEl.textContent = 'Парсинг PDF...';
-      _arParsePdf(file, function(articles) {
-        if ((!articles || articles.length < 3) && _arGetOpenAIKey()) {
-          console.log('articles.js: текстовый парсинг дал ' + (articles ? articles.length : 0) + ', пробую AI...');
-          if (statusEl) statusEl.textContent = 'Текстовый парсинг: мало результатов, подключаю AI...';
-          _arProcessPdfWithOpenAI(proj, file, _arGetOpenAIKey());
+      if (statusEl) statusEl.textContent = 'Разбираю PDF...';
+      _arParsePdfHybrid(file, function(articles) {
+        if (!articles || articles.length === 0) {
+          /* Фолбэк: AI если ничего не нашли */
+          var apiKey = _arGetOpenAIKey();
+          if (apiKey) {
+            if (statusEl) statusEl.textContent = 'Текст не распознан, пробую AI...';
+            _arProcessPdfWithOpenAI(proj, file, apiKey);
+          } else {
+            if (statusEl) statusEl.textContent = '';
+            alert('Не удалось распознать артикулы в PDF.\n\nДобавьте ключ OpenAI для AI-распознавания.');
+          }
         } else {
           if (statusEl) statusEl.textContent = '';
           _arApplyLoaded(proj, articles, file.name);
@@ -1351,6 +1347,284 @@ function _arParseXlsx(data) {
  * @param {File} file — PDF файл
  * @param {function} callback — callback(articles)
  */
+
+/**
+ * Гибридный парсинг PDF: pdf.js даёт точные координаты текста,
+ * canvas — пиксели для кропа референс-фото.
+ *
+ * Алгоритм для типичного каталога (фото сверху, SKU снизу блока):
+ * 1. Рендерим страницу в canvas (высокое разрешение)
+ * 2. Извлекаем текстовые элементы с координатами
+ * 3. Находим строки похожие на артикулы
+ * 4. Для каждого артикула вырезаем изображение — область выше текста
+ * 5. Возвращаем articles[] с refImage
+ *
+ * @param {File}     file     — PDF файл
+ * @param {function} callback — callback(articles|null)
+ */
+function _arParsePdfHybrid(file, callback) {
+  if (typeof pdfjsLib === 'undefined') {
+    callback(null);
+    return;
+  }
+
+  var statusEl = document.getElementById('ar-stats');
+  var reader = new FileReader();
+
+  reader.onload = function(ev) {
+    var data = new Uint8Array(ev.target.result);
+    pdfjsLib.getDocument({ data: data }).promise.then(function(pdf) {
+
+      var allArticles = [];
+      var pagesTotal = pdf.numPages;
+      var pagesDone = 0;
+
+      /* Обрабатываем каждую страницу */
+      function processPage(pageNum) {
+        if (pageNum > pagesTotal) {
+          /* Готово */
+          callback(allArticles.length > 0 ? allArticles : null);
+          return;
+        }
+
+        if (statusEl) statusEl.textContent = 'PDF: страница ' + pageNum + '/' + pagesTotal + '...';
+
+        pdf.getPage(pageNum).then(function(page) {
+          var scale = 2.5; /* высокое разрешение для качественного кропа */
+          var viewport = page.getViewport({ scale: scale });
+          var canvas = document.createElement('canvas');
+          canvas.width = Math.round(viewport.width);
+          canvas.height = Math.round(viewport.height);
+          var ctx = canvas.getContext('2d');
+
+          /* Рендер и текст параллельно */
+          var renderDone = false, textDone = false;
+          var textItems = [];
+
+          function onBothDone() {
+            if (!renderDone || !textDone) return;
+
+            /* Найти SKU-строки с их Y-координатами на canvas */
+            var skuItems = _arFindSkuItems(textItems, canvas.height);
+
+            /* Вырезать фото для каждого SKU */
+            var pageArticles = _arCropArticleImages(skuItems, canvas, textItems);
+            allArticles = allArticles.concat(pageArticles);
+            processPage(pageNum + 1);
+          }
+
+          page.render({ canvasContext: ctx, viewport: viewport }).promise.then(function() {
+            renderDone = true;
+            onBothDone();
+          });
+
+          page.getTextContent().then(function(content) {
+            /* Собираем текстовые элементы с координатами в пространстве canvas */
+            for (var k = 0; k < content.items.length; k++) {
+              var item = content.items[k];
+              var str = item.str.trim();
+              if (!str) continue;
+              /* pdf.js: Y от низа страницы, canvas: Y от верха */
+              var pdfX = item.transform[4];
+              var pdfY = item.transform[5];
+              var canvasX = pdfX * scale;
+              var canvasY = canvas.height - pdfY * scale;
+              var fontSize = Math.abs(item.transform[3]) * scale;
+              textItems.push({ str: str, x: canvasX, y: canvasY, fontSize: fontSize });
+            }
+            textDone = true;
+            onBothDone();
+          });
+
+        }).catch(function() { processPage(pageNum + 1); });
+      }
+
+      processPage(1);
+
+    }).catch(function(e) {
+      console.error('articles.js: PDF hybrid error:', e);
+      callback(null);
+    });
+  };
+
+  reader.readAsArrayBuffer(file);
+}
+
+
+/**
+ * Найти текстовые элементы похожие на артикулы.
+ * Возвращает список с canvasY (Y от верха страницы).
+ */
+function _arFindSkuItems(textItems, canvasHeight) {
+  /* Регулярки для артикулов: содержат цифры+буквы+дефисы, длина 5-40 */
+  var SKU_RE = /^[A-Za-z0-9][A-Za-z0-9\-\_\.\/]{4,39}$/;
+  /* Слова-исключения (заголовки, служебные слова) */
+  var SKIP_RE = /^(артикул|артикл|sku|article|category|color|код|code|наименование|размер|size|price|цена|qty|кол|итого|total|sum|описание)$/i;
+
+  var found = [];
+  for (var i = 0; i < textItems.length; i++) {
+    var item = textItems[i];
+    var s = item.str.trim();
+    if (!s || s.length < 5 || s.length > 50) continue;
+    if (SKIP_RE.test(s)) continue;
+    if (SKU_RE.test(s)) {
+      found.push({ sku: s, x: item.x, y: item.y, fontSize: item.fontSize });
+    }
+  }
+
+  /* Убрать дубли (один артикул может быть на нескольких строках) */
+  var seen = {};
+  var unique = [];
+  for (var j = 0; j < found.length; j++) {
+    if (!seen[found[j].sku]) {
+      seen[found[j].sku] = true;
+      unique.push(found[j]);
+    }
+  }
+
+  return unique;
+}
+
+
+/**
+ * Вырезать референс-фото для каждого артикула.
+ *
+ * Логика:
+ * - Сортируем SKU по Y (сверху вниз)
+ * - Разбиваем на колонки по X
+ * - Для каждого SKU: фото = область выше текста до верхней границы его блока
+ */
+function _arCropArticleImages(skuItems, canvas, allTextItems) {
+  if (skuItems.length === 0) return [];
+
+  /* Сортируем по Y (сверху вниз) */
+  var sorted = skuItems.slice().sort(function(a, b) { return a.y - b.y; });
+
+  /* Определяем количество колонок по распределению X */
+  var xValues = sorted.map(function(s) { return s.x; }).sort(function(a, b) { return a - b; });
+  var cols = _arDetectColumns(xValues, canvas.width);
+
+  var articles = [];
+
+  for (var i = 0; i < sorted.length; i++) {
+    var item = sorted[i];
+    var col = _arGetColumn(item.x, cols);
+
+    /* Предыдущий SKU в той же колонке → его Y = верхняя граница нашего блока */
+    var topY = 0;
+    for (var j = i - 1; j >= 0; j--) {
+      if (_arGetColumn(sorted[j].x, cols) === col) {
+        topY = sorted[j].y + (sorted[j].fontSize || 14);
+        break;
+      }
+    }
+
+    /* Нижняя граница блока = позиция самой нижней текстовой строки под SKU в том же блоке */
+    var bottomY = item.y + (item.fontSize || 14) * 2;
+
+    /* Граница фото = немного выше текста SKU */
+    var photoBottom = item.y - 4;
+    var photoTop = topY + 4;
+
+    if (photoBottom - photoTop < 20) continue; /* слишком маленькая область */
+
+    /* Горизонтальные границы колонки */
+    var colLeft = col.left;
+    var colRight = col.right;
+    var cropW = Math.round(colRight - colLeft);
+    var cropH = Math.round(photoBottom - photoTop);
+
+    if (cropW < 20 || cropH < 20) continue;
+
+    try {
+      var cropCanvas = document.createElement('canvas');
+      /* Ограничиваем размер: не больше 800x1000 */
+      var scaleDown = Math.min(1, 800 / cropW, 1000 / cropH);
+      cropCanvas.width = Math.round(cropW * scaleDown);
+      cropCanvas.height = Math.round(cropH * scaleDown);
+      cropCanvas.getContext('2d').drawImage(
+        canvas,
+        Math.round(colLeft), Math.round(photoTop), cropW, cropH,
+        0, 0, cropCanvas.width, cropCanvas.height
+      );
+      var refImage = cropCanvas.toDataURL('image/jpeg', 0.85);
+
+      articles.push({
+        id: 'ar_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+        sku: item.sku,
+        category: '',
+        color: '',
+        refImage: refImage,
+        status: 'unmatched',
+        cardIdx: -1
+      });
+    } catch(e) {
+      /* Кроп не получился — добавляем без фото */
+      articles.push({
+        id: 'ar_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+        sku: item.sku,
+        category: '',
+        color: '',
+        refImage: '',
+        status: 'unmatched',
+        cardIdx: -1
+      });
+    }
+  }
+
+  return articles;
+}
+
+
+/**
+ * Определить колонки по X-координатам SKU.
+ * Возвращает массив {left, right, center}.
+ */
+function _arDetectColumns(xValues, canvasWidth) {
+  if (xValues.length === 0) return [{ left: 0, right: canvasWidth, center: canvasWidth / 2 }];
+
+  /* Кластеризация: группируем X с допуском canvasWidth/6 */
+  var tolerance = canvasWidth / 6;
+  var clusters = [];
+  for (var i = 0; i < xValues.length; i++) {
+    var x = xValues[i];
+    var found = false;
+    for (var c = 0; c < clusters.length; c++) {
+      if (Math.abs(clusters[c].center - x) < tolerance) {
+        clusters[c].values.push(x);
+        clusters[c].center = clusters[c].values.reduce(function(a, b) { return a + b; }, 0) / clusters[c].values.length;
+        found = true;
+        break;
+      }
+    }
+    if (!found) clusters.push({ center: x, values: [x] });
+  }
+
+  clusters.sort(function(a, b) { return a.center - b.center; });
+
+  /* Назначить left/right для каждой колонки */
+  var result = [];
+  for (var ci = 0; ci < clusters.length; ci++) {
+    var prevRight = ci > 0 ? clusters[ci - 1].center + (clusters[ci].center - clusters[ci - 1].center) / 2 : 0;
+    var nextLeft = ci < clusters.length - 1 ? clusters[ci].center + (clusters[ci + 1].center - clusters[ci].center) / 2 : canvasWidth;
+    result.push({ left: prevRight, right: nextLeft, center: clusters[ci].center });
+  }
+
+  return result;
+}
+
+
+/**
+ * Определить индекс колонки для X-координаты.
+ */
+function _arGetColumn(x, cols) {
+  for (var i = 0; i < cols.length; i++) {
+    if (x >= cols[i].left && x < cols[i].right) return cols[i];
+  }
+  return cols[cols.length - 1];
+}
+
+
 function _arParsePdf(file, callback) {
   if (typeof pdfjsLib === 'undefined') {
     alert('Библиотека PDF.js не загружена. Проверьте интернет-соединение.');
