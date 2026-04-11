@@ -40,6 +40,107 @@ var _arSelectedCard = null;
 var _arOpenAIKey = '';
 var _arLastPdfPath = '';  /* путь к последнему загруженному PDF чек-листу */
 
+/** @type {number|null} Дебаунс-таймер для облачной синхронизации артикулов */
+var _arCloudSyncTimer = null;
+
+/** @type {number} Задержка дебаунса облачного сохранения (мс) */
+var AR_CLOUD_SYNC_DELAY = 4000;
+
+
+/* ──────────────────────────────────────────────
+   Облачная синхронизация артикулов
+   ────────────────────────────────────────────── */
+
+/**
+ * Запланировать облачную синхронизацию артикулов с дебаунсом.
+ * Вызывается после каждого изменения артикулов.
+ * Требует: sbSaveArticles и sbSaveRenameLog из supabase.js.
+ */
+function arCloudSync() {
+  if (_arCloudSyncTimer) clearTimeout(_arCloudSyncTimer);
+  _arCloudSyncTimer = setTimeout(function() {
+    _arCloudSyncTimer = null;
+    _arDoCloudSync();
+  }, AR_CLOUD_SYNC_DELAY);
+}
+
+/**
+ * Выполнить облачную синхронизацию артикулов и лога переименований.
+ * Вызывается из дебаунса arCloudSync().
+ */
+function _arDoCloudSync() {
+  var proj = getActiveProject();
+  if (!proj || !proj._cloudId) return;  /* Нет облачного проекта — ничего не делаем */
+
+  if (typeof sbSaveArticles === 'function') {
+    sbSaveArticles(proj, function(err) {
+      if (err) console.warn('articles: cloud sync error (articles):', err);
+    });
+  }
+  if (typeof sbSaveRenameLog === 'function') {
+    sbSaveRenameLog(proj, function(err) {
+      if (err) console.warn('articles: cloud sync error (rename_log):', err);
+    });
+  }
+}
+
+
+/**
+ * Загрузить артикулы из облака для текущего проекта.
+ * Вызывается при открытии вкладки Артикулы если проект подключён к облаку
+ * и локальный список пустой (первый открытый на этом устройстве).
+ * @param {Function} [onDone] — опциональный callback(err)
+ */
+function arLoadFromCloud(onDone) {
+  var proj = getActiveProject();
+  if (!proj || !proj._cloudId) {
+    if (typeof onDone === 'function') onDone(null);
+    return;
+  }
+  if (typeof sbLoadArticles !== 'function') {
+    if (typeof onDone === 'function') onDone(null);
+    return;
+  }
+
+  sbLoadArticles(proj, function(err, articles) {
+    if (err) {
+      console.warn('arLoadFromCloud error:', err);
+      if (typeof onDone === 'function') onDone(err);
+      return;
+    }
+    if (!articles || articles.length === 0) {
+      if (typeof onDone === 'function') onDone(null);
+      return;
+    }
+
+    /* Мерж: облачные данные приоритетнее если локальных нет, иначе обогащаем поле status */
+    var localIsEmpty = (!proj.articles || proj.articles.length === 0);
+    if (localIsEmpty) {
+      proj.articles = articles;
+      console.log('arLoadFromCloud: загружено', articles.length, 'артикулов из облака');
+    } else {
+      /* Обновить статусы из облака (не перезаписывать refImage — он хранится локально) */
+      var cloudById = {};
+      for (var i = 0; i < articles.length; i++) cloudById[articles[i].id] = articles[i];
+      for (var j = 0; j < proj.articles.length; j++) {
+        var local = proj.articles[j];
+        var remote = cloudById[local.id];
+        if (remote) {
+          local.status  = remote.status;
+          local.cardIdx = remote.cardIdx;
+        }
+      }
+    }
+
+    arRenderChecklist();
+    arRenderMatching();
+    arRenderVerification();
+    arUpdateStats();
+    if (typeof shAutoSave === 'function') shAutoSave();
+    if (typeof onDone === 'function') onDone(null);
+  });
+}
+
 
 /* ──────────────────────────────────────────────
    Инициализация
@@ -219,6 +320,13 @@ function arOnPageShow() {
   arRenderMatching();
   arRenderVerification();
   arUpdateStats();
+
+  /* Если проект в облаке — попробовать подтянуть артикулы (только первый раз или если список пустой) */
+  if (proj._cloudId && (!proj.articles || proj.articles.length === 0)) {
+    arLoadFromCloud(function(err) {
+      if (err) console.warn('arOnPageShow: cloud load failed:', err);
+    });
+  }
 }
 
 
@@ -1068,6 +1176,7 @@ function _arApplyLoaded(proj, articles, fileName) {
   arRenderVerification();
   arUpdateStats();
   if (typeof shAutoSave === 'function') shAutoSave();
+  arCloudSync();
   console.log('articles.js: загружено ' + articles.length + ' артикулов из ' + fileName);
 
   /* Автоматически запустить AI-расстановку если есть ключ и незакреплённые карточки */
@@ -2750,6 +2859,7 @@ function arDoMatch(skuIdx, cardIdx) {
   arRenderVerification();
   arUpdateStats();
   if (typeof shAutoSave === 'function') shAutoSave();
+  arCloudSync();
 }
 
 
@@ -2769,6 +2879,7 @@ function arUnmatch(skuIdx) {
   arRenderVerification();
   arUpdateStats();
   if (typeof shAutoSave === 'function') shAutoSave();
+  arCloudSync();
 }
 
 
@@ -3066,7 +3177,39 @@ function arRenderVerification() {
 
 
 /**
+ * Применить автопереименование карточки по артикулу.
+ * Вызывается при верификации совпадения артикул–карточка.
+ * Устанавливает card.name = art.sku для привязанной карточки.
+ * Записывает событие в proj._renameLog для облачной синхронизации.
+ * Не откатывает имя при снятии верификации — оставляем как есть.
+ * @param {object} proj  — активный проект
+ * @param {object} art   — артикул со статусом 'verified' и cardIdx >= 0
+ */
+function _arApplyCardRename(proj, art) {
+  if (!art || art.cardIdx < 0) return;
+  if (!proj.cards || !proj.cards[art.cardIdx]) return;
+
+  var card = proj.cards[art.cardIdx];
+  var oldName = card.name || '';
+  card.name = art.sku;
+
+  /* Записать в лог переименований */
+  if (!proj._renameLog) proj._renameLog = [];
+  proj._renameLog.push({
+    article_id:    art.id,
+    card_idx:      art.cardIdx,
+    original_name: oldName,
+    new_name:      art.sku,
+    trigger:       'verify',
+    renamed_at:    new Date().toISOString(),
+    _synced:       false
+  });
+}
+
+
+/**
  * Переключить статус верификации артикула.
+ * При переходе в 'verified' — автоматически переименовать привязанную карточку.
  */
 function arToggleVerify(idx) {
   var proj = getActiveProject();
@@ -3075,15 +3218,22 @@ function arToggleVerify(idx) {
   var art = proj.articles[idx];
   art.status = (art.status === 'verified') ? 'matched' : 'verified';
 
+  /* Автопереименование карточки при верификации */
+  if (art.status === 'verified') {
+    _arApplyCardRename(proj, art);
+  }
+
   arRenderChecklist();
   arRenderVerification();
   arUpdateStats();
   if (typeof shAutoSave === 'function') shAutoSave();
+  arCloudSync();
 }
 
 
 /**
  * Подтвердить все сопоставленные артикулы как верифицированные.
+ * Автоматически переименовывает все привязанные карточки.
  */
 function arConfirmAll() {
   var proj = getActiveProject();
@@ -3092,12 +3242,15 @@ function arConfirmAll() {
   for (var i = 0; i < proj.articles.length; i++) {
     if (proj.articles[i].status === 'matched') {
       proj.articles[i].status = 'verified';
+      /* Автопереименование карточки */
+      _arApplyCardRename(proj, proj.articles[i]);
     }
   }
   arRenderChecklist();
   arRenderVerification();
   arUpdateStats();
   if (typeof shAutoSave === 'function') shAutoSave();
+  arCloudSync();
 }
 
 
@@ -3117,6 +3270,7 @@ function arResetVerification() {
   arRenderVerification();
   arUpdateStats();
   if (typeof shAutoSave === 'function') shAutoSave();
+  arCloudSync();
 }
 
 

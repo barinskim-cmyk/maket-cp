@@ -2535,6 +2535,8 @@ function cpMobileRender() {
     html += cpMobileRenderSelect();
   } else if (_mobViewMode === 'other') {
     html += cpMobileRenderOther();
+  } else if (_mobViewMode === 'pipeline') {
+    html += cpMobileRenderPipeline();
   } else {
     html += cpMobileRenderGallery();
   }
@@ -2577,6 +2579,13 @@ function _cpMobileCardMenuHTML(proj) {
   html += '<span>Карточки (' + proj.cards.length + ')</span>';
   html += '<button class="mob-card-menu-close" onclick="cpMobileToggleCardMenu()">&times;</button>';
   html += '</div>';
+
+  /* Ссылка на пайплайн / историю съёмки */
+  var pipelineLabel = (window._isShareLink) ? 'История съёмки' : 'Пайплайн';
+  html += '<button class="mob-card-menu-pipeline-btn" onclick="cpMobileToggleCardMenu();cpMobileSetView(\'pipeline\')">';
+  html += pipelineLabel;
+  html += '</button>';
+
   html += '<div class="mob-card-menu-list">';
 
   for (var i = 0; i < proj.cards.length; i++) {
@@ -2660,6 +2669,83 @@ function cpMobileSetView(mode) {
   _mobViewMode = mode;
   cpMobileRender();
 }
+
+
+/**
+ * Мобильный рендер пайплайна съёмки (только чтение).
+ * Для клиентов по share-ссылке называется "История съёмки",
+ * для владельца — "Пайплайн".
+ * @returns {string} HTML
+ */
+function cpMobileRenderPipeline() {
+  var proj = getActiveProject();
+  if (!proj) {
+    return '<div style="padding:40px 16px;text-align:center;color:#999">Нет данных</div>';
+  }
+
+  var title = (window._isShareLink) ? 'История съёмки' : 'Пайплайн';
+  var stage = proj._stage || 0;
+
+  /* Считаем фото по этапам (если функция доступна) */
+  var photoCounts = (typeof shPhotosPerStage === 'function') ? shPhotosPerStage(proj) : [];
+  var totalPhotos = (proj.previews) ? proj.previews.length : 0;
+
+  var html = '<div class="mob-pipeline">';
+  html += '<div class="mob-pipeline-title">' + esc(title) + '</div>';
+
+  html += '<div class="mob-pipeline-steps">';
+
+  for (var i = 0; i < PIPELINE_STAGES.length; i++) {
+    var s = PIPELINE_STAGES[i];
+    var cnt = photoCounts[i] || 0;
+
+    /* Состояние: done / active / future */
+    var cls = '';
+    if (totalPhotos > 0) {
+      var hasPhotosAfter = false;
+      for (var j = i + 1; j < PIPELINE_STAGES.length; j++) {
+        if ((photoCounts[j] || 0) > 0) { hasPhotosAfter = true; break; }
+      }
+      if (cnt === 0 && hasPhotosAfter) cls = 'done';
+      else if (cnt > 0) cls = 'active';
+    } else {
+      /* Нет фото — опираемся на proj._stage */
+      if (i < stage) cls = 'done';
+      else if (i === stage) cls = 'active';
+    }
+
+    html += '<div class="mob-pipeline-step mob-pipeline-step-' + (cls || 'future') + '">';
+
+    /* Точка-индикатор */
+    html += '<div class="mob-pipeline-dot">';
+    html += (cls === 'done') ? '&#10003;' : (i + 1);
+    html += '</div>';
+
+    html += '<div class="mob-pipeline-step-info">';
+    html += '<div class="mob-pipeline-step-name">' + esc(s.name);
+    if (totalPhotos > 0 && cnt > 0) {
+      var pct = Math.round(cnt / totalPhotos * 100);
+      html += '<span class="mob-pipeline-step-count">' + cnt + ' фото (' + pct + '%)</span>';
+    }
+    html += '</div>';
+
+    /* Дата / заметка */
+    if (cls === 'done' && proj._stageHistory && proj._stageHistory[i]) {
+      html += '<div class="mob-pipeline-step-note">' + esc(proj._stageHistory[i]) + '</div>';
+    } else if (cls === 'active' && proj._stageDates && proj._stageDates[i] && proj._stageDates[i].firstEnter) {
+      var enterDate = new Date(proj._stageDates[i].firstEnter);
+      html += '<div class="mob-pipeline-step-note">c ' + enterDate.toLocaleDateString('ru-RU') + '</div>';
+    }
+
+    html += '</div>'; /* step-info */
+    html += '</div>'; /* step */
+  }
+
+  html += '</div>'; /* steps */
+  html += '</div>'; /* pipeline */
+  return html;
+}
+
 
 /**
  * Рендер непрерывной ленты карточек (мобильный).

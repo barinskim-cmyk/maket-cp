@@ -3566,6 +3566,274 @@ function sbRefreshVersions() {
 }
 
 
+/* ══════════════════════════════════════════════
+   Синхронизация артикулов (migration 018)
+   ══════════════════════════════════════════════ */
+
+/**
+ * Сохранить артикулы проекта в Supabase (батч upsert через RPC).
+ * Вызывается при каждом shAutoSave если проект привязан к облаку.
+ *
+ * @param {object}   proj      — проект с _cloudId и articles[]
+ * @param {Function} [callback] — callback(err) при завершении
+ */
+function sbSaveArticles(proj, callback) {
+  if (!sbClient || !proj || !proj._cloudId) {
+    if (typeof callback === 'function') callback(null);
+    return;
+  }
+  var articles = proj.articles || [];
+
+  /* Сериализовать: оставляем только поля нужные для БД, base64 не трогаем здесь */
+  var payload = [];
+  for (var i = 0; i < articles.length; i++) {
+    var a = articles[i];
+    payload.push({
+      id:             a.id || ('ar_' + i),
+      sku:            a.sku || '',
+      category:       a.category || '',
+      color:          a.color || '',
+      status:         a.status || 'unmatched',
+      card_idx:       (typeof a.cardIdx === 'number') ? a.cardIdx : -1,
+      ref_image_path: a._refImagePath || null  /* URL в Storage, не base64 */
+    });
+  }
+
+  sbClient.rpc('save_articles_batch', {
+    p_project_id: proj._cloudId,
+    p_articles:   payload
+  })
+  .then(function(resp) {
+    if (resp.error) {
+      console.warn('sbSaveArticles error:', resp.error.message);
+      if (typeof callback === 'function') callback(resp.error.message);
+    } else {
+      if (typeof callback === 'function') callback(null);
+    }
+  })
+  ['catch'](function(err) {
+    console.error('sbSaveArticles exception:', err);
+    if (typeof callback === 'function') callback(err && err.message ? err.message : String(err));
+  });
+}
+
+
+/**
+ * Загрузить артикулы проекта из Supabase.
+ * Сливает с локальными: если локальных нет — заменяет; если есть — перезаписывает.
+ *
+ * @param {object}   proj      — проект (должен иметь _cloudId)
+ * @param {Function} callback  — callback(err, articles[])
+ */
+function sbLoadArticles(proj, callback) {
+  if (!sbClient || !proj || !proj._cloudId) {
+    if (typeof callback === 'function') callback(null, []);
+    return;
+  }
+
+  sbClient.from('articles')
+    .select('*')
+    .eq('project_id', proj._cloudId)
+    .order('created_at', { ascending: true })
+    .then(function(resp) {
+      if (resp.error) {
+        console.warn('sbLoadArticles error:', resp.error.message);
+        if (typeof callback === 'function') callback(resp.error.message, []);
+        return;
+      }
+      var rows = resp.data || [];
+      /* Конвертировать DB row → JS Article */
+      var articles = [];
+      for (var i = 0; i < rows.length; i++) {
+        var r = rows[i];
+        articles.push({
+          id:            r.id,
+          sku:           r.sku,
+          category:      r.category || '',
+          color:         r.color || '',
+          status:        r.status || 'unmatched',
+          cardIdx:       (typeof r.card_idx === 'number') ? r.card_idx : -1,
+          refImage:      '',    /* base64 не хранится в БД — загружается отдельно */
+          _refImagePath: r.ref_image_path || null
+        });
+      }
+      if (typeof callback === 'function') callback(null, articles);
+    })
+    ['catch'](function(err) {
+      console.error('sbLoadArticles exception:', err);
+      if (typeof callback === 'function') callback(err && err.message ? err.message : String(err), []);
+    });
+}
+
+
+/**
+ * Загрузить референс-изображение артикула из Supabase Storage.
+ * Загружает только если у артикула есть _refImagePath.
+ *
+ * @param {string}   refImagePath — путь в Storage bucket article-refs
+ * @param {Function} callback     — callback(err, base64DataUrl)
+ */
+function sbDownloadArticleRefImage(refImagePath, callback) {
+  if (!sbClient || !refImagePath) {
+    if (typeof callback === 'function') callback(null, '');
+    return;
+  }
+
+  sbClient.storage.from('article-refs')
+    .download(refImagePath)
+    .then(function(resp) {
+      if (resp.error) {
+        console.warn('sbDownloadArticleRefImage error:', resp.error.message);
+        if (typeof callback === 'function') callback(resp.error.message, '');
+        return;
+      }
+      /* Конвертировать Blob в base64 */
+      var reader = new FileReader();
+      reader.onloadend = function() {
+        if (typeof callback === 'function') callback(null, reader.result);
+      };
+      reader.onerror = function() {
+        if (typeof callback === 'function') callback('FileReader error', '');
+      };
+      reader.readAsDataURL(resp.data);
+    })
+    ['catch'](function(err) {
+      console.error('sbDownloadArticleRefImage exception:', err);
+      if (typeof callback === 'function') callback(String(err), '');
+    });
+}
+
+
+/**
+ * Загрузить референс-изображение артикула в Supabase Storage.
+ * base64 → Storage bucket article-refs → сохранить URL в art._refImagePath.
+ *
+ * @param {string}   projectId  — UUID проекта
+ * @param {string}   artId      — ID артикула (имя файла)
+ * @param {string}   base64     — data:image/...;base64,... строка
+ * @param {Function} callback   — callback(err, publicUrl)
+ */
+function sbUploadArticleRefImage(projectId, artId, base64, callback) {
+  if (!sbClient || !projectId || !artId || !base64) {
+    if (typeof callback === 'function') callback(null, '');
+    return;
+  }
+
+  /* base64 → Blob */
+  var parts = base64.split(',');
+  var mime  = (parts[0].match(/:(.*?);/) || ['', 'image/jpeg'])[1];
+  var bstr  = atob(parts[1] || '');
+  var n = bstr.length;
+  var u8arr = new Uint8Array(n);
+  while (n--) { u8arr[n] = bstr.charCodeAt(n); }
+  var blob = new Blob([u8arr], { type: mime });
+  var ext  = mime.split('/')[1] || 'jpg';
+  var path = projectId + '/' + artId + '.' + ext;
+
+  sbClient.storage.from('article-refs')
+    .upload(path, blob, { upsert: true, contentType: mime })
+    .then(function(resp) {
+      if (resp.error) {
+        console.warn('sbUploadArticleRefImage error:', resp.error.message);
+        if (typeof callback === 'function') callback(resp.error.message, '');
+        return;
+      }
+      /* Получить публичный URL */
+      var urlResp = sbClient.storage.from('article-refs').getPublicUrl(path);
+      var publicUrl = (urlResp.data && urlResp.data.publicUrl) ? urlResp.data.publicUrl : '';
+      if (typeof callback === 'function') callback(null, publicUrl);
+    })
+    ['catch'](function(err) {
+      console.error('sbUploadArticleRefImage exception:', err);
+      if (typeof callback === 'function') callback(String(err), '');
+    });
+}
+
+
+/**
+ * Сохранить лог переименований в Supabase.
+ * Передаёт только новые записи (не загруженные ранее).
+ *
+ * @param {object}   proj     — проект с _cloudId и _renameLog[]
+ * @param {Function} [callback] — callback(err)
+ */
+function sbSaveRenameLog(proj, callback) {
+  if (!sbClient || !proj || !proj._cloudId) {
+    if (typeof callback === 'function') callback(null);
+    return;
+  }
+  var log = proj._renameLog || [];
+  /* Только несинхронизированные записи */
+  var pending = [];
+  for (var i = 0; i < log.length; i++) {
+    if (!log[i]._synced) pending.push(log[i]);
+  }
+  if (pending.length === 0) {
+    if (typeof callback === 'function') callback(null);
+    return;
+  }
+
+  sbClient.rpc('save_rename_log_batch', {
+    p_project_id: proj._cloudId,
+    p_entries:    pending
+  })
+  .then(function(resp) {
+    if (resp.error) {
+      console.warn('sbSaveRenameLog error:', resp.error.message);
+      if (typeof callback === 'function') callback(resp.error.message);
+    } else {
+      /* Пометить как синхронизированные */
+      for (var i = 0; i < pending.length; i++) pending[i]._synced = true;
+      if (typeof callback === 'function') callback(null);
+    }
+  })
+  ['catch'](function(err) {
+    console.error('sbSaveRenameLog exception:', err);
+    if (typeof callback === 'function') callback(String(err));
+  });
+}
+
+
+/**
+ * Загрузить лог переименований из Supabase.
+ * @param {object}   proj     — проект с _cloudId
+ * @param {Function} callback — callback(err, entries[])
+ */
+function sbLoadRenameLog(proj, callback) {
+  if (!sbClient || !proj || !proj._cloudId) {
+    if (typeof callback === 'function') callback(null, []);
+    return;
+  }
+
+  sbClient.from('rename_log')
+    .select('*')
+    .eq('project_id', proj._cloudId)
+    .order('renamed_at', { ascending: true })
+    .then(function(resp) {
+      if (resp.error) {
+        if (typeof callback === 'function') callback(resp.error.message, []);
+        return;
+      }
+      var rows = (resp.data || []).map(function(r) {
+        return {
+          id:            r.id,
+          article_id:    r.article_id,
+          card_idx:      r.card_idx,
+          original_name: r.original_name,
+          new_name:      r.new_name,
+          trigger:       r.trigger,
+          renamed_at:    r.renamed_at,
+          _synced:       true
+        };
+      });
+      if (typeof callback === 'function') callback(null, rows);
+    })
+    ['catch'](function(err) {
+      if (typeof callback === 'function') callback(String(err), []);
+    });
+}
+
+
 // Автоинициализация
 if (typeof window !== 'undefined') {
   // Вызовется после загрузки Supabase SDK
