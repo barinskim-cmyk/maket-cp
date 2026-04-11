@@ -1476,6 +1476,20 @@ function _shDoCloudSync() {
       } else {
         console.log('cloud-sync: синхронизировано (owner path)');
         if (typeof _sbShowSyncStatus === 'function') _sbShowSyncStatus('Сохранено');
+
+        /* Синхронизировать артикулы и лог переименований — fire-and-forget.
+           Вызывается только если в проекте есть артикулы (не трогать если пустые).
+           Не блокирует основной флаг _shCloudSyncRunning. */
+        if (typeof sbSaveArticles === 'function' && proj.articles && proj.articles.length > 0) {
+          sbSaveArticles(proj, function(artErr) {
+            if (artErr) console.warn('cloud-sync: articles error:', artErr);
+          });
+        }
+        if (typeof sbSaveRenameLog === 'function' && proj._renameLog && proj._renameLog.length > 0) {
+          sbSaveRenameLog(proj, function(logErr) {
+            if (logErr) console.warn('cloud-sync: rename_log error:', logErr);
+          });
+        }
       }
     });
     return;

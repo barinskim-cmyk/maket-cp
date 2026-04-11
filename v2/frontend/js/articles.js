@@ -40,11 +40,8 @@ var _arSelectedCard = null;
 var _arOpenAIKey = '';
 var _arLastPdfPath = '';  /* путь к последнему загруженному PDF чек-листу */
 
-/** @type {number|null} Дебаунс-таймер для облачной синхронизации артикулов */
-var _arCloudSyncTimer = null;
-
-/** @type {number} Задержка дебаунса облачного сохранения (мс) */
-var AR_CLOUD_SYNC_DELAY = 4000;
+/* Облачная синхронизация артикулов использует тот же механизм что карточки —
+   shCloudSyncExplicit() из shootings.js. Отдельный таймер не нужен. */
 
 
 /* ──────────────────────────────────────────────
@@ -52,35 +49,17 @@ var AR_CLOUD_SYNC_DELAY = 4000;
    ────────────────────────────────────────────── */
 
 /**
- * Запланировать облачную синхронизацию артикулов с дебаунсом.
- * Вызывается после каждого изменения артикулов.
- * Требует: sbSaveArticles и sbSaveRenameLog из supabase.js.
+ * Запланировать облачную синхронизацию.
+ * Использует тот же механизм что карточки (shCloudSyncExplicit из shootings.js):
+ * - Единый дебаунс-таймер (3 сек)
+ * - Флаг _shCloudSyncRunning предотвращает параллельные записи
+ * - sbMarkPushDone() блокирует pull на SB_PULL_BLOCK_WINDOW (10 сек)
+ * Фактическая запись sbSaveArticles() + sbSaveRenameLog() происходит
+ * внутри _shDoCloudSync() в shootings.js.
  */
 function arCloudSync() {
-  if (_arCloudSyncTimer) clearTimeout(_arCloudSyncTimer);
-  _arCloudSyncTimer = setTimeout(function() {
-    _arCloudSyncTimer = null;
-    _arDoCloudSync();
-  }, AR_CLOUD_SYNC_DELAY);
-}
-
-/**
- * Выполнить облачную синхронизацию артикулов и лога переименований.
- * Вызывается из дебаунса arCloudSync().
- */
-function _arDoCloudSync() {
-  var proj = getActiveProject();
-  if (!proj || !proj._cloudId) return;  /* Нет облачного проекта — ничего не делаем */
-
-  if (typeof sbSaveArticles === 'function') {
-    sbSaveArticles(proj, function(err) {
-      if (err) console.warn('articles: cloud sync error (articles):', err);
-    });
-  }
-  if (typeof sbSaveRenameLog === 'function') {
-    sbSaveRenameLog(proj, function(err) {
-      if (err) console.warn('articles: cloud sync error (rename_log):', err);
-    });
+  if (typeof shCloudSyncExplicit === 'function') {
+    shCloudSyncExplicit();
   }
 }
 
