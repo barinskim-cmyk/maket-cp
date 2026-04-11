@@ -1257,8 +1257,10 @@ function _arParseVisionResponse(responseText, status, callback) {
  * Особенности gpt-5.4-mini (reasoning-модель):
  * - max_tokens НЕ поддерживается — используем max_completion_tokens
  *   (в этот лимит входят ещё и reasoning-токены, поэтому даём x5 запас)
- * - temperature НЕ поддерживается — вместо неё reasoning.effort
+ * - temperature НЕ поддерживается — вместо неё reasoning_effort
  *   (minimal | low | medium | high): low — разумный дефолт для матчинга
+ * - ВАЖНО: Chat Completions API ждёт ПЛОСКОЕ поле reasoning_effort,
+ *   а не вложенный объект reasoning.effort (это формат Responses API)
  * - vision через image_url работает как у gpt-4o (URL или base64)
  *
  * @param {Array}    messages        — messages-массив для OpenAI
@@ -1282,7 +1284,7 @@ function _arOpenAIRequest(messages, maxTokens, timeoutMs, apiKey, callback, reas
       body: {
         messages: messages,
         max_completion_tokens: budget,
-        reasoning: { effort: effort },
+        reasoning_effort: effort,
         model: 'gpt-5.4-mini'
       }
     }).then(function(result) {
@@ -1321,7 +1323,7 @@ function _arOpenAIRequest(messages, maxTokens, timeoutMs, apiKey, callback, reas
     model: 'gpt-5.4-mini',
     messages: messages,
     max_completion_tokens: budget,
-    reasoning: { effort: effort }
+    reasoning_effort: effort
   }));
 }
 
@@ -1344,14 +1346,14 @@ function _arCallOpenAIVision(apiKey, base64Image, pageNum, totalPages, callback)
 
   /* ── Веб-режим: Edge Function ──
      Extraction из PDF — структурированная задача, extractим JSON-массив
-     артикулов. Для неё ставим reasoning.effort = 'medium' и большой
+     артикулов. Для неё ставим reasoning_effort = 'medium' и большой
      бюджет токенов: reasoning + полный список SKU может быть длинным. */
   if (isWeb) {
     sbClient.functions.invoke('openai-vision', {
       body: {
         messages: messages,
         max_completion_tokens: 16000,
-        reasoning: { effort: 'medium' },
+        reasoning_effort: 'medium',
         model: 'gpt-5.4-mini'
       }
     }).then(function(result) {
@@ -1403,7 +1405,7 @@ function _arCallOpenAIVision(apiKey, base64Image, pageNum, totalPages, callback)
     model: 'gpt-5.4-mini',
     messages: messages,
     max_completion_tokens: 16000,
-    reasoning: { effort: 'medium' }
+    reasoning_effort: 'medium'
   }));
 }
 

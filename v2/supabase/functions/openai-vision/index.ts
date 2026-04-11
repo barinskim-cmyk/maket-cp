@@ -52,8 +52,16 @@ serve(async (req: Request) => {
 
     /* Тело запроса от фронта. Поддерживает и старые gpt-4o-подобные
        параметры (max_tokens/temperature), и новые gpt-5.x reasoning-
-       параметры (max_completion_tokens/reasoning.effort). Функция
-       определяет, какую схему использовать, по имени модели. */
+       параметры (max_completion_tokens/reasoning_effort). Функция
+       определяет, какую схему использовать, по имени модели.
+
+       ВАЖНО про reasoning:
+         - Chat Completions API (то, что мы вызываем) ожидает ПЛОСКОЕ
+           поле `reasoning_effort: 'low'|'medium'|'high'|'minimal'`.
+         - Responses API (другой эндпоинт) ожидает вложенный объект
+           `reasoning: { effort: 'low' }`. Мы им не пользуемся.
+         Если фронт по ошибке прислал вложенный reasoning — разворачиваем
+         его в плоский reasoning_effort. */
     const body = await req.json();
     const {
       messages,
@@ -61,8 +69,16 @@ serve(async (req: Request) => {
       max_completion_tokens,
       temperature,
       reasoning,
+      reasoning_effort,
       model = 'gpt-5.4-mini',
     } = body;
+
+    /* Нормализуем reasoning_effort: предпочитаем плоское поле,
+       но если пришёл вложенный объект reasoning.effort — распаковываем. */
+    let effortFlat: string | undefined = reasoning_effort;
+    if (!effortFlat && reasoning && typeof reasoning === 'object' && reasoning.effort) {
+      effortFlat = reasoning.effort;
+    }
 
     if (!messages || !Array.isArray(messages)) {
       return new Response(JSON.stringify({ error: 'messages required' }), {
@@ -90,7 +106,9 @@ serve(async (req: Request) => {
 
     if (isReasoning) {
       openaiBody.max_completion_tokens = max_completion_tokens ?? max_tokens ?? 4000;
-      openaiBody.reasoning = reasoning ?? { effort: 'low' };
+      /* Chat Completions: плоское reasoning_effort, а НЕ вложенный объект */
+      openaiBody.reasoning_effort = effortFlat ?? 'low';
+      /* temperature не поддерживается reasoning-моделями — не отправляем */
     } else {
       openaiBody.max_tokens = max_tokens ?? max_completion_tokens ?? 4000;
       openaiBody.temperature = temperature ?? 0.1;
