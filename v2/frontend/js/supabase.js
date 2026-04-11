@@ -1937,6 +1937,9 @@ function sbPullProject(callback) {
         var rc = _rpcCards[c];
         var card = {
           id: rc.id, status: rc.status || 'draft',
+          /* ВАЖНО: name должен быть прочитан из БД, иначе переименование
+             через arToggleVerify / arConfirmAll не переживает reload. */
+          name: rc.name || '',
           _crystallized: rc.status === 'crystallized',
           _hasHero: rc.has_hero, _hAspect: rc.h_aspect || '3/2',
           _vAspect: rc.v_aspect || '2/3', _lockRows: rc.lock_rows || false,
@@ -2122,6 +2125,9 @@ function sbPullProject(callback) {
           var card = {
             id: rc.id,
             status: rc.status || 'draft',
+            /* ВАЖНО: name должен быть прочитан из БД, иначе переименование
+               через arToggleVerify / arConfirmAll не переживает reload. */
+            name: rc.name || '',
             _crystallized: rc.status === 'crystallized',
             _hasHero: rc.has_hero,
             _hAspect: rc.h_aspect || '3/2',
