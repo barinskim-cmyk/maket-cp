@@ -1277,12 +1277,15 @@ function sbSaveCardsByToken(token, cards, callback) {
     checkpoints_data: (proj && proj._checkpoints) ? proj._checkpoints : []
   }).then(function(res) {
     if (res.error) {
-      console.error('save_cards_by_token:', res.error);
+      console.error('save_cards_by_token:', res.error.code, res.error.message);
       callback('Ошибка сохранения: ' + res.error.message);
     } else {
       console.log('supabase.js: данные клиента сохранены (' + cards.length + ' карточек, ' + ocNames.length + ' доп. контент)');
       callback(null);
     }
+  })['catch'](function(err) {
+    console.error('save_cards_by_token (exception):', err);
+    callback('Ошибка сохранения: ' + (err && err.message ? err.message : String(err)));
   });
 }
 

@@ -2444,6 +2444,16 @@ function cpMobileInit() {
     appMain.appendChild(mobWrap);
   }
 
+  /* Оверлей «переверните телефон» для iOS (в CSS скрыт в ландшафте) */
+  if (!document.getElementById('mob-rotate-overlay')) {
+    var rotOverlay = document.createElement('div');
+    rotOverlay.id = 'mob-rotate-overlay';
+    rotOverlay.className = 'mob-rotate-overlay';
+    rotOverlay.innerHTML = '<div style="font-size:48px">&#8635;</div>' +
+      '<div>Пожалуйста, переверните телефон<br>в вертикальное положение</div>';
+    document.body.appendChild(rotOverlay);
+  }
+
   /* Скрыть все дочерние элементы кроме mob-wrap */
   for (var i = 0; i < appMain.children.length; i++) {
     var child = appMain.children[i];
@@ -2453,6 +2463,13 @@ function cpMobileInit() {
   }
 
   _mobViewMode = 'cards';
+
+  /* Заблокировать поворот экрана — только портретная ориентация.
+     Работает в Android Chrome; iOS Safari не поддерживает lock. */
+  if (screen.orientation && typeof screen.orientation.lock === 'function') {
+    screen.orientation.lock('portrait').catch(function() { /* тихо игнорируем если не поддерживается */ });
+  }
+
   cpMobileRender();
 }
 
@@ -2523,6 +2540,13 @@ function cpMobileRender() {
   }
 
   mobWrap.innerHTML = html;
+
+  /* Выровнять mob-filter-bar по реальной высоте хедера (чтобы не было зазора) */
+  var _hdr = mobWrap.querySelector('.mob-header');
+  var _fb  = mobWrap.querySelector('.mob-filter-bar');
+  if (_hdr && _fb) {
+    _fb.style.top = _hdr.offsetHeight + 'px';
+  }
 
   /* Привязать touch-события к каруселям */
   if (_mobViewMode === 'cards') {

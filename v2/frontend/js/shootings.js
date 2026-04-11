@@ -1452,12 +1452,22 @@ function _shDoCloudSync() {
   var proj = getActiveProject();
   if (!proj) return;
 
+  /* Safety-таймаут: если sync не завершился за 30 сек — сбрасываем флаг.
+     Защита от зависания при необработанном exception внутри promise. */
+  var _syncSafetyTimer = setTimeout(function() {
+    if (_shCloudSyncRunning) {
+      console.warn('cloud-sync: safety timeout — сброс флага _shCloudSyncRunning');
+      _shCloudSyncRunning = false;
+    }
+  }, 30000);
+
   /* Если пользователь залогинен — ВСЕГДА используем owner-путь (прямой доступ к таблицам).
      Это надёжнее чем RPC save_cards_by_token (которая может не существовать).
      Owner-путь работает через RLS: залогиненный пользователь = владелец проекта. */
   if (isOwner && proj._cloudId) {
     _shCloudSyncRunning = true;
     sbSyncCardsLight(proj._cloudId, proj.cards || [], function(err) {
+      clearTimeout(_syncSafetyTimer);
       _shCloudSyncRunning = false;
       if (typeof sbMarkPushDone === 'function') sbMarkPushDone();
       if (err) {
@@ -1475,6 +1485,7 @@ function _shDoCloudSync() {
   if (isClient && !isOwner && proj._cloudId) {
     _shCloudSyncRunning = true;
     sbSaveCardsByToken(window._shareToken, proj.cards || [], function(err) {
+      clearTimeout(_syncSafetyTimer);
       _shCloudSyncRunning = false;
       if (typeof sbMarkPushDone === 'function') sbMarkPushDone();
       if (err) {
@@ -1493,6 +1504,7 @@ function _shDoCloudSync() {
     _shCloudSyncRunning = true;
     console.log('cloud-sync: первичная загрузка "' + proj.brand + '" в облако...');
     sbUploadProject(App.selectedProject, function(err, cloudId) {
+      clearTimeout(_syncSafetyTimer);
       _shCloudSyncRunning = false;
       if (err) {
         console.warn('cloud-sync: ошибка загрузки:', err);
@@ -1502,6 +1514,7 @@ function _shDoCloudSync() {
     });
     return;
   }
+  clearTimeout(_syncSafetyTimer);
 }
 
 /**
