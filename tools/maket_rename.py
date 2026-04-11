@@ -133,8 +133,8 @@ def main():
 
         found.append((old_path, new_path, old_name, new_name))
 
-    # Предпросмотр
-    print(f"\nНайдено файлов для переименования: {len(found)}")
+    # Статистика без подтверждения (сопоставление уже сделано в Maket CP)
+    print(f"\nФайлов для переименования: {len(found)}")
     if not_found:
         print(f"Не найдено: {len(not_found)}")
     if skipped:
@@ -151,20 +151,7 @@ def main():
         input("\nНажмите Enter для выхода...")
         sys.exit(0)
 
-    print("\nПредпросмотр:")
-    for i, (old_path, new_path, old_name, new_name) in enumerate(found):
-        if i < 15:
-            print(f"  {old_name} -> {new_name}")
-    if len(found) > 15:
-        print(f"  ... и ещё {len(found) - 15}")
-
-    # Подтверждение
-    print(f"\nБудет переименовано {len(found)} файлов.")
-    confirm = input("Продолжить? (да/нет): ").strip().lower()
-    if confirm not in ("да", "yes", "y", "д"):
-        print("Отменено.")
-        input("\nНажмите Enter для выхода...")
-        sys.exit(0)
+    print("\nПереименовываю...")  # сразу работаем
 
     # Переименование
     success = 0
