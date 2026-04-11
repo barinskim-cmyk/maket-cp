@@ -881,6 +881,44 @@ tr:hover td { background: #fafafa; }
   <td contenteditable="true" class="my-comment"></td>
 </tr>
 
+<tr class="section-row"><td colspan="10">Артикулы &amp; синхронизация</td></tr>
+
+<tr data-row="mob-pipeline">
+  <td><span class="status-done">DONE</span></td>
+  <td>Мобильный / Share Link</td>
+  <td contenteditable="true"><strong>Пайплайн / "История съёмки" в мобильном интерфейсе</strong></td>
+  <td>c63b468</td>
+  <td>Вкладка пайплайна доступна через бургер-меню мобильного интерфейса. Для клиентов по share-ссылке называется "История съёмки". Показывает этапы (done/active/future), кол-во фото, даты. Read-only, без кнопок действий.</td>
+  <td class="files">cards.js, style.css</td>
+  <td>--</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="art-autorename">
+  <td><span class="status-done">DONE</span></td>
+  <td>Артикулы</td>
+  <td contenteditable="true"><strong>Авто-переименование карточки при верификации артикула</strong></td>
+  <td>c63b468</td>
+  <td>При клике "Подтвердить" (arToggleVerify) или "Подтвердить все" (arConfirmAll) карточка автоматически получает имя из артикула (card.name = art.sku). Событие записывается в proj._renameLog с trigger='verify'.</td>
+  <td class="files">articles.js</td>
+  <td>--</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="art-supabase-sync">
+  <td><span class="status-done">DONE</span></td>
+  <td>Артикулы / Облако</td>
+  <td contenteditable="true"><strong>Синхронизация артикулов с Supabase</strong></td>
+  <td>c63b468</td>
+  <td>Новая таблица articles + rename_log (migration 018). RPC save_articles_batch + save_rename_log_batch. JS: sbSaveArticles(), sbLoadArticles(), sbUploadArticleRefImage(), sbSaveRenameLog(), sbLoadRenameLog(). Дебаунс-синхронизация из articles.js при каждом match/verify/import. Загрузка из облака при открытии вкладки Артикулы если список пустой. ТРЕБУЕТ: запустить 018_articles_sync.sql в Supabase Dashboard.</td>
+  <td class="files">supabase.js, articles.js, 018_articles_sync.sql</td>
+  <td>--</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
 </tbody>
 </table>
 
