@@ -163,12 +163,13 @@ function arDbRestoreRefImages(proj, onDone) {
           c.continue();
         } else {
           if (restored > 0) {
-            console.log('arDbRestoreRefImages: восстановлено', restored, 'ref-изображений для', proj.brand);
+            console.log('arDbRestoreRefImages: восстановлено', restored, 'ref-изображений из IndexedDB для', proj.brand);
             arRenderChecklist();
             arRenderMatching();
             arRenderVerification();
           }
-          if (typeof onDone === 'function') onDone();
+          /* Фолбэк: попробовать скачать из Supabase Storage те что не нашлись в IndexedDB */
+          _arRestoreRefImagesFromCloud(proj, onDone);
         }
       };
       cursor.onerror = function() {
@@ -189,6 +190,123 @@ function arDbRestoreRefImages(proj, onDone) {
 function _arProjKey(proj) {
   var k = (proj.brand || 'noname') + '_' + (proj.shoot_date || '');
   return k.replace(/[^a-zA-Zа-яА-Я0-9_-]/g, '_');
+}
+
+
+/**
+ * Загрузить ref-изображения артикулов в Supabase Storage.
+ * Вызывается после импорта PDF если пользователь залогинен и проект в облаке.
+ * Загружает только артикулы у которых есть refImage но нет _refImagePath (ещё не в облаке).
+ * После успешной загрузки сохраняет URL в art._refImagePath и вызывает shAutoSave().
+ *
+ * Аналог sbUploadThumb() / sbUploadPreviews() для превью.
+ *
+ * @param {object} proj — проект с articles[] и _cloudId
+ */
+function arUploadRefImagesToCloud(proj) {
+  if (!proj || !proj._cloudId) return;
+  if (typeof sbUploadArticleRefImage !== 'function') return;
+  if (typeof sbIsLoggedIn === 'function' && !sbIsLoggedIn()) return;
+
+  var toUpload = [];
+  for (var i = 0; i < (proj.articles || []).length; i++) {
+    var art = proj.articles[i];
+    if (art.refImage && !art._refImagePath && art.id) {
+      toUpload.push(i);
+    }
+  }
+  if (toUpload.length === 0) return;
+
+  console.log('arUploadRefImagesToCloud: загружаю', toUpload.length, 'ref-изображений...');
+  var uploaded = 0;
+
+  function uploadNext(queueIdx) {
+    if (queueIdx >= toUpload.length) {
+      console.log('arUploadRefImagesToCloud: загружено', uploaded, 'из', toUpload.length);
+      if (uploaded > 0 && typeof shAutoSave === 'function') shAutoSave();
+      return;
+    }
+    var artIdx = toUpload[queueIdx];
+    var art = proj.articles[artIdx];
+    if (!art) { uploadNext(queueIdx + 1); return; }
+
+    sbUploadArticleRefImage(proj._cloudId, art.id, art.refImage, function(err, publicUrl) {
+      if (!err && publicUrl) {
+        art._refImagePath = publicUrl;
+        uploaded++;
+      } else if (err) {
+        console.warn('arUploadRefImagesToCloud: ошибка для', art.sku, ':', err);
+      }
+      /* Небольшая пауза чтобы не спамить Storage API */
+      setTimeout(function() { uploadNext(queueIdx + 1); }, 200);
+    });
+  }
+
+  uploadNext(0);
+}
+
+
+/**
+ * Восстановить ref-изображения из Supabase Storage в proj.articles[].refImage.
+ * Вызывается из arDbRestoreRefImages() как фолбэк если IndexedDB пустой.
+ * После загрузки сохраняет в IndexedDB для кэширования.
+ *
+ * @param {object}   proj     — проект
+ * @param {Function} [onDone] — callback()
+ */
+function _arRestoreRefImagesFromCloud(proj, onDone) {
+  if (!proj || !proj._cloudId) {
+    if (typeof onDone === 'function') onDone();
+    return;
+  }
+  if (typeof sbDownloadArticleRefImage !== 'function') {
+    if (typeof onDone === 'function') onDone();
+    return;
+  }
+
+  /* Только артикулы с _refImagePath но без refImage */
+  var toDownload = [];
+  for (var i = 0; i < (proj.articles || []).length; i++) {
+    var art = proj.articles[i];
+    if (!art.refImage && art._refImagePath) {
+      toDownload.push(i);
+    }
+  }
+  if (toDownload.length === 0) {
+    if (typeof onDone === 'function') onDone();
+    return;
+  }
+
+  console.log('arRestoreRefImagesFromCloud: скачиваю', toDownload.length, 'ref-изображений...');
+  var restored = 0;
+
+  function downloadNext(queueIdx) {
+    if (queueIdx >= toDownload.length) {
+      if (restored > 0) {
+        /* Сохранить в IndexedDB как кэш */
+        arDbSaveRefImages(proj);
+        arRenderChecklist();
+        arRenderMatching();
+        arRenderVerification();
+        console.log('arRestoreRefImagesFromCloud: восстановлено', restored, 'изображений');
+      }
+      if (typeof onDone === 'function') onDone();
+      return;
+    }
+    var artIdx = toDownload[queueIdx];
+    var art = proj.articles[artIdx];
+    if (!art || !art._refImagePath) { downloadNext(queueIdx + 1); return; }
+
+    sbDownloadArticleRefImage(art._refImagePath, function(err, dataUrl) {
+      if (!err && dataUrl) {
+        art.refImage = dataUrl;
+        restored++;
+      }
+      setTimeout(function() { downloadNext(queueIdx + 1); }, 100);
+    });
+  }
+
+  downloadNext(0);
 }
 
 
@@ -1307,8 +1425,9 @@ function _arApplyLoaded(proj, articles, fileName) {
   arUpdateStats();
   if (typeof shAutoSave === 'function') shAutoSave();
   arCloudSync();
-  /* Сохранить ref-изображения в IndexedDB (они не помещаются в localStorage) */
+  /* Сохранить ref-изображения: IndexedDB (локальный кэш) + Supabase Storage (облако) */
   arDbSaveRefImages(proj);
+  arUploadRefImagesToCloud(proj);
   console.log('articles.js: загружено ' + articles.length + ' артикулов из ' + fileName);
 
   /* Автоматически запустить AI-расстановку если есть ключ и незакреплённые карточки */
