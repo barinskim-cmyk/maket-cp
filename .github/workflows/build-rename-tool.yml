@@ -1,60 +1,25 @@
 name: Build maket_rename.exe
 
 on:
-  workflow_dispatch:          # запуск вручную из GitHub Actions
-  push:
-    paths:
-      - 'tools/maket_rename.py'   # автозапуск при изменении скрипта
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build-windows:
     runs-on: windows-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
-      - name: Install PyInstaller
-        run: pip install pyinstaller
-
-      - name: Build exe
-        run: |
-          pyinstaller --onefile --console --name maket_rename tools/maket_rename.py
-
-      - name: Upload artifact (for testing)
-        uses: actions/upload-artifact@v4
-        with:
-          name: maket_rename-exe
-          path: dist/maket_rename.exe
-          retention-days: 30
-
-      - name: Create or update GitHub Release
-        uses: softprops/action-gh-release@v2
+      - run: pip install pyinstaller
+      - run: pyinstaller --onefile --console --name maket_rename tools/maket_rename.py
+      - uses: softprops/action-gh-release@v2
         with:
           tag_name: rename-tool
           name: "Maket CP — Rename Tool"
-          body: |
-            ## maket_rename.exe — скрипт переименования фотографий
-
-            **Как использовать:**
-            1. Скачайте `maket_rename.exe`
-            2. Положите в папку с фотографиями
-            3. Туда же положите CSV-файл (экспорт из Maket CP → вкладка Артикулы)
-            4. Запустите — скрипт переименует файлы и создаст `rename_log.txt`
-
-            **Формат CSV:**
-            ```
-            old_name,new_name
-            DSC_0042.jpg,PL01056CN-13-black-26S_01.jpg
-            ```
-
-            Поддерживает вложенные папки. Не перезаписывает файлы (пропускает конфликты).
           files: dist/maket_rename.exe
-          make_latest: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
