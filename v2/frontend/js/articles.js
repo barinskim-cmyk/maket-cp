@@ -44,6 +44,154 @@ var _arLastPdfPath = '';  /* путь к последнему загруженн
    shCloudSyncExplicit() из shootings.js. Отдельный таймер не нужен. */
 
 
+/* ══════════════════════════════════════════════
+   IndexedDB: хранение ref-изображений артикулов
+   Отдельная БД, не зависит от maketcp_previews.
+   refImage (base64) не помещается в localStorage —
+   храним здесь, как превью фотографий.
+   ══════════════════════════════════════════════ */
+
+var AR_DB_NAME    = 'maketcp_articles';
+var AR_DB_VERSION = 1;
+var AR_DB_STORE   = 'ref_images';
+var _arDb         = null;
+
+/**
+ * Открыть IndexedDB для ref-изображений артикулов.
+ * @param {function} callback — callback(db) или callback(null) при ошибке
+ */
+function arDbOpen(callback) {
+  if (_arDb) { callback(_arDb); return; }
+  if (!window.indexedDB) { callback(null); return; }
+
+  var req = indexedDB.open(AR_DB_NAME, AR_DB_VERSION);
+  req.onupgradeneeded = function(e) {
+    var db = e.target.result;
+    if (!db.objectStoreNames.contains(AR_DB_STORE)) {
+      /* Ключ: "projKey/artId" */
+      db.createObjectStore(AR_DB_STORE);
+    }
+  };
+  req.onsuccess = function(e) {
+    _arDb = e.target.result;
+    callback(_arDb);
+  };
+  req.onerror = function() {
+    console.warn('arDbOpen: IndexedDB не доступен');
+    callback(null);
+  };
+}
+
+/**
+ * Сохранить ref-изображения всех артикулов проекта в IndexedDB.
+ * Сохраняет только артикулы у которых есть непустой refImage.
+ * @param {object} proj — проект с articles[] и proj.brand/shoot_date
+ */
+function arDbSaveRefImages(proj) {
+  if (!proj || !proj.articles || proj.articles.length === 0) return;
+  var projKey = _arProjKey(proj);
+
+  arDbOpen(function(db) {
+    if (!db) return;
+    try {
+      var tx = db.transaction(AR_DB_STORE, 'readwrite');
+      var store = tx.objectStore(AR_DB_STORE);
+      var saved = 0;
+      for (var i = 0; i < proj.articles.length; i++) {
+        var art = proj.articles[i];
+        if (!art.refImage || !art.id) continue;
+        store.put({ id: art.id, refImage: art.refImage }, projKey + '/' + art.id);
+        saved++;
+      }
+      if (saved > 0) console.log('arDbSaveRefImages: сохранено', saved, 'ref-изображений для', proj.brand);
+    } catch(e) {
+      console.warn('arDbSaveRefImages:', e);
+    }
+  });
+}
+
+/**
+ * Восстановить ref-изображения артикулов из IndexedDB в proj.articles[].refImage.
+ * Вызывается при открытии вкладки Артикулы.
+ * @param {object}   proj     — проект
+ * @param {function} [onDone] — опциональный callback()
+ */
+function arDbRestoreRefImages(proj, onDone) {
+  if (!proj || !proj.articles || proj.articles.length === 0) {
+    if (typeof onDone === 'function') onDone();
+    return;
+  }
+
+  /* Проверить: нужно ли восстанавливать */
+  var missing = 0;
+  for (var i = 0; i < proj.articles.length; i++) {
+    if (!proj.articles[i].refImage) missing++;
+  }
+  if (missing === 0) {
+    if (typeof onDone === 'function') onDone();
+    return;  /* Всё уже есть */
+  }
+
+  var projKey = _arProjKey(proj);
+
+  arDbOpen(function(db) {
+    if (!db) { if (typeof onDone === 'function') onDone(); return; }
+    try {
+      var tx = db.transaction(AR_DB_STORE, 'readonly');
+      var store = tx.objectStore(AR_DB_STORE);
+
+      /* Индекс артикулов по id для быстрого поиска */
+      var byId = {};
+      for (var j = 0; j < proj.articles.length; j++) {
+        if (proj.articles[j].id) byId[proj.articles[j].id] = proj.articles[j];
+      }
+
+      var prefix = projKey + '/';
+      var cursor = store.openCursor();
+      var restored = 0;
+
+      cursor.onsuccess = function(e) {
+        var c = e.target.result;
+        if (c) {
+          if (typeof c.key === 'string' && c.key.indexOf(prefix) === 0) {
+            var artId = c.key.slice(prefix.length);
+            if (byId[artId] && !byId[artId].refImage && c.value && c.value.refImage) {
+              byId[artId].refImage = c.value.refImage;
+              restored++;
+            }
+          }
+          c.continue();
+        } else {
+          if (restored > 0) {
+            console.log('arDbRestoreRefImages: восстановлено', restored, 'ref-изображений для', proj.brand);
+            arRenderChecklist();
+            arRenderMatching();
+            arRenderVerification();
+          }
+          if (typeof onDone === 'function') onDone();
+        }
+      };
+      cursor.onerror = function() {
+        if (typeof onDone === 'function') onDone();
+      };
+    } catch(e) {
+      console.warn('arDbRestoreRefImages:', e);
+      if (typeof onDone === 'function') onDone();
+    }
+  });
+}
+
+/**
+ * Ключ проекта для IndexedDB — тот же формат что в previews.js.
+ * @param {object} proj
+ * @returns {string}
+ */
+function _arProjKey(proj) {
+  var k = (proj.brand || 'noname') + '_' + (proj.shoot_date || '');
+  return k.replace(/[^a-zA-Zа-яА-Я0-9_-]/g, '_');
+}
+
+
 /* ──────────────────────────────────────────────
    Облачная синхронизация артикулов
    ────────────────────────────────────────────── */
@@ -300,12 +448,15 @@ function arOnPageShow() {
   arRenderVerification();
   arUpdateStats();
 
-  /* Если проект в облаке — попробовать подтянуть артикулы (только первый раз или если список пустой) */
-  if (proj._cloudId && (!proj.articles || proj.articles.length === 0)) {
-    arLoadFromCloud(function(err) {
-      if (err) console.warn('arOnPageShow: cloud load failed:', err);
-    });
-  }
+  /* Восстановить ref-изображения из IndexedDB (они не хранятся в localStorage) */
+  arDbRestoreRefImages(proj, function() {
+    /* После восстановления refImages — подтянуть статусы из облака если нужно */
+    if (proj._cloudId && (!proj.articles || proj.articles.length === 0)) {
+      arLoadFromCloud(function(err) {
+        if (err) console.warn('arOnPageShow: cloud load failed:', err);
+      });
+    }
+  });
 }
 
 
@@ -996,7 +1147,7 @@ function _arOpenAIRequest(messages, maxTokens, timeoutMs, apiKey, callback) {
 
   if (isWeb) {
     sbClient.functions.invoke('openai-vision', {
-      body: { messages: messages, max_tokens: maxTokens, temperature: 0.1 }
+      body: { messages: messages, max_tokens: maxTokens, temperature: 0 }
     }).then(function(result) {
       if (result.error) {
         var errText = result.error.message || String(result.error);
@@ -1029,7 +1180,7 @@ function _arOpenAIRequest(messages, maxTokens, timeoutMs, apiKey, callback) {
   xhr.onload = function() { callback(xhr.responseText, xhr.status); };
   xhr.onerror = function() { callback(null, 0); };
   xhr.ontimeout = function() { callback(null, -1); };
-  xhr.send(JSON.stringify({ model: 'gpt-4o', messages: messages, max_tokens: maxTokens, temperature: 0.1 }));
+  xhr.send(JSON.stringify({ model: 'gpt-4o', messages: messages, max_tokens: maxTokens, temperature: 0 }));
 }
 
 
@@ -1048,7 +1199,7 @@ function _arCallOpenAIVision(apiKey, base64Image, pageNum, totalPages, callback)
   /* ── Веб-режим: Edge Function ── */
   if (isWeb) {
     sbClient.functions.invoke('openai-vision', {
-      body: { messages: messages, max_tokens: 4000, temperature: 0.1 }
+      body: { messages: messages, max_tokens: 4000, temperature: 0 }
     }).then(function(result) {
       if (result.error) {
         /* Edge Function вернула HTTP-ошибку или сетевую ошибку */
@@ -1098,7 +1249,7 @@ function _arCallOpenAIVision(apiKey, base64Image, pageNum, totalPages, callback)
     model: 'gpt-4o',
     messages: messages,
     max_tokens: 4000,
-    temperature: 0.1
+    temperature: 0
   }));
 }
 
@@ -1156,6 +1307,8 @@ function _arApplyLoaded(proj, articles, fileName) {
   arUpdateStats();
   if (typeof shAutoSave === 'function') shAutoSave();
   arCloudSync();
+  /* Сохранить ref-изображения в IndexedDB (они не помещаются в localStorage) */
+  arDbSaveRefImages(proj);
   console.log('articles.js: загружено ' + articles.length + ' артикулов из ' + fileName);
 
   /* Автоматически запустить AI-расстановку если есть ключ и незакреплённые карточки */
@@ -2542,7 +2695,7 @@ function _arMatchWithPdfPages(cards, skuList, pdfPages, apiKey, proj, statusEl) 
       model: 'gpt-4o',
       messages: [{ role: 'user', content: msgContent }],
       max_tokens: 300,
-      temperature: 0.2
+      temperature: 0
     };
 
     _arSendWithRetry(body, apiKey, 0, function(text) {
