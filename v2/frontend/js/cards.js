@@ -2847,6 +2847,12 @@ function cpMobileRenderFeed() {
 
     html += '</div>'; /* mob-card-slots */
 
+    /* Кнопка "добавить слот" — только в клиентском режиме */
+    if (typeof _appClientMode !== 'undefined' && _appClientMode) {
+      html += '<button class="mob-slot-add-btn" onclick="cpMobileAddSlot(' + ci + ')" ';
+      html += 'aria-label="Добавить слот">+ Добавить слот</button>';
+    }
+
     /* Комментарии к карточке (мобильная версия) */
     try { html += _cpMobileCommentsHTML(ci, card); } catch(e) { console.error('mob-comments render:', e); }
 
@@ -2968,6 +2974,69 @@ function cpMobileCarousel(cardIdx, slotIdx, dir, e) {
   /* Авто-синхронизация (тихо, без UI перерисовки) */
   if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
   if (typeof shAutoSave === 'function') shAutoSave();
+}
+
+/**
+ * Добавить новый пустой слот в карточку (мобильный клиент).
+ * Нужно чтобы клиент мог вернуть удалённый слот или добавить ещё фото.
+ * Ориентация нового слота берётся из последнего слота карточки (или 'v' по умолчанию).
+ * @param {number} cardIdx
+ */
+function cpMobileAddSlot(cardIdx) {
+  var proj = getActiveProject();
+  if (!proj || !proj.cards || !proj.cards[cardIdx]) return;
+  var card = proj.cards[cardIdx];
+  if (!card.slots) card.slots = [];
+
+  /* Ориентация: наследуем от последнего слота — так вероятнее совпадёт с шаблоном */
+  var defOrient = 'v';
+  if (card.slots.length > 0) {
+    var last = card.slots[card.slots.length - 1];
+    defOrient = last.orient || 'v';
+  }
+
+  card.slots.push({
+    orient: defOrient,
+    weight: 1,
+    options: [],
+    selected: -1,
+    file: null,
+    dataUrl: null,
+    thumbUrl: null,
+    path: null,
+    comment: ''
+  });
+
+  if (typeof sbLogAction === 'function') sbLogAction('add_slot', 'card', card.id, card.name, '');
+  if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
+  if (typeof shAutoSave === 'function') shAutoSave();
+
+  /* Хирургический апдейт: перерисовать только mob-card-block этой карточки */
+  if (_mobViewMode === 'cards') {
+    var block = document.querySelector('.mob-card-block[data-card-idx="' + cardIdx + '"]');
+    if (block && block.parentNode) {
+      var feedHtml = '';
+      try { feedHtml = cpMobileRenderFeed(); } catch(e) { feedHtml = ''; }
+      var tmp = document.createElement('div');
+      tmp.innerHTML = feedHtml;
+      var newBlock = tmp.querySelector('.mob-card-block[data-card-idx="' + cardIdx + '"]');
+      if (newBlock) {
+        block.parentNode.replaceChild(newBlock, block);
+        if (typeof cpMobileBindCarousels === 'function') cpMobileBindCarousels();
+        if (typeof cpMobileBindDoubleTap === 'function') cpMobileBindDoubleTap();
+        if (typeof cpMobileBindSlotTap === 'function') cpMobileBindSlotTap();
+        /* Прокрутить к новому слоту, чтобы клиент видел куда он добавился */
+        var newSlot = newBlock.querySelector('.mob-slot-empty:last-of-type');
+        if (newSlot && newSlot.scrollIntoView) {
+          try { newSlot.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch(e2) {}
+        }
+        return;
+      }
+    }
+  }
+
+  /* Фолбэк */
+  cpMobileRender();
 }
 
 /**
@@ -3134,6 +3203,9 @@ function cpMobileReject() {
 function cpMobileBindCarousels() {
   var carousels = document.querySelectorAll('.mob-carousel-wrap');
   for (var i = 0; i < carousels.length; i++) {
+    /* Избегаем двойной привязки при хирургических апдейтах. */
+    if (carousels[i].getAttribute('data-swipe-bound') === '1') continue;
+    carousels[i].setAttribute('data-swipe-bound', '1');
     (function(el) {
       var startX = 0;
       var startY = 0;
@@ -3163,6 +3235,9 @@ function cpMobileBindCarousels() {
 function cpMobileBindDoubleTap() {
   var empties = document.querySelectorAll('.mob-slot-empty');
   for (var i = 0; i < empties.length; i++) {
+    /* Избегаем двойной привязки при хирургических апдейтах. */
+    if (empties[i].getAttribute('data-dbltap-bound') === '1') continue;
+    empties[i].setAttribute('data-dbltap-bound', '1');
     (function(el) {
       var lastTap = 0;
       el.addEventListener('touchend', function(e) {
@@ -3188,6 +3263,9 @@ function cpMobileBindDoubleTap() {
 function cpMobileBindSlotTap() {
   var carousels = document.querySelectorAll('.mob-carousel-wrap');
   for (var i = 0; i < carousels.length; i++) {
+    /* Избегаем двойной привязки при хирургических апдейтах. */
+    if (carousels[i].getAttribute('data-tap-bound') === '1') continue;
+    carousels[i].setAttribute('data-tap-bound', '1');
     (function(el) {
       el.addEventListener('click', function(e) {
         /* Если кликнули на кнопку (стрелку, удаление) — не трогать */

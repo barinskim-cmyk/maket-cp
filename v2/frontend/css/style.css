@@ -1979,6 +1979,27 @@ body.mob-client-mode html {
   border: 2px dashed #ccc; border-radius: 4px;
   cursor: pointer;
 }
+
+/* Кнопка "добавить слот" — под сеткой слотов карточки (мобильный клиент) */
+.mob-slot-add-btn {
+  display: block;
+  width: calc(100% - 24px);
+  margin: 8px 12px 4px;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1.5px dashed #bbb;
+  border-radius: 6px;
+  color: #666;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  -webkit-tap-highlight-color: rgba(0,0,0,0.05);
+}
+.mob-slot-add-btn:active {
+  background: #f5f5f5;
+  border-color: #888;
+  color: #333;
+}
 .mob-slot-empty-text {
   font-size: 13px; color: #bbb; text-align: center;
   padding: 20px;
