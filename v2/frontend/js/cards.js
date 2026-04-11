@@ -3798,8 +3798,22 @@ function cpSaveNewComment(cardIdx, e) {
  * @returns {string}
  */
 function _cpMobileCommentsHTML(cardIdx, card) {
+  /* Внешний контейнер — id нужен чтобы обновлять блок точечно
+     (без полной перерисовки страницы, иначе поле ввода "моргает") */
+  var html = '<div class="mob-comments" id="mob-comments-' + cardIdx + '">';
+  html += _cpMobileCommentsInnerHTML(cardIdx, card);
+  html += '</div>';
+  return html;
+}
+
+/**
+ * Содержимое блока комментариев (без внешнего контейнера).
+ * Вынесено отдельно, чтобы `cpMobileSendComment` мог обновлять только эту часть
+ * — и не перерисовывать всю страницу через `cpMobileRender()`.
+ */
+function _cpMobileCommentsInnerHTML(cardIdx, card) {
   var comments = card._comments || [];
-  var html = '<div class="mob-comments">';
+  var html = '';
 
   /* Существующие комментарии */
   if (comments.length > 0) {
@@ -3814,13 +3828,14 @@ function _cpMobileCommentsHTML(cardIdx, card) {
     }
   }
 
-  /* Поле ввода */
+  /* Поле ввода + кнопка "OK". Отправка — через обработчик onkeydown (Enter)
+     и onclick кнопки, оба вызывают cpMobileSendComment(cardIdx). */
   html += '<div class="mob-comment-add">';
-  html += '<input type="text" class="mob-comment-input" id="mob-cmt-input-' + cardIdx + '" placeholder="Комментарий...">';
+  html += '<input type="text" class="mob-comment-input" id="mob-cmt-input-' + cardIdx + '" placeholder="Комментарий..." ';
+  html += 'onkeydown="if(event.key===\'Enter\'){cpMobileSendComment(' + cardIdx + ');event.preventDefault();}">';
   html += '<button class="mob-comment-send" onclick="cpMobileSendComment(' + cardIdx + ')">OK</button>';
   html += '</div>';
 
-  html += '</div>';
   return html;
 }
 
@@ -3833,7 +3848,6 @@ function cpMobileSendComment(cardIdx) {
   if (!input) return;
   var text = input.value.trim();
   if (!text) return;
-  input.value = '';
   var author = window._shareToken ? 'client' : 'team';
   var proj = getActiveProject();
   if (!proj || !proj.cards || !proj.cards[cardIdx]) return;
@@ -3852,5 +3866,20 @@ function cpMobileSendComment(cardIdx) {
   if (typeof shAutoSave === 'function') shAutoSave();
   /* Синхронизировать комментарий в облако немедленно */
   if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
-  cpMobileRender();
+
+  /* ТОЧЕЧНОЕ обновление — перерисовываем ТОЛЬКО блок комментариев этой карточки.
+     Раньше вызывался cpMobileRender() и вся страница мигала/прыгала.
+     Теперь меняем innerHTML одного контейнера — input получает фокус заново. */
+  var container = document.getElementById('mob-comments-' + cardIdx);
+  if (container) {
+    container.innerHTML = _cpMobileCommentsInnerHTML(cardIdx, card);
+    /* Вернуть фокус на поле ввода — удобнее для подряд нескольких комментариев */
+    var newInput = document.getElementById('mob-cmt-input-' + cardIdx);
+    if (newInput) {
+      try { newInput.focus({ preventScroll: true }); } catch(e) { newInput.focus(); }
+    }
+  } else {
+    /* Фолбэк: если контейнер не найден (например, вид сменился) — полный рендер */
+    cpMobileRender();
+  }
 }

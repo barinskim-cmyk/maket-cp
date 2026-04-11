@@ -3477,6 +3477,13 @@ function arToggleVerify(idx) {
   arRenderChecklist();
   arRenderVerification();
   arUpdateStats();
+
+  /* Обновить отображение карточек — имя карточки поменялось,
+     сайдбар со списком карточек и заголовок активной карточки
+     должны показать новое название СРАЗУ, без переключения вкладок. */
+  if (typeof cpRenderList === 'function') cpRenderList();
+  if (typeof cpRenderCard === 'function') cpRenderCard();
+
   if (typeof shAutoSave === 'function') shAutoSave();
   arCloudSync();
 }
@@ -3500,6 +3507,12 @@ function arConfirmAll() {
   arRenderChecklist();
   arRenderVerification();
   arUpdateStats();
+
+  /* После массового подтверждения — обновить список карточек и активную карточку,
+     чтобы новые имена стали видны сразу. */
+  if (typeof cpRenderList === 'function') cpRenderList();
+  if (typeof cpRenderCard === 'function') cpRenderCard();
+
   if (typeof shAutoSave === 'function') shAutoSave();
   arCloudSync();
 }
