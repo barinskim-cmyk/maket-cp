@@ -1265,7 +1265,17 @@ function _arOpenAIRequest(messages, maxTokens, timeoutMs, apiKey, callback) {
 
   if (isWeb) {
     sbClient.functions.invoke('openai-vision', {
-      body: { messages: messages, max_tokens: maxTokens, temperature: 0 }
+      body: {
+        messages: messages,
+        max_tokens: maxTokens,
+        /* Temperature 0.2: Masha попросила "повысить температуру" для
+           матчинга — слегка ослабляем детерминизм, чтобы модель не
+           застревала на "match: null" из-за строгих правил промпта.
+           Confidence-фильтр high/medium + playoff-раунд удерживают
+           false-positive в рамках. */
+        temperature: 0.2,
+        model: 'gpt-5.4-mini'
+      }
     }).then(function(result) {
       if (result.error) {
         var errText = result.error.message || String(result.error);
@@ -1298,7 +1308,16 @@ function _arOpenAIRequest(messages, maxTokens, timeoutMs, apiKey, callback) {
   xhr.onload = function() { callback(xhr.responseText, xhr.status); };
   xhr.onerror = function() { callback(null, 0); };
   xhr.ontimeout = function() { callback(null, -1); };
-  xhr.send(JSON.stringify({ model: 'gpt-4o', messages: messages, max_tokens: maxTokens, temperature: 0 }));
+  /* gpt-5.4-mini: в ~5× дешевле gpt-4o и поддерживает URL-first vision-payload.
+     Web-режим получает ту же модель через openai-vision Edge Function (см.
+     body.model выше). Temperature 0.2: Masha попросила повысить температуру
+     для матчинга, чтобы модель смелее выбирала между похожими кандидатами. */
+  xhr.send(JSON.stringify({
+    model: 'gpt-5.4-mini',
+    messages: messages,
+    max_tokens: maxTokens,
+    temperature: 0.2
+  }));
 }
 
 
@@ -1364,7 +1383,7 @@ function _arCallOpenAIVision(apiKey, base64Image, pageNum, totalPages, callback)
   xhr.ontimeout = function() { callback('Таймаут запроса', null); };
 
   xhr.send(JSON.stringify({
-    model: 'gpt-4o',
+    model: 'gpt-5.4-mini',
     messages: messages,
     max_tokens: 4000,
     temperature: 0
@@ -2732,13 +2751,18 @@ function arAutoMatchAll() {
   var statusEl = document.getElementById('ar-stats');
   console.log('articles.js: arAutoMatchAll — ' + cards.length + ' cards, PDF pages strategy');
 
-  /* Основная стратегия: PDF страницы (все артикулы видны на одной картинке) */
+  /* Основная стратегия: PDF страницы (все артикулы видны на одной картинке).
+     После рендера загружаем страницы в Supabase Storage и кешируем URL —
+     это экономит токены и трафик, так как OpenAI Vision грузит картинки
+     напрямую по URL вместо приёма base64. */
   if (_arLastPdfPath && window.pywebview && window.pywebview.api && window.pywebview.api.pdf_pages_to_images) {
     if (statusEl) statusEl.textContent = 'Рендерю PDF (300 DPI)...';
     window.pywebview.api.pdf_pages_to_images(_arLastPdfPath).then(function(result) {
       if (result && result.pages && result.pages.length > 0) {
         console.log('articles.js: PDF rendered — ' + result.pages.length + ' pages');
-        _arMatchWithPdfPages(cards, skuList, result.pages, apiKey, proj, statusEl);
+        _arEnsurePdfPageUrls(proj, result.pages, statusEl, function(pageUrls) {
+          _arMatchWithPdfPages(cards, skuList, pageUrls, apiKey, proj, statusEl);
+        });
       } else {
         if (statusEl) statusEl.textContent = 'PDF не отрендерился, пробую refImage...';
         _arMatchWithRefImages(cards, proj, pvByName, apiKey, statusEl);
@@ -2746,9 +2770,70 @@ function arAutoMatchAll() {
     }).catch(function() {
       _arMatchWithRefImages(cards, proj, pvByName, apiKey, statusEl);
     });
+  } else if (proj._pdfPageUrls && proj._pdfPageUrls.length > 0) {
+    /* Веб-режим или повторный прогон: страницы уже в Storage — используем кэш */
+    console.log('articles.js: using cached PDF page URLs (' + proj._pdfPageUrls.length + ')');
+    _arMatchWithPdfPages(cards, skuList, proj._pdfPageUrls.slice(), apiKey, proj, statusEl);
   } else {
     _arMatchWithRefImages(cards, proj, pvByName, apiKey, statusEl);
   }
+}
+
+
+/**
+ * Загрузить страницы отрендеренного PDF в Supabase Storage (ai-pdf-pages)
+ * и вернуть массив публичных URL. Если страницы уже загружены (совпадает
+ * количество), возвращаем кэш из proj._pdfPageUrls без повторной выгрузки.
+ * Если облако недоступно — возвращаем исходный массив base64 (fallback).
+ *
+ * @param {object}   proj     — активный проект (нужен proj._cloudId)
+ * @param {string[]} pdfPages — массив base64 (или data URL) страниц
+ * @param {Element}  statusEl — элемент для отображения статуса
+ * @param {function} onDone   — callback(urlArray)
+ */
+function _arEnsurePdfPageUrls(proj, pdfPages, statusEl, onDone) {
+  /* Нет облака или функция загрузки недоступна — используем base64 напрямую */
+  if (!proj || !proj._cloudId || typeof sbUploadPdfPage !== 'function') {
+    onDone(pdfPages);
+    return;
+  }
+  /* Кэш актуален — reuse */
+  if (proj._pdfPageUrls && proj._pdfPageUrls.length === pdfPages.length) {
+    console.log('articles.js: PDF pages URL cache hit (' + pdfPages.length + ')');
+    onDone(proj._pdfPageUrls.slice());
+    return;
+  }
+
+  console.log('articles.js: uploading ' + pdfPages.length + ' PDF pages to Storage');
+  var urls = [];
+  var i = 0;
+  function next() {
+    if (i >= pdfPages.length) {
+      proj._pdfPageUrls = urls.slice();
+      if (typeof shAutoSave === 'function') shAutoSave();
+      onDone(urls);
+      return;
+    }
+    if (statusEl) {
+      statusEl.textContent = 'Загружаю PDF в облако (' + (i + 1) + '/' + pdfPages.length + ')...';
+    }
+    var page = pdfPages[i];
+    /* Базовая нормализация: если это голый base64 — добавляем префикс */
+    if (page && page.indexOf('data:') !== 0) page = 'data:image/jpeg;base64,' + page;
+
+    sbUploadPdfPage(proj._cloudId, i, page, function(err, publicUrl) {
+      if (publicUrl) {
+        urls.push(publicUrl);
+      } else {
+        /* Fallback — если upload упал, используем base64 на этой странице */
+        console.warn('articles.js: PDF page ' + i + ' upload failed (' + err + '), falling back to base64');
+        urls.push(page);
+      }
+      i++;
+      next();
+    });
+  }
+  next();
 }
 
 
@@ -2824,7 +2909,7 @@ function _arMatchWithPdfPages(cards, skuList, pdfPages, apiKey, proj, statusEl) 
     }
 
     var body = {
-      model: 'gpt-4o',
+      model: 'gpt-5.4-mini',
       messages: [{ role: 'user', content: msgContent }],
       max_tokens: 300,
       temperature: 0
@@ -2921,12 +3006,20 @@ function _arMatchWithRefImages(cards, proj, pvByName, apiKey, statusEl) {
 
     var ci = cards[cardIdx];
 
-    /* Собрать свободные кандидаты */
+    /* Собрать свободные кандидаты.
+       refImageUrl — публичный URL в Storage (предпочтительно для Vision API).
+       refImage   — base64 fallback, если URL ещё не загружен. */
     var candidates = [];
     for (var a = 0; a < (proj.articles || []).length; a++) {
       var art = proj.articles[a];
-      if (art.cardIdx >= 0 || !art.refImage) continue;
-      candidates.push({ idx: a, sku: art.sku, refImage: art.refImage });
+      if (art.cardIdx >= 0) continue;
+      if (!art.refImage && !art._refImagePath) continue;
+      candidates.push({
+        idx: a,
+        sku: art.sku,
+        refImage: art.refImage || '',
+        refImageUrl: art._refImagePath || ''
+      });
     }
 
     if (candidates.length === 0) {
@@ -3142,10 +3235,16 @@ function _arMatchOneCard(cardIdx, cardImgs, category, candidates, apiKey, onDone
     msgContent.push({ type: 'image_url', image_url: { url: cUrl, detail: 'high' } });
   }
 
-  /* Фото кандидатов */
+  /* Фото кандидатов: предпочитаем URL из Storage — OpenAI Vision скачает
+     сам, это экономит входные токены и трафик. Если URL нет — fallback base64. */
   for (var j = 0; j < cands.length; j++) {
+    var refUrl = cands[j].refImageUrl || cands[j].refImage;
+    if (!refUrl) continue;
+    if (refUrl.indexOf('data:') !== 0 && refUrl.indexOf('http') !== 0) {
+      refUrl = 'data:image/jpeg;base64,' + refUrl;
+    }
     msgContent.push({ type: 'text', text: '--- A' + (j + 1) + ' ---' });
-    msgContent.push({ type: 'image_url', image_url: { url: cands[j].refImage, detail: 'high' } });
+    msgContent.push({ type: 'image_url', image_url: { url: refUrl, detail: 'high' } });
   }
 
   _arOpenAIRequest([{ role: 'user', content: msgContent }], 200, 60000, apiKey, function(responseText, status) {

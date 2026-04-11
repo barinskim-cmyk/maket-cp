@@ -50,9 +50,14 @@ serve(async (req: Request) => {
       });
     }
 
-    /* Тело запроса: { messages, max_tokens, temperature } */
+    /* Тело запроса: { messages, max_tokens, temperature, model } */
     const body = await req.json();
-    const { messages, max_tokens = 4000, temperature = 0.1 } = body;
+    const {
+      messages,
+      max_tokens = 4000,
+      temperature = 0.1,
+      model = 'gpt-5.4-mini',
+    } = body;
 
     if (!messages || !Array.isArray(messages)) {
       return new Response(JSON.stringify({ error: 'messages required' }), {
@@ -70,7 +75,9 @@ serve(async (req: Request) => {
       });
     }
 
-    /* Запрос к OpenAI */
+    /* Запрос к OpenAI.
+       Модель передаётся из фронтенда (по умолчанию gpt-5.4-mini — дешевле
+       и быстрее gpt-4o, поддерживает URL-first vision-payload). */
     const openaiResp = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -78,7 +85,7 @@ serve(async (req: Request) => {
         'Authorization': `Bearer ${openaiKey}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model,
         messages,
         max_tokens,
         temperature,

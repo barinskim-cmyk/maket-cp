@@ -3769,6 +3769,56 @@ function sbUploadArticleRefImage(projectId, artId, base64, callback) {
 
 
 /**
+ * Загрузить страницу PDF чек-листа в Supabase Storage (bucket ai-pdf-pages).
+ * Используется для AI-матчинга: вместо отправки base64 в OpenAI Vision
+ * передаётся публичный URL, что экономит трафик и входные токены.
+ *
+ * Путь в бакете: <projectId>/page_<pageIdx>.<ext>
+ * Upsert: true — перезапись при повторной выгрузке.
+ *
+ * @param {string}   projectId — UUID проекта в Supabase (proj._cloudId)
+ * @param {number}   pageIdx   — индекс страницы (0-based)
+ * @param {string}   base64    — data:image/...;base64,... строка
+ * @param {Function} callback  — callback(err, publicUrl)
+ */
+function sbUploadPdfPage(projectId, pageIdx, base64, callback) {
+  if (!sbClient || !projectId || !base64) {
+    if (typeof callback === 'function') callback(null, '');
+    return;
+  }
+
+  /* base64 → Blob */
+  var parts = base64.split(',');
+  var mime  = (parts[0].match(/:(.*?);/) || ['', 'image/jpeg'])[1];
+  var bstr  = atob(parts[1] || '');
+  var n = bstr.length;
+  var u8arr = new Uint8Array(n);
+  while (n--) { u8arr[n] = bstr.charCodeAt(n); }
+  var blob = new Blob([u8arr], { type: mime });
+  var ext  = (mime.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
+  var path = projectId + '/page_' + pageIdx + '.' + ext;
+
+  sbClient.storage.from('ai-pdf-pages')
+    .upload(path, blob, { upsert: true, contentType: mime })
+    .then(function(resp) {
+      if (resp.error) {
+        console.warn('sbUploadPdfPage error:', resp.error.message);
+        if (typeof callback === 'function') callback(resp.error.message, '');
+        return;
+      }
+      /* Bucket публичный — получаем прямой URL */
+      var urlResp = sbClient.storage.from('ai-pdf-pages').getPublicUrl(path);
+      var publicUrl = (urlResp.data && urlResp.data.publicUrl) ? urlResp.data.publicUrl : '';
+      if (typeof callback === 'function') callback(null, publicUrl);
+    })
+    ['catch'](function(err) {
+      console.error('sbUploadPdfPage exception:', err);
+      if (typeof callback === 'function') callback(String(err), '');
+    });
+}
+
+
+/**
  * Сохранить лог переименований в Supabase.
  * Передаёт только новые записи (не загруженные ранее).
  *
