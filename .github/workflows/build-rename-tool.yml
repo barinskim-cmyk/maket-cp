@@ -19,8 +19,6 @@ jobs:
 
       - name: Test maket_rename.exe
         shell: pwsh
-        env:
-          PYTHONUTF8: "1"
         run: |
           mkdir test_photos
           echo $null > test_photos\DSC_0001.jpg
@@ -28,6 +26,7 @@ jobs:
           echo $null > test_photos\DSC_0003.jpg
           "old_name,new_name`nDSC_0001.jpg,ART-001-black_01.jpg`nDSC_0002.jpg,ART-001-black_02.jpg`nDSC_0003.jpg,ART-002-white_01.jpg" | Out-File -Encoding utf8 test_photos\rename_test.csv
           cd test_photos
+          $env:PYTHONUTF8 = "1"
           ..\dist\maket_rename.exe
           if (!(Test-Path "ART-001-black_01.jpg")) { Write-Error "FAIL"; exit 1 }
           if (!(Test-Path "ART-001-black_02.jpg")) { Write-Error "FAIL"; exit 1 }
