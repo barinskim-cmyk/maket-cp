@@ -17,14 +17,22 @@ Maket CP -- DAM для коммерческих фотографов. Desktop-fi
    Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
    ```
 3. **Перед началом работы** -- проверить `git log --oneline -5` чтобы понять контекст.
-4. **Workaround для lock-файлов** в этой среде: использовать `GIT_DIR=/tmp/maketcp_git` как описано ниже:
+4. **Workaround для lock-файлов** в этой среде: использовать `GIT_DIR=/tmp/maketcp_git` как описано ниже.
+   **ОБЯЗАТЕЛЬНО включать fetch + rebase перед коммитом и push после** -- иначе у Masha будет non-fast-forward при git push:
    ```bash
    cp -r .git /tmp/maketcp_git
    rm -f /tmp/maketcp_git/*.lock /tmp/maketcp_git/objects/maintenance.lock
+   # 1. Синхронизироваться с remote перед коммитом
+   GIT_DIR=/tmp/maketcp_git GIT_WORK_TREE="$(pwd)" git fetch origin main 2>/dev/null || true
+   GIT_DIR=/tmp/maketcp_git GIT_WORK_TREE="$(pwd)" git rebase origin/main 2>/dev/null || true
+   # 2. Добавить файлы и закоммитить
    GIT_DIR=/tmp/maketcp_git GIT_WORK_TREE="$(pwd)" git add <files>
    GIT_DIR=/tmp/maketcp_git GIT_WORK_TREE="$(pwd)" git commit -m "..."
+   # 3. Скопировать обратно и запушить
    cp -r /tmp/maketcp_git/* .git/ 2>/dev/null
+   GIT_DIR=/tmp/maketcp_git GIT_WORK_TREE="$(pwd)" git push origin main 2>/dev/null || true
    ```
+   Если push упал -- не критично, Masha может запустить `git sync` вручную.
 5. **Никогда не делать** `git add .` или `git add -A` -- только конкретные файлы.
 
 ## Архитектура: не ломать
