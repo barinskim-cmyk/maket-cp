@@ -91,10 +91,15 @@ document.addEventListener('click', function(e) {
 function navUpdateTabVisibility() {
   var isDesktop = !!(window.pywebview && window.pywebview.api);
   var syncBtn = document.getElementById('nav-sync');
+  var arBtn   = document.getElementById('nav-articles');
 
   /* Синхронизация — только desktop (нужен Python для записи COS) */
   if (syncBtn) syncBtn.style.display = isDesktop ? '' : 'none';
-  /* Артикулы — доступны и в web, и в desktop */
+
+  /* Артикулы — только desktop.
+     В web/мобильном режиме вкладка скрыта: переименование через maket_rename.exe,
+     а web-клиенты (share-ссылки и мобильные владельцы) не работают с артикулами. */
+  if (arBtn) arBtn.style.display = isDesktop ? '' : 'none';
 }
 
 /* Запуск при DOMContentLoaded: скрыть для web */

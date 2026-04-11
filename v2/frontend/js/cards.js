@@ -2701,11 +2701,23 @@ function cpMobileRenderFeed() {
       if (isHero || isHeroByWeight) slotClass = 'mob-slot-hero';
       else if (orient === 'h') slotClass = 'mob-slot-h';
 
+      /* Aspect ratio из шаблона карточки (например '2/3', '3/4', '4/5').
+         Для вертикальных берём _vAspect, для горизонтальных — _hAspect.
+         Hero-слот показывается в полную ширину без фиксированного соотношения. */
+      var slotStyle = '';
+      if (slotClass === 'mob-slot-v') {
+        var vAspect = card._vAspect || '2/3';
+        slotStyle = ' style="aspect-ratio:' + vAspect.replace('/', ' / ') + '"';
+      } else if (slotClass === 'mob-slot-h') {
+        var hAspect = card._hAspect || '3/2';
+        slotStyle = ' style="aspect-ratio:' + hAspect.replace('/', ' / ') + '"';
+      }
+
       var hasFoto = slot.file || slot.dataUrl;
 
       if (hasFoto) {
         var src = slot.dataUrl || slot.thumbUrl || slot.thumb || '';
-        html += '<div class="' + slotClass + ' mob-carousel-wrap" data-card="' + ci + '" data-slot="' + si + '">';
+        html += '<div class="' + slotClass + ' mob-carousel-wrap"' + slotStyle + ' data-card="' + ci + '" data-slot="' + si + '">';
         html += '<img src="' + src + '" loading="lazy">';
         /* Стрелки и удаление — скрыты, появляются по тапу на этот слот */
         html += '<div class="mob-carousel-controls mob-controls-hidden" data-controls="' + ci + '-' + si + '">';
@@ -2719,7 +2731,7 @@ function cpMobileRenderFeed() {
         html += '</div>';
       } else {
         /* Пустой слот */
-        html += '<div class="' + slotClass + ' mob-slot-empty" data-card="' + ci + '" data-slot="' + si + '">';
+        html += '<div class="' + slotClass + ' mob-slot-empty"' + slotStyle + ' data-card="' + ci + '" data-slot="' + si + '">';
         html += '<div class="mob-slot-empty-text">Нажмите дважды чтобы добавить фото</div>';
         html += '</div>';
       }

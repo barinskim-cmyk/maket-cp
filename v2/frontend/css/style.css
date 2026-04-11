@@ -1875,10 +1875,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   width: 100%; height: auto; display: block;
 }
 
-/* Вертикаль: по 2 в ряд */
+/* Вертикаль: по 2 в ряд.
+   aspect-ratio задаётся inline стилем из card._vAspect (fallback 2/3 в CSS). */
 .mob-slot-v {
   width: calc(50% - 1px); position: relative;
-  aspect-ratio: 2 / 3; overflow: hidden;
+  aspect-ratio: 2 / 3; overflow: hidden; /* fallback если inline не задан */
 }
 .mob-slot-v img {
   width: 100%; height: 100%; display: block;
