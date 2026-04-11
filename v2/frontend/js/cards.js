@@ -2462,6 +2462,11 @@ function cpMobileInit() {
     }
   }
 
+  /* Пометка для CSS — чтобы html/body получили белый фон
+     (иначе под полупрозрачной адресной строкой Telegram/Safari
+     просвечивает серый body-background). */
+  document.body.classList.add('mob-client-mode');
+
   _mobViewMode = 'cards';
 
   /* Заблокировать поворот экрана — только портретная ориентация.

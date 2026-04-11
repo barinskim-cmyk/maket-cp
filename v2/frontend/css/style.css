@@ -1734,11 +1734,33 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   flex-shrink: 0; color: #333; padding: 0;
 }
 
+/* В мобильной клиентской версии весь фон страницы — белый,
+   чтобы под translucent-адресной строкой браузера не просвечивал серый. */
+body.mob-client-mode,
+body.mob-client-mode html {
+  background: #fff !important;
+}
+
 .mob-header {
   position: sticky; top: 0; z-index: 60;
   background: #fff; border-bottom: 1px solid #e0e0e0;
   padding: 10px 12px;
+  /* iOS: учёт "островка" (безопасной зоны сверху) при viewport-fit=cover.
+     Без этого sticky-заголовок стоит под статус-баром. */
+  padding-top: calc(10px + env(safe-area-inset-top, 0px));
   display: flex; justify-content: space-between; align-items: center;
+}
+/* Заглушка над sticky-тулбаром: перекрывает полупрозрачную
+   адресную строку браузера (Telegram/Safari) и rubber-band overscroll.
+   Без неё из-под тулбара видна лента карточек при прокрутке вверх. */
+.mob-header::before {
+  content: '';
+  position: absolute;
+  left: 0; right: 0;
+  bottom: 100%;
+  height: 600px;
+  background: #fff;
+  pointer-events: none;
 }
 .mob-header-left {
   display: flex; align-items: center; gap: 10px;

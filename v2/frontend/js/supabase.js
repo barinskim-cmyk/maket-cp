@@ -2067,6 +2067,13 @@ function sbPullProject(callback) {
         if (typeof acRenderField === 'function') acRenderField();
         if (typeof ocRenderField === 'function') ocRenderField();
         if (typeof pvRenderAll === 'function') pvRenderAll();
+        /* Мобильный клиент: cpRenderCard не рендерит мобильную ленту.
+           Нужен отдельный вызов cpMobileRender, иначе подгруженные с облака
+           комментарии остаются невидимыми до первого ручного действия. */
+        if (typeof cpIsMobileClient === 'function' && cpIsMobileClient() &&
+            typeof cpMobileRender === 'function') {
+          cpMobileRender();
+        }
         if (typeof shAutoSave === 'function') shAutoSave();
       }
 
@@ -2263,6 +2270,11 @@ function sbPullProject(callback) {
             if (typeof acRenderField === 'function') acRenderField();
             if (typeof ocRenderField === 'function') ocRenderField();
             if (typeof pvRenderAll === 'function') pvRenderAll();
+            /* Мобильная лента — отдельный рендер, см. коммент выше. */
+            if (typeof cpIsMobileClient === 'function' && cpIsMobileClient() &&
+                typeof cpMobileRender === 'function') {
+              cpMobileRender();
+            }
             /* Сохранить в localStorage */
             if (typeof shAutoSave === 'function') shAutoSave();
           }
