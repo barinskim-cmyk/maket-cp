@@ -2781,17 +2781,30 @@ function _arMatchWithPdfPages(cards, skuList, pdfPages, apiKey, proj, statusEl) 
     }
     if (freeSkus.length === 0) { idx = cards.length; processNext(); return; }
 
-    /* Простой промпт */
-    var promptText = 'I have ' + ci.imgs.length + ' photoshoot photos of ONE product and '
-      + pdfPages.length + ' pages from a product checklist PDF.\n\n'
-      + 'The photoshoot may show a styled outfit. Look at which item is shown in close-up '
-      + 'or appears most prominently — that is the target product.\n\n'
-      + 'Find this product in the checklist PDF pages. The PDF has small reference photos next to SKU codes.\n\n'
-      + 'Available SKUs:\n';
+    /* Строгий промпт с критериями confidence */
+    var promptText = 'TASK: Match a photoshoot card to its SKU in a checklist PDF.\n\n'
+      + 'PHOTOSHOOT CARD: ' + ci.imgs.length + ' photos of ONE product '
+      + '(close-ups, details, and/or full-body model shots).\n'
+      + 'Identify the TARGET product:\n'
+      + '- Close-up photos show the target product directly.\n'
+      + '- In full-body shots look at what item is highlighted or consistent across angles.\n'
+      + '- A card is ALWAYS about ONE product, even if the model wears a full outfit.\n\n'
+      + 'CHECKLIST PDF: ' + pdfPages.length + ' page(s) containing small reference photos next to SKU codes.\n\n'
+      + 'Available (unmatched) SKUs:\n';
     for (var si = 0; si < freeSkus.length; si++) {
       promptText += '"' + freeSkus[si].sku + '", ';
     }
-    promptText += '\n\nReturn JSON: {"match": "EXACT_SKU", "confidence": "high|medium|low"} or {"match": null}';
+    promptText += '\n\nDECISION RULES:\n'
+      + '1. Compare shape, silhouette, color, material, texture, hardware, logo.\n'
+      + '2. A match requires clear agreement on MULTIPLE visual details. Vague color match is NOT enough.\n'
+      + '3. If you are NOT sure — return {"match": null}. Do not guess.\n'
+      + '4. Different colors or different categories (shoes vs bag) = NOT a match.\n\n'
+      + 'CONFIDENCE scale:\n'
+      + '- "high": visually identical, all key details agree.\n'
+      + '- "medium": very similar but at least one detail uncertain.\n'
+      + '- "low": only loose similarity — DO NOT use low-confidence as a real match.\n\n'
+      + 'Return strict JSON only: {"match": "EXACT_SKU", "confidence": "high|medium|low", "reason": "short"} '
+      + 'or {"match": null, "reason": "short"}.';
 
     var msgContent = [];
     msgContent.push({ type: 'text', text: promptText });
@@ -2824,14 +2837,21 @@ function _arMatchWithPdfPages(cards, skuList, pdfPages, apiKey, proj, statusEl) 
           var result = JSON.parse(jsonMatch ? jsonMatch[0] : text);
           console.log('articles.js: card ' + ci.idx + ' AI:', JSON.stringify(result));
           if (result.match && result.match !== 'null' && result.match !== null) {
-            var matchedSku = String(result.match).trim();
-            for (var fi = 0; fi < freeSkus.length; fi++) {
-              if (freeSkus[fi].sku === matchedSku) {
-                arDoMatch(freeSkus[fi].idx, ci.idx);
-                applied++;
-                arRenderMatching();
-                break;
+            /* Применяем только high/medium; low оставляем для ручной верификации */
+            var confScore = _arConfScore(result.confidence);
+            if (confScore >= 2) {
+              var matchedSku = String(result.match).trim();
+              for (var fi = 0; fi < freeSkus.length; fi++) {
+                if (freeSkus[fi].sku === matchedSku) {
+                  arDoMatch(freeSkus[fi].idx, ci.idx);
+                  applied++;
+                  arRenderMatching();
+                  break;
+                }
               }
+            } else {
+              console.log('articles.js: card ' + ci.idx + ' low confidence (' +
+                (result.confidence || '?') + '), skip auto-apply: ' + (result.reason || ''));
             }
           }
         } catch(e) {
@@ -2930,22 +2950,86 @@ function _arMatchWithRefImages(cards, proj, pvByName, apiKey, statusEl) {
 
     function processNextBatch() {
       if (batchIdx >= batches.length) {
-        /* Все батчи прошли — выбрать лучший матч */
-        if (allMatches.length > 0) {
-          /* Приоритет: high > medium > low */
-          var best = allMatches[0];
-          for (var mi = 1; mi < allMatches.length; mi++) {
-            if (_arConfScore(allMatches[mi].confidence) > _arConfScore(best.confidence)) {
-              best = allMatches[mi];
+        /* Все батчи прошли. Если лидер один — применяем сразу.
+           Если лидеров ≥2 — запускаем playoff (AI сравнивает только финалистов). */
+        if (allMatches.length === 0) {
+          cardIdx++;
+          setTimeout(processNextCard, 1000);
+          return;
+        }
+        if (allMatches.length === 1) {
+          var one = allMatches[0];
+          console.log('articles.js: card ' + ci.idx + ' single match: ' + one.sku + ' (' + one.confidence + ')');
+          /* Применяем только high/medium — low отправляется в ручную верификацию */
+          if (_arConfScore(one.confidence) >= 2) {
+            arDoMatch(one.artIdx, ci.idx);
+            applied++;
+            arRenderMatching();
+          } else {
+            console.log('articles.js: card ' + ci.idx + ' confidence too low (' + one.confidence + '), skip auto-apply');
+          }
+          cardIdx++;
+          setTimeout(processNextCard, 1000);
+          return;
+        }
+
+        /* Playoff: собираем финалистов и запускаем повторный _arMatchOneCard.
+           Это устраняет основной источник inconsistency — когда AI говорит
+           "high" сразу на нескольких батчах для разных артикулов. */
+        var finalists = [];
+        var seen = {};
+        /* Приоритет финалистов: сначала high, потом medium (low отсекаем) */
+        var order = allMatches.slice().sort(function(a, b) {
+          return _arConfScore(b.confidence) - _arConfScore(a.confidence);
+        });
+        for (var fi = 0; fi < order.length; fi++) {
+          var m = order[fi];
+          if (_arConfScore(m.confidence) < 2) continue; /* low отсекаем */
+          if (seen[m.artIdx]) continue;
+          seen[m.artIdx] = true;
+          /* Найти кандидата в исходном пуле чтобы взять refImage */
+          for (var ci3 = 0; ci3 < candidates.length; ci3++) {
+            if (candidates[ci3].idx === m.artIdx) {
+              finalists.push(candidates[ci3]);
+              break;
             }
           }
-          console.log('articles.js: card ' + ci.idx + ' best match: ' + best.sku + ' (' + best.confidence + ')');
-          arDoMatch(best.artIdx, ci.idx);
+          if (finalists.length >= BATCH_SIZE) break;
+        }
+
+        if (finalists.length === 0) {
+          cardIdx++;
+          setTimeout(processNextCard, 1000);
+          return;
+        }
+        if (finalists.length === 1) {
+          /* Все финалисты — дубликаты одного артикула, применяем */
+          var solo = allMatches[0];
+          console.log('articles.js: card ' + ci.idx + ' unanimous: ' + solo.sku);
+          arDoMatch(finalists[0].idx, ci.idx);
           applied++;
           arRenderMatching();
+          cardIdx++;
+          setTimeout(processNextCard, 1000);
+          return;
         }
-        cardIdx++;
-        setTimeout(processNextCard, 1000);
+
+        /* Playoff-запрос: сравнить только финалистов */
+        if (statusEl) statusEl.textContent = 'AI: карточка ' + (cardIdx + 1) + '/' + total +
+          ' — финал (' + finalists.length + ' кандидатов)...';
+
+        _arMatchOneCard(ci.idx, ci.imgs, ci.category, finalists, apiKey, function(finalArtIdx, finalConf) {
+          if (finalArtIdx >= 0 && _arConfScore(finalConf) >= 2) {
+            console.log('articles.js: card ' + ci.idx + ' playoff winner artIdx=' + finalArtIdx + ' (' + finalConf + ')');
+            arDoMatch(finalArtIdx, ci.idx);
+            applied++;
+            arRenderMatching();
+          } else {
+            console.log('articles.js: card ' + ci.idx + ' playoff inconclusive, leaving for manual verification');
+          }
+          cardIdx++;
+          setTimeout(processNextCard, 1500);
+        });
         return;
       }
 
@@ -3017,23 +3101,32 @@ function _arGetCardImages(card, pvByName) {
 function _arMatchOneCard(cardIdx, cardImgs, category, candidates, apiKey, onDone) {
   var cands = candidates;
 
-  /* Промпт: анализ всех фото, определение предмета */
-  var promptText = 'TASK: Match a product from a photoshoot to its catalog reference.\n\n'
-    + 'PHOTOSHOOT CARD: ' + cardImgs.length + ' photos from the same product card.\n'
-    + 'These photos may include close-ups, detail shots, and full-body model shots.\n'
-    + 'The card is about ONE specific product. To identify it:\n'
-    + '- If there is a close-up: the close-up shows the target product.\n'
-    + '- If all photos are full-body/model shots: look at what product is highlighted, '
-    + 'or what item appears consistently across all angles. The product may be shoes, a bag, '
-    + 'clothing, glasses, jewelry, or any accessory.\n'
-    + '- A single card is always about ONE product, even if the model wears an entire outfit.\n\n'
-    + 'CATALOG REFERENCES (batch ' + (cands.length) + ' items):\n';
+  /* Промпт: строгий, с явными critериями confidence и false-positive defense */
+  var promptText = 'TASK: Match a product from a photoshoot card to its catalog reference.\n\n'
+    + 'PHOTOSHOOT CARD: ' + cardImgs.length + ' photos from ONE product card '
+    + '(close-ups, detail shots, and/or full-body model shots of the same product).\n'
+    + 'Identify the TARGET product:\n'
+    + '- If there is a close-up photo — it shows the target product directly.\n'
+    + '- Otherwise look at what item is highlighted or appears consistently across angles.\n'
+    + '- The target can be shoes, a bag, clothing, glasses, jewelry, or any accessory.\n'
+    + '- A card is ALWAYS about ONE product, even when the model wears an entire outfit.\n\n'
+    + 'CATALOG REFERENCES (' + cands.length + ' items):\n';
   for (var i = 0; i < cands.length; i++) {
     promptText += '- A' + (i + 1) + ': "' + cands[i].sku + '"\n';
   }
-  promptText += '\nCompare the target product to each reference.\n'
-    + 'Key details: shape, silhouette, color, material, texture, hardware, heel type, sole, stitching, logo.\n'
-    + 'Return JSON: {"match": "A3", "confidence": "high|medium|low"} or {"match": null} if none in this batch.';
+  promptText += '\nDECISION RULES:\n'
+    + '1. Compare shape, silhouette, color, material, texture, hardware, heel, sole, stitching, logo.\n'
+    + '2. A match requires clear agreement on MULTIPLE visual details. Color + vague shape is not enough.\n'
+    + '3. If two or more references look plausible — pick the BEST one but mark confidence "medium".\n'
+    + '4. If NONE of the references clearly match — return {"match": null}. Do NOT guess.\n'
+    + '5. Different colors = NOT a match (unless it is clearly the same model in a different colorway).\n'
+    + '6. Different product category (e.g. shoes vs bag) = definitely not a match.\n\n'
+    + 'CONFIDENCE scale:\n'
+    + '- "high": visually identical or same model — all key details agree.\n'
+    + '- "medium": very similar but at least one detail is uncertain (angle, lighting).\n'
+    + '- "low": only loose similarity. DO NOT apply low-confidence matches.\n\n'
+    + 'Return strict JSON only: {"match": "A3", "confidence": "high|medium|low", "reason": "short"} '
+    + 'or {"match": null, "reason": "short"}.';
 
   var msgContent = [];
   msgContent.push({ type: 'text', text: promptText });

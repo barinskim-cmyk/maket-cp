@@ -2416,6 +2416,9 @@ function _cpPdfDrawImage(doc, slot, x, y, w, h) {
 /** @type {string} Текущий режим: 'cards' | 'select' | 'options' */
 var _mobViewMode = 'cards';
 
+/** @type {string} Режим, в котором был последний рендер — для сохранения скролла. */
+var _mobLastRenderedView = '';
+
 /**
  * Проверить, нужен ли мобильный режим.
  * @returns {boolean}
@@ -2504,6 +2507,15 @@ function cpMobileRender() {
   var mobWrap = document.getElementById('mob-wrap');
   if (!mobWrap) return;
 
+  /* Сохранить позицию скролла только если режим просмотра не менялся —
+     иначе при переключении табов (cards→select) скролл из одной ленты
+     не имеет смысла применять к другой. */
+  var _mobSavedScroll = 0;
+  if (_mobLastRenderedView === _mobViewMode) {
+    _mobSavedScroll = window.pageYOffset || document.documentElement.scrollTop || 0;
+  }
+  _mobLastRenderedView = _mobViewMode;
+
   var proj = getActiveProject();
   var brandName = proj ? esc(proj.brand || '') : '';
 
@@ -2560,6 +2572,11 @@ function cpMobileRender() {
     cpMobileBindCarousels();
     cpMobileBindDoubleTap();
     cpMobileBindSlotTap();
+  }
+
+  /* Восстановить скролл после полного ре-рендера. */
+  if (_mobSavedScroll > 0) {
+    try { window.scrollTo(0, _mobSavedScroll); } catch(e) {}
   }
 }
 
@@ -2974,15 +2991,84 @@ function cpMobileClearSlot(cardIdx, slotIdx) {
   slot.path = null;
   if (oldFile && typeof sbLogAction === 'function') sbLogAction('remove_from_slot', 'card', card.id, card.name, oldFile);
 
+  var wasClient = (typeof _appClientMode !== 'undefined' && _appClientMode);
+  var cardsBefore = proj.cards.length;
+  var slotsBefore = card.slots.length;
+
   /* Авто-переверстка: убрать пустые слоты, удалить пустые карточки */
-  if (typeof _appClientMode !== 'undefined' && _appClientMode) {
+  if (wasClient) {
     cpAutoReflow(proj, cardIdx);
   }
 
   if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
   if (typeof shAutoSave === 'function') shAutoSave();
 
+  /* Сохранить скролл, чтобы пользователя не "улетало" в начало ленты. */
+  var scrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
+
+  var cardsAfter = proj.cards.length;
+  var slotsAfter = (proj.cards[cardIdx] && proj.cards[cardIdx].slots)
+    ? proj.cards[cardIdx].slots.length : 0;
+  var sameCard = (cardsAfter === cardsBefore);
+  var sameSlots = sameCard && (slotsAfter === slotsBefore);
+
+  /* Случай клиентского режима: auto-reflow схлопнул слоты, но карточка цела.
+     Перерисуем ТОЛЬКО один mob-card-block — без полного ре-рендера ленты. */
+  if (sameCard && !sameSlots && _mobViewMode === 'cards') {
+    var block = document.querySelector('.mob-card-block[data-card-idx="' + cardIdx + '"]');
+    if (block && block.parentNode) {
+      /* Рендерим полную ленту (все индексы уже корректные),
+         из результата вытаскиваем блок нужной карточки. */
+      var feedHtml = '';
+      try { feedHtml = cpMobileRenderFeed(); } catch(e) { feedHtml = ''; }
+      var tmpC = document.createElement('div');
+      tmpC.innerHTML = feedHtml;
+      var newBlock = tmpC.querySelector('.mob-card-block[data-card-idx="' + cardIdx + '"]');
+      if (newBlock) {
+        block.parentNode.replaceChild(newBlock, block);
+        if (typeof cpMobileBindCarousels === 'function') cpMobileBindCarousels();
+        if (typeof cpMobileBindDoubleTap === 'function') cpMobileBindDoubleTap();
+        if (typeof cpMobileBindSlotTap === 'function') cpMobileBindSlotTap();
+        return;
+      }
+    }
+  }
+
+  if (sameSlots && _mobViewMode === 'cards') {
+    /* Хирургический апдейт: перерисовать только нужный слот
+       (без flash всей ленты). */
+    var wrap = document.querySelector('.mob-card-block[data-card-idx="' + cardIdx + '"] .mob-carousel-wrap[data-card="' + cardIdx + '"][data-slot="' + slotIdx + '"]');
+    if (wrap && wrap.parentNode) {
+      var orient = slot.orient || 'v';
+      var weight = slot.weight || 1;
+      var isHero = (card._hasHero && slotIdx === 0) || (weight >= 2 && slotIdx === 0);
+      var slotClass = 'mob-slot-v';
+      var slotStyle = '';
+      if (isHero) {
+        slotClass = 'mob-slot-hero';
+      } else if (orient === 'h') {
+        slotClass = 'mob-slot-h';
+        var hAspect = card._hAspect || '3/2';
+        slotStyle = ' style="aspect-ratio:' + hAspect.replace('/', ' / ') + '"';
+      } else {
+        var vAspect = card._vAspect || '2/3';
+        slotStyle = ' style="aspect-ratio:' + vAspect.replace('/', ' / ') + '"';
+      }
+      var emptyHtml = '<div class="' + slotClass + ' mob-slot-empty"' + slotStyle + ' data-card="' + cardIdx + '" data-slot="' + slotIdx + '">' +
+        '<div class="mob-slot-empty-text">Нажмите дважды чтобы добавить фото</div>' +
+        '</div>';
+      var tmp = document.createElement('div');
+      tmp.innerHTML = emptyHtml;
+      wrap.parentNode.replaceChild(tmp.firstChild, wrap);
+      /* Восстановить биндинги на пустой слот */
+      if (typeof cpMobileBindDoubleTap === 'function') cpMobileBindDoubleTap();
+      return;
+    }
+  }
+
+  /* Фолбэк: полный ре-рендер с восстановлением скролла. */
   cpMobileRender();
+  try { window.scrollTo(0, scrollY); } catch(e) {}
 }
 
 /**
