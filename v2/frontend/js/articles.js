@@ -1249,32 +1249,41 @@ function _arParseVisionResponse(responseText, status, callback) {
 }
 
 /**
- * Универсальный запрос к OpenAI Chat Completions.
+ * Универсальный запрос к OpenAI Chat Completions (gpt-5.4-mini).
  * Автоматически выбирает путь:
  * - Веб (sbClient доступен): Supabase Edge Function "openai-vision"
  * - Desktop (pywebview): прямой XHR с apiKey
  *
- * @param {Array}    messages   — messages-массив для OpenAI
- * @param {number}   maxTokens  — max_tokens
- * @param {number}   timeoutMs  — timeout XHR (только для desktop)
- * @param {string}   apiKey     — ключ (только для desktop)
- * @param {function} callback   — callback(responseText, httpStatus)
+ * Особенности gpt-5.4-mini (reasoning-модель):
+ * - max_tokens НЕ поддерживается — используем max_completion_tokens
+ *   (в этот лимит входят ещё и reasoning-токены, поэтому даём x5 запас)
+ * - temperature НЕ поддерживается — вместо неё reasoning.effort
+ *   (minimal | low | medium | high): low — разумный дефолт для матчинга
+ * - vision через image_url работает как у gpt-4o (URL или base64)
+ *
+ * @param {Array}    messages        — messages-массив для OpenAI
+ * @param {number}   maxTokens       — целевой бюджет финального ответа
+ *                                      (внутри функции x5 для reasoning)
+ * @param {number}   timeoutMs       — timeout XHR (только для desktop)
+ * @param {string}   apiKey          — ключ (только для desktop)
+ * @param {function} callback        — callback(responseText, httpStatus)
+ * @param {string}   [reasoningEffort] — minimal|low|medium|high (default low)
  */
-function _arOpenAIRequest(messages, maxTokens, timeoutMs, apiKey, callback) {
+function _arOpenAIRequest(messages, maxTokens, timeoutMs, apiKey, callback, reasoningEffort) {
   var isWeb = !window.pywebview && typeof sbClient !== 'undefined' && sbClient;
+  var effort = reasoningEffort || 'low';
+
+  /* Для reasoning-моделей в max_completion_tokens входят и «думательные»
+     токены, и финальный ответ. Даём x5 запаса от целевого бюджета ответа. */
+  var budget = Math.max(2000, (maxTokens || 300) * 5);
 
   if (isWeb) {
     sbClient.functions.invoke('openai-vision', {
       body: {
         messages: messages,
-        max_tokens: maxTokens,
-        /* Temperature 0.2: Masha попросила "повысить температуру" для
-           матчинга — слегка ослабляем детерминизм, чтобы модель не
-           застревала на "match: null" из-за строгих правил промпта.
-           Confidence-фильтр high/medium + playoff-раунд удерживают
-           false-positive в рамках. */
-        temperature: 0.2,
-        model: 'gpt-4o-mini'
+        max_completion_tokens: budget,
+        reasoning: { effort: effort },
+        model: 'gpt-5.4-mini'
       }
     }).then(function(result) {
       if (result.error) {
@@ -1308,23 +1317,21 @@ function _arOpenAIRequest(messages, maxTokens, timeoutMs, apiKey, callback) {
   xhr.onload = function() { callback(xhr.responseText, xhr.status); };
   xhr.onerror = function() { callback(null, 0); };
   xhr.ontimeout = function() { callback(null, -1); };
-  /* gpt-4o-mini: в ~17× дешевле gpt-4o ($0.15/M in vs $2.50/M), поддерживает
-     vision, max_tokens и temperature — в отличие от gpt-5.x reasoning-серии,
-     где эти параметры запрещены. Web-режим использует ту же модель через
-     openai-vision Edge Function (см. body.model выше). Temperature 0.2:
-     Masha попросила повысить температуру, чтобы модель смелее выбирала
-     между похожими кандидатами вместо "match: null". */
   xhr.send(JSON.stringify({
-    model: 'gpt-4o-mini',
+    model: 'gpt-5.4-mini',
     messages: messages,
-    max_tokens: maxTokens,
-    temperature: 0.2
+    max_completion_tokens: budget,
+    reasoning: { effort: effort }
   }));
 }
 
 
 /**
- * Отправить изображение страницы в OpenAI Vision API.
+ * Отправить изображение страницы в OpenAI Vision API (fallback-путь).
+ *
+ * Используется только как запасной вариант, когда текстовый парсинг PDF
+ * (_arParsePdfHybrid через pdf.js + SheetJS) нашёл меньше 3 артикулов.
+ * В обычной жизни срабатывает редко — основной extraction идёт без AI.
  *
  * Два режима:
  * - Веб (нет pywebview + есть sbClient): через Supabase Edge Function "openai-vision"
@@ -1335,10 +1342,18 @@ function _arCallOpenAIVision(apiKey, base64Image, pageNum, totalPages, callback)
   var messages = _arBuildVisionMessages(base64Image, pageNum, totalPages);
   var isWeb = !window.pywebview && typeof sbClient !== 'undefined' && sbClient;
 
-  /* ── Веб-режим: Edge Function ── */
+  /* ── Веб-режим: Edge Function ──
+     Extraction из PDF — структурированная задача, extractим JSON-массив
+     артикулов. Для неё ставим reasoning.effort = 'medium' и большой
+     бюджет токенов: reasoning + полный список SKU может быть длинным. */
   if (isWeb) {
     sbClient.functions.invoke('openai-vision', {
-      body: { messages: messages, max_tokens: 4000, temperature: 0 }
+      body: {
+        messages: messages,
+        max_completion_tokens: 16000,
+        reasoning: { effort: 'medium' },
+        model: 'gpt-5.4-mini'
+      }
     }).then(function(result) {
       if (result.error) {
         /* Edge Function вернула HTTP-ошибку или сетевую ошибку */
@@ -1385,10 +1400,10 @@ function _arCallOpenAIVision(apiKey, base64Image, pageNum, totalPages, callback)
   xhr.ontimeout = function() { callback('Таймаут запроса', null); };
 
   xhr.send(JSON.stringify({
-    model: 'gpt-4o-mini',
+    model: 'gpt-5.4-mini',
     messages: messages,
-    max_tokens: 4000,
-    temperature: 0
+    max_completion_tokens: 16000,
+    reasoning: { effort: 'medium' }
   }));
 }
 
@@ -2910,11 +2925,15 @@ function _arMatchWithPdfPages(cards, skuList, pdfPages, apiKey, proj, statusEl) 
       msgContent.push({ type: 'image_url', image_url: { url: pdfPages[pi], detail: 'high' } });
     }
 
+    /* Примечание: body ниже передаётся в _arSendWithRetry → _arOpenAIRequest,
+       но та функция сама формирует финальный payload с gpt-5.4-mini и
+       reasoning. Поля model/max_completion_tokens здесь оставлены как
+       документация, фактически используется только body.messages и
+       body.max_tokens (трактуется как целевой бюджет ответа). */
     var body = {
-      model: 'gpt-4o-mini',
+      model: 'gpt-5.4-mini',
       messages: [{ role: 'user', content: msgContent }],
-      max_tokens: 300,
-      temperature: 0
+      max_tokens: 300
     };
 
     _arSendWithRetry(body, apiKey, 0, function(text) {

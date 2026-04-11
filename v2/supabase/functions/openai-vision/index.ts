@@ -50,13 +50,18 @@ serve(async (req: Request) => {
       });
     }
 
-    /* Тело запроса: { messages, max_tokens, temperature, model } */
+    /* Тело запроса от фронта. Поддерживает и старые gpt-4o-подобные
+       параметры (max_tokens/temperature), и новые gpt-5.x reasoning-
+       параметры (max_completion_tokens/reasoning.effort). Функция
+       определяет, какую схему использовать, по имени модели. */
     const body = await req.json();
     const {
       messages,
-      max_tokens = 4000,
-      temperature = 0.1,
-      model = 'gpt-4o-mini',
+      max_tokens,
+      max_completion_tokens,
+      temperature,
+      reasoning,
+      model = 'gpt-5.4-mini',
     } = body;
 
     if (!messages || !Array.isArray(messages)) {
@@ -75,22 +80,32 @@ serve(async (req: Request) => {
       });
     }
 
+    /* Определяем схему параметров по модели.
+       gpt-5.x — reasoning серия: max_completion_tokens + reasoning.effort,
+                 temperature не поддерживается.
+       gpt-4o/4o-mini — классика: max_tokens + temperature. */
+    const isReasoning = /^(gpt-5|o\d)/i.test(String(model));
+    // deno-lint-ignore no-explicit-any
+    const openaiBody: Record<string, any> = { model, messages };
+
+    if (isReasoning) {
+      openaiBody.max_completion_tokens = max_completion_tokens ?? max_tokens ?? 4000;
+      openaiBody.reasoning = reasoning ?? { effort: 'low' };
+    } else {
+      openaiBody.max_tokens = max_tokens ?? max_completion_tokens ?? 4000;
+      openaiBody.temperature = temperature ?? 0.1;
+    }
+
     /* Запрос к OpenAI.
-       Модель передаётся из фронтенда (по умолчанию gpt-4o-mini — ~17× дешевле
-       gpt-4o, поддерживает vision + URL-first payload + temperature/max_tokens.
-       Серия gpt-5.x не подходит: там reasoning-параметры и нет max_tokens. */
+       По умолчанию используем gpt-5.4-mini — reasoning-модель с vision,
+       $0.75/$4.50 за миллион токенов. Фронт может переопределить model. */
     const openaiResp = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${openaiKey}`,
       },
-      body: JSON.stringify({
-        model,
-        messages,
-        max_tokens,
-        temperature,
-      }),
+      body: JSON.stringify(openaiBody),
     });
 
     const data = await openaiResp.json();
