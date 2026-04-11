@@ -1274,7 +1274,7 @@ function _arOpenAIRequest(messages, maxTokens, timeoutMs, apiKey, callback) {
            Confidence-фильтр high/medium + playoff-раунд удерживают
            false-positive в рамках. */
         temperature: 0.2,
-        model: 'gpt-5.4-mini'
+        model: 'gpt-4o-mini'
       }
     }).then(function(result) {
       if (result.error) {
@@ -1308,12 +1308,14 @@ function _arOpenAIRequest(messages, maxTokens, timeoutMs, apiKey, callback) {
   xhr.onload = function() { callback(xhr.responseText, xhr.status); };
   xhr.onerror = function() { callback(null, 0); };
   xhr.ontimeout = function() { callback(null, -1); };
-  /* gpt-5.4-mini: в ~5× дешевле gpt-4o и поддерживает URL-first vision-payload.
-     Web-режим получает ту же модель через openai-vision Edge Function (см.
-     body.model выше). Temperature 0.2: Masha попросила повысить температуру
-     для матчинга, чтобы модель смелее выбирала между похожими кандидатами. */
+  /* gpt-4o-mini: в ~17× дешевле gpt-4o ($0.15/M in vs $2.50/M), поддерживает
+     vision, max_tokens и temperature — в отличие от gpt-5.x reasoning-серии,
+     где эти параметры запрещены. Web-режим использует ту же модель через
+     openai-vision Edge Function (см. body.model выше). Temperature 0.2:
+     Masha попросила повысить температуру, чтобы модель смелее выбирала
+     между похожими кандидатами вместо "match: null". */
   xhr.send(JSON.stringify({
-    model: 'gpt-5.4-mini',
+    model: 'gpt-4o-mini',
     messages: messages,
     max_tokens: maxTokens,
     temperature: 0.2
@@ -1383,7 +1385,7 @@ function _arCallOpenAIVision(apiKey, base64Image, pageNum, totalPages, callback)
   xhr.ontimeout = function() { callback('Таймаут запроса', null); };
 
   xhr.send(JSON.stringify({
-    model: 'gpt-5.4-mini',
+    model: 'gpt-4o-mini',
     messages: messages,
     max_tokens: 4000,
     temperature: 0
@@ -2909,7 +2911,7 @@ function _arMatchWithPdfPages(cards, skuList, pdfPages, apiKey, proj, statusEl) 
     }
 
     var body = {
-      model: 'gpt-5.4-mini',
+      model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: msgContent }],
       max_tokens: 300,
       temperature: 0

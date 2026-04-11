@@ -56,7 +56,7 @@ serve(async (req: Request) => {
       messages,
       max_tokens = 4000,
       temperature = 0.1,
-      model = 'gpt-5.4-mini',
+      model = 'gpt-4o-mini',
     } = body;
 
     if (!messages || !Array.isArray(messages)) {
@@ -76,8 +76,9 @@ serve(async (req: Request) => {
     }
 
     /* Запрос к OpenAI.
-       Модель передаётся из фронтенда (по умолчанию gpt-5.4-mini — дешевле
-       и быстрее gpt-4o, поддерживает URL-first vision-payload). */
+       Модель передаётся из фронтенда (по умолчанию gpt-4o-mini — ~17× дешевле
+       gpt-4o, поддерживает vision + URL-first payload + temperature/max_tokens.
+       Серия gpt-5.x не подходит: там reasoning-параметры и нет max_tokens. */
     const openaiResp = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
