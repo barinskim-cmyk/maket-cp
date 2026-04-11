@@ -96,10 +96,11 @@ function navUpdateTabVisibility() {
   /* Синхронизация — только desktop (нужен Python для записи COS) */
   if (syncBtn) syncBtn.style.display = isDesktop ? '' : 'none';
 
-  /* Артикулы — только desktop.
-     В web/мобильном режиме вкладка скрыта: переименование через maket_rename.exe,
-     а web-клиенты (share-ссылки и мобильные владельцы) не работают с артикулами. */
-  if (arBtn) arBtn.style.display = isDesktop ? '' : 'none';
+  /* Артикулы — доступны в desktop и в обычном web-браузере (широкий экран).
+     Скрываем только на мобильном (<768px) и при share-ссылке (клиентский просмотр). */
+  var isMobileScreen = (window.innerWidth < 768);
+  var isShareLink    = !!window._isShareLink;
+  if (arBtn) arBtn.style.display = (isMobileScreen || isShareLink) ? 'none' : '';
 }
 
 /* Запуск при DOMContentLoaded: скрыть для web */
