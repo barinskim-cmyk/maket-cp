@@ -953,12 +953,24 @@ function _arLoadViaBrowser(proj) {
       return;
     }
 
-    /* Excel — бинарный парсинг через SheetJS */
+    /* Excel — бинарный парсинг через SheetJS + извлечение картинок
+       из xl/media/ через JSZip (для .xlsx — .xls без картинок). */
     if (ext === 'xlsx' || ext === 'xls') {
       var reader = new FileReader();
       reader.onload = function(ev) {
-        var articles = _arParseXlsx(ev.target.result);
-        _arApplyLoaded(proj, articles, file.name);
+        var statusEl = document.getElementById('ar-stats');
+        if (ext === 'xlsx') {
+          if (statusEl) statusEl.textContent = 'Разбираю Excel (текст + картинки)...';
+          _arParseXlsxWithImages(ev.target.result, function(articles) {
+            if (statusEl) statusEl.textContent = '';
+            _arApplyLoaded(proj, articles, file.name);
+          });
+        } else {
+          /* .xls (старый бинарный формат) — только текст через SheetJS */
+          var articles = _arParseXlsx(ev.target.result);
+          _arCleanupExcelRow(articles);
+          _arApplyLoaded(proj, articles, file.name);
+        }
       };
       reader.readAsArrayBuffer(file);
       return;
@@ -1727,7 +1739,11 @@ function _arParseXlsx(data) {
         color: colorCol >= 0 ? String(row[colorCol] || '').trim() : '',
         refImage: '',
         status: 'unmatched',
-        cardIdx: -1
+        cardIdx: -1,
+        /* Запоминаем исходный 0-индексированный номер Excel-строки.
+           Нужен для сопоставления встроенных картинок по ряду в
+           _arParseXlsxWithImages(). Очищаем перед сохранением в проект. */
+        _excelRow: i
       });
     }
     console.log('articles.js: Excel parsed, sheet "' + sheetName + '", ' + articles.length + ' rows, skuCol=' + skuCol);
@@ -1735,6 +1751,303 @@ function _arParseXlsx(data) {
   } catch(e) {
     console.error('articles.js: Excel parse error:', e);
     return null;
+  }
+}
+
+
+/**
+ * Асинхронный парсер .xlsx: извлекает и текст (через _arParseXlsx),
+ * и встроенные в ячейки картинки (через JSZip + ручной разбор
+ * xl/drawings/*.xml и xl/drawings/_rels/*.rels).
+ *
+ * Структура xlsx как zip:
+ *   xl/worksheets/sheet1.xml               — данные ячеек
+ *   xl/worksheets/_rels/sheet1.xml.rels    — ссылка sheet → drawing
+ *   xl/drawings/drawing1.xml               — anchors (xdr:twoCellAnchor)
+ *   xl/drawings/_rels/drawing1.xml.rels    — rId → ../media/imageN.png
+ *   xl/media/imageN.{png|jpeg}             — сами файлы
+ *
+ * Алгоритм:
+ *   1. Парсим текст стандартным _arParseXlsx().
+ *      Каждая статья получает _excelRow (0-индексированный номер строки).
+ *   2. Распаковываем zip через JSZip, читаем rels первого листа,
+ *      находим путь к drawing*.xml.
+ *   3. В drawing*.xml собираем якоря (twoCellAnchor + oneCellAnchor):
+ *      для каждого — xdr:from/xdr:row (строка) и a:blip/r:embed (rId).
+ *   4. В drawing-rels резолвим rId → путь к файлу картинки в архиве.
+ *   5. Каждый файл читаем как base64, строим data: URL.
+ *   6. Маппим row → dataURL и навешиваем на статьи по _excelRow
+ *      (с fallback ±1, потому что иногда якорь стоит на соседнюю строку).
+ *
+ * В случае любой ошибки (нет drawings, нет rels, битый XML, JSZip не
+ * загружен) молча возвращаем текстовые статьи без картинок — чтобы
+ * частичный результат всё равно работал.
+ *
+ * @param {ArrayBuffer} arrayBuffer — бинарное содержимое .xlsx
+ * @param {function}    onDone      — onDone(articles|null)
+ */
+function _arParseXlsxWithImages(arrayBuffer, onDone) {
+  var articles = _arParseXlsx(arrayBuffer);
+  if (!articles || articles.length === 0) { onDone(articles); return; }
+
+  if (typeof JSZip === 'undefined') {
+    console.warn('articles.js: JSZip недоступен, картинки из xlsx не извлечены');
+    _arCleanupExcelRow(articles);
+    onDone(articles);
+    return;
+  }
+
+  /* Хелпер: ищем дочерние элементы по local name, игнорируя префикс. */
+  function byLocal(parent, local) {
+    if (!parent) return [];
+    var all = parent.getElementsByTagName('*');
+    var out = [];
+    for (var i = 0; i < all.length; i++) {
+      var t = all[i].tagName;
+      if (all[i].localName === local || t === local ||
+          (t.indexOf(':') >= 0 && t.split(':').pop() === local)) {
+        out.push(all[i]);
+      }
+    }
+    return out;
+  }
+
+  /* Хелпер: резолвим относительный путь внутри zip.
+     В rels target обычно '../media/imageN.png' относительно
+     'xl/drawings/drawing1.xml' → итог 'xl/media/imageN.png'. */
+  function resolvePath(basePath, target) {
+    if (!target) return null;
+    if (target.charAt(0) === '/') return target.substring(1);
+    var baseParts = basePath.split('/');
+    baseParts.pop(); /* убираем имя файла */
+    var relParts = target.split('/');
+    for (var i = 0; i < relParts.length; i++) {
+      if (relParts[i] === '..') baseParts.pop();
+      else if (relParts[i] !== '.') baseParts.push(relParts[i]);
+    }
+    return baseParts.join('/');
+  }
+
+  JSZip.loadAsync(arrayBuffer).then(function(zip) {
+    /* Шаг 1: прочитать workbook.xml.rels → найти первый worksheet */
+    var wbRelsFile = zip.file('xl/_rels/workbook.xml.rels');
+    if (!wbRelsFile) { _arCleanupExcelRow(articles); onDone(articles); return; }
+
+    wbRelsFile.async('string').then(function(wbRelsXml) {
+      var dp = new DOMParser();
+      var wbRelsDoc = dp.parseFromString(wbRelsXml, 'text/xml');
+      var wbRels = wbRelsDoc.getElementsByTagName('Relationship');
+      var sheetTarget = null;
+      for (var i = 0; i < wbRels.length; i++) {
+        var t = wbRels[i].getAttribute('Type') || '';
+        if (t.indexOf('/worksheet') >= 0) {
+          sheetTarget = wbRels[i].getAttribute('Target');
+          break;
+        }
+      }
+      if (!sheetTarget) { _arCleanupExcelRow(articles); onDone(articles); return; }
+
+      /* xl/_rels/workbook.xml.rels → target 'worksheets/sheet1.xml' → полный путь */
+      var sheetPath = resolvePath('xl/_rels/workbook.xml.rels', sheetTarget);
+      /* Путь к rels листа: xl/worksheets/_rels/sheet1.xml.rels */
+      var sheetFile = sheetPath.split('/').pop();
+      var sheetDir  = sheetPath.substring(0, sheetPath.length - sheetFile.length);
+      var sheetRelsPath = sheetDir + '_rels/' + sheetFile + '.rels';
+
+      var sheetRelsFile = zip.file(sheetRelsPath);
+      if (!sheetRelsFile) { _arCleanupExcelRow(articles); onDone(articles); return; }
+
+      sheetRelsFile.async('string').then(function(sheetRelsXml) {
+        var sheetRelsDoc = dp.parseFromString(sheetRelsXml, 'text/xml');
+        var sRels = sheetRelsDoc.getElementsByTagName('Relationship');
+        var drawingTarget = null;
+        for (var j = 0; j < sRels.length; j++) {
+          var t2 = sRels[j].getAttribute('Type') || '';
+          if (t2.indexOf('/drawing') >= 0) {
+            drawingTarget = sRels[j].getAttribute('Target');
+            break;
+          }
+        }
+        if (!drawingTarget) {
+          console.log('articles.js: xlsx без drawings, картинок нет');
+          _arCleanupExcelRow(articles);
+          onDone(articles);
+          return;
+        }
+
+        var drawingPath = resolvePath(sheetRelsPath, drawingTarget);
+        var drawingFile = zip.file(drawingPath);
+        if (!drawingFile) { _arCleanupExcelRow(articles); onDone(articles); return; }
+
+        drawingFile.async('string').then(function(drawingXml) {
+          var drawDoc = dp.parseFromString(drawingXml, 'text/xml');
+
+          /* Читаем rels drawing-а: rId → путь к медиа-файлу */
+          var dFile = drawingPath.split('/').pop();
+          var dDir  = drawingPath.substring(0, drawingPath.length - dFile.length);
+          var drawRelsPath = dDir + '_rels/' + dFile + '.rels';
+          var drawRelsFile = zip.file(drawRelsPath);
+          if (!drawRelsFile) { _arCleanupExcelRow(articles); onDone(articles); return; }
+
+          drawRelsFile.async('string').then(function(drawRelsXml) {
+            var drawRelsDoc = dp.parseFromString(drawRelsXml, 'text/xml');
+            var dRels = drawRelsDoc.getElementsByTagName('Relationship');
+            var ridMap = {};
+            for (var k = 0; k < dRels.length; k++) {
+              var rid = dRels[k].getAttribute('Id');
+              var tgt = dRels[k].getAttribute('Target');
+              var resolved = resolvePath(drawRelsPath, tgt);
+              if (rid && resolved) ridMap[rid] = resolved;
+            }
+
+            /* Собираем якоря: twoCellAnchor + oneCellAnchor */
+            var anchors = byLocal(drawDoc, 'twoCellAnchor')
+              .concat(byLocal(drawDoc, 'oneCellAnchor'));
+
+            var rowToPath = {}; /* 0-indexed Excel row → путь в zip */
+            for (var a = 0; a < anchors.length; a++) {
+              var anchor = anchors[a];
+              var fromEl = byLocal(anchor, 'from')[0];
+              if (!fromEl) continue;
+              var rowEl = byLocal(fromEl, 'row')[0];
+              if (!rowEl) continue;
+              var row = parseInt(rowEl.textContent || rowEl.innerHTML, 10);
+              if (isNaN(row)) continue;
+
+              /* a:blip — ссылка на картинку по rId в атрибуте r:embed */
+              var blips = byLocal(anchor, 'blip');
+              var blipEl = blips[0];
+              if (!blipEl) continue;
+              var embed = blipEl.getAttribute('r:embed')
+                       || blipEl.getAttribute('embed')
+                       || blipEl.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'embed');
+              if (!embed || !ridMap[embed]) continue;
+
+              rowToPath[row] = ridMap[embed];
+            }
+
+            var rows = Object.keys(rowToPath);
+            if (rows.length === 0) {
+              console.log('articles.js: xlsx — drawings есть, но картинок не найдено');
+              _arCleanupExcelRow(articles);
+              onDone(articles);
+              return;
+            }
+
+            /* Читаем все уникальные файлы картинок → base64 data URL */
+            var pending = 0;
+            var rowToDataUrl = {};
+            var doneCount = 0;
+
+            function mimeFromPath(p) {
+              var ext = (p.split('.').pop() || '').toLowerCase();
+              if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg';
+              if (ext === 'gif')                    return 'image/gif';
+              if (ext === 'bmp')                    return 'image/bmp';
+              return 'image/png';
+            }
+
+            for (var r in rowToPath) {
+              if (!Object.prototype.hasOwnProperty.call(rowToPath, r)) continue;
+              var imgPath = rowToPath[r];
+              var imgFile = zip.file(imgPath);
+              if (!imgFile) continue;
+              pending++;
+              (function(rowKey, imgPathClosure) {
+                imgFile.async('base64').then(function(b64) {
+                  rowToDataUrl[rowKey] = 'data:' + mimeFromPath(imgPathClosure) + ';base64,' + b64;
+                  doneCount++;
+                  if (doneCount === pending) attach();
+                }).catch(function(e) {
+                  console.warn('articles.js: не прочитал картинку', imgPathClosure, e);
+                  doneCount++;
+                  if (doneCount === pending) attach();
+                });
+              })(r, imgPath);
+            }
+
+            if (pending === 0) {
+              _arCleanupExcelRow(articles);
+              onDone(articles);
+              return;
+            }
+
+            function attach() {
+              /* Стратегия привязки картинок к артикулам:
+
+                 Идеал — картинка в той же строке, что SKU. Но в реальных
+                 каталогах бывают глобальные сдвиги (лишний заголовок каталога
+                 или merged-ячейки смещают якоря), и тогда exact-match даст
+                 случайные перекрёстные связи.
+
+                 Поэтому:
+                 1. Если число картинок == число артикулов → сортируем обоих
+                    по возрастанию row и соединяем 1:1 по порядку. Это
+                    устойчиво к любому глобальному сдвигу.
+                 2. Иначе (sparse-каталог, где у части артикулов нет ref-фото)
+                    — только точный match по строке. Декоративные картинки
+                    без парной строки просто игнорируем. */
+              var sortedImageRows = Object.keys(rowToDataUrl)
+                .map(function(k) { return parseInt(k, 10); })
+                .filter(function(n) { return !isNaN(n); })
+                .sort(function(a, b) { return a - b; });
+              var sortedArticles = articles.slice().sort(function(a, b) {
+                return (a._excelRow || 0) - (b._excelRow || 0);
+              });
+
+              var attached = 0;
+              if (sortedImageRows.length === sortedArticles.length && sortedArticles.length > 0) {
+                /* 1:1 pairing */
+                for (var p = 0; p < sortedArticles.length; p++) {
+                  sortedArticles[p].refImage = rowToDataUrl[sortedImageRows[p]];
+                  attached++;
+                }
+                console.log('articles.js: xlsx — 1:1 pairing по порядку (count match)');
+              } else {
+                /* Sparse — точный match по строке */
+                for (var ai = 0; ai < articles.length; ai++) {
+                  var art = articles[ai];
+                  if (rowToDataUrl[art._excelRow]) {
+                    art.refImage = rowToDataUrl[art._excelRow];
+                    attached++;
+                  }
+                }
+                console.log('articles.js: xlsx — exact row match (sparse), картинок:',
+                            sortedImageRows.length, 'артикулов:', sortedArticles.length);
+              }
+
+              console.log('articles.js: xlsx — извлечено картинок:', pending,
+                          'привязано к артикулам:', attached, 'из', articles.length);
+              _arCleanupExcelRow(articles);
+              onDone(articles);
+            }
+          }).catch(function(e) {
+            console.warn('articles.js: ошибка чтения drawing rels', e);
+            _arCleanupExcelRow(articles); onDone(articles);
+          });
+        }).catch(function(e) {
+          console.warn('articles.js: ошибка чтения drawing.xml', e);
+          _arCleanupExcelRow(articles); onDone(articles);
+        });
+      }).catch(function(e) {
+        console.warn('articles.js: ошибка чтения sheet rels', e);
+        _arCleanupExcelRow(articles); onDone(articles);
+      });
+    }).catch(function(e) {
+      console.warn('articles.js: ошибка чтения workbook rels', e);
+      _arCleanupExcelRow(articles); onDone(articles);
+    });
+  }).catch(function(e) {
+    console.error('articles.js: JSZip не смог открыть xlsx', e);
+    _arCleanupExcelRow(articles); onDone(articles);
+  });
+}
+
+/** Убираем временное поле _excelRow перед передачей артикулов дальше. */
+function _arCleanupExcelRow(articles) {
+  if (!articles) return;
+  for (var i = 0; i < articles.length; i++) {
+    if (articles[i] && '_excelRow' in articles[i]) delete articles[i]._excelRow;
   }
 }
 
