@@ -90,7 +90,32 @@ def main():
 
     api.set_window(window)
 
-    webview.start(debug="--debug" in sys.argv)
+    # Где хранить cookies / localStorage между запусками.
+    # По умолчанию pywebview использует private_mode=True — это стирает
+    # localStorage при каждом запуске, из-за чего Supabase-сессия теряется
+    # и пользователю приходится логиниться заново. Кладём хранилище в
+    # ~/Library/Application Support/MaketCP (macOS) / %APPDATA%/MaketCP (Windows) /
+    # ~/.config/MaketCP (Linux), чтобы сессия жила.
+    home = Path.home()
+    if sys.platform == "darwin":
+        storage_dir = home / "Library" / "Application Support" / "MaketCP"
+    elif sys.platform.startswith("win"):
+        storage_dir = Path(os.environ.get("APPDATA", str(home))) / "MaketCP"
+    else:
+        storage_dir = home / ".config" / "MaketCP"
+    try:
+        storage_dir.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        storage_dir = None
+
+    start_kwargs = {
+        "debug": "--debug" in sys.argv,
+        "private_mode": False,  # включаем persistent storage
+    }
+    if storage_dir:
+        start_kwargs["storage_path"] = str(storage_dir)
+
+    webview.start(**start_kwargs)
 
 
 if __name__ == "__main__":
