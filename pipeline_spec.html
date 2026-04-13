@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Maket CP -- Pipeline & Versions Spec</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0d1117; color: #c9d1d9; line-height: 1.6; }
+
+/* Navigation */
+.nav { position: fixed; top: 0; left: 0; width: 260px; height: 100vh; background: #161b22; border-right: 1px solid #21262d; padding: 20px 16px; overflow-y: auto; z-index: 10; }
+.nav h2 { font-size: 13px; color: #8b949e; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+.nav a { display: block; padding: 6px 10px; margin: 2px 0; color: #8b949e; text-decoration: none; font-size: 13px; border-radius: 4px; }
+.nav a:hover { background: #21262d; color: #e6edf3; }
+.nav a.l2 { padding-left: 24px; font-size: 12px; }
+.nav .sep { height: 1px; background: #21262d; margin: 12px 0; }
+
+/* Main content */
+.main { margin-left: 260px; padding: 40px 48px; max-width: 900px; }
+h1 { font-size: 28px; color: #e6edf3; margin-bottom: 4px; }
+.version-badge { font-size: 13px; color: #8b949e; margin-bottom: 32px; }
+h2 { font-size: 20px; color: #e6edf3; margin-top: 48px; margin-bottom: 16px; padding-top: 16px; border-top: 1px solid #21262d; }
+h3 { font-size: 16px; color: #e6edf3; margin-top: 24px; margin-bottom: 10px; }
+p { margin-bottom: 12px; color: #c9d1d9; }
+em { color: #e6edf3; font-style: normal; font-weight: 600; }
+
+/* Blocks */
+.card { background: #161b22; border: 1px solid #21262d; border-radius: 8px; padding: 20px; margin: 16px 0; }
+.card.highlight { border-color: #7c6ef0; }
+.card.warning { border-color: #d29922; }
+.card h4 { font-size: 14px; color: #e6edf3; margin-bottom: 8px; }
+.card p { margin-bottom: 8px; }
+
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px; }
+th { background: #161b22; color: #e6edf3; text-align: left; padding: 10px 12px; border: 1px solid #21262d; font-weight: 600; }
+td { padding: 8px 12px; border: 1px solid #21262d; vertical-align: top; }
+tr:hover td { background: #161b2266; }
+
+/* Tags */
+.tag { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; }
+.tag.project { background: #1f2937; color: #79c0ff; }
+.tag.group { background: #2d1f1f; color: #ffa657; }
+.tag.photo { background: #1f2d1f; color: #3fb950; }
+.tag.cc { background: #2d2545; color: #a78bfa; }
+.tag.ret { background: #2d2015; color: #f0883e; }
+.tag.tech { background: #152d15; color: #3fb950; }
+.tag.orig { background: #1f2937; color: #8b949e; }
+
+/* Diagram */
+.diagram { background: #0d1117; border: 1px solid #21262d; border-radius: 8px; padding: 24px; margin: 16px 0; overflow-x: auto; }
+.diagram-title { font-size: 12px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; }
+
+/* Pipeline row */
+.pipe-row { display: flex; align-items: center; gap: 4px; margin: 8px 0; flex-wrap: nowrap; }
+.pipe-stage { padding: 8px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; white-space: nowrap; text-align: center; min-width: 80px; }
+.pipe-arrow { color: #30363d; font-size: 14px; flex-shrink: 0; }
+.pipe-stage.s1 { background: #1a1a2e; color: #818cf8; border: 1px solid #4338ca; }
+.pipe-stage.s2 { background: #1a2332; color: #60a5fa; border: 1px solid #2563eb; }
+.pipe-stage.s3 { background: #1a2e1a; color: #4ade80; border: 1px solid #16a34a; }
+.pipe-stage.s4 { background: #2e2a1a; color: #fbbf24; border: 1px solid #d97706; }
+.pipe-stage.s5 { background: #2e1a1a; color: #f87171; border: 1px solid #dc2626; }
+.pipe-stage.s6 { background: #2e1a2e; color: #c084fc; border: 1px solid #9333ea; }
+.pipe-stage.s7 { background: #1a2e2e; color: #2dd4bf; border: 1px solid #0d9488; }
+.pipe-stage.s8 { background: #2e2e1a; color: #a3e635; border: 1px solid #65a30d; }
+
+/* Version timeline */
+.vtimeline { display: flex; align-items: flex-start; gap: 0; position: relative; padding: 16px 0; }
+.vnode { display: flex; flex-direction: column; align-items: center; min-width: 100px; position: relative; z-index: 1; }
+.vcircle { width: 56px; height: 56px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 3px solid; background: #0d1117; }
+.vcircle .vn { font-size: 18px; font-weight: 700; }
+.vcircle .va { font-size: 9px; font-weight: 600; text-transform: uppercase; }
+.vcircle.cc { border-color: #7c6ef0; color: #7c6ef0; }
+.vcircle.ret { border-color: #f0883e; color: #f0883e; }
+.vcircle.tech { border-color: #3fb950; color: #3fb950; }
+.vcircle.orig { border-color: #8b949e; color: #8b949e; }
+.vbadge { position: absolute; bottom: -4px; right: -4px; width: 20px; height: 20px; border-radius: 50%; font-size: 11px; font-weight: 700; color: #fff; display: flex; align-items: center; justify-content: center; }
+.vbadge.ok { background: #238636; }
+.vbadge.no { background: #da3633; }
+.vbadge.wait { background: #d29922; }
+.vlabel { margin-top: 8px; font-size: 11px; text-align: center; color: #8b949e; }
+.varrow { display: flex; align-items: center; justify-content: center; min-width: 40px; height: 56px; color: #30363d; font-size: 16px; }
+
+/* Counts bar */
+.counts-bar { display: flex; gap: 2px; margin: 8px 0; height: 24px; border-radius: 4px; overflow: hidden; }
+.counts-bar .segment { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: #fff; }
+.counts-bar .segment.done { background: #238636; }
+.counts-bar .segment.progress { background: #d29922; }
+.counts-bar .segment.waiting { background: #30363d; color: #8b949e; }
+
+/* Code block */
+.code { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.5; background: #0d1117; border: 1px solid #21262d; border-radius: 6px; padding: 16px; overflow-x: auto; margin: 12px 0; }
+.code .kw { color: #ff7b72; }
+.code .ty { color: #79c0ff; }
+.code .str { color: #a5d6ff; }
+.code .cm { color: #8b949e; }
+.code .fn { color: #d2a8ff; }
+.code .co { color: #ffa657; }
+
+/* Rule */
+.rule { margin: 12px 0; padding: 12px 16px; border-left: 3px solid #30363d; }
+.rule.important { border-left-color: #d29922; }
+.rule.critical { border-left-color: #da3633; }
+.rule .rule-title { font-size: 13px; font-weight: 600; color: #e6edf3; margin-bottom: 4px; }
+.rule p { font-size: 13px; }
+
+/* Scenario */
+.scenario { margin: 16px 0; }
+.scenario-title { font-size: 14px; font-weight: 600; color: #e6edf3; margin-bottom: 8px; }
+
+/* Status */
+.status-ok { color: #3fb950; }
+.status-warn { color: #d29922; }
+.status-err { color: #f85149; }
+</style>
+</head>
+<body>
+
+<!-- NAVIGATION -->
+<div class="nav">
+  <h2>Pipeline Spec</h2>
+  <a href="#overview">Обзор: два пайплайна</a>
+  <a href="#general" class="l2">1. Общий пайплайн</a>
+  <a href="#photo" class="l2">2. Пайплайн фото</a>
+  <a href="#connection" class="l2">Связь между ними</a>
+  <div class="sep"></div>
+  <a href="#stages">Этапы</a>
+  <a href="#stage-list" class="l2">8 этапов</a>
+  <a href="#triggers" class="l2">17 триггеров</a>
+  <div class="sep"></div>
+  <a href="#versions">Версии фото</a>
+  <a href="#version-model" class="l2">Модель версии</a>
+  <a href="#attributes" class="l2">Атрибуты (CC/ret/tech)</a>
+  <a href="#version-rules" class="l2">Правила</a>
+  <a href="#version-scenarios" class="l2">Сценарии</a>
+  <div class="sep"></div>
+  <a href="#branching">Ветвление</a>
+  <a href="#branch-model" class="l2">Как работает</a>
+  <a href="#branch-scenarios" class="l2">Сценарии</a>
+  <div class="sep"></div>
+  <a href="#data">Модель данных</a>
+  <a href="#data-version" class="l2">photo_versions</a>
+  <a href="#data-events" class="l2">stage_events</a>
+  <a href="#data-single" class="l2">Единый справочник</a>
+  <div class="sep"></div>
+  <a href="#ui">UI: два представления</a>
+  <a href="#ui-compact" class="l2">Компактный</a>
+  <a href="#ui-detailed" class="l2">Детальный</a>
+  <div class="sep"></div>
+  <a href="#roles">Роли</a>
+  <div class="sep"></div>
+  <a href="#roadmap">Концепция развития</a>
+  <a href="#roadmap-metrics" class="l2">Метрики: очередь + работа</a>
+  <a href="#roadmap-storage" class="l2">Хранение и доставка</a>
+  <a href="#roadmap-potential" class="l2">Расширение потенциала</a>
+  <a href="#roadmap-standard" class="l2">Стандартный порядок атрибутов</a>
+  <div class="sep"></div>
+  <a href="#decisions">Решения и открытые вопросы</a>
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="main">
+
+<h1>Maket CP: Pipeline & Versions</h1>
+<div class="version-badge">Спецификация v1.0 -- 13 апреля 2026</div>
+
+<!-- ===== OVERVIEW ===== -->
+<h2 id="overview">Два пайплайна</h2>
+
+<p>В Maket CP существуют <em>два пайплайна</em>, работающих на разных уровнях. Они не дублируют друг друга -- общий пайплайн агрегирует данные из пайплайна фото.</p>
+
+<div class="card highlight">
+<h4 id="general">1. Общий пайплайн (уровень проекта)</h4>
+<p>Показывает <em>где проект в целом</em>. Уже реализован на экране "Съёмки".</p>
+<p>Формат: название этапа + счётчик, например <em>"Отбор клиента: 38/40"</em> -- значит из 40 фото преотбора 38 прошли отбор.</p>
+<p>Этап проекта считается завершённым когда на нём 0 фото (все ушли вперёд или назад).</p>
+<p>Проект НЕ ждёт все фото -- часть уезжает вперёд, часть остаётся. Счётчик это и показывает.</p>
+</div>
+
+<div class="card highlight">
+<h4 id="photo">2. Пайплайн фото (уровень каждого фото)</h4>
+<p>Каждое фото имеет <em>свой этап и свою историю</em>. Включает версии, итерации, согласования.</p>
+<p>Версия фото = ключевое событие. Номер версии -- глобальный счётчик этих событий.</p>
+<p>Атрибуты версии (CC, retouch, tech) определяют <em>тип обработки</em> и формируют этапы.</p>
+<p>Действия пользователя (загрузка, согласование, отклонение) двигают фото по этапам.</p>
+</div>
+
+<div class="card" id="connection">
+<h4>Связь: пайплайн фото --> общий пайплайн</h4>
+<p>Общий пайплайн -- это <em>агрегация</em>. Он не хранит свой stage отдельно, а вычисляет из состояний всех фото:</p>
+<table>
+<tr><th>Общий пайплайн показывает</th><th>Откуда берётся</th></tr>
+<tr><td>"ЦК: 35/38"</td><td>35 фото имеют согласованную версию с атрибутом CC из 38 в отборе</td></tr>
+<tr><td>"Ретушь: 20/38"</td><td>20 фото имеют загруженную версию с атрибутом retouch</td></tr>
+<tr><td>"На доработке ЦК: 3"</td><td>3 фото с отклонённой последней CC-версией</td></tr>
+</table>
+</div>
+
+
+<!-- ===== STAGES ===== -->
+<h2 id="stages">Этапы пайплайна</h2>
+
+<h3 id="stage-list">8 этапов</h3>
+
+<div class="diagram">
+<div class="diagram-title">Последовательность этапов проекта</div>
+<div class="pipe-row">
+  <div class="pipe-stage s1">Превью<br><small>преотбор</small></div>
+  <div class="pipe-arrow">--></div>
+  <div class="pipe-stage s2">Отбор команды<br><small>Structure</small></div>
+  <div class="pipe-arrow">--></div>
+  <div class="pipe-stage s3">Отбор клиента</div>
+  <div class="pipe-arrow">--></div>
+  <div class="pipe-stage s4">ЦК</div>
+  <div class="pipe-arrow">--></div>
+  <div class="pipe-stage s5">Комментарии<br><small>на ретушь</small></div>
+  <div class="pipe-arrow">--></div>
+  <div class="pipe-stage s6">Ретушь</div>
+  <div class="pipe-arrow">--></div>
+  <div class="pipe-stage s7">Согласование<br><small>ретуши</small></div>
+  <div class="pipe-arrow">--></div>
+  <div class="pipe-stage s8">Адаптация<br><small>к каналам</small></div>
+</div>
+</div>
+
+<p>Не все этапы обязательны. "Комментарии на ретушь" появляется только если кто-то оставил аннотацию. Проекты с финальной ЦК в превью могут пропустить этап ЦК.</p>
+
+<h3 id="triggers">17 триггеров</h3>
+
+<table>
+<tr><th>#</th><th>Этап</th><th>Триггер</th><th>Кто</th><th>Уровень</th><th>Что происходит</th></tr>
+<tr><td>1</td><td><span class="tag project">Превью</span></td><td>Загружена папка с превью</td><td>Фотограф</td><td><span class="tag project">Проект</span></td><td>Фото появляются в галерее</td></tr>
+<tr><td>2</td><td><span class="tag project">Отбор команды</span></td><td>Фото разложены по карточкам</td><td>Фотограф</td><td><span class="tag project">Проект</span></td><td>Формируется отбор</td></tr>
+<tr><td>3</td><td><span class="tag project">Отбор команды</span></td><td>"Ссылка на преотбор"</td><td>Фотограф</td><td><span class="tag project">Проект</span></td><td>Share link, проект уходит клиенту</td></tr>
+<tr><td>4</td><td><span class="tag project">Отбор клиента</span></td><td>Клиент открыл ссылку</td><td>Клиент</td><td><span class="tag project">Проект</span></td><td>Клиент видит карточки</td></tr>
+<tr><td>5</td><td><span class="tag group">Отбор клиента</span></td><td>Клиент нажал "Согласовать"</td><td>Клиент</td><td><span class="tag group">Группа</span></td><td>Согласованные фото едут дальше</td></tr>
+<tr><td>6</td><td><span class="tag group">Отбор клиента</span></td><td>"Вернуть на доработку"</td><td>Клиент</td><td><span class="tag group">Группа</span></td><td>Фото обратно, итерация +1</td></tr>
+<tr><td>7</td><td><span class="tag photo">Отбор клиента</span></td><td>Фото удалено из отбора</td><td>Клиент / фотограф</td><td><span class="tag photo">Фото</span></td><td>Каскад: отменяет всё, ветка "убитые"</td></tr>
+<tr><td>8</td><td><span class="tag group">ЦК</span></td><td>Загружена версия "ЦК"</td><td>Фотограф</td><td><span class="tag group">Группа</span></td><td>Версия привязана к фото отбора</td></tr>
+<tr><td>9</td><td><span class="tag project">ЦК</span></td><td>"ЦК финальная"</td><td>Фотограф</td><td><span class="tag project">Отбор</span></td><td>Превью = финал (нет отдельной ЦК)</td></tr>
+<tr><td>10</td><td><span class="tag group">ЦК</span></td><td>Повторная ЦК на часть фото</td><td>Фотограф</td><td><span class="tag group">Группа</span></td><td>Новая итерация ЦК для группы</td></tr>
+<tr><td>11</td><td><span class="tag project">Комментарии</span></td><td>Первая аннотация</td><td>Клиент / фотограф</td><td><span class="tag project">Проект</span></td><td>Этап появляется в пайплайне</td></tr>
+<tr><td>12</td><td><span class="tag project">Комментарии</span></td><td>"Завершить комментирование"</td><td>Клиент / фотограф</td><td><span class="tag project">Проект</span></td><td>Комментарии зафиксированы</td></tr>
+<tr><td>13</td><td><span class="tag group">Ретушь</span></td><td>Загружена версия "Ретушь"</td><td>Ретушёр</td><td><span class="tag group">Группа</span></td><td>Частичная загрузка, итерации</td></tr>
+<tr><td>14</td><td><span class="tag group">Ретушь</span></td><td>Повторная ретушь</td><td>Ретушёр</td><td><span class="tag group">Группа</span></td><td>Новая итерация после правок</td></tr>
+<tr><td>15</td><td><span class="tag group">Согласование</span></td><td>Клиент согласовал ретушь</td><td>Клиент</td><td><span class="tag group">Группа</span></td><td>Фото готовы к адаптации</td></tr>
+<tr><td>16</td><td><span class="tag group">Согласование</span></td><td>"Вернуть на доработку"</td><td>Клиент</td><td><span class="tag group">Группа</span></td><td>Обратно ретушёру, итерация +1</td></tr>
+<tr><td>17</td><td><span class="tag project">Адаптация</span></td><td>Все фото согласованы</td><td>Система</td><td><span class="tag project">Проект</span></td><td>Финальный этап</td></tr>
+</table>
+
+<div class="rule important">
+<div class="rule-title">Три уровня триггеров</div>
+<p><span class="tag project">Проект</span> -- действие затрагивает весь проект (загрузка папки, share link, финал).</p>
+<p><span class="tag group">Группа фото</span> -- действие затрагивает часть фото (частичное согласование, загрузка ЦК для 10 из 40).</p>
+<p><span class="tag photo">Фото</span> -- действие над одним фото (удаление из отбора).</p>
+</div>
+
+
+<!-- ===== VERSIONS ===== -->
+<h2 id="versions">Версии фото</h2>
+
+<h3 id="version-model">Что такое версия</h3>
+
+<p>Версия -- порядковый номер ключевого события в жизни фото. Каждая новая версия = новый файл (после обработки или переработки). Номер <em>глобальный, никогда не сбрасывается</em>.</p>
+
+<h3 id="attributes">Атрибуты</h3>
+
+<p>У каждой версии есть атрибут -- тип обработки. Три атрибута:</p>
+
+<table>
+<tr><th>Атрибут</th><th>Код</th><th>Что это</th><th>Кто делает</th></tr>
+<tr><td><span class="tag cc">Цветокоррекция</span></td><td>cc</td><td>Цветовое решение, тональность, баланс</td><td>Фотограф</td></tr>
+<tr><td><span class="tag ret">Ретушь</span></td><td>retouch</td><td>Обработка кожи, фона, деталей</td><td>Ретушёр</td></tr>
+<tr><td><span class="tag tech">Техническая</span></td><td>tech</td><td>Ресайз, шарпенинг, адаптация к каналам</td><td>Фотограф / система</td></tr>
+</table>
+
+<div class="card highlight">
+<h4>Единый справочник -- один источник правды</h4>
+<p>Атрибуты определены в ОДНОМ месте. Фронтенд, бэкенд и база данных используют одни и те же строки: <code>cc</code>, <code>retouch</code>, <code>tech</code>. Никаких <code>color_correction</code> на бэкенде, <code>color</code> на фронте -- <em>только единый справочник</em>.</p>
+</div>
+
+<h3 id="version-rules">Правила: версия --> пайплайн</h3>
+
+<div class="rule important">
+<div class="rule-title">Версия загружена = этап создан</div>
+<p>Загрузка новой версии автоматически создаёт точку пайплайна для этого фото. Фото попадает на этап и ждёт решения.</p>
+</div>
+
+<div class="rule important">
+<div class="rule-title">Согласовано = этап завершён</div>
+<p>Пользователь принимает версию -- этап закрывается. Фото готово к следующему типу обработки.</p>
+</div>
+
+<div class="rule critical">
+<div class="rule-title">Не согласовано = новая итерация, новый этап, новая версия</div>
+<p>Отклонение --> новая версия с тем же атрибутом и новым номером. Это новый этап. Две ЦК = две разных версии (например, v2 CC#1 и v3 CC#2).</p>
+</div>
+
+<div class="rule">
+<div class="rule-title">Номер версии = полная история</div>
+<p>По номеру видно сколько ключевых событий произошло. Фото с версией 7 -- прожило больше итераций чем фото с версией 3. Атрибуты рассказывают что именно.</p>
+</div>
+
+<h3 id="version-scenarios">Сценарии</h3>
+
+<div class="scenario">
+<div class="scenario-title">Идеальный путь: всё с первого раза</div>
+<div class="diagram">
+<div class="vtimeline">
+  <div class="vnode"><div class="vcircle orig"><span class="vn">1</span><span class="va">orig</span></div><div class="vbadge ok">+</div><div class="vlabel">В отбор</div></div>
+  <div class="varrow">--></div>
+  <div class="vnode"><div class="vcircle cc"><span class="vn">2</span><span class="va">CC</span></div><div class="vbadge ok">OK</div><div class="vlabel">CC принята</div></div>
+  <div class="varrow">--></div>
+  <div class="vnode"><div class="vcircle ret"><span class="vn">3</span><span class="va">ret</span></div><div class="vbadge ok">OK</div><div class="vlabel">Ретушь ОК</div></div>
+  <div class="varrow">--></div>
+  <div class="vnode"><div class="vcircle tech"><span class="vn">4</span><span class="va">tech</span></div><div class="vbadge ok">OK</div><div class="vlabel">Готово</div></div>
+</div>
+<p style="font-size:12px;color:#8b949e;margin-top:12px">Общий: "ЦК 1/1, Ретушь 1/1, Адаптация 1/1" -- все этапы мгновенно пройдены</p>
+</div>
+</div>
+
+<div class="scenario">
+<div class="scenario-title">Две итерации ЦК</div>
+<div class="diagram">
+<div class="vtimeline">
+  <div class="vnode"><div class="vcircle orig"><span class="vn">1</span><span class="va">orig</span></div><div class="vbadge ok">+</div><div class="vlabel">Отбор</div></div>
+  <div class="varrow">--></div>
+  <div class="vnode"><div class="vcircle cc"><span class="vn">2</span><span class="va">CC</span></div><div class="vbadge no">X</div><div class="vlabel">CC#1 нет</div></div>
+  <div class="varrow">--></div>
+  <div class="vnode"><div class="vcircle cc"><span class="vn">3</span><span class="va">CC</span></div><div class="vbadge ok">OK</div><div class="vlabel">CC#2 да</div></div>
+  <div class="varrow">--></div>
+  <div class="vnode"><div class="vcircle ret"><span class="vn">4</span><span class="va">ret</span></div><div class="vbadge ok">OK</div><div class="vlabel">Ретушь ОК</div></div>
+  <div class="varrow">--></div>
+  <div class="vnode"><div class="vcircle tech"><span class="vn">5</span><span class="va">tech</span></div><div class="vbadge ok">OK</div><div class="vlabel">Готово</div></div>
+</div>
+<p style="font-size:12px;color:#8b949e;margin-top:12px">Версия 5 вместо 4 -- одна лишняя итерация ЦК видна сразу по номеру</p>
+</div>
+</div>
+
+<div class="scenario">
+<div class="scenario-title">Сложный кейс: CC x3 + Retouch x2</div>
+<div class="diagram">
+<div class="vtimeline">
+  <div class="vnode"><div class="vcircle orig"><span class="vn">1</span><span class="va">orig</span></div><div class="vbadge ok">+</div><div class="vlabel">Отбор</div></div>
+  <div class="varrow">-></div>
+  <div class="vnode"><div class="vcircle cc"><span class="vn">2</span><span class="va">CC</span></div><div class="vbadge no">X</div><div class="vlabel">CC#1</div></div>
+  <div class="varrow">-></div>
+  <div class="vnode"><div class="vcircle cc"><span class="vn">3</span><span class="va">CC</span></div><div class="vbadge no">X</div><div class="vlabel">CC#2</div></div>
+  <div class="varrow">-></div>
+  <div class="vnode"><div class="vcircle cc"><span class="vn">4</span><span class="va">CC</span></div><div class="vbadge ok">OK</div><div class="vlabel">CC#3</div></div>
+  <div class="varrow">-></div>
+  <div class="vnode"><div class="vcircle ret"><span class="vn">5</span><span class="va">ret</span></div><div class="vbadge no">X</div><div class="vlabel">Ret#1</div></div>
+  <div class="varrow">-></div>
+  <div class="vnode"><div class="vcircle ret"><span class="vn">6</span><span class="va">ret</span></div><div class="vbadge ok">OK</div><div class="vlabel">Ret#2</div></div>
+  <div class="varrow">-></div>
+  <div class="vnode"><div class="vcircle tech"><span class="vn">7</span><span class="va">tech</span></div><div class="vbadge wait">?</div><div class="vlabel">Ждёт</div></div>
+</div>
+<p style="font-size:12px;color:#8b949e;margin-top:12px">Версия 7 -- значит 7 ключевых событий. 3 итерации ЦК + 2 ретуши видны по атрибутам</p>
+</div>
+</div>
+
+
+<!-- ===== BRANCHING ===== -->
+<h2 id="branching">Ветвление</h2>
+
+<h3 id="branch-model">Как фото расходятся</h3>
+
+<p>Проект с 40 фото. Клиент смотрит ЦК и решает: 35 -- ОК, 5 -- переделать. Что происходит:</p>
+
+<div class="diagram">
+<div class="diagram-title">Ветвление на этапе ЦК (проект 40 фото)</div>
+<table style="border: none;">
+<tr>
+  <td style="border: none; padding: 8px; vertical-align: top; width: 50%;">
+    <div style="font-size: 14px; font-weight: 600; color: #3fb950; margin-bottom: 8px;">35 фото: CC согласована</div>
+    <div class="counts-bar" style="width: 100%;">
+      <div class="segment done" style="flex: 1;">35 --> Ретушь</div>
+    </div>
+    <p style="font-size: 12px; color: #8b949e; margin-top: 8px;">Едут дальше. Общий пайплайн: "Ретушь: 0/35" (загружены 0, ждём ретушёра)</p>
+  </td>
+  <td style="border: none; padding: 8px; vertical-align: top; width: 50%;">
+    <div style="font-size: 14px; font-weight: 600; color: #f85149; margin-bottom: 8px;">5 фото: CC отклонена</div>
+    <div class="counts-bar" style="width: 100%;">
+      <div class="segment progress" style="flex: 1;">5 --> CC #2</div>
+    </div>
+    <p style="font-size: 12px; color: #8b949e; margin-top: 8px;">Ждут новую ЦК. Общий пайплайн: "На доработке ЦК: 5"</p>
+  </td>
+</tr>
+</table>
+</div>
+
+<div class="rule important">
+<div class="rule-title">Проект НЕ ждёт -- фото уезжают вперёд</div>
+<p>35 фото уже на ретуши, 5 ещё на ЦК. Два потока параллельно. Когда 5 фото получат согласованную ЦК#2, они догонят основной поток на этапе ретуши.</p>
+</div>
+
+<h3 id="branch-scenarios">Пример: полный жизненный цикл проекта</h3>
+
+<div class="diagram">
+<div class="diagram-title">Проект: 40 фото, вся история</div>
+<table>
+<tr><th>Событие</th><th>Общий пайплайн</th><th>Что видят</th></tr>
+<tr><td>Загружены 40 превью</td><td>Превью: 40</td><td>Фотограф раскладывает</td></tr>
+<tr><td>Разложены по карточкам, отправлены клиенту</td><td>Отбор клиента: 40</td><td>Клиент смотрит</td></tr>
+<tr><td>Клиент согласовал 38, убрал 2</td><td>Отбор: 38/40 -- ЦК: 0/38</td><td>Фотограф делает ЦК</td></tr>
+<tr><td>Загружены 38 ЦК-версий (v2 CC для каждого)</td><td>ЦК: 38 ждут согласования</td><td>Клиент смотрит ЦК</td></tr>
+<tr><td>Клиент: 33 ОК, 5 переделать</td><td>Ретушь: 0/33 -- ЦК доработка: 5</td><td>Два потока параллельно</td></tr>
+<tr><td>Загружены 5 повторных ЦК (v3 CC#2)</td><td>ЦК доработка: 5 ждут</td><td>Клиент смотрит повторно</td></tr>
+<tr><td>Клиент согласовал все 5</td><td>Ретушь: 0/38</td><td>Потоки соединились</td></tr>
+<tr><td>Ретушёр загрузил 38 ретушей (v3 ret / v4 ret)</td><td>Ретушь: 38 ждут</td><td>Клиент смотрит ретушь</td></tr>
+<tr><td>Клиент: 36 ОК, 2 переделать</td><td>Адаптация: 0/36 -- Ретушь доработка: 2</td><td>Два потока опять</td></tr>
+<tr><td>Повторная ретушь + согласование</td><td>Адаптация: 0/38</td><td>Все вместе</td></tr>
+<tr><td>Адаптация выполнена</td><td>Готово: 38</td><td>Проект завершён</td></tr>
+</table>
+<p style="font-size: 12px; color: #8b949e; margin-top: 12px;">
+Обратите внимание: у 33 фото "быстрого" потока -- версия 4 (orig, CC, ret, tech).<br>
+У 5 фото с переделкой ЦК -- версия 5 (orig, CC#1, CC#2, ret, tech).<br>
+У 2 фото с переделкой ретуши -- версия 6 (orig, CC#1, CC#2, ret#1, ret#2, tech) или 5 если ЦК прошла с первого раза.
+</p>
+</div>
+
+<div class="card">
+<h4>Три ценности ветвления</h4>
+<p><em>Скорость</em> -- съёмка отгружается частями, никто не простаивает.</p>
+<p><em>Прозрачность</em> -- дашборд: сколько фото на каком этапе прямо сейчас.</p>
+<p><em>Аргументация</em> -- полная история итераций, стоимость каждого раунда правок. Клиент видит сколько раз отправлял на доработки.</p>
+</div>
+
+
+<!-- ===== DATA MODEL ===== -->
+<h2 id="data">Модель данных</h2>
+
+<h3 id="data-single">Единый справочник (один источник правды)</h3>
+
+<div class="code">
+<span class="cm">// === Единый справочник -- ЭТО ОПРЕДЕЛЯЕТСЯ В ОДНОМ МЕСТЕ ===</span>
+<span class="cm">// Фронтенд, бэкенд, Supabase -- все используют эти строки</span>
+
+<span class="kw">var</span> <span class="co">VERSION_ATTRIBUTES</span> = {
+    <span class="str">'cc'</span>:      { <span class="fn">label</span>: <span class="str">'Цветокоррекция'</span>, <span class="fn">order</span>: <span class="ty">1</span> },
+    <span class="str">'retouch'</span>: { <span class="fn">label</span>: <span class="str">'Ретушь'</span>,          <span class="fn">order</span>: <span class="ty">2</span> },
+    <span class="str">'tech'</span>:    { <span class="fn">label</span>: <span class="str">'Техническая'</span>,     <span class="fn">order</span>: <span class="ty">3</span> }
+};
+
+<span class="kw">var</span> <span class="co">VERSION_STATUSES</span> = {
+    <span class="str">'uploaded'</span>:  <span class="str">'Загружена'</span>,    <span class="cm">// --> этап создан в пайплайне</span>
+    <span class="str">'approved'</span>:  <span class="str">'Согласована'</span>,  <span class="cm">// --> этап завершён</span>
+    <span class="str">'rejected'</span>:  <span class="str">'Отклонена'</span>    <span class="cm">// --> нужна новая итерация</span>
+};
+</div>
+
+<h3 id="data-version">photo_versions (Supabase)</h3>
+
+<div class="code">
+<span class="kw">CREATE TABLE</span> <span class="fn">photo_versions</span> (
+    <span class="fn">id</span>          <span class="ty">uuid</span> <span class="kw">PRIMARY KEY DEFAULT</span> gen_random_uuid(),
+    <span class="fn">project_id</span>  <span class="ty">uuid</span> <span class="kw">REFERENCES</span> projects(id),
+    <span class="fn">photo_name</span>  <span class="ty">text</span> <span class="kw">NOT NULL</span>,        <span class="cm">-- имя файла фото</span>
+    <span class="fn">number</span>      <span class="ty">int</span> <span class="kw">NOT NULL</span>,         <span class="cm">-- 1, 2, 3... глобальный счётчик</span>
+    <span class="fn">attribute</span>   <span class="ty">text</span> <span class="kw">NOT NULL</span>,        <span class="cm">-- 'cc' | 'retouch' | 'tech'</span>
+    <span class="fn">status</span>      <span class="ty">text</span> <span class="kw">NOT NULL</span>         <span class="cm">-- 'uploaded' | 'approved' | 'rejected'</span>
+                <span class="kw">DEFAULT</span> <span class="str">'uploaded'</span>,
+    <span class="fn">iteration</span>   <span class="ty">int</span> <span class="kw">NOT NULL</span>,         <span class="cm">-- CC#1, CC#2... номер итерации этого атрибута</span>
+    <span class="fn">file_path</span>   <span class="ty">text</span>,                <span class="cm">-- путь к файлу (Storage или локальный)</span>
+    <span class="fn">preview_path</span> <span class="ty">text</span>,               <span class="cm">-- путь к превью JPEG</span>
+    <span class="fn">cos_path</span>    <span class="ty">text</span>,                <span class="cm">-- путь к COS-файлу (если есть)</span>
+    <span class="fn">created_at</span>  <span class="ty">timestamptz</span> <span class="kw">DEFAULT</span> now(),
+    <span class="fn">decided_at</span>  <span class="ty">timestamptz</span>,         <span class="cm">-- когда согласовано/отклонено</span>
+    <span class="fn">decided_by</span>  <span class="ty">uuid</span>,               <span class="cm">-- кто принял решение</span>
+    <span class="kw">UNIQUE</span>(project_id, photo_name, number)
+);
+</div>
+
+<h3 id="data-events">stage_events (контрольные точки пайплайна)</h3>
+
+<div class="code">
+<span class="kw">CREATE TABLE</span> <span class="fn">stage_events</span> (
+    <span class="fn">id</span>          <span class="ty">uuid</span> <span class="kw">PRIMARY KEY DEFAULT</span> gen_random_uuid(),
+    <span class="fn">project_id</span>  <span class="ty">uuid</span> <span class="kw">REFERENCES</span> projects(id),
+    <span class="fn">trigger_id</span>  <span class="ty">int</span> <span class="kw">NOT NULL</span>,         <span class="cm">-- номер триггера (1-17)</span>
+    <span class="fn">photos</span>      <span class="ty">text[]</span>,              <span class="cm">-- какие фото затронуты (null = весь проект)</span>
+    <span class="fn">from_stage</span>  <span class="ty">int</span>,                 <span class="cm">-- с какого этапа</span>
+    <span class="fn">to_stage</span>    <span class="ty">int</span>,                 <span class="cm">-- на какой этап</span>
+    <span class="fn">actor</span>       <span class="ty">uuid</span>,               <span class="cm">-- кто сделал</span>
+    <span class="fn">comment</span>     <span class="ty">text</span>,                <span class="cm">-- комментарий (при отклонении)</span>
+    <span class="fn">created_at</span>  <span class="ty">timestamptz</span> <span class="kw">DEFAULT</span> now()
+);
+
+<span class="cm">-- Текущий этап каждого фото = производная:</span>
+<span class="cm">-- SELECT photo, MAX(to_stage) FROM stage_events</span>
+<span class="cm">-- WHERE photo = ANY(photos) GROUP BY photo</span>
+<span class="cm">--</span>
+<span class="cm">-- Общий пайплайн = агрегация:</span>
+<span class="cm">-- COUNT(*) по to_stage для всех фото проекта</span>
+</div>
+
+
+<!-- ===== UI ===== -->
+<h2 id="ui">UI: два представления</h2>
+
+<h3 id="ui-compact">Компактный (экран "Съёмки")</h3>
+
+<div class="card">
+<p>Уже реализован. Показывает этапы проекта с счётчиками:</p>
+<div class="diagram">
+<div class="pipe-row">
+  <div class="pipe-stage s1" style="opacity: 0.5;">Превью<br><small>40/40</small></div>
+  <div class="pipe-arrow">--></div>
+  <div class="pipe-stage s2" style="opacity: 0.5;">Отбор<br><small>38/40</small></div>
+  <div class="pipe-arrow">--></div>
+  <div class="pipe-stage s4" style="opacity: 1; box-shadow: 0 0 12px #d97706;">ЦК<br><small>33/38</small></div>
+  <div class="pipe-arrow">--></div>
+  <div class="pipe-stage s6" style="opacity: 0.3;">Ретушь<br><small>0/33</small></div>
+  <div class="pipe-arrow">--></div>
+  <div class="pipe-stage s8" style="opacity: 0.3;">Адаптация<br><small>--</small></div>
+</div>
+<p style="font-size: 12px; color: #8b949e; margin-top: 8px;">Текущий: ЦК 33/38 (5 на доработке). Этап подсвечен.</p>
+</div>
+</div>
+
+<h3 id="ui-detailed">Детальный (оверлей по клику)</h3>
+
+<div class="card">
+<p>Открывается по клику на этап. Показывает реальное движение фото:</p>
+<p>-- Батчи: группы фото, которые двигались вместе ("12 апреля: 33 фото CC согласованы")</p>
+<p>-- Возвраты: "12 апреля: 5 фото возвращены на ЦК, комментарий: 'тёплый тон'"</p>
+<p>-- Итерации: сколько раз группа проходила этап</p>
+<p>-- История: полный лог контрольных точек проекта</p>
+</div>
+
+
+<!-- ===== ROLES ===== -->
+<h2 id="roles">Роли и что видят</h2>
+
+<table>
+<tr><th>Роль</th><th>Платформа</th><th>Что видит в пайплайне</th><th>Что может делать</th></tr>
+<tr><td>Фотограф</td><td>Desktop</td><td>Всё: оба пайплайна, все версии, все итерации</td><td>Загружать версии, подтверждать "ЦК финальная", отправлять клиенту</td></tr>
+<tr><td>Клиент</td><td>Web</td><td>Упрощённый: текущий этап + что от него требуется</td><td>Согласовать, отклонить, комментировать, удалить из отбора</td></tr>
+<tr><td>Ретушёр</td><td>Web</td><td>Свои задачи: какие фото на ретуши, комментарии</td><td>Загружать ретушь, видеть аннотации</td></tr>
+</table>
+
+
+<!-- ===== ROADMAP ===== -->
+<h2 id="roadmap">Концепция развития</h2>
+
+<p>Этот раздел -- карта того, как метрики и пайплайн будут эволюционировать. Сначала -- грубее, потом -- точнее, по мере появления новых сигналов (событий, триггеров).</p>
+
+<!-- метрики: очередь + работа -->
+<h3 id="roadmap-metrics">Метрики на этапе: от одного ведра к четырём состояниям</h3>
+
+<p>Сейчас мы показываем на каждом этапе три числа: <strong>готово</strong> (cumulative N/M), <strong>на этапе</strong> (сейчас тут), <strong>ожидается</strong> (ещё не дошло). "На этапе" -- это одно общее ведро. По мере появления новых сигналов оно разобьётся на более тонкие состояния.</p>
+
+<div class="card">
+<h4>v1 (сейчас): одно ведро "на этапе"</h4>
+<p>Считаем как "ушли с предыдущего этапа, но ещё не прошли текущий". Этого достаточно чтобы увидеть где работа скопилась, но не видно <em>почему</em>.</p>
+<table>
+<tr><th>Метрика</th><th>Что значит</th><th>Сигнал</th></tr>
+<tr><td>готово</td><td>Прошли этот этап (есть approved версия с нужным атрибутом)</td><td>Событие "approved"</td></tr>
+<tr><td>на этапе</td><td>Ушли с предыдущего, не прошли этот</td><td>Разность cumulative между этапами</td></tr>
+<tr><td>ожидается</td><td>Из масштаба, не дошли до этапа</td><td>Масштаб - прошли предыдущий</td></tr>
+</table>
+</div>
+
+<div class="card highlight">
+<h4>v2: "на этапе" разделится на четыре точных состояния</h4>
+<p>Как только мы начнём фиксировать события "исполнитель скачал архив", "исполнитель загрузил версию", ведро "на этапе" распадётся. Это покажет клиенту где именно затык.</p>
+<table>
+<tr><th>Состояние</th><th>Что значит</th><th>Нужный сигнал</th><th>Где видно затык</th></tr>
+<tr><td>ожидается</td><td>Из масштаба, ещё не дошли до этапа</td><td>есть (предыдущий этап)</td><td>--</td></tr>
+<tr><td>в очереди</td><td>Ушли с предыдущего, но никто не забрал в работу</td><td>нужно: событие "скачал архив"</td><td>Координатор не передал / исполнитель не взял</td></tr>
+<tr><td>в работе</td><td>Исполнитель скачал, делает</td><td>нужно: "скачал архив"</td><td>Идёт работа (норма)</td></tr>
+<tr><td>загружено, ждёт согласования</td><td>Исполнитель вернул результат, ждёт решения клиента / фотографа</td><td>есть: "uploaded version"</td><td>Клиент не посмотрел / фотограф не согласовал</td></tr>
+<tr><td>готово</td><td>Согласовано, прошли дальше</td><td>есть: "approved"</td><td>--</td></tr>
+</table>
+<p><strong>Что даст:</strong> клиент видит "5 в очереди у ретушёра" -- значит нужно пнуть ретушёра. "80 ждут твоего согласования" -- значит затык на клиенте. Прозрачность без лишних звонков.</p>
+</div>
+
+<div class="card">
+<h4>Что нужно чтобы переключиться на v2</h4>
+<ul>
+<li>Триггер скачивания архива (отмечается когда исполнитель взял файлы в работу) -- новое событие в stage_events.</li>
+<li>UI: четыре маленьких цифры под "готово" вместо одной "на этапе".</li>
+<li>Правила переходов: как только кто-то скачал -- фото переходит из "в очереди" в "в работе". Как только загрузил -- в "загружено, ждёт согласования".</li>
+<li>Формально v2 -- это агрегация из stage_events, а не отдельная сущность. Одна и та же таблица событий, разные фильтры.</li>
+</ul>
+</div>
+
+<!-- расширение потенциала -->
+<h3 id="roadmap-potential">Расширение потенциала и масштаба</h3>
+
+<div class="card">
+<p>Масштаб может меняться <em>в обе стороны</em> в течение проекта:</p>
+<ul>
+<li><strong>+ фото из преотбора</strong> -- клиент попросил вернуть в проект фото, которые были отсеяны. Расширяет масштаб.</li>
+<li><strong>+ новые превью</strong> -- клиенту не хватило, фотограф докладывает ещё превью. Расширяет потенциал, а через него может увеличиться и масштаб.</li>
+<li><strong>- убили фото</strong> -- фото помечено "убитое", но история работы сохраняется в отдельной ветке (для подсчёта стоимости).</li>
+</ul>
+<p>Каждое изменение масштаба -- отдельное событие с пометкой "+ N из преотбора" под пайплайном. N/M у всех этапов автоматически пересчитывается.</p>
+</div>
+
+<!-- стандартный порядок -->
+<h3 id="roadmap-standard">Стандартный порядок атрибутов</h3>
+
+<div class="card">
+<p><strong>Канон:</strong> orig --> CC --> retouch --> tech.</p>
+<p>Это самый частый сценарий. Но порядок не строгий:</p>
+<ul>
+<li>CC может делаться <em>поверх</em> ретуши (когда цветокоррекция уточняется после ретуши на готовых файлах) -- это не регрессия, а слой сверху.</li>
+<li>Tech может быть пропущен (если правки не нужны).</li>
+<li>CC может быть пропущен (если фотограф сразу утвердил "ЦК финальная").</li>
+</ul>
+<p>В пайплайне порядок атрибутов визуально фиксированный, но отдельные фото могут проходить его в любой последовательности. Это видно в детальном пайплайне как неравномерные ячейки.</p>
+</div>
+
+<!-- хранение -->
+<h3 id="roadmap-storage">Хранение и доставка файлов</h3>
+
+<div class="card">
+<p><strong>Проблема:</strong> часто задержки между этапами происходят потому что нужно дождаться пока кто-то пришлёт ссылку на облако или передаст архив. Это должно быть встроено в Maket CP.</p>
+<p><strong>Решение:</strong> полноразмерные JPEG и TIFF хранятся в Supabase Storage, клиент скачивает прямо из портала.</p>
+<table>
+<tr><th>Размер</th><th>Для чего</th><th>Где</th></tr>
+<tr><td>Превью (до 2MB)</td><td>Смотреть в интерфейсе</td><td>Supabase Storage, публичный url</td></tr>
+<tr><td>Full JPEG (5-15MB)</td><td>Скачать клиенту / ретушёру</td><td>Supabase Storage, ссылка по триггеру скачивания</td></tr>
+<tr><td>TIFF (50-200MB)</td><td>Ретушёру для работы</td><td>Supabase Storage, только по запросу "скачать архив"</td></tr>
+<tr><td>COS файлы</td><td>Связь с рейтингами и аннотациями</td><td>Supabase Storage, рядом с фото</td></tr>
+</table>
+<p><strong>Монетизация:</strong> хранение оплачивается в рамках подписки или разово за проект. Ретенция -- 3 месяца (далее архив). Экспорт всех файлов -- всегда доступен через кнопку "экспорт проекта".</p>
+<p><strong>Связь с пайплайном:</strong> скачивание архива -- это триггер перехода фото из "в очереди" в "в работе" (см. v2 метрик выше).</p>
+</div>
+
+
+<!-- ===== DECISIONS ===== -->
+<h2 id="decisions">Принятые решения и открытые вопросы</h2>
+
+<div class="card">
+<h4>Принятые решения</h4>
+<table>
+<tr><th>Что</th><th>Решение</th><th>Когда</th></tr>
+<tr><td>Уровень пайплайна</td><td>Два уровня: проект (агрегация) + фото (реальный)</td><td>Апрель 2026</td></tr>
+<tr><td>Ветвление</td><td>Фото уезжают вперёд, не ждут весь пакет</td><td>Апрель 2026</td></tr>
+<tr><td>Версии</td><td>Глобальный номер + атрибут + статус</td><td>Апрель 2026</td></tr>
+<tr><td>Атрибуты</td><td>Три: cc, retouch, tech (единый справочник)</td><td>Апрель 2026</td></tr>
+<tr><td>Триггеры</td><td>17 триггеров на 3 уровнях (проект/группа/фото)</td><td>Апрель 2026</td></tr>
+<tr><td>Этап проекта</td><td>Вычисляется из состояний фото, не хранится отдельно</td><td>Апрель 2026</td></tr>
+<tr><td>Удалённые фото</td><td>Ветка "убитые" с историей проделанной работы</td><td>Апрель 2026</td></tr>
+<tr><td>ID фото</td><td>Двойное хранение: COS keyword + суффикс имени</td><td>Апрель 2026</td></tr>
+<tr><td>COS файлы</td><td>Хранятся в Supabase Storage, не в БД</td><td>Апрель 2026</td></tr>
+</table>
+</div>
+
+<div class="card warning">
+<h4>Открытые вопросы</h4>
+<table>
+<tr><th>Вопрос</th><th>Контекст</th></tr>
+<tr><td>Версия 1 = orig или первое превью?</td><td>Нужно решить: оригинал уже считается версией или версии начинаются с CC?</td></tr>
+<tr><td>Групповое согласование UI</td><td>Клиент согласовывает по одному фото или может выбрать группу?</td></tr>
+<tr><td>Уведомления при ветвлении</td><td>Как фотограф узнаёт что 5 фото вернулись на ЦК?</td></tr>
+<tr><td>Порядок реализации ветвления</td><td>Сначала наполнение (photo_versions, загрузка), ветки -- потом</td></tr>
+<tr><td>Пропуск этапов</td><td>"ЦК финальная" = пропуск ЦК. Какие ещё этапы можно пропускать?</td></tr>
+</table>
+</div>
+
+</div>
+</body>
+</html>

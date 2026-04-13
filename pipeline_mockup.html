@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Pipeline UI Mockup</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0d1117; color: #c9d1d9; padding: 32px; line-height: 1.5; }
+h1 { font-size: 22px; color: #e6edf3; margin-bottom: 6px; }
+.sub { font-size: 13px; color: #8b949e; margin-bottom: 24px; }
+h2 { font-size: 16px; color: #e6edf3; margin: 40px 0 12px 0; padding-top: 16px; border-top: 1px solid #21262d; }
+h3 { font-size: 14px; color: #e6edf3; margin: 16px 0 10px 0; }
+
+/* Moment */
+.moment { background: #161b22; border: 1px solid #21262d; border-radius: 8px; padding: 20px; margin: 16px 0; }
+.moment-title { font-size: 14px; font-weight: 600; color: #e6edf3; margin-bottom: 4px; }
+.moment-context { font-size: 12px; color: #8b949e; margin-bottom: 16px; }
+.moment-label { font-size: 11px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; margin: 12px 0 8px; }
+
+/* ==== EXTERNAL (compact) pipeline ==== */
+.ext-pipeline { background: #0d1117; border: 1px solid #21262d; border-radius: 6px; padding: 20px; }
+.ext-row { display: flex; align-items: stretch; gap: 0; overflow-x: auto; }
+.ext-stage {
+  flex: 1;
+  min-width: 100px;
+  padding: 12px 8px;
+  text-align: center;
+  border-radius: 6px;
+  margin: 0 2px;
+  position: relative;
+}
+.ext-stage .ext-name { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
+.ext-stage .ext-count { font-size: 20px; font-weight: 700; margin-top: 4px; }
+.ext-stage .ext-sub { font-size: 10px; margin-top: 2px; opacity: 0.8; }
+
+/* три строки метрик */
+.ext-metrics { margin-top: 6px; font-size: 10px; line-height: 1.4; }
+.ext-metrics .m-ready { color: #e6edf3; font-weight: 700; font-size: 16px; line-height: 1.1; }
+.ext-metrics .m-row { display: flex; justify-content: space-between; gap: 6px; opacity: 0.7; }
+.ext-metrics .m-row .m-val { font-weight: 600; }
+.ext-metrics .m-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.3px; opacity: 0.6; }
+.ext-stage.empty .ext-metrics { opacity: 0.6; }
+
+/* stage states -- минимализм: только два состояния */
+.ext-stage.active {
+  background: #161b22;
+  color: #e6edf3;
+  border: 1px solid #30363d;
+}
+.ext-stage.empty {
+  background: transparent;
+  color: #4b5563;
+  border: 1px dashed #30363d;
+  opacity: 0.45;
+}
+/* обратная совместимость для старой разметки */
+.ext-stage.done,
+.ext-stage.current,
+.ext-stage.iteration { background: #161b22; color: #e6edf3; border: 1px solid #30363d; }
+.ext-stage.future { background: transparent; color: #4b5563; border: 1px dashed #30363d; opacity: 0.45; }
+
+.ext-arrow { display: flex; align-items: center; color: #30363d; padding: 0 2px; font-size: 14px; align-self: center; }
+.ext-arrow.faint { opacity: 0.4; }
+
+/* Project border bar */
+.border-bar {
+  font-size: 12px;
+  color: #d29922;
+  margin-top: 12px;
+  padding: 6px 12px;
+  background: #2e2a1a;
+  border-radius: 4px;
+  border: 1px solid #d97706;
+  display: inline-block;
+}
+
+/* ==== INTERNAL (overlay) pipeline ==== */
+.int-overlay {
+  background: #0a0c10;
+  border: 1px solid #21262d;
+  border-radius: 6px;
+  padding: 20px;
+  margin-top: 8px;
+}
+.int-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.int-title { font-size: 13px; font-weight: 600; color: #e6edf3; }
+.int-close { color: #8b949e; font-size: 12px; }
+
+/* Internal timeline -- как Gantt */
+.int-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11px;
+  overflow-x: auto;
+}
+.int-track {
+  display: grid;
+  grid-template-columns: 140px repeat(10, minmax(60px, 1fr));
+  gap: 2px;
+  align-items: center;
+}
+.int-track-name {
+  color: #c9d1d9;
+  font-weight: 600;
+  font-size: 11px;
+  padding: 6px 8px;
+  background: #161b22;
+  border-radius: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.int-cell {
+  padding: 6px 4px;
+  border-radius: 3px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 10px;
+  min-height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* детальный пайплайн -- минимализм:
+   - active (есть работа сейчас) = чёрный с рамкой, максимальный контраст
+   - past (прошло) = полупрозрачно, видно но приглушено
+   - empty (никогда не было) = пунктир, почти невидимо */
+.int-cell.empty { background: transparent; border: 1px dashed #21262d; opacity: 0.2; color: transparent; }
+.int-cell.active { background: #161b22; color: #e6edf3; border: 1px solid #58627a; }
+.int-cell.past { background: #0d1117; border: 1px solid #21262d; color: #6b7280; opacity: 0.6; }
+
+/* мэппинг legacy классов */
+.int-cell.cc,
+.int-cell.ret,
+.int-cell.new,
+.int-cell.waiting,
+.int-cell.preview { background: #161b22; color: #e6edf3; border: 1px solid #58627a; }
+.int-cell.ok,
+.int-cell.cc-reject,
+.int-cell.ret-reject { background: #0d1117; border: 1px solid #21262d; color: #6b7280; opacity: 0.6; }
+
+.int-header-row {
+  display: grid;
+  grid-template-columns: 140px repeat(10, minmax(60px, 1fr));
+  gap: 2px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #21262d;
+  margin-bottom: 6px;
+}
+.int-header-cell { font-size: 9px; color: #6b7280; text-align: center; text-transform: uppercase; letter-spacing: 0.3px; padding: 2px; }
+.int-header-spacer { }
+
+/* Legend */
+.legend-mini { display: flex; gap: 12px; margin-top: 12px; flex-wrap: wrap; font-size: 11px; color: #8b949e; }
+.legend-mini-item { display: flex; align-items: center; gap: 4px; }
+.legend-dot { width: 10px; height: 10px; border-radius: 2px; }
+
+/* Row arrow between panels */
+.row-arrow {
+  text-align: center;
+  color: #8b949e;
+  font-size: 12px;
+  padding: 8px;
+  font-style: italic;
+}
+
+/* Summary */
+.summary {
+  background: #161b22;
+  border: 1px solid #21262d;
+  border-radius: 8px;
+  padding: 20px;
+  margin-top: 32px;
+}
+.summary h3 { color: #e6edf3; margin-bottom: 10px; }
+.summary ul { margin-left: 20px; font-size: 13px; }
+.summary li { margin-bottom: 6px; color: #c9d1d9; }
+</style>
+</head>
+<body>
+
+<h1>Pipeline UI -- два представления</h1>
+<div class="sub">Общий (на главном экране) + детальный (во всплывающем окне). Моменты из реального кейса Маши.</div>
+
+<!-- ================== LEGEND ================== -->
+<div class="moment">
+  <h3>Легенда -- минимализм, без лишних цветов</h3>
+  <div class="legend-mini">
+    <div class="legend-mini-item"><div class="legend-dot" style="background: #161b22; border: 1px solid #58627a;"></div>Активный этап -- есть фото, идёт работа</div>
+    <div class="legend-mini-item"><div class="legend-dot" style="background: transparent; border: 1px dashed #30363d;"></div>Пустой этап -- никого нет (прошли все или ещё не дошли)</div>
+  </div>
+  <p style="font-size: 12px; color: #8b949e; margin-top: 8px;">
+    Внимание собирается естественно там где идёт работа. Завершённые и будущие этапы равны визуально -- они одинаково "пусты".
+    Итерации и ветки видны в детальном пайплайне (История съёмки), а не через цвета на общем.
+  </p>
+
+  <h3 style="margin-top: 20px;">Три метрики на этапе</h3>
+  <ul style="font-size: 13px; line-height: 1.6;">
+    <li><strong>Готово</strong> (ключевое, крупно) -- <span style="color: #e6edf3; font-weight: 600;">N/M</span>, где N прошли этот этап, M = масштаб проекта. Cumulative -- показывает "сколько уже завершило".</li>
+    <li><strong>На этапе</strong> -- сколько фото сейчас сидят на этом этапе (ушли с предыдущего, ещё не прошли текущий). Это "в очереди + в работе".</li>
+    <li><strong>Ожидается</strong> -- сколько из масштаба ещё не дошли до этого этапа. На последних этапах это предсказание объёма работы.</li>
+  </ul>
+  <p style="font-size: 12px; color: #8b949e; margin-top: 8px;">
+    <strong>В будущем:</strong> метрика <em>на этапе</em> разделится на четыре точных состояния:
+    <em>в очереди</em> (ушло с предыдущего, никто не забрал),
+    <em>в работе</em> (исполнитель скачал архив, делает),
+    <em>загружено, ждёт согласования</em> (результат вернулся, ждёт решения клиента / фотографа).
+    Это точнее покажет где затык: у координатора, у исполнителя или у согласующего.
+  </p>
+</div>
+
+<!-- ================== MOMENT 1 ================== -->
+<h2>Момент 1: загрузили 600 превью, пока ничего не делали</h2>
+
+<div class="moment">
+  <div class="moment-title">На главном экране проекта</div>
+  <div class="moment-context">Фотограф залил 600 превью, команда ещё не собрала отбор. Только превью и намёки.</div>
+
+  <div class="moment-label">Общий пайплайн (готово / на этапе / ожидается)</div>
+  <div class="ext-pipeline">
+    <div class="ext-row">
+      <div class="ext-stage active">
+        <div class="ext-name">Превью</div>
+        <div class="ext-metrics">
+          <div class="m-ready">600</div>
+          <div class="m-label">потенциал</div>
+        </div>
+      </div>
+      <div class="ext-arrow faint">--></div>
+      <div class="ext-stage empty">
+        <div class="ext-name">Отбор команды</div>
+        <div class="ext-metrics">
+          <div class="m-ready">--</div>
+          <div class="m-label">отбор не начат</div>
+        </div>
+      </div>
+      <div class="ext-arrow faint">--></div>
+      <div class="ext-stage empty">
+        <div class="ext-name">Отбор клиента</div>
+        <div class="ext-metrics">
+          <div class="m-ready">--</div>
+        </div>
+      </div>
+      <div class="ext-arrow faint">--></div>
+      <div class="ext-stage empty">
+        <div class="ext-name">ЦК</div>
+        <div class="ext-metrics">
+          <div class="m-ready">--</div>
+        </div>
+      </div>
+      <div class="ext-arrow faint">--></div>
+      <div class="ext-stage empty">
+        <div class="ext-name">Ретушь</div>
+        <div class="ext-metrics">
+          <div class="m-ready">--</div>
+        </div>
+      </div>
+      <div class="ext-arrow faint">--></div>
+      <div class="ext-stage empty">
+        <div class="ext-name">Адаптация</div>
+        <div class="ext-metrics">
+          <div class="m-ready">--</div>
+        </div>
+      </div>
+    </div>
+    <div class="border-bar">Потенциал: 600 превью. Масштаб ещё не определён.</div>
+  </div>
+</div>
+
+<!-- ================== MOMENT 2 ================== -->
+<h2>Момент 2: отбор клиента зафиксирован (100 фото), ЦК согласована</h2>
+
+<div class="moment">
+  <div class="moment-title">На главном экране проекта</div>
+  <div class="moment-context">Команда собрала 160, клиент вырезал 60, оставил 100. ЦК v1 сразу принята. Фотограф сейчас делает корректированную ЦК v2 для ретушёра.</div>
+
+  <div class="moment-label">Общий пайплайн</div>
+  <div class="ext-pipeline">
+    <div class="ext-row">
+      <div class="ext-stage empty">
+        <div class="ext-name">Превью</div>
+        <div class="ext-metrics">
+          <div class="m-ready">600</div>
+          <div class="m-label">потенциал</div>
+        </div>
+      </div>
+      <div class="ext-arrow faint">--></div>
+      <div class="ext-stage empty">
+        <div class="ext-name">Отбор команды</div>
+        <div class="ext-metrics">
+          <div class="m-ready">160/160</div>
+          <div class="m-label">готово</div>
+        </div>
+      </div>
+      <div class="ext-arrow faint">--></div>
+      <div class="ext-stage empty">
+        <div class="ext-name">Отбор клиента</div>
+        <div class="ext-metrics">
+          <div class="m-ready">100/100</div>
+          <div class="m-label">готово</div>
+        </div>
+      </div>
+      <div class="ext-arrow faint">--></div>
+      <div class="ext-stage active">
+        <div class="ext-name">ЦК</div>
+        <div class="ext-metrics">
+          <div class="m-ready">0/100</div>
+          <div class="m-label">готово</div>
+          <div class="m-row"><span>на этапе</span><span class="m-val">100</span></div>
+          <div class="m-row"><span>ожидается</span><span class="m-val">0</span></div>
+        </div>
+      </div>
+      <div class="ext-arrow faint">--></div>
+      <div class="ext-stage empty">
+        <div class="ext-name">Ретушь</div>
+        <div class="ext-metrics">
+          <div class="m-ready">0/100</div>
+          <div class="m-label">готово</div>
+          <div class="m-row"><span>ожидается</span><span class="m-val">100</span></div>
+        </div>
+      </div>
+      <div class="ext-arrow faint">--></div>
+      <div class="ext-stage empty">
+        <div class="ext-name">Адаптация</div>
+        <div class="ext-metrics">
+          <div class="m-ready">0/100</div>
+          <div class="m-label">готово</div>
+          <div class="m-row"><span>ожидается</span><span class="m-val">100</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="border-bar">Потенциал: 600 превью. Масштаб: 100.</div>
+  </div>
+
+  <div class="row-arrow">Клик на этап --> машина времени (состояние в момент этапа). Отдельная кнопка "История съёмки" --> детальный пайплайн ниже.</div>
+
+  <div class="moment-label">Детальный пайплайн (всплывающее окно)</div>
+  <div class="int-overlay">
+    <div class="int-header">
+      <div class="int-title">История: проект "Весна 2026", 100 фото</div>
+      <div class="int-close">закрыть X</div>
+    </div>
+    <div class="int-timeline">
+      <div class="int-header-row">
+        <div class="int-header-spacer"></div>
+        <div class="int-header-cell">Превью</div>
+        <div class="int-header-cell">Отбор</div>
+        <div class="int-header-cell">ЦК v1</div>
+        <div class="int-header-cell">ЦК v2</div>
+        <div class="int-header-cell">Ретушь</div>
+        <div class="int-header-cell">Ретушь v2</div>
+        <div class="int-header-cell">Согл.</div>
+        <div class="int-header-cell">Адаптация</div>
+        <div class="int-header-cell"></div>
+        <div class="int-header-cell"></div>
+      </div>
+      <div class="int-track">
+        <div class="int-track-name">Основные 100 фото</div>
+        <div class="int-cell preview">600</div>
+        <div class="int-cell new">100</div>
+        <div class="int-cell ok">100 OK</div>
+        <div class="int-cell cc">100 идёт</div>
+        <div class="int-cell empty"></div>
+        <div class="int-cell empty"></div>
+        <div class="int-cell empty"></div>
+        <div class="int-cell empty"></div>
+        <div class="int-cell empty"></div>
+        <div class="int-cell empty"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================== MOMENT 3 ================== -->
+<h2>Момент 3: ретушь v1 -- заказчик добавил 2 фото и попросил правки на 90/100</h2>
+
+<div class="moment">
+  <div class="moment-title">На главном экране проекта</div>
+  <div class="moment-context">Ретушь v1 показана заказчику. 10 принято сразу, 90 на правки, ещё +2 новых просит добавить. Появились ответвления.</div>
+
+  <div class="moment-label">Общий пайплайн (ЦК и Ретушь оба активны -- параллельные потоки)</div>
+  <div class="ext-pipeline">
+    <div class="ext-row">
+      <div class="ext-stage empty">
+        <div class="ext-name">Превью</div>
+        <div class="ext-metrics">
+          <div class="m-ready">600</div>
+          <div class="m-label">потенциал</div>
+        </div>
+      </div>
+      <div class="ext-arrow faint">--></div>
+      <div class="ext-stage empty">
+        <div class="ext-name">Отбор</div>
+        <div class="ext-metrics">
+          <div class="m-ready">102/102</div>
+          <div class="m-label">готово +2</div>
+        </div>
+      </div>
+      <div class="ext-arrow faint">--></div>
+      <div class="ext-stage active">
+        <div class="ext-name">ЦК</div>
+        <div class="ext-metrics">
+          <div class="m-ready">100/102</div>
+          <div class="m-label">готово</div>
+          <div class="m-row"><span>на этапе</span><span class="m-val">2</span></div>
+          <div class="m-row"><span>ожидается</span><span class="m-val">0</span></div>
+        </div>
+      </div>
+      <div class="ext-arrow faint">--></div>
+      <div class="ext-stage active">
+        <div class="ext-name">Ретушь</div>
+        <div class="ext-metrics">
+          <div class="m-ready">10/102</div>
+          <div class="m-label">готово</div>
+          <div class="m-row"><span>на этапе</span><span class="m-val">90</span></div>
+          <div class="m-row"><span>ожидается</span><span class="m-val">2</span></div>
+        </div>
+      </div>
+      <div class="ext-arrow faint">--></div>
+      <div class="ext-stage empty">
+        <div class="ext-name">Адаптация</div>
+        <div class="ext-metrics">
+          <div class="m-ready">0/102</div>
+          <div class="m-label">готово</div>
+          <div class="m-row"><span>ожидается</span><span class="m-val">102</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="border-bar">Потенциал: 600 превью. Масштаб: 102 (было 100, +2 из преотбора).</div>
+  </div>
+
+  <div class="row-arrow">Кнопка "История съёмки" --> детальный пайплайн ниже</div>
+
+  <div class="moment-label">Детальный пайплайн</div>
+  <div class="int-overlay">
+    <div class="int-header">
+      <div class="int-title">История: 102 фото в 3 потоках</div>
+      <div class="int-close">закрыть X</div>
+    </div>
+    <div class="int-timeline">
+      <div class="int-header-row">
+        <div class="int-header-spacer"></div>
+        <div class="int-header-cell">Отбор</div>
+        <div class="int-header-cell">ЦК v1</div>
+        <div class="int-header-cell">ЦК v2</div>
+        <div class="int-header-cell">Ретушь v1</div>
+        <div class="int-header-cell">Ретушь v2</div>
+        <div class="int-header-cell">Согл.</div>
+        <div class="int-header-cell">Адаптация</div>
+        <div class="int-header-cell"></div>
+        <div class="int-header-cell"></div>
+        <div class="int-header-cell"></div>
+      </div>
+      <div class="int-track">
+        <div class="int-track-name">10 фото (принято сразу)</div>
+        <div class="int-cell new">10</div>
+        <div class="int-cell ok">OK</div>
+        <div class="int-cell ok">OK</div>
+        <div class="int-cell ok">OK</div>
+        <div class="int-cell empty"></div>
+        <div class="int-cell waiting">ждёт</div>
+        <div class="int-cell empty"></div>
+        <div class="int-cell empty"></div>
+        <div class="int-cell empty"></div>
+        <div class="int-cell empty"></div>
+      </div>
+      <div class="int-track">
+        <div class="int-track-name">90 фото (с правками)</div>
+        <div class="int-cell new">90</div>
+        <div class="int-cell ok">OK</div>
+        <div class="int-cell ok">OK</div>
+        <div class="int-cell ret-reject">правки</div>
+        <div class="int-cell ret">идёт</div>
+        <div class="int-cell empty"></div>
+        <div class="int-cell empty"></div>
+        <div class="int-cell empty"></div>
+        <div class="int-cell empty"></div>
+        <div class="int-cell empty"></div>
+      </div>
+      <div class="int-track">
+        <div class="int-track-name">+2 добавлены позже</div>
+        <div class="int-cell new">+2</div>
+        <div class="int-cell empty"></div>
+        <div class="int-cell cc">v1 идёт</div>
+        <div class="int-cell empty"></div>
+        <div class="int-cell empty"></div>
+        <div class="int-cell empty"></div>
+        <div class="int-cell empty"></div>
+        <div class="int-cell empty"></div>
+        <div class="int-cell empty"></div>
+        <div class="int-cell empty"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================== MOMENT 4 ================== -->
+<h2>Момент 4: ретушь раунд 2 -- 80/102 на переделку + заказчик добавил ещё 5</h2>
+
+<div class="moment">
+  <div class="moment-title">На главном экране проекта</div>
+  <div class="moment-context">Второй раунд ретуши показан. 22 принято, 80 на переделку, плюс клиент добавил ещё 5 фото из преотбора. Граница выросла до 107.</div>
+
+  <div class="moment-label">Общий пайплайн</div>
+  <div class="ext-pipeline">
+    <div class="ext-row">
+      <div class="ext-stage empty">
+        <div class="ext-name">Превью</div>
+        <div class="ext-metrics">
+          <div class="m-ready">600</div>
+          <div class="m-label">потенциал</div>
+        </div>
+      </div>
+      <div class="ext-arrow faint">--></div>
+      <div class="ext-stage empty">
+        <div class="ext-name">Отбор</div>
+        <div class="ext-metrics">
+          <div class="m-ready">107/107</div>
+          <div class="m-label">готово (+2, +5)</div>
+        </div>
+      </div>
+      <div class="ext-arrow faint">--></div>
+      <div class="ext-stage active">
+        <div class="ext-name">ЦК</div>
+        <div class="ext-metrics">
+          <div class="m-ready">102/107</div>
+          <div class="m-label">готово</div>
+          <div class="m-row"><span>на этапе</span><span class="m-val">5</span></div>
+          <div class="m-row"><span>ожидается</span><span class="m-val">0</span></div>
+        </div>
+      </div>
+      <div class="ext-arrow faint">--></div>
+      <div class="ext-stage active">
+        <div class="ext-name">Ретушь</div>
+        <div class="ext-metrics">
+          <div class="m-ready">22/107</div>
+          <div class="m-label">готово</div>
+          <div class="m-row"><span>на этапе</span><span class="m-val">80</span></div>
+          <div class="m-row"><span>ожидается</span><span class="m-val">5</span></div>
+        </div>
+      </div>
+      <div class="ext-arrow faint">--></div>
+      <div class="ext-stage empty">
+        <div class="ext-name">Адаптация</div>
+        <div class="ext-metrics">
+          <div class="m-ready">0/107</div>
+          <div class="m-label">готово</div>
+          <div class="m-row"><span>ожидается</span><span class="m-val">107</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="border-bar">Потенциал: 600 превью. Масштаб: 107 (было 102, +5 из преотбора).</div>
+  </div>
+
+  <div class="moment-label">Детальный пайплайн</div>
+  <div class="int-overlay">
+    <div class="int-header">
+      <div class="int-title">История: 107 фото, несколько веток слились в одну</div>
+      <div class="int-close">закрыть X</div>
+    </div>
+    <div class="int-timeline">
+      <div class="int-header-row">
+        <div class="int-header-spacer"></div>
+        <div class="int-header-cell">Отбор</div>
+        <div class="int-header-cell">ЦК</div>
+        <div class="int-header-cell">Ретушь v1</div>
+        <div class="int-header-cell">Ретушь v2</div>
+        <div class="int-header-cell">Ретушь v3</div>
+        <div class="int-header-cell">Согл.</div>
+        <div class="int-header-cell">Адаптация</div>
+        <div class="int-header-cell"></div>
+        <div class="int-header-cell"></div>
+        <div class="int-header-cell"></div>
+      </div>
+      <div class="int-track">
+        <div class="int-track-name">22 фото (принято в v2)</div>
+        <div class="int-cell new">22</div>
+        <div class="int-cell ok">OK</div>
+        <div class="int-cell ret-reject">правки</div>
+        <div class="int-cell ok">OK</div>
+        <div class="int-cell empty"></div>
+        <div class="int-cell waiting">ждут</div>
+        <div class="int-cell empty"></div>
+        <div class="int-cell empty"></div>
+        <div class="int-cell empty"></div>
+        <div class="int-cell empty"></div>
+      </div>
+      <div class="int-track">
+        <div class="int-track-name">80 фото (на v3 правки)</div>
+        <div class="int-cell new">80</div>
+        <div class="int-cell ok">OK</div>
+        <div class="int-cell ret-reject">правки</div>
+        <div class="int-cell ret-reject">правки</div>
+        <div class="int-cell ret">идёт</div>
+        <div class="int-cell empty"></div>
+        <div class="int-cell empty"></div>
+        <div class="int-cell empty"></div>
+        <div class="int-cell empty"></div>
+        <div class="int-cell empty"></div>
+      </div>
+      <div class="int-track">
+        <div class="int-track-name">+5 добавлены сейчас</div>
+        <div class="int-cell new">+5</div>
+        <div class="int-cell cc">идёт</div>
+        <div class="int-cell empty"></div>
+        <div class="int-cell empty"></div>
+        <div class="int-cell empty"></div>
+        <div class="int-cell empty"></div>
+        <div class="int-cell empty"></div>
+        <div class="int-cell empty"></div>
+        <div class="int-cell empty"></div>
+        <div class="int-cell empty"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================== MOMENT 5 ================== -->
+<h2>Момент 5: финал -- все 107 готовы</h2>
+
+<div class="moment">
+  <div class="moment-title">На главном экране проекта</div>
+  <div class="moment-context">После всех итераций, ЦК поверх ретуши, доработок. 107 фото финализированы.</div>
+
+  <div class="moment-label">Общий пайплайн -- проект завершён, все этапы бледные</div>
+  <div class="ext-pipeline">
+    <div class="ext-row">
+      <div class="ext-stage empty">
+        <div class="ext-name">Превью</div>
+        <div class="ext-metrics">
+          <div class="m-ready">600</div>
+          <div class="m-label">потенциал</div>
+        </div>
+      </div>
+      <div class="ext-arrow faint">--></div>
+      <div class="ext-stage empty">
+        <div class="ext-name">Отбор</div>
+        <div class="ext-metrics">
+          <div class="m-ready">107/107</div>
+          <div class="m-label">готово</div>
+        </div>
+      </div>
+      <div class="ext-arrow faint">--></div>
+      <div class="ext-stage empty">
+        <div class="ext-name">ЦК</div>
+        <div class="ext-metrics">
+          <div class="m-ready">107/107</div>
+          <div class="m-label">готово</div>
+        </div>
+      </div>
+      <div class="ext-arrow faint">--></div>
+      <div class="ext-stage empty">
+        <div class="ext-name">Ретушь</div>
+        <div class="ext-metrics">
+          <div class="m-ready">107/107</div>
+          <div class="m-label">готово</div>
+        </div>
+      </div>
+      <div class="ext-arrow faint">--></div>
+      <div class="ext-stage empty">
+        <div class="ext-name">Адаптация</div>
+        <div class="ext-metrics">
+          <div class="m-ready">107/107</div>
+          <div class="m-label">готово</div>
+        </div>
+      </div>
+    </div>
+    <div class="border-bar">Проект завершён. Все этапы пусты (работы нет). Потенциал: 600. Масштаб: 107.</div>
+  </div>
+</div>
+
+<!-- ================== PRINCIPLES ================== -->
+<div class="summary">
+  <h3>Принципы общего пайплайна</h3>
+  <ul>
+    <li><strong>Превью = потенциал проекта</strong>. До отбора считаем число превью (600).</li>
+    <li><strong>Отбор = масштаб проекта</strong>. После формирования все следующие этапы меряются от него.</li>
+    <li><strong>Три метрики на каждом этапе:</strong> готово (N/M, ключевое), на этапе (сейчас сидит тут), ожидается (ещё не дошло).</li>
+    <li><strong>Готово</strong> -- cumulative: сколько прошли через этап из масштаба. Формат "N/M".</li>
+    <li><strong>На этапе</strong> -- фото, которые ушли с предыдущего этапа, но ещё не прошли текущий. В будущем разделится на "в очереди" + "в работе" (по триггеру скачивания исполнителем).</li>
+    <li><strong>Ожидается</strong> -- фото из масштаба, которые ещё не дошли до этого этапа.</li>
+    <li><strong>Только два визуальных состояния:</strong> активный этап (работа идёт, фото тут) -- чёрный с рамкой. Пустой этап (все ушли или ещё не дошли) -- бледный пунктир.</li>
+    <li>Завершённый этап после того как все ушли = <strong>такой же бледный</strong> как будущий. Нет "зелёного" и "жёлтого" -- это отвлекает.</li>
+    <li>Параллельные потоки возможны: несколько этапов могут быть активны одновременно (ЦК + Ретушь на разных группах).</li>
+    <li>Расширение масштаба (добавили фото) -- отметка под пайплайном.</li>
+    <li>Итерации не показываются цветом на общем -- их видно в детальном (История съёмки).</li>
+  </ul>
+
+  <h3 style="margin-top: 20px;">Два действия на пайплайне</h3>
+  <ul>
+    <li><strong>Клик на этап = машина времени.</strong> Возврат в момент когда этап шёл: какие фото были в отборе, как они выглядели, какие версии были загружены. Снимок состояния в точке времени.</li>
+    <li><strong>Кнопка "История съёмки" = детальный пайплайн.</strong> Открывается отдельно, не через клик на этап. Показывает движение групп фото во времени: ветки, итерации, переделки, расширения масштаба. Это ответ на вопрос "что происходило".</li>
+  </ul>
+
+  <h3 style="margin-top: 20px;">Принципы детального пайплайна (История съёмки)</h3>
+  <ul>
+    <li>Открывается по отдельной кнопке, не по клику на этап</li>
+    <li>Строки -- группы фото, которые двигались вместе</li>
+    <li>Колонки -- этапы с номером итерации (ЦК v1, ЦК v2, Ретушь v1...)</li>
+    <li>Ячейки показывают что происходило: принято, отклонено, идёт, ждёт</li>
+    <li>Новые фото (расширение масштаба) появляются как отдельная строка</li>
+    <li>Видна полная сложность проекта -- сколько было итераций, переделок, веток</li>
+    <li>Основа для аргументации стоимости правок</li>
+  </ul>
+</div>
+
+</body>
+</html>
