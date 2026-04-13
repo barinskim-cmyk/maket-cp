@@ -196,6 +196,77 @@ class AppAPI:
             return {"ok": True, "dataUrl": data_url}
         return {"error": "Файл не найден"}
 
+    def load_native_paths(self, paths: list) -> dict:
+        """Загрузить превью по абсолютным путям (desktop-only drag-and-drop).
+
+        Используется когда пользователь тащит файлы/папки из Finder или
+        Capture One — там приходят обычные file:// URI с реальными путями
+        на диске, и мы можем прочитать байты напрямую без HTML5 File API.
+
+        Запускается в отдельном потоке. Push-события:
+          onNativeDropProgress({loaded, total, pct})
+          onNativeDropDone({total, loaded, items: [...]})
+
+        Args:
+            paths: список абсолютных путей (файлы или папки).
+
+        Returns:
+            {"status": "started", "expected": N} — сразу; результат придёт
+            через onNativeDropDone.
+        """
+        from ..services.preview_service import IMAGE_EXTENSIONS
+
+        # Разворачиваем папки в файлы, сохраняем порядок, фильтруем по расширению
+        collected: list[Path] = []
+        seen: set[str] = set()
+        for raw in paths or []:
+            try:
+                p = Path(raw)
+            except Exception:
+                continue
+            if not p.exists():
+                continue
+            if p.is_dir():
+                for f in sorted(p.rglob("*"), key=lambda x: str(x).lower()):
+                    if f.is_file() and f.suffix.lower() in IMAGE_EXTENSIONS:
+                        key = str(f.resolve())
+                        if key not in seen:
+                            seen.add(key)
+                            collected.append(f)
+            elif p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS:
+                key = str(p.resolve())
+                if key not in seen:
+                    seen.add(key)
+                    collected.append(p)
+
+        total = len(collected)
+
+        def task(files: list):
+            items: list[dict] = []
+            for i, fp in enumerate(files, 1):
+                try:
+                    item = self.preview_service._make_preview(fp)
+                    if item:
+                        items.append(item.to_dict())
+                except Exception as e:
+                    print(f"[load_native_paths] failed on {fp}: {e}")
+                pct = round(i / total * 100) if total else 0
+                self._emit("onNativeDropProgress", {
+                    "loaded": i, "total": total, "pct": pct
+                })
+            self._emit("onNativeDropDone", {
+                "total": total, "loaded": len(items), "items": items,
+            })
+
+        if total == 0:
+            self._emit("onNativeDropDone", {
+                "total": 0, "loaded": 0, "items": [],
+            })
+            return {"status": "done", "expected": 0}
+
+        threading.Thread(target=task, args=(collected,), daemon=True).start()
+        return {"status": "started", "expected": total}
+
     # ── Проект ──
 
     def new_project(self, brand: str, shoot_date: str, template_name: str = "h3") -> dict:

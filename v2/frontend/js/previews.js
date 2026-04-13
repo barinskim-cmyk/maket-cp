@@ -929,6 +929,21 @@ function pvInitDropzone(dropzoneId) {
     var store = proj.previews;
     var dzId = dropzoneId;
 
+    // ── Desktop-only: пробуем прочитать файлы через Python по file:// путям ──
+    // Работает для Finder (с RAW и любыми форматами) и для Capture One когда тот
+    // отдаёт реальный путь на диск в text/uri-list. Если нативный путь пустой
+    // или не сработает — падаем в веб-ветку ниже (она не трогается).
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.load_native_paths) {
+      try {
+        pvTryDesktopDrop(e, dzId);
+      } catch (err) {
+        console.error('[pv-drop] desktop path failed, falling back to web:', err);
+      }
+      // Если desktop ветка приняла drop — она сама разрулит и не даст
+      // веб-ветке запуститься. Маркер — флаг e._pvHandled.
+      if (e._pvHandled) return;
+    }
+
     // webkitGetAsEntry для папок
     var items = e.dataTransfer.items;
     if (items && items.length > 0 && items[0].webkitGetAsEntry) {
@@ -951,6 +966,184 @@ function pvInitDropzone(dropzoneId) {
     if (!files || files.length === 0) return;
     pvLoadFilesWithProgress(files, store, dzId, '');
   });
+}
+
+// ══════════════════════════════════════════════
+//  Desktop drop: попытка забрать файлы по нативным путям
+//  (Finder, Capture One). Работает только под pywebview.
+// ══════════════════════════════════════════════
+
+function pvTryDesktopDrop(e, dzId) {
+  var dt = e.dataTransfer;
+  if (!dt) return;
+
+  // Диагностика: что именно отдал источник драга
+  var types = [];
+  try { types = Array.prototype.slice.call(dt.types || []); } catch (err) {}
+  var dump = {};
+  for (var i = 0; i < types.length; i++) {
+    try { dump[types[i]] = dt.getData(types[i]); }
+    catch (err) { dump[types[i]] = '[unreadable]'; }
+  }
+  var filesMeta = [];
+  if (dt.files) {
+    for (var f = 0; f < dt.files.length; f++) {
+      var fl = dt.files[f];
+      filesMeta.push({ name: fl.name, type: fl.type, size: fl.size });
+    }
+  }
+  console.log('[pv-drop][desktop] types:', types);
+  console.log('[pv-drop][desktop] data by type:', dump);
+  console.log('[pv-drop][desktop] files meta:', filesMeta);
+
+  // Пытаемся собрать пути
+  var paths = pvExtractNativePaths(dt, dump);
+  console.log('[pv-drop][desktop] extracted paths:', paths);
+
+  if (!paths.length) {
+    // Ничего не нашли — пусть отработает веб-ветка (может e.dataTransfer.files
+    // содержит настоящие File-объекты от Capture One)
+    return;
+  }
+
+  // Мы ответственны за этот drop
+  e._pvHandled = true;
+
+  var proj = getActiveProject();
+  if (!proj) return;
+  if (!proj.previews) proj.previews = [];
+  var store = proj.previews;
+
+  // UI-прогресс (пока Python работает)
+  pvShowProgress(dzId, 0, paths.length, true);
+
+  // Подписка на push-события Python
+  var onProgress = function(data) {
+    if (!data) return;
+    pvShowProgress(dzId, data.loaded || 0, data.total || 0, true);
+  };
+  var onDone = function(data) {
+    try {
+      if (data && data.items && data.items.length) {
+        // Сливаем с существующим store по имени (как в pvLoadFilesWithProgress)
+        var byName = {};
+        for (var k = 0; k < store.length; k++) byName[store[k].name] = true;
+        var added = 0;
+        for (var j = 0; j < data.items.length; j++) {
+          var it = data.items[j];
+          if (byName[it.name]) continue;
+          // Нормализуем shape под фронтенд
+          var obj = {
+            name: it.name,
+            path: it.path || '',
+            thumb: it.thumb || '',
+            preview: it.preview || it.thumb || '',
+            rating: it.rating || 0,
+            orient: it.orient || 'h',
+            folders: [],
+          };
+          store.push(obj);
+          byName[it.name] = true;
+          added++;
+        }
+        console.log('[pv-drop][desktop] loaded via python:', added, 'of', data.items.length);
+      } else if (!data || !data.total) {
+        alert('В перетянутых файлах не нашлось поддерживаемых форматов (jpg/png/tiff/heic).\n\n' +
+              'Capture One иногда отдаёт "отложенные" превью, у которых ещё нет файла на диске.\n' +
+              'Попробуйте сначала экспортнуть в папку и перетащить её.');
+      }
+    } finally {
+      pvShowProgress(dzId, 0, 0, false);
+      // Отписаться от событий
+      window.onNativeDropProgress = null;
+      window.onNativeDropDone = null;
+      pvRenderAll();
+      try {
+        var proj2 = getActiveProject();
+        if (proj2 && typeof pvDbSaveProjectPreviews === 'function') pvDbSaveProjectPreviews(proj2);
+        if (proj2 && proj2._cloudId && typeof sbUploadPreviews === 'function') {
+          sbUploadPreviews(proj2._cloudId, proj2.previews, function(){});
+        }
+        if (typeof pvAutoAdvancePreselect === 'function') pvAutoAdvancePreselect();
+      } catch (err) { console.warn(err); }
+    }
+  };
+  window.onNativeDropProgress = onProgress;
+  window.onNativeDropDone = onDone;
+
+  window.pywebview.api.load_native_paths(paths).then(function(res) {
+    console.log('[pv-drop][desktop] load_native_paths returned:', res);
+    if (res && res.status === 'done' && (!res.expected || res.expected === 0)) {
+      // Уже отправлен onNativeDropDone с пустым списком
+    }
+  }).catch(function(err) {
+    console.error('[pv-drop][desktop] load_native_paths error:', err);
+    pvShowProgress(dzId, 0, 0, false);
+    window.onNativeDropProgress = null;
+    window.onNativeDropDone = null;
+    alert('Ошибка загрузки: ' + err);
+  });
+}
+
+// Извлечь file:// пути из dataTransfer
+function pvExtractNativePaths(dt, dump) {
+  var out = [];
+  var seen = {};
+
+  function addMaybe(s) {
+    if (!s) return;
+    s = String(s).trim();
+    if (!s) return;
+    var p = s;
+    if (p.indexOf('file://') === 0) {
+      p = p.substring('file://'.length);
+      // Для macOS: file:///Users/... → /Users/...
+      // Для Windows: file:///C:/... → C:/...
+      if (p.indexOf('/') === 0 && /^\/[A-Za-z]:\//.test(p)) {
+        p = p.substring(1);
+      }
+      try { p = decodeURI(p); } catch (err) {}
+    }
+    // Только абсолютные пути (начало с / или с буквы диска)
+    if (p.indexOf('/') !== 0 && !/^[A-Za-z]:[\\/]/.test(p)) return;
+    if (seen[p]) return;
+    seen[p] = true;
+    out.push(p);
+  }
+
+  // 1. text/uri-list — самый надёжный источник
+  var uriList = dump && dump['text/uri-list'];
+  if (uriList) {
+    var lines = uriList.split(/[\r\n]+/);
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i].trim();
+      if (!line || line.indexOf('#') === 0) continue;
+      addMaybe(line);
+    }
+  }
+
+  // 2. text/plain (часто Finder / некоторые DAM кладут путь сюда)
+  var plain = dump && dump['text/plain'];
+  if (plain) {
+    var pLines = plain.split(/[\r\n]+/);
+    for (var j = 0; j < pLines.length; j++) addMaybe(pLines[j]);
+  }
+
+  // 3. Через items API — может быть DataTransferItem с kind=='string' type=='text/uri-list'
+  //    уже покрыт выше, но на всякий случай пробуем dt.items
+  try {
+    if (dt.items) {
+      for (var k = 0; k < dt.items.length; k++) {
+        var it = dt.items[k];
+        if (it.kind === 'file' && it.getAsFile) {
+          var f = it.getAsFile();
+          if (f && f.path) addMaybe(f.path);  // nw.js / electron-like
+        }
+      }
+    }
+  } catch (err) {}
+
+  return out;
 }
 
 // ── Обработка entries (папки) ──
