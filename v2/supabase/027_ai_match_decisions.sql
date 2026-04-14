@@ -1,36 +1,35 @@
--- ══════════════════════════════════════════════
+-- ============================================================
 -- Migration 027: AI Match Decisions
 --
--- Журнал решений пользователя по парам (карточка ↔ артикул).
--- Используется для двух целей:
---   1) Поведение AI: повторный прогон "Расставить (AI)" исключает
---      пары, ранее отклонённые пользователем (decision='rejected').
---   2) Будущее обучение ML: накопленный лог решений с снапшотами
---      картинок и контекстом (AI confidence, причина) — это
---      разметка для дообучения модели метчинга.
+-- Immutable log of user decisions on (card x article) pairs.
+-- Two purposes:
+--   1) AI behavior: re-running matching excludes pairs the
+--      user previously rejected.
+--   2) ML training data: snapshots and AI context form the
+--      labeled dataset for future matching model.
 --
--- Записи иммутабельны (история не редактируется): при отмене
--- решения добавляется новая запись с обратным decision.
--- ══════════════════════════════════════════════
+-- Records are immutable. Undoing a verification adds a new
+-- 'unverified' record (history is not overwritten).
+-- ============================================================
 
 CREATE TABLE IF NOT EXISTS ai_match_decisions (
   id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id      uuid        NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   article_id      text        NOT NULL,
-  sku             text,                                 -- snapshot для ML
+  sku             text,
   card_idx        int         NOT NULL,
-  decision        text        NOT NULL,                 -- rejected | verified | manual_link | unverified
-  ai_confidence   text,                                 -- high | medium | low | null
-  ai_reason       text,                                 -- объяснение AI, если было
-  ref_image_path  text,                                 -- snapshot пути в Storage (артикул)
-  card_image_path text,                                 -- snapshot пути первого фото карточки
+  decision        text        NOT NULL,
+  ai_confidence   text,
+  ai_reason       text,
+  ref_image_path  text,
+  card_image_path text,
   decided_at      timestamptz NOT NULL DEFAULT now(),
-  decided_by      uuid        DEFAULT auth.uid(),       -- user id, для аудита
+  decided_by      uuid        DEFAULT auth.uid(),
   CONSTRAINT ai_match_decisions_decision_chk
     CHECK (decision IN ('rejected', 'verified', 'manual_link', 'unverified'))
 );
 
--- ── Индексы ────────────────────────────────────
+-- Indexes
 CREATE INDEX IF NOT EXISTS ai_match_decisions_project_idx
   ON ai_match_decisions(project_id);
 CREATE INDEX IF NOT EXISTS ai_match_decisions_project_decision_idx
@@ -38,16 +37,14 @@ CREATE INDEX IF NOT EXISTS ai_match_decisions_project_decision_idx
 CREATE INDEX IF NOT EXISTS ai_match_decisions_pair_idx
   ON ai_match_decisions(project_id, card_idx, article_id);
 
--- ── RLS ────────────────────────────────────────
+-- RLS
 ALTER TABLE ai_match_decisions ENABLE ROW LEVEL SECURITY;
 
--- Владелец проекта: полный доступ
 CREATE POLICY "ai_match_decisions_owner_all" ON ai_match_decisions
   FOR ALL
   USING (project_id IN (SELECT get_my_project_ids()))
   WITH CHECK (project_id IN (SELECT get_my_project_ids()));
 
--- Участники проекта (по share/membership): только чтение
 CREATE POLICY "ai_match_decisions_member_select" ON ai_match_decisions
   FOR SELECT
   USING (
@@ -56,7 +53,7 @@ CREATE POLICY "ai_match_decisions_member_select" ON ai_match_decisions
     )
   );
 
--- ── RPC: добавить решение ──────────────────────
+-- RPC: add a decision
 CREATE OR REPLACE FUNCTION add_ai_match_decision(
   p_project_id      uuid,
   p_article_id      text,
@@ -75,7 +72,6 @@ AS $$
 DECLARE
   v_id uuid;
 BEGIN
-  -- Доступ: владелец ИЛИ участник проекта
   IF NOT EXISTS (
     SELECT 1 FROM projects WHERE id = p_project_id AND owner_id = auth.uid()
     UNION ALL
@@ -103,11 +99,8 @@ BEGIN
 END;
 $$;
 
--- ── RPC: получить актуальные отклонения ────────
--- "Актуальные" = последнее решение по паре — 'rejected' и
--- нет более поздней записи 'verified' / 'manual_link' для той же пары.
--- Используется при загрузке проекта чтобы восстановить
--- proj._rejectedPairs в JS.
+-- RPC: get active rejections for a project
+-- Returns pairs whose latest decision is 'rejected'
 CREATE OR REPLACE FUNCTION get_active_rejections(p_project_id uuid)
 RETURNS TABLE (
   card_idx     int,
@@ -132,14 +125,3 @@ AS $$
       OR EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id = p_project_id AND pm.user_id = auth.uid())
     );
 $$;
-
--- ══════════════════════════════════════════════
--- ИНСТРУКЦИЯ ПО ПРИМЕНЕНИЮ
--- ══════════════════════════════════════════════
--- 1. Открыть Supabase Dashboard → SQL Editor
--- 2. Скопировать содержимое этого файла
--- 3. Запустить
--- 4. Проверить:
---    SELECT COUNT(*) FROM ai_match_decisions;  -- должно быть 0
---    SELECT * FROM get_active_rejections('00000000-0000-0000-0000-000000000000'::uuid);  -- пусто, без ошибок
--- ══════════════════════════════════════════════
