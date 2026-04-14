@@ -499,37 +499,71 @@ function _sbUploadSlotImages(projectId, slotRows, uploads, done) {
 function sbUploadPreviews(projectId, previews, callback) {
   if (!previews || previews.length === 0) { callback(null); return; }
 
-  /* Шаг 1: получить список уже загруженных превью по file_name */
+  /* Шаг 1: получить список уже загруженных превью с путями.
+     ВАЖНО: проверяем не только существование записи, но и наличие thumb_path/preview_path.
+     Если Storage upload упал, но INSERT в previews прошёл — в таблице остаётся "мёртвая"
+     запись с NULL-путями. Такие записи НАДО перезагружать, а не пропускать. */
   sbClient.from('previews')
-    .select('file_name')
+    .select('file_name, thumb_path, preview_path')
     .eq('project_id', projectId)
     .then(function(existRes) {
       if (existRes.error) { callback('Ошибка чтения превью: ' + existRes.error.message); return; }
 
-      /* Множество уже существующих имён */
-      var existingNames = {};
-      (existRes.data || []).forEach(function(r) { existingNames[r.file_name] = true; });
+      /* Множество имён, у которых есть ХОТЯ БЫ одна рабочая картинка.
+         Записи с обоими NULL считаем мёртвыми — перезагрузим. */
+      var validNames = {};
+      var brokenNames = [];
+      (existRes.data || []).forEach(function(r) {
+        var hasThumb   = r.thumb_path   && String(r.thumb_path).indexOf('http') === 0;
+        var hasPreview = r.preview_path && String(r.preview_path).indexOf('http') === 0;
+        if (hasThumb || hasPreview) {
+          validNames[r.file_name] = true;
+        } else {
+          brokenNames.push(r.file_name);
+        }
+      });
 
-      /* Фильтруем: только новые превью */
+      if (brokenNames.length > 0) {
+        console.warn('sbUploadPreviews: ' + brokenNames.length + ' мёртвых записей в previews (NULL paths) — будут перезагружены');
+      }
+
+      /* Фильтруем: нужны новые + мёртвые */
       var newPreviews = [];
       for (var i = 0; i < previews.length; i++) {
-        if (!existingNames[previews[i].name]) {
+        if (!validNames[previews[i].name]) {
           newPreviews.push({ pv: previews[i], position: i });
         }
       }
 
       if (newPreviews.length === 0) {
-        console.log('supabase.js: все ' + previews.length + ' превью уже в облаке, пропускаем');
+        console.log('supabase.js: все ' + previews.length + ' превью уже в облаке с рабочими URL, пропускаем');
         callback(null);
         return;
       }
 
-      console.log('supabase.js: ' + newPreviews.length + ' новых превью из ' + previews.length + ' (пакетами по 5)...');
-
-      /* Шаг 2: загружаем только новые */
+      /* Шаг 2: загружаем новые и перезагружаем мёртвые.
+         Для мёртвых сначала удаляем старую запись, потом идём в общий upload-цикл
+         (чтобы INSERT не конфликтовал с unique-индексом project_id+file_name). */
       var rows = [];
       var BATCH = 5;
       var idx = 0;
+
+      function startUpload() {
+        console.log('supabase.js: ' + newPreviews.length + ' превью к загрузке (из них ' + brokenNames.length + ' перезагрузка мёртвых)...');
+        nextBatch();
+      }
+
+      if (brokenNames.length > 0) {
+        sbClient.from('previews').delete()
+          .eq('project_id', projectId)
+          .in('file_name', brokenNames)
+          .then(function(delRes) {
+            if (delRes.error) console.warn('sbUploadPreviews: не удалось удалить мёртвые записи:', delRes.error.message);
+            startUpload();
+          });
+      } else {
+        startUpload();
+      }
 
       function nextBatch() {
         if (idx >= newPreviews.length) {
@@ -548,21 +582,35 @@ function sbUploadPreviews(projectId, previews, callback) {
             var thumbData = pv.thumb || '';
             var previewData = pv.preview || '';
 
+            /* Helper: добавить строку ТОЛЬКО если есть хоть одна рабочая картинка.
+               "Мёртвые" записи (оба NULL) не создаём — они безвозвратно ломают
+               восстановление превью после hard reload. Превью без URL вернётся
+               на следующую попытку sync, когда локальный base64 ещё есть. */
+            function _pushRow(thumbUrl, previewUrl) {
+              var hasThumb   = thumbUrl   && String(thumbUrl).indexOf('http')   === 0;
+              var hasPreview = previewUrl && String(previewUrl).indexOf('http') === 0;
+              if (!hasThumb && !hasPreview) {
+                console.warn('sbUploadPreviews: ' + pv.name + ' — обе загрузки пусты, пропускаем (не создаём мёртвую запись)');
+                return;
+              }
+              rows.push({
+                project_id: projectId,
+                file_name: pv.name,
+                thumb_path: hasThumb   ? thumbUrl   : null,
+                preview_path: hasPreview ? previewUrl : null,
+                rating: pv.rating || 0,
+                orient: pv.orient || 'v',
+                position: item.position
+              });
+            }
+
             if (thumbData && thumbData.indexOf('data:') === 0) {
               /* Загрузить 300px thumb */
               sbUploadThumb(projectId, 'pv_' + pv.name, thumbData, function(err, thumbUrl) {
                 /* Загрузить 1200px preview (если есть) */
                 if (previewData && previewData.indexOf('data:') === 0) {
                   sbUploadThumb(projectId, 'full_' + pv.name, previewData, function(err2, previewUrl) {
-                    rows.push({
-                      project_id: projectId,
-                      file_name: pv.name,
-                      thumb_path: thumbUrl || null,
-                      preview_path: previewUrl || null,
-                      rating: pv.rating || 0,
-                      orient: pv.orient || 'v',
-                      position: item.position
-                    });
+                    _pushRow(thumbUrl, previewUrl);
                     batchDone++;
                     if (batchDone >= batchCount) {
                       if (rows.length % 50 === 0 || idx + batchCount >= newPreviews.length) {
@@ -572,15 +620,7 @@ function sbUploadPreviews(projectId, previews, callback) {
                     }
                   });
                 } else {
-                  rows.push({
-                    project_id: projectId,
-                    file_name: pv.name,
-                    thumb_path: thumbUrl || null,
-                    preview_path: null,
-                    rating: pv.rating || 0,
-                    orient: pv.orient || 'v',
-                    position: item.position
-                  });
+                  _pushRow(thumbUrl, null);
                   batchDone++;
                   if (batchDone >= batchCount) {
                     if (rows.length % 50 === 0 || idx + batchCount >= newPreviews.length) {
@@ -591,15 +631,10 @@ function sbUploadPreviews(projectId, previews, callback) {
                 }
               });
             } else {
-              rows.push({
-                project_id: projectId,
-                file_name: pv.name,
-                thumb_path: (pv.thumb && pv.thumb.indexOf('http') === 0) ? pv.thumb : null,
-                preview_path: (pv.preview && pv.preview.indexOf('http') === 0) ? pv.preview : null,
-                rating: pv.rating || 0,
-                orient: pv.orient || 'v',
-                position: item.position
-              });
+              /* Источник уже URL (не base64) — просто переносим ссылки */
+              var existingThumb   = (pv.thumb   && pv.thumb.indexOf('http')   === 0) ? pv.thumb   : null;
+              var existingPreview = (pv.preview && pv.preview.indexOf('http') === 0) ? pv.preview : null;
+              _pushRow(existingThumb, existingPreview);
               batchDone++;
               if (batchDone >= batchCount) nextBatch();
             }
@@ -608,8 +643,8 @@ function sbUploadPreviews(projectId, previews, callback) {
 
         idx = end;
       }
-
-      nextBatch();
+      /* nextBatch() запускается внутри startUpload() — либо сразу,
+         либо после DELETE мёртвых записей. */
     });
 }
 
