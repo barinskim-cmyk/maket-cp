@@ -933,6 +933,30 @@ tr:hover td { background: #fafafa; }
 
 <tr class="section-row"><td colspan="10">Защита от потери данных (инцидент [anchor client] 14.04.2026)</td></tr>
 
+<tr data-row="sync-queue-pending">
+  <td><span class="s-done">DONE</span></td>
+  <td>Облако / Синхронизация</td>
+  <td contenteditable="true"><strong>Pending-sync очередь + action_log с 0 фазы</strong></td>
+  <td>995263e, b9cd02f</td>
+  <td>Follow-up инцидент 14.04.2026 (краштест): из 57 созданных карточек в облако долетела только 1. Причина — НЕ DELETE+INSERT race как в [anchor client], а флаг _shCloudSyncRunning в shootings.js: пока шла первичная долгая заливка sbUploadProject, все последующие shCloudSyncExplicit видели флаг=true и молча выходили. После завершения заливки ничего не ретриггерило sync. Фиксы: (1) добавлен _shCloudSyncPending флаг + _shFinishSync() helper — sync автоматически перезапускается если за время работы пришли новые изменения; (2) sbLogAction теперь буферизует события в _sbPendingLogActions пока _cloudId не установлен, sbFlushPendingLog проталкивает их после первичной заливки; (3) cpAddCard/cpDeleteCard теперь логируют create_card/delete_card (раньше логировались только операции со слотами); (4) DELETE+INSERT cards заменён на UPSERT с onConflict='id,project_id' (составной pkey) и deleted_at=null в payload — обходит конфликт с триггером миграции 026. Проверка на проекте краштест2: 4 карточки × 4 слота = 16 live slots, 33 log_events (7 create_card + 26 add_to_slot), 100 превью — всё долетело.</td>
+  <td class="files">shootings.js, supabase.js, cards.js</td>
+  <td>--</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="slots-bloat-upsert">
+  <td><span class="s-done">DONE</span></td>
+  <td>Облако / БД</td>
+  <td contenteditable="true"><strong>Slots: заменить DELETE+INSERT на UPSERT (убрать раздутие soft-deleted)</strong></td>
+  <td>ce3917a</td>
+  <td>Реализация: sbSyncCardsLight теперь фетчит существующие (card_id, position) → slot.id, переиспользует id при UPSERT (onConflict: 'id'). Новые слоты получают crypto.randomUUID(). deleted_at=null воскрешает soft-deleted по совпадающему id. Стейл-слоты soft-delete'ятся через .not('id', 'in', localSlotIds). Для проектов &gt;200 слотов стейл-чистка пропускается (URL лимит), разберётся в следующем цикле. Миграция 028: разовая физическая чистка накопленных soft-deleted slot rows через SET LOCAL maketcp.allow_hard_delete='on'. Фиксит statement_timeout на больших проектах (57+ карточек).</td>
+  <td class="files">supabase.js, 028_purge_soft_deleted_slots.sql</td>
+  <td>--</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
 <tr data-row="soft-delete-cards">
   <td><span class="s-done">DONE</span></td>
   <td>Облако / БД</td>
