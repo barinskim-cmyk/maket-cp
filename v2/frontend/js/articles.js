@@ -4063,31 +4063,53 @@ function _arMatchOneCard(cardIdx, cardImgs, category, candidates, apiKey, onDone
     msgContent.push({ type: 'image_url', image_url: { url: refUrl, detail: 'high' } });
   }
 
-  _arOpenAIRequest([{ role: 'user', content: msgContent }], 200, 60000, apiKey, function(responseText, status) {
-    if (status === 200) {
-      try {
-        var resp = JSON.parse(responseText);
-        var text = resp.choices[0].message.content.trim();
-        console.log('articles.js: card ' + cardIdx + ' batch AI response:', text);
-        var jsonMatch = text.match(/\{[\s\S]*\}/);
-        var result = JSON.parse(jsonMatch ? jsonMatch[0] : text);
-        if (result.match && result.match !== 'null' && result.match !== null) {
-          var artNum = parseInt(String(result.match).replace(/\D/g, ''), 10);
-          var cand = cands[artNum - 1];
-          if (cand) {
-            console.log('articles.js: card ' + cardIdx + ' -> ' + cand.sku + ' (' + (result.confidence || '?') + ')');
-            onDone(cand.idx, result.confidence || 'medium');
-            return;
+  /* Retry wrapper: 429 (rate limit) и 5xx — транзиентные, повторяем.
+     400 и другие 4xx — постоянные (формат запроса/авторизация), не повторяем. */
+  var MAX_RETRIES = 3;
+  function sendOnce(attempt) {
+    _arOpenAIRequest([{ role: 'user', content: msgContent }], 200, 60000, apiKey, function(responseText, status) {
+      if (status === 200) {
+        try {
+          var resp = JSON.parse(responseText);
+          var text = resp.choices[0].message.content.trim();
+          console.log('articles.js: card ' + cardIdx + ' batch AI response:', text);
+          var jsonMatch = text.match(/\{[\s\S]*\}/);
+          var result = JSON.parse(jsonMatch ? jsonMatch[0] : text);
+          if (result.match && result.match !== 'null' && result.match !== null) {
+            var artNum = parseInt(String(result.match).replace(/\D/g, ''), 10);
+            var cand = cands[artNum - 1];
+            if (cand) {
+              console.log('articles.js: card ' + cardIdx + ' -> ' + cand.sku + ' (' + (result.confidence || '?') + ')');
+              onDone(cand.idx, result.confidence || 'medium');
+              return;
+            }
           }
+        } catch(e) {
+          console.error('articles.js: card ' + cardIdx + ' parse error:', e, 'response:', responseText && responseText.slice(0, 300));
         }
-      } catch(e) {
-        console.error('articles.js: card ' + cardIdx + ' parse error:', e);
+      } else if ((status === 429 || status >= 500) && attempt < MAX_RETRIES) {
+        /* Транзиентная ошибка — пробуем ещё, с экспоненциальным backoff */
+        var wait = (attempt + 1) * 3000;
+        console.warn('articles.js: card ' + cardIdx + ' status ' + status + ', retry in ' + (wait/1000) + 's (' + (attempt+1) + '/' + MAX_RETRIES + ')');
+        setTimeout(function() { sendOnce(attempt + 1); }, wait);
+        return;
+      } else {
+        /* Логируем тело ответа — без него невозможно диагностировать 400 */
+        var snippet = '';
+        try {
+          var body = responseText ? JSON.parse(responseText) : null;
+          if (body && body.error) {
+            snippet = typeof body.error === 'string' ? body.error : (body.error.message || JSON.stringify(body.error));
+          } else {
+            snippet = String(responseText || '').slice(0, 300);
+          }
+        } catch(_) { snippet = String(responseText || '').slice(0, 300); }
+        console.error('articles.js: card ' + cardIdx + ' API error ' + status + ': ' + snippet);
       }
-    } else {
-      console.error('articles.js: card ' + cardIdx + ' API error ' + status);
-    }
-    onDone(-1, null);
-  });
+      onDone(-1, null);
+    });
+  }
+  sendOnce(0);
 }
 
 /**
