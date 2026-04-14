@@ -574,6 +574,85 @@ function arOnPageShow() {
         if (err) console.warn('arOnPageShow: cloud load failed:', err);
       });
     }
+
+    /* Проверить: был ли прерванный импорт? Если да — предложить восстановить. */
+    arDbGetPartialImport(proj, function(partial) {
+      if (!partial || !partial.length) return;
+      var haveSkuSet = {};
+      for (var i = 0; i < (proj.articles || []).length; i++) {
+        if (proj.articles[i] && proj.articles[i].sku) haveSkuSet[proj.articles[i].sku] = true;
+      }
+      /* Новые артикулы (которых ещё нет в проекте) */
+      var newOnes = [];
+      var enrichCount = 0;  // те что уже есть в проекте, но без refImage
+      for (var j = 0; j < partial.length; j++) {
+        var p = partial[j];
+        if (!p.sku) continue;
+        if (haveSkuSet[p.sku]) {
+          /* Уже есть — можем обогатить refImage если отсутствует */
+          for (var k = 0; k < proj.articles.length; k++) {
+            var existing = proj.articles[k];
+            if (existing.sku === p.sku && !existing.refImage && p.refImage) {
+              enrichCount++;
+              break;
+            }
+          }
+        } else {
+          newOnes.push(p);
+        }
+      }
+      if (newOnes.length === 0 && enrichCount === 0) {
+        /* Нечего восстанавливать — просто чистим partial */
+        arDbClearPartialImport(proj);
+        return;
+      }
+      var msg = 'Найден незавершённый импорт каталога:\n'
+              + '• новых артикулов: ' + newOnes.length + '\n'
+              + '• артикулов с пропущенным фото: ' + enrichCount + '\n\n'
+              + 'Восстановить и добавить к проекту?';
+      if (!confirm(msg)) {
+        if (confirm('Удалить сохранённый незавершённый импорт? (Отмена — оставить на потом)')) {
+          arDbClearPartialImport(proj);
+        }
+        return;
+      }
+      /* Обогащаем существующие */
+      for (var m = 0; m < partial.length; m++) {
+        var pp = partial[m];
+        if (!pp.sku) continue;
+        for (var n = 0; n < proj.articles.length; n++) {
+          var ea = proj.articles[n];
+          if (ea.sku === pp.sku) {
+            if (!ea.refImage && pp.refImage) ea.refImage = pp.refImage;
+            if (!ea.category && pp.category) ea.category = pp.category;
+            if (!ea.color && pp.color) ea.color = pp.color;
+            break;
+          }
+        }
+      }
+      /* Добавляем новые */
+      for (var q = 0; q < newOnes.length; q++) {
+        var np = newOnes[q];
+        proj.articles.push({
+          id: 'ar_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+          sku: np.sku,
+          category: np.category || '',
+          color: np.color || '',
+          refImage: np.refImage || '',
+          status: 'unmatched',
+          cardIdx: -1,
+        });
+      }
+      arRenderChecklist();
+      arRenderMatching();
+      arRenderVerification();
+      arUpdateStats();
+      if (typeof shAutoSave === 'function') shAutoSave();
+      arDbSaveRefImages(proj);
+      arUploadRefImagesToCloud(proj);
+      arDbClearPartialImport(proj);
+      console.log('articles.js: восстановлен незавершённый импорт, добавлено', newOnes.length, 'обогащено', enrichCount);
+    });
   });
 }
 
@@ -907,6 +986,12 @@ function _arSendPagesToOpenAI(proj, pages, apiKey, fileName, statusEl) {
       if (!err && pageArticles && pageArticles.length > 0) {
         allArticles = allArticles.concat(pageArticles);
       }
+      /* Освобождаем ссылку на отрендеренную страницу — это base64 JPEG
+         весом до 1MB. На 40-страничном каталоге экономит десятки MB. */
+      pages[pageIdx] = null;
+      base64Data = null;
+      /* Инкрементально пишем партиальный результат в IndexedDB */
+      try { _arDbSavePartialImport(proj, allArticles); } catch(_) {}
       pageIdx++;
       /* Небольшая пауза чтобы не превысить rate limit */
       setTimeout(processPage, 300);
@@ -914,6 +999,96 @@ function _arSendPagesToOpenAI(proj, pages, apiKey, fileName, statusEl) {
   }
 
   processPage();
+}
+
+
+// ══════════════════════════════════════════════
+//  Partial import (robustness): сохранение прогресса импорта
+//  во время обработки PDF, чтобы при краше вкладки или OOM
+//  не потерять уже распознанные артикулы и их refImage.
+// ══════════════════════════════════════════════
+
+var AR_PARTIAL_DB_KEY = '_partial_import';
+
+/**
+ * Сохранить промежуточный результат импорта в IndexedDB.
+ * Ключ — "_partial_import/{projKey}". Значение — массив raw-артикулов
+ * с refImage, которые накопились на этот момент. При успешном завершении
+ * _arApplyLoaded эту запись удаляет.
+ *
+ * @param {object} proj
+ * @param {Array}  rawArticles — текущий allArticles на момент вызова
+ */
+function _arDbSavePartialImport(proj, rawArticles) {
+  if (!proj || !rawArticles || !rawArticles.length) return;
+  var projKey = _arProjKey(proj);
+  arDbOpen(function(db) {
+    if (!db) return;
+    try {
+      var tx = db.transaction(AR_DB_STORE, 'readwrite');
+      var store = tx.objectStore(AR_DB_STORE);
+      /* Кладём только минимум — sku/category/color/refImage.
+         Это даёт на диске ~200KB на артикул с картинкой — ок для десятков. */
+      var slim = [];
+      for (var i = 0; i < rawArticles.length; i++) {
+        var a = rawArticles[i];
+        if (!a || !a.sku) continue;
+        slim.push({
+          sku: String(a.sku),
+          category: a.category || '',
+          color: a.color || '',
+          description: a.description || '',
+          refImage: a.refImage || '',
+        });
+      }
+      store.put({ articles: slim, savedAt: Date.now() }, AR_PARTIAL_DB_KEY + '/' + projKey);
+    } catch(e) { console.warn('_arDbSavePartialImport:', e); }
+  });
+}
+
+/**
+ * Прочитать незавершённый импорт из IndexedDB (если есть).
+ * Используется при открытии вкладки «Артикулы» чтобы предложить
+ * восстановить данные после краша.
+ *
+ * @param {object}   proj
+ * @param {function} callback(articles|null)
+ */
+function arDbGetPartialImport(proj, callback) {
+  if (!proj) { callback(null); return; }
+  var projKey = _arProjKey(proj);
+  arDbOpen(function(db) {
+    if (!db) { callback(null); return; }
+    try {
+      var tx = db.transaction(AR_DB_STORE, 'readonly');
+      var store = tx.objectStore(AR_DB_STORE);
+      var req = store.get(AR_PARTIAL_DB_KEY + '/' + projKey);
+      req.onsuccess = function() {
+        var r = req.result;
+        if (r && r.articles && r.articles.length) callback(r.articles);
+        else callback(null);
+      };
+      req.onerror = function() { callback(null); };
+    } catch(e) { console.warn('arDbGetPartialImport:', e); callback(null); }
+  });
+}
+
+/**
+ * Удалить запись о незавершённом импорте (вызывается в _arApplyLoaded
+ * при успешном завершении).
+ * @param {object} proj
+ */
+function arDbClearPartialImport(proj) {
+  if (!proj) return;
+  var projKey = _arProjKey(proj);
+  arDbOpen(function(db) {
+    if (!db) return;
+    try {
+      var tx = db.transaction(AR_DB_STORE, 'readwrite');
+      var store = tx.objectStore(AR_DB_STORE);
+      store.delete(AR_PARTIAL_DB_KEY + '/' + projKey);
+    } catch(e) { console.warn('arDbClearPartialImport:', e); }
+  });
 }
 
 
@@ -1139,8 +1314,12 @@ function _arProcessPdfWithOpenAI(proj, file, apiKey) {
         }
 
         pdf.getPage(pageNum).then(function(page) {
-          /* Рендерим страницу в canvas */
-          var scale = 2.0; /* хорошее качество для OCR */
+          /* Рендерим страницу в canvas.
+             scale=1.5 — достаточно для OCR Vision, заметно легче по памяти
+             чем 2.0 (A4 → 1860×2631 ≈19MB bitmap vs 35MB при 2.0).
+             56 артикулов × 40 страниц × 35MB = 1.4GB живёт в замыканиях
+             Promise-цепочки и приводит к OOM Chrome. */
+          var scale = 1.5;
           var viewport = page.getViewport({ scale: scale });
           var canvas = document.createElement('canvas');
           canvas.width = viewport.width;
@@ -1156,6 +1335,11 @@ function _arProcessPdfWithOpenAI(proj, file, apiKey) {
             _arCallOpenAIVision(apiKey, base64Data, pageNum, totalPages, function(err, pageArticles) {
               processed++;
               if (statusEl) statusEl.textContent = 'AI: обработка ' + processed + '/' + totalPages + ' страниц...';
+
+              /* imageBase64/base64Data больше не нужны — отпускаем ссылки,
+                 пока обрабатываем crop'ы (canvas ещё нужен для drawImage) */
+              imageBase64 = null;
+              base64Data = null;
 
               if (!err && pageArticles && pageArticles.length > 0) {
                 /* Вырезать референс-фото из canvas по bounding box */
@@ -1178,16 +1362,36 @@ function _arProcessPdfWithOpenAI(proj, file, apiKey) {
                       cropCanvas.height = outH;
                       cropCanvas.getContext('2d').drawImage(canvas, bx, by, bw, bh, 0, 0, outW, outH);
                       a.refImage = cropCanvas.toDataURL('image/jpeg', 0.82);
+                      /* Освобождаем crop-canvas сразу после получения dataURL */
+                      cropCanvas.width = 0;
+                      cropCanvas.height = 0;
+                      cropCanvas = null;
                     } catch(cropErr) {
                       console.warn('articles.js: crop error', cropErr);
                     }
                   }
+                  /* bounding box больше не нужен — не держим лишнего в памяти */
+                  delete a.img;
                 }
                 allArticles = allArticles.concat(pageArticles);
               }
 
-              /* Следующая страница */
-              processPage(pageNum + 1);
+              /* ── Освобождаем память: canvas, ctx, PDF page ──
+                 Без этого Promise-замыкание держит bitmap страницы до конца
+                 всего прохода, и Chrome сдаётся на ~20-30 странице с OOM. */
+              try { canvas.width = 0; canvas.height = 0; } catch(_) {}
+              canvas = null;
+              ctx = null;
+              try { if (page && typeof page.cleanup === 'function') page.cleanup(); } catch(_) {}
+
+              /* Инкрементально пишем refImage в IndexedDB, чтобы при краше
+                 не терять уже обработанные страницы. Ключи — по SKU,
+                 на этапе _arApplyLoaded они переиспользуются. */
+              try { _arDbSavePartialImport(proj, allArticles); } catch(_) {}
+
+              /* Пауза между страницами — даём GC прогнать и rate limit OpenAI
+                 выдохнуть. 300ms достаточно для V8 major GC. */
+              setTimeout(function() { processPage(pageNum + 1); }, 300);
             });
           });
         });
@@ -1478,6 +1682,8 @@ function _arApplyLoaded(proj, articles, fileName) {
   /* Сохранить ref-изображения: IndexedDB (локальный кэш) + Supabase Storage (облако) */
   arDbSaveRefImages(proj);
   arUploadRefImagesToCloud(proj);
+  /* Импорт дошёл до конца — можно удалить партиальный бэкап */
+  try { arDbClearPartialImport(proj); } catch(_) {}
   console.log('articles.js: загружено ' + articles.length + ' артикулов из ' + fileName);
 
   /* Автоматически запустить AI-расстановку если есть ключ и незакреплённые карточки */
