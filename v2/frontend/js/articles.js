@@ -3449,11 +3449,32 @@ function _arMatchWithPdfPages(cards, skuList, pdfPages, apiKey, proj, statusEl) 
   var total = cards.length;
   var applied = 0;
   var idx = 0;
+  /* Mini-batch flush: каждые 5 карточек — частичный sync в облако +
+     пауза для GC + проверка heap. Без этого на 50+ карточках
+     браузер уходит в OOM (инцидент [anchor client]). */
+  var FLUSH_EVERY = 5;
+  var CARD_TIMEOUT_MS = 60000;
+  var HEAP_ABORT_RATIO = 0.85;
+  var cardTimeoutId = null;
+
+  function _checkHeapPressure() {
+    try {
+      if (performance && performance.memory && performance.memory.jsHeapSizeLimit) {
+        var ratio = performance.memory.usedJSHeapSize / performance.memory.jsHeapSizeLimit;
+        if (ratio > HEAP_ABORT_RATIO) {
+          console.warn('articles.js: heap ' + (ratio * 100).toFixed(1) + '% — abort');
+          return true;
+        }
+      }
+    } catch(e) {}
+    return false;
+  }
 
   /* Финализация: одна перерисовка + один sync в конце батча.
      Это избавляет UI от 50+ тяжёлых перерисовок и 50+ cloud pushes,
      из-за которых при 57 артикулах страница висла. */
   function finalize(msg) {
+    if (cardTimeoutId) { clearTimeout(cardTimeoutId); cardTimeoutId = null; }
     if (statusEl) statusEl.textContent = msg || ('AI: ' + applied + ' из ' + total + ' сопоставлено');
     arRenderChecklist();
     arRenderMatching();
@@ -3464,18 +3485,65 @@ function _arMatchWithPdfPages(cards, skuList, pdfPages, apiKey, proj, statusEl) 
   }
 
   function processNext() {
+    if (cardTimeoutId) { clearTimeout(cardTimeoutId); cardTimeoutId = null; }
+
     if (idx >= cards.length) {
       finalize();
       return;
     }
 
+    /* Mini-batch flush каждые FLUSH_EVERY карточек */
+    if (idx > 0 && idx % FLUSH_EVERY === 0) {
+      if (statusEl) statusEl.textContent = 'AI: ' + idx + '/' + total + ' — пауза, сохраняю прогресс...';
+      arRenderChecklist();
+      arRenderMatching();
+      arUpdateStats();
+      if (typeof shAutoSave === 'function') shAutoSave();
+      if (typeof arCloudSync === 'function') arCloudSync();
+
+      if (_checkHeapPressure()) {
+        finalize('AI остановлен: память заполнена. Обработано ' + idx + '/' + total +
+          '. Проверьте результат и запустите Расставить (AI) ещё раз.');
+        return;
+      }
+      setTimeout(_processNext_body, 800);
+      return;
+    }
+
+    _processNext_body();
+  }
+
+  function _processNext_body() {
+    /* Soft timeout на карточку: 60с страховка от зависшего API.
+       Токен уникализирует таймаут каждой карточки — если ответ API
+       придёт ПОСЛЕ срабатывания таймаута, callback увидит что токен
+       уже не совпадает и не будет двигать idx второй раз. */
+    var myToken = {};
+    cardTimeoutId = myToken;
+    var timeoutHandle = setTimeout(function() {
+      if (cardTimeoutId !== myToken) return;
+      console.warn('articles.js: card ' + idx + ' timeout (60s) — skipping');
+      cardTimeoutId = null;
+      idx++;
+      processNext();
+    }, CARD_TIMEOUT_MS);
+
     var ci = cards[idx];
     if (statusEl) statusEl.textContent = 'AI: карточка ' + (idx + 1) + '/' + total + '...';
 
-    /* Пересобрать свободные SKU */
+    /* Пересобрать свободные SKU.
+       Исключаем те, которые пользователь уже отклонил вручную для этой
+       карточки (кнопка × в режиме сопоставления). Список отклонённых
+       собираем отдельно чтобы выдать в prompt как негативные примеры. */
     var freeSkus = [];
+    var rejectedSkus = [];
     for (var a = 0; a < (proj.articles || []).length; a++) {
-      if (proj.articles[a].cardIdx < 0) freeSkus.push({ idx: a, sku: proj.articles[a].sku });
+      if (proj.articles[a].cardIdx >= 0) continue;
+      if (_arIsRejected(proj, ci.idx, proj.articles[a].id)) {
+        rejectedSkus.push(proj.articles[a].sku);
+        continue;
+      }
+      freeSkus.push({ idx: a, sku: proj.articles[a].sku });
     }
     if (freeSkus.length === 0) { idx = cards.length; processNext(); return; }
 
@@ -3491,6 +3559,14 @@ function _arMatchWithPdfPages(cards, skuList, pdfPages, apiKey, proj, statusEl) 
       + 'Available (unmatched) SKUs:\n';
     for (var si = 0; si < freeSkus.length; si++) {
       promptText += '"' + freeSkus[si].sku + '", ';
+    }
+    /* Негативные примеры: пары, которые пользователь уже отклонил */
+    if (rejectedSkus.length > 0) {
+      promptText += '\n\nREJECTED (user already confirmed NONE of these match the card):\n';
+      for (var rj = 0; rj < rejectedSkus.length; rj++) {
+        promptText += '"' + rejectedSkus[rj] + '", ';
+      }
+      promptText += '\nDO NOT return any of these rejected SKUs as match.';
     }
     promptText += '\n\nDECISION RULES:\n'
       + '1. Compare shape, silhouette, color, material, texture, hardware, logo.\n'
@@ -3533,6 +3609,15 @@ function _arMatchWithPdfPages(cards, skuList, pdfPages, apiKey, proj, statusEl) 
     };
 
     _arSendWithRetry(body, apiKey, 0, function(text) {
+      /* Race-guard: если наш таймер уже сработал (cardTimeoutId сбросился
+         или сменился на токен следующей карточки), значит processNext уже
+         ушёл дальше — не двигаем idx повторно. */
+      if (cardTimeoutId !== myToken) {
+        console.log('articles.js: late response for card ' + idx + ' — dropping');
+        return;
+      }
+      clearTimeout(timeoutHandle);
+      cardTimeoutId = null;
       if (text) {
         try {
           var jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -3616,8 +3701,33 @@ function _arMatchWithRefImages(cards, proj, pvByName, apiKey, statusEl) {
   var applied = 0;
   var cardIdx = 0;
   var BATCH_SIZE = 10;
+  /* Mini-batch flush каждые N карточек: освобождаем локальные ссылки,
+     делаем паузу для GC + проверяем heap. Это мера против OOM на длинных
+     прогонах (инцидент [anchor client]: 57 карточек → сбой по памяти). */
+  var FLUSH_EVERY = 5;
+  var CARD_TIMEOUT_MS = 60000; /* soft cap: 60с на одну карточку */
+  var HEAP_ABORT_RATIO = 0.85; /* если heap > 85% лимита — остановиться */
+  var cardStartTime = 0;
+  var cardTimeoutId = null;
+
+  function _checkHeapPressure() {
+    try {
+      if (performance && performance.memory && performance.memory.jsHeapSizeLimit) {
+        var used = performance.memory.usedJSHeapSize;
+        var limit = performance.memory.jsHeapSizeLimit;
+        var ratio = used / limit;
+        if (ratio > HEAP_ABORT_RATIO) {
+          console.warn('articles.js: heap pressure ' + (ratio * 100).toFixed(1) + '% — aborting matching');
+          return true;
+        }
+      }
+    } catch(e) { /* performance.memory только в Chromium */ }
+    return false;
+  }
 
   function processNextCard() {
+    if (cardTimeoutId) { clearTimeout(cardTimeoutId); cardTimeoutId = null; }
+
     if (cardIdx >= cards.length) {
       /* Финализация батча: одна перерисовка + один sync — избегаем
          сотен тяжёлых DOM-обновлений при 50+ карточках. */
@@ -3631,22 +3741,78 @@ function _arMatchWithRefImages(cards, proj, pvByName, apiKey, statusEl) {
       return;
     }
 
+    /* Mini-batch flush: каждые FLUSH_EVERY карточек — пауза + частичный sync.
+       Это (a) даёт шанс браузеру прибрать мусор между сериями,
+       (b) сохраняет промежуточный прогресс в облако — если браузер упадёт
+           дальше, уже сопоставленные пары останутся.
+       Heap-проверка: если память > 85% лимита — останавливаемся мягко,
+       показываем пользователю что сделано, он может верифицировать +
+       запустить повторный прогон после перезагрузки страницы. */
+    if (cardIdx > 0 && cardIdx % FLUSH_EVERY === 0) {
+      if (statusEl) statusEl.textContent = 'AI: ' + cardIdx + '/' + total + ' — пауза, сохраняю прогресс...';
+      arRenderChecklist();
+      arRenderMatching();
+      arUpdateStats();
+      if (typeof shAutoSave === 'function') shAutoSave();
+      if (typeof arCloudSync === 'function') arCloudSync();
+
+      if (_checkHeapPressure()) {
+        if (statusEl) {
+          statusEl.textContent = 'AI остановлен: память заполнена. Обработано ' +
+            cardIdx + '/' + total + '. Проверьте результат и запустите Расставить (AI) ещё раз.';
+        }
+        return;
+      }
+
+      /* Небольшая пауза — шанс для GC + разгрузка event loop */
+      setTimeout(processNextCard_body, 800);
+      return;
+    }
+
+    processNextCard_body();
+  }
+
+  var _iterSeq = 0; /* монотонный счётчик итераций для race-guard */
+
+  function processNextCard_body() {
+    /* Soft timeout: если одна карточка висит > 60с — аварийно пропускаем её,
+       двигаемся дальше. API мог подвиснуть, не хотим терять остальные.
+       Используем seq-токен чтобы позднее пришедший callback не сдвинул
+       cardIdx ещё раз после того как таймаут уже это сделал. */
+    _iterSeq++;
+    var mySeq = _iterSeq;
+    cardStartTime = Date.now();
+    cardTimeoutId = setTimeout(function() {
+      if (mySeq !== _iterSeq) return;
+      console.warn('articles.js: card ' + cardIdx + ' timeout (60s) — skipping');
+      cardIdx++;
+      processNextCard();
+    }, CARD_TIMEOUT_MS);
+
     var ci = cards[cardIdx];
 
     /* Собрать свободные кандидаты.
        refImageUrl — публичный URL в Storage (предпочтительно для Vision API).
-       refImage   — base64 fallback, если URL ещё не загружен. */
+       refImage   — base64 fallback, если URL ещё не загружен.
+       Также исключаем пары, которые пользователь уже отклонил вручную (×)
+       в режиме сопоставления — это отрицательное обучение AI. */
     var candidates = [];
+    var rejectedForCard = 0;
     for (var a = 0; a < (proj.articles || []).length; a++) {
       var art = proj.articles[a];
       if (art.cardIdx >= 0) continue;
       if (!art.refImage && !art._refImagePath) continue;
+      /* Пропускаем пары, отклонённые ранее для этой же карточки */
+      if (_arIsRejected(proj, ci.idx, art.id)) { rejectedForCard++; continue; }
       candidates.push({
         idx: a,
         sku: art.sku,
         refImage: art.refImage || '',
         refImageUrl: art._refImagePath || ''
       });
+    }
+    if (rejectedForCard > 0) {
+      console.log('articles.js: card ' + ci.idx + ' — excluded ' + rejectedForCard + ' rejected pair(s)');
     }
 
     if (candidates.length === 0) {
@@ -3936,15 +4102,50 @@ function arDoMatch(skuIdx, cardIdx, silent) {
 
 
 /**
- * Отвязать артикул от карточки.
- * @param {number} skuIdx — индекс артикула
+ * Отвязать артикул от карточки и ЗАПИСАТЬ эту пару как отклонённую.
+ *
+ * Логика: если пользователь вручную нажал "×" на привязке карточка↔артикул,
+ * значит AI предложил неправильно. Записываем пару в `proj._rejectedPairs`
+ * чтобы следующий прогон "Расставить (AI)" не предлагал то же самое снова.
+ *
+ * Структура записи:
+ *   { cardIdx: number, articleId: string, rejectedAt: string }
+ *
+ * В candidates-фильтре _arMatchWithRefImages эти пары будут выключены:
+ * артикул не попадёт в кандидатов для конкретной карточки.
+ *
+ * @param {number} skuIdx — индекс артикула в proj.articles
  */
 function arUnmatch(skuIdx) {
   var proj = getActiveProject();
   if (!proj || !proj.articles || !proj.articles[skuIdx]) return;
 
-  proj.articles[skuIdx].cardIdx = -1;
-  proj.articles[skuIdx].status = 'unmatched';
+  var art = proj.articles[skuIdx];
+  var prevCardIdx = art.cardIdx;
+
+  /* Запоминаем отклонение, если пара была реально привязана */
+  if (prevCardIdx >= 0 && art.id) {
+    if (!proj._rejectedPairs) proj._rejectedPairs = [];
+    /* Проверка на дубль */
+    var already = false;
+    for (var r = 0; r < proj._rejectedPairs.length; r++) {
+      if (proj._rejectedPairs[r].cardIdx === prevCardIdx
+          && proj._rejectedPairs[r].articleId === art.id) {
+        already = true; break;
+      }
+    }
+    if (!already) {
+      proj._rejectedPairs.push({
+        cardIdx:    prevCardIdx,
+        articleId:  art.id,
+        rejectedAt: new Date().toISOString()
+      });
+      console.log('articles.js: rejected pair recorded — card ' + prevCardIdx + ' != ' + art.sku);
+    }
+  }
+
+  art.cardIdx = -1;
+  art.status = 'unmatched';
 
   arRenderChecklist();
   arRenderMatching();
@@ -3952,6 +4153,22 @@ function arUnmatch(skuIdx) {
   arUpdateStats();
   if (typeof shAutoSave === 'function') shAutoSave();
   arCloudSync();
+}
+
+
+/**
+ * Проверить, отклонена ли пара (cardIdx, articleId) пользователем.
+ * Используется AI-метчером для исключения пары из кандидатов.
+ */
+function _arIsRejected(proj, cardIdx, articleId) {
+  if (!proj || !proj._rejectedPairs || !articleId) return false;
+  for (var r = 0; r < proj._rejectedPairs.length; r++) {
+    if (proj._rejectedPairs[r].cardIdx === cardIdx
+        && proj._rejectedPairs[r].articleId === articleId) {
+      return true;
+    }
+  }
+  return false;
 }
 
 
