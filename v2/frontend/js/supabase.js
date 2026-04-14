@@ -417,7 +417,9 @@ function sbUploadCards(projectId, cards, callback) {
     /* Загружаем миниатюры в Supabase Storage, затем апсертим карточки */
     _sbUploadSlotImages(projectId, slotRows, uploadsNeeded, function() {
       /* UPSERT карточек (обходит pkey-конфликт при soft-deleted строках). */
-      sbClient.from('cards').upsert(cardRows, { onConflict: 'id' }).then(function(cardRes) {
+      /* onConflict: 'id,project_id' — primary key cards_pkey составной (см. миграцию 026).
+   Использование одиночного 'id' даёт ошибку "no unique or exclusion constraint matching". */
+      sbClient.from('cards').upsert(cardRows, { onConflict: 'id,project_id' }).then(function(cardRes) {
         if (cardRes.error) { callback('Ошибка карточек: ' + cardRes.error.message); return; }
 
         /* Soft-delete карточек, которых нет в локальном списке */
@@ -1923,7 +1925,9 @@ function sbSyncCardsLight(projectId, cards, callback) {
     /* UPSERT карточек: существующие обновляются (включая deleted_at=null),
        новые вставляются. Это обходит конфликт pkey который возникал при
        старом DELETE+INSERT паттерне после миграции 026 (soft-delete). */
-    sbClient.from('cards').upsert(cardRows, { onConflict: 'id' }).then(function(cardRes) {
+    /* onConflict: 'id,project_id' — primary key cards_pkey составной (см. миграцию 026).
+   Использование одиночного 'id' даёт ошибку "no unique or exclusion constraint matching". */
+      sbClient.from('cards').upsert(cardRows, { onConflict: 'id,project_id' }).then(function(cardRes) {
       if (cardRes.error) { callback('Ошибка карточек: ' + cardRes.error.message); return; }
 
       /* Soft-delete карточек, которых больше нет в локальном списке.
