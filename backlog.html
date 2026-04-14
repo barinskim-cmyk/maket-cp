@@ -931,6 +931,56 @@ tr:hover td { background: #fafafa; }
   <td contenteditable="true" class="my-comment"></td>
 </tr>
 
+<tr class="section-row"><td colspan="10">Защита от потери данных (инцидент [anchor client] 14.04.2026)</td></tr>
+
+<tr data-row="soft-delete-cards">
+  <td><span class="s-done">DONE</span></td>
+  <td>Облако / БД</td>
+  <td contenteditable="true"><strong>Soft-delete карточек/слотов + BEFORE DELETE триггер</strong></td>
+  <td>a221d30</td>
+  <td>После инцидента с потерей всех карточек в проекте [anchor client] (тестирование Викой, пустой push в облако перезатёр локальные копии у всех клиентов). Решение: миграция 026 добавляет deleted_at timestamptz в cards/slots, partial indexes WHERE deleted_at IS NULL, BEFORE DELETE триггер перехватывает любой DELETE и превращает в UPDATE deleted_at=now(). Физически удалить карточку теперь невозможно без SET LOCAL maketcp.allow_hard_delete='on'. save_cards_by_token имеет guard на пустой массив. RPC restore_deleted_cards(project_id, since) восстанавливает мягко-удалённое. JS: .is('deleted_at', null) на всех SELECT карточек/слотов, защита sbPullProject от 0-cards wipe. ТРЕБУЕТ: запустить 026_soft_delete_cards_slots.sql в Supabase Dashboard.</td>
+  <td class="files">026_soft_delete_cards_slots.sql, supabase.js</td>
+  <td>--</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="log-from-stage-0">
+  <td><span class="s-done">DONE</span></td>
+  <td>Облако / Аналитика</td>
+  <td contenteditable="true"><strong>action_log с 0 этапа (раньше было с 3)</strong></td>
+  <td>a221d30</td>
+  <td>SB_LOG_MIN_STAGE был 3 — из-за этого все действия на ранних этапах (превью, отбор, раскладка карточек) не логировались. Проект [anchor client] к моменту инцидента был на раннем этапе, поэтому action_log оказался пустым и восстановить карточки из лога не удалось. Снизили порог до 0 — теперь любое движение карточки/слота пишется в лог с самого начала проекта.</td>
+  <td class="files">supabase.js</td>
+  <td>--</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="matching-perf-57">
+  <td><span class="s-done">DONE</span></td>
+  <td>Артикулы</td>
+  <td contenteditable="true"><strong>Оптимизация метчинга: устранение зависания на 57 артикулах</strong></td>
+  <td>a221d30</td>
+  <td>При метчинге большого количества артикулов (57 у Вики) UI зависал из-за рендера ~3 списков после каждого матча и длинных пауз между карточками. Решение: добавил silent-параметр в arDoMatch (пропуск рендеров), финальный render+sync в конце пакета, сократил паузы между карточками 2500→600мс (main), 1500→600мс (playoff), 1000→500мс (остальные).</td>
+  <td class="files">articles.js</td>
+  <td>--</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="export-list-txt">
+  <td><span class="s-done">DONE</span></td>
+  <td>Карточки</td>
+  <td contenteditable="true"><strong>Backup: кнопка "Список фото (TXT)"</strong></td>
+  <td>a221d30</td>
+  <td>Вернул в UI кнопку экспорта списка карточек и фото в них в .txt — как запасной способ сохранить результат работы до перехода на следующий этап. Функция cpExportList() существовала в коде, но UI-триггера не было.</td>
+  <td class="files">index.html</td>
+  <td>--</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
 </tbody>
 </table>
 
