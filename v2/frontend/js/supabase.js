@@ -349,85 +349,101 @@ function sbUploadCards(projectId, cards, callback) {
       if (r.file_name && r.thumb_path) thumbMap[r.file_name] = r.thumb_path;
     });
 
-    /* Soft-delete старых карточек (триггер миграции 026 превратит DELETE
-       в UPDATE deleted_at=now()). Физически ничего не стирается —
-       восстановление через SELECT restore_deleted_cards(project_id, since). */
-    sbClient.from('cards').delete().eq('project_id', projectId).then(function(delRes) {
-      if (delRes.error) { callback('Ошибка удаления карточек: ' + delRes.error.message); return; }
+    // Подготовка строк cards + slots
+    var cardRows = [];
+    var slotRows = [];
+    /** @type {Array<{slotIdx: number, dataUrl: string, fileName: string}>} */
+    var uploadsNeeded = [];
+    var localCardIds = [];
 
-      // Подготовка строк cards + slots
-      var cardRows = [];
-      var slotRows = [];
-      /** @type {Array<{slotIdx: number, dataUrl: string, fileName: string}>} */
-      var uploadsNeeded = [];
+    for (var c = 0; c < cards.length; c++) {
+      var card = cards[c];
+      /* Для кристаллизованных карточек — строго card.id (стабильный).
+         Для черновиков — card.id или новый UUID. */
+      var cardId = card.id || (crypto.randomUUID ? crypto.randomUUID() : ('card_' + projectId.slice(0,8) + '_' + c + '_' + Date.now()));
+      localCardIds.push(cardId);
+      var cardStatus = card._crystallized ? 'crystallized' : (card.status || 'draft');
 
-      for (var c = 0; c < cards.length; c++) {
-        var card = cards[c];
-        /* Для кристаллизованных карточек — строго card.id (стабильный).
-           Для черновиков — card.id или новый UUID. */
-        var cardId = card.id || (crypto.randomUUID ? crypto.randomUUID() : ('card_' + projectId.slice(0,8) + '_' + c + '_' + Date.now()));
-        var cardStatus = card._crystallized ? 'crystallized' : (card.status || 'draft');
+      cardRows.push({
+        id: cardId,
+        project_id: projectId,
+        position: c,
+        name: card.name || null,
+        status: cardStatus,
+        has_hero: card._hasHero !== undefined ? card._hasHero : true,
+        h_aspect: card._hAspect || '3/2',
+        v_aspect: card._vAspect || '2/3',
+        lock_rows: card._lockRows || false,
+        /* Воскрешаем soft-deleted карточку с тем же id (миграция 026). */
+        deleted_at: null
+      });
 
-        cardRows.push({
-          id: cardId,
-          project_id: projectId,
-          position: c,
-          name: card.name || null,
-          status: cardStatus,
-          has_hero: card._hasHero !== undefined ? card._hasHero : true,
-          h_aspect: card._hAspect || '3/2',
-          v_aspect: card._vAspect || '2/3',
-          lock_rows: card._lockRows || false
-        });
+      if (card.slots) {
+        for (var s = 0; s < card.slots.length; s++) {
+          var slot = card.slots[s];
+          var slotIdx = slotRows.length;
+          var fileName = slot.file || ('slot_' + c + '_' + s + '.jpg');
 
-        if (card.slots) {
-          for (var s = 0; s < card.slots.length; s++) {
-            var slot = card.slots[s];
-            var slotIdx = slotRows.length;
-            var fileName = slot.file || ('slot_' + c + '_' + s + '.jpg');
+          /* Сохраняем существующий thumb_path если есть, или URL из dataUrl */
+          var existingThumb = thumbMap[fileName] || null;
+          var dataUrl = slot.dataUrl || slot.thumbUrl || slot.thumb || null;
 
-            /* Сохраняем существующий thumb_path если есть, или URL из dataUrl */
-            var existingThumb = thumbMap[fileName] || null;
-            var dataUrl = slot.dataUrl || slot.thumbUrl || slot.thumb || null;
+          /* Если dataUrl — это уже URL из Storage, используем как thumb_path */
+          if (!existingThumb && dataUrl && dataUrl.indexOf('http') === 0) {
+            existingThumb = dataUrl;
+          }
 
-            /* Если dataUrl — это уже URL из Storage, используем как thumb_path */
-            if (!existingThumb && dataUrl && dataUrl.indexOf('http') === 0) {
-              existingThumb = dataUrl;
-            }
+          slotRows.push({
+            card_id: cardId,
+            project_id: projectId,
+            position: s,
+            orient: slot.orient || 'v',
+            weight: slot.weight || 1,
+            row_num: (slot.row !== undefined) ? slot.row : null,
+            rotation: slot.rotation || 0,
+            file_name: fileName,
+            thumb_path: existingThumb,
+            original_path: null
+          });
 
-            slotRows.push({
-              card_id: cardId,
-              project_id: projectId,
-              position: s,
-              orient: slot.orient || 'v',
-              weight: slot.weight || 1,
-              row_num: (slot.row !== undefined) ? slot.row : null,
-              rotation: slot.rotation || 0,
-              file_name: fileName,
-              thumb_path: existingThumb,
-              original_path: null
-            });
-
-            /* Собираем слоты с base64 картинками для загрузки в Storage */
-            if (dataUrl && dataUrl.indexOf('data:') === 0) {
-              uploadsNeeded.push({ slotIdx: slotIdx, dataUrl: dataUrl, fileName: fileName });
-            }
+          /* Собираем слоты с base64 картинками для загрузки в Storage */
+          if (dataUrl && dataUrl.indexOf('data:') === 0) {
+            uploadsNeeded.push({ slotIdx: slotIdx, dataUrl: dataUrl, fileName: fileName });
           }
         }
       }
+    }
 
-      /* Загружаем миниатюры в Supabase Storage, затем вставляем записи */
-      _sbUploadSlotImages(projectId, slotRows, uploadsNeeded, function() {
-        // Вставляем карточки
-        sbClient.from('cards').insert(cardRows).then(function(cardRes) {
-          if (cardRes.error) { callback('Ошибка карточек: ' + cardRes.error.message); return; }
+    /* Загружаем миниатюры в Supabase Storage, затем апсертим карточки */
+    _sbUploadSlotImages(projectId, slotRows, uploadsNeeded, function() {
+      /* UPSERT карточек (обходит pkey-конфликт при soft-deleted строках). */
+      sbClient.from('cards').upsert(cardRows, { onConflict: 'id' }).then(function(cardRes) {
+        if (cardRes.error) { callback('Ошибка карточек: ' + cardRes.error.message); return; }
 
-          if (slotRows.length === 0) { callback(null); return; }
+        /* Soft-delete карточек, которых нет в локальном списке */
+        var deleteStale = (function() {
+          var q = sbClient.from('cards').delete().eq('project_id', projectId);
+          if (localCardIds.length > 0) {
+            var inList = '(' + localCardIds.map(function(id) {
+              return '"' + String(id).replace(/"/g, '\\"') + '"';
+            }).join(',') + ')';
+            q = q.not('id', 'in', inList);
+          }
+          return q;
+        })();
 
-          // Вставляем слоты (thumb_path уже заполнен после загрузки)
-          sbClient.from('slots').insert(slotRows).then(function(slotRes) {
-            if (slotRes.error) { callback('Ошибка слотов: ' + slotRes.error.message); return; }
-            callback(null);
+        deleteStale.then(function(stDel) {
+          if (stDel.error) console.warn('cards stale soft-delete:', stDel.error.message);
+
+          /* Слоты: soft-delete всех + INSERT новых (id у слотов DB-generated) */
+          sbClient.from('slots').delete().eq('project_id', projectId).then(function(slotDel) {
+            if (slotDel.error) { callback('Ошибка слотов (del): ' + slotDel.error.message); return; }
+            if (slotRows.length === 0) { callback(null); return; }
+
+            sbClient.from('slots').insert(slotRows).then(function(slotRes) {
+              if (slotRes.error) { callback('Ошибка слотов (ins): ' + slotRes.error.message); return; }
+              callback(null);
+            });
           });
         });
       });
@@ -1852,64 +1868,94 @@ function sbSyncCardsLight(projectId, cards, callback) {
       if (r.file_name && r.thumb_path) thumbMap[r.file_name] = r.thumb_path;
     });
 
-    /* Soft-delete старых карточек (триггер миграции 026 превращает DELETE
-       в UPDATE deleted_at=now(); физически данные сохраняются, можно
-       восстановить через SELECT restore_deleted_cards(...)). */
-    sbClient.from('cards').delete().eq('project_id', projectId).then(function(delRes) {
-      if (delRes.error) { callback('Ошибка удаления: ' + delRes.error.message); return; }
+    /* Собираем строки cards + slots из локального состояния */
+    var cardRows = [];
+    var slotRows = [];
+    var localCardIds = [];
 
-      var cardRows = [];
-      var slotRows = [];
+    for (var c = 0; c < cards.length; c++) {
+      var card = cards[c];
+      /* Сохраняем card.id из JS — иначе комментарии теряются при перезагрузке
+         (ключи "card:<id>" в comments не совпадут с новыми UUID).
+         Для кристаллизованных карточек ID строго обязателен. */
+      var cardId = card.id || (crypto.randomUUID ? crypto.randomUUID() : ('card_' + projectId.slice(0,8) + '_' + c + '_' + Date.now()));
+      localCardIds.push(cardId);
 
-      for (var c = 0; c < cards.length; c++) {
-        var card = cards[c];
-        /* Сохраняем card.id из JS — иначе комментарии теряются при перезагрузке
-           (ключи "card:<id>" в comments не совпадут с новыми UUID).
-           Для кристаллизованных карточек ID строго обязателен. */
-        var cardId = card.id || (crypto.randomUUID ? crypto.randomUUID() : ('card_' + projectId.slice(0,8) + '_' + c + '_' + Date.now()));
+      /* Статус: кристаллизованная карточка → 'crystallized', иначе 'draft' */
+      var cardStatus = card._crystallized ? 'crystallized' : (card.status || 'draft');
 
-        /* Статус: кристаллизованная карточка → 'crystallized', иначе 'draft' */
-        var cardStatus = card._crystallized ? 'crystallized' : (card.status || 'draft');
+      cardRows.push({
+        id: cardId,
+        project_id: projectId,
+        position: c,
+        name: card.name || null,
+        status: cardStatus,
+        has_hero: card._hasHero !== undefined ? card._hasHero : true,
+        h_aspect: card._hAspect || '3/2',
+        v_aspect: card._vAspect || '2/3',
+        lock_rows: card._lockRows || false,
+        /* Явно воскрешаем soft-deleted карточку если id совпадает.
+           Триггер миграции 026 превращает DELETE в UPDATE deleted_at=now(),
+           и без этого поля upsert оставил бы карточку "удалённой". */
+        deleted_at: null
+      });
 
-        cardRows.push({
-          id: cardId,
-          project_id: projectId,
-          position: c,
-          name: card.name || null,
-          status: cardStatus,
-          has_hero: card._hasHero !== undefined ? card._hasHero : true,
-          h_aspect: card._hAspect || '3/2',
-          v_aspect: card._vAspect || '2/3',
-          lock_rows: card._lockRows || false
-        });
-
-        if (card.slots) {
-          for (var s = 0; s < card.slots.length; s++) {
-            var slot = card.slots[s];
-            var fileName = slot.file || ('slot_' + c + '_' + s + '.jpg');
-            slotRows.push({
-              card_id: cardId,
-              project_id: projectId,
-              position: s,
-              orient: slot.orient || 'v',
-              weight: slot.weight || 1,
-              row_num: (slot.row !== undefined) ? slot.row : null,
-              rotation: slot.rotation || 0,
-              file_name: fileName,
-              thumb_path: thumbMap[fileName] || null,
-              original_path: null
-            });
-          }
+      if (card.slots) {
+        for (var s = 0; s < card.slots.length; s++) {
+          var slot = card.slots[s];
+          var fileName = slot.file || ('slot_' + c + '_' + s + '.jpg');
+          slotRows.push({
+            card_id: cardId,
+            project_id: projectId,
+            position: s,
+            orient: slot.orient || 'v',
+            weight: slot.weight || 1,
+            row_num: (slot.row !== undefined) ? slot.row : null,
+            rotation: slot.rotation || 0,
+            file_name: fileName,
+            thumb_path: thumbMap[fileName] || null,
+            original_path: null
+          });
         }
       }
+    }
 
-      sbClient.from('cards').insert(cardRows).then(function(cardRes) {
-        if (cardRes.error) { callback('Ошибка карточек: ' + cardRes.error.message); return; }
-        if (slotRows.length === 0) { callback(null); return; }
+    /* UPSERT карточек: существующие обновляются (включая deleted_at=null),
+       новые вставляются. Это обходит конфликт pkey который возникал при
+       старом DELETE+INSERT паттерне после миграции 026 (soft-delete). */
+    sbClient.from('cards').upsert(cardRows, { onConflict: 'id' }).then(function(cardRes) {
+      if (cardRes.error) { callback('Ошибка карточек: ' + cardRes.error.message); return; }
 
-        sbClient.from('slots').insert(slotRows).then(function(slotRes) {
-          if (slotRes.error) { callback('Ошибка слотов: ' + slotRes.error.message); return; }
-          callback(null);
+      /* Soft-delete карточек, которых больше нет в локальном списке.
+         Триггер миграции 026 превратит DELETE в UPDATE deleted_at=now().
+         Используем фильтр "project_id=X AND id NOT IN (localCardIds)". */
+      var deleteStaleCards = (function() {
+        var q = sbClient.from('cards').delete().eq('project_id', projectId);
+        if (localCardIds.length > 0) {
+          /* Supabase v2: .not('id', 'in', '("id1","id2")')
+             Формируем список в синтаксисе PostgREST. */
+          var inList = '(' + localCardIds.map(function(id) {
+            return '"' + String(id).replace(/"/g, '\\"') + '"';
+          }).join(',') + ')';
+          q = q.not('id', 'in', inList);
+        }
+        return q;
+      })();
+
+      deleteStaleCards.then(function(stDel) {
+        if (stDel.error) console.warn('cards stale soft-delete:', stDel.error.message);
+
+        /* Слоты: у них DB-generated id (UUID), так что конфликта pkey нет.
+           Сначала soft-delete всех слотов проекта (триггер 026), затем INSERT новых.
+           Да, это оставляет мусор в БД (soft-deleted slot rows накапливаются),
+           но это не критично для корректности и легче чем дельта-синк. */
+        sbClient.from('slots').delete().eq('project_id', projectId).then(function(slotDel) {
+          if (slotDel.error) { callback('Ошибка слотов (del): ' + slotDel.error.message); return; }
+          if (slotRows.length === 0) { callback(null); return; }
+          sbClient.from('slots').insert(slotRows).then(function(slotIns) {
+            if (slotIns.error) { callback('Ошибка слотов (ins): ' + slotIns.error.message); return; }
+            callback(null);
+          });
         });
       });
     });
