@@ -508,8 +508,10 @@ function sbLoadAllFromCloud() {
             /* Облачная загрузка завершена — убрать заглушку "Загружаю..." */
             if (typeof _shCloudLoadDone !== 'undefined') _shCloudLoadDone = true;
 
-            /* Сохраняем лёгкий кэш в localStorage (без base64) */
-            _authSaveLightCache(projects);
+            /* Основное автосохранение делает _shDoAutoSave (ключ
+               maketcp_projects). Раньше здесь был отдельный кэш
+               _authSaveLightCache (ключ maketcp_autosave) — он нигде
+               не читался и только занимал место в localStorage. Удалён. */
 
             /* Мобильный режим для залогиненного пользователя:
                показать экран выбора проекта вместо десктопного UI */
@@ -547,43 +549,9 @@ function sbLoadAllFromCloud() {
   });
 }
 
-/**
- * Сохранить лёгкий кэш проектов в localStorage (без base64 картинок).
- * Используется как фолбэк, основные данные — в облаке.
- * @param {Array} projects
- */
-function _authSaveLightCache(projects) {
-  try {
-    var light = projects.map(function(p) {
-      var clone = {
-        _cloudId: p._cloudId,
-        brand: p.brand,
-        shoot_date: p.shoot_date,
-        templateId: p.templateId,
-        _stage: p._stage,
-        _stageHistory: p._stageHistory || {},
-        channels: p.channels || [],
-        cards: (p.cards || []).map(function(c) {
-          return {
-            id: c.id, status: c.status,
-            _hasHero: c._hasHero, _hAspect: c._hAspect,
-            _vAspect: c._vAspect, _lockRows: c._lockRows,
-            slots: (c.slots || []).map(function(s) {
-              return { orient: s.orient, weight: s.weight, row: s.row,
-                       rotation: s.rotation, file: s.file, dataUrl: null };
-            })
-          };
-        }),
-        previews: [],
-        otherContent: []
-      };
-      return clone;
-    });
-    localStorage.setItem('maketcp_autosave', JSON.stringify(light));
-  } catch(e) {
-    console.warn('cloud-ui: не удалось сохранить кэш в localStorage');
-  }
-}
+/* _authSaveLightCache удалён: ключ maketcp_autosave нигде не читался,
+   только занимал место в localStorage. Автосохранение делается в
+   shootings.js::_shDoAutoSave под ключом maketcp_projects. */
 
 /**
  * Показать auth gate (заблокировать приложение).

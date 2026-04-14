@@ -1707,6 +1707,26 @@ function _shDoAutoSave() {
        Для слотов карточек: сохраняем thumbUrl (300px) вместо dataUrl (1200px). */
     var toSave = _shBuildSavePayload(false);
 
+    /* GC: почистить maketcp_pv_* ключи для проектов, которых больше нет
+       в App.projects (удалены или перенесены в облако). Эти ключи
+       могут занимать сотни KB и душить квоту localStorage. */
+    var activeKeys = {};
+    for (var ai = 0; ai < App.projects.length; ai++) {
+      if (!App.projects[ai]._cloudId) {
+        activeKeys[SH_PREVIEWS_KEY_PREFIX + _shProjKey(App.projects[ai])] = true;
+      }
+    }
+    var lsKeys = Object.keys(localStorage);
+    for (var lk = 0; lk < lsKeys.length; lk++) {
+      var k = lsKeys[lk];
+      if (k.indexOf(SH_PREVIEWS_KEY_PREFIX) === 0 && !activeKeys[k]) {
+        try {
+          localStorage.removeItem(k);
+          console.log('localStorage GC: удалён orphan превью-ключ', k);
+        } catch(gcErr) { /* ignore */ }
+      }
+    }
+
     /* Сохраняем превью отдельно (только для локальных проектов) */
     for (var i = 0; i < App.projects.length; i++) {
       var proj = App.projects[i];
