@@ -36,6 +36,11 @@ var _arSelectedSku = null;
 /** @type {number|null} Индекс выбранной карточки для сопоставления */
 var _arSelectedCard = null;
 
+/** @type {boolean} Скрывать верифицированные артикулы из списков метчинга.
+ * По умолчанию включено — чтобы метчинг можно было делать в несколько проходов:
+ * сопоставил часть, подтвердил, скрыл, продолжил с оставшимися без визуального шума. */
+var _arHideVerified = true;
+
 /** @type {string} Кэшированный OpenAI API key (загружается при старте) */
 var _arOpenAIKey = '';
 var _arLastPdfPath = '';  /* путь к последнему загруженному PDF чек-листу */
@@ -676,12 +681,33 @@ function arRenderChecklist() {
     return;
   }
 
-  var html = '<table class="ar-table"><thead><tr>'
+  /* Счётчик скрытых верифицированных */
+  var verifiedCount = 0;
+  for (var vi = 0; vi < proj.articles.length; vi++) {
+    if (proj.articles[vi].status === 'verified') verifiedCount++;
+  }
+
+  /* Тумблер "скрывать верифицированные" + статистика */
+  var html = '';
+  if (verifiedCount > 0) {
+    html += '<div class="ar-filter-bar" style="display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:12px;color:#666">'
+      + '<label style="cursor:pointer;display:flex;align-items:center;gap:4px">'
+      + '<input type="checkbox"' + (_arHideVerified ? ' checked' : '') + ' onchange="arToggleHideVerified()"> '
+      + 'Скрывать верифицированные'
+      + '</label>'
+      + '<span>' + (_arHideVerified ? verifiedCount + ' скрыто' : 'Показаны все') + '</span>'
+      + '</div>';
+  }
+
+  html += '<table class="ar-table"><thead><tr>'
     + '<th>#</th><th></th><th>Фото</th><th>Артикул</th><th>Категория</th><th>Цвет</th><th>Карточка</th><th></th>'
     + '</tr></thead><tbody>';
 
   for (var i = 0; i < proj.articles.length; i++) {
     var art = proj.articles[i];
+    /* Фильтр верифицированных */
+    if (_arHideVerified && art.status === 'verified') continue;
+
     var statusCls = 'ar-status-' + (art.status || 'unmatched');
     var statusText = art.status === 'verified' ? 'OK' : (art.status === 'matched' ? '~' : '--');
     var cardLabel = (art.cardIdx >= 0 && proj.cards && proj.cards[art.cardIdx])
@@ -714,6 +740,18 @@ function arRenderChecklist() {
     + '</div>';
 
   el.innerHTML = html;
+}
+
+
+/**
+ * Переключить показ/скрытие верифицированных во всех трёх списках метчинга.
+ * Поддерживает multi-pass workflow: скрыл подтверждённые — продолжил с оставшимися.
+ */
+function arToggleHideVerified() {
+  _arHideVerified = !_arHideVerified;
+  arRenderChecklist();
+  arRenderMatching();
+  arRenderVerification();
 }
 
 
@@ -2975,8 +3013,24 @@ function arRenderMatching() {
     return;
   }
 
+  /* ── Тумблер скрытия верифицированных + счётчик ── */
+  var verifiedCards = 0;
+  for (var vi = 0; vi < (proj.articles || []).length; vi++) {
+    if (proj.articles[vi].status === 'verified' && proj.articles[vi].cardIdx >= 0) verifiedCards++;
+  }
+
   /* ── Строки: карточка + артикул бок о бок ── */
   var html = '';
+  if (verifiedCards > 0) {
+    html += '<div class="ar-filter-bar" style="display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:12px;color:#666">'
+      + '<label style="cursor:pointer;display:flex;align-items:center;gap:4px">'
+      + '<input type="checkbox"' + (_arHideVerified ? ' checked' : '') + ' onchange="arToggleHideVerified()"> '
+      + 'Скрывать верифицированные'
+      + '</label>'
+      + '<span>' + (_arHideVerified ? verifiedCards + ' карточек скрыто' : 'Показаны все') + '</span>'
+      + '</div>';
+  }
+
   for (var c = 0; c < proj.cards.length; c++) {
     var card = proj.cards[c];
 
@@ -2990,6 +3044,11 @@ function arRenderMatching() {
         break;
       }
     }
+
+    /* Multi-pass: скрыть карточку, если её артикул уже верифицирован.
+       Это позволяет запускать "Расставить (AI)" повторно только по оставшимся
+       непривязанным/неподтверждённым карточкам. */
+    if (_arHideVerified && linkedArt && linkedArt.status === 'verified') continue;
 
     var selCard = (_arSelectedCard === c) ? ' ar-selected' : '';
 
@@ -4136,6 +4195,13 @@ function arRenderVerification() {
     + '<button class="btn btn-sm" onclick="arConfirmAll()">Подтвердить все</button>'
     + '<button class="btn btn-sm" onclick="arResetVerification()" style="color:#999">Сбросить</button>'
     + '<span class="ar-verify-progress">' + verifiedCount + ' / ' + matchedItems.length + ' проверено</span>';
+  /* Тумблер "скрывать верифицированные" — общий для всех трёх списков */
+  if (verifiedCount > 0) {
+    toolbarHtml += '<label style="cursor:pointer;display:flex;align-items:center;gap:4px;font-size:12px;color:#666;margin-left:12px">'
+      + '<input type="checkbox"' + (_arHideVerified ? ' checked' : '') + ' onchange="arToggleHideVerified()"> '
+      + 'Скрывать подтверждённые'
+      + '</label>';
+  }
   /* Кнопка формирования списка переименования (доступна после верификации) */
   if (verifiedCount > 0) {
     toolbarHtml += '<button class="btn btn-sm btn-primary" onclick="arGenerateRenameList()" '
@@ -4149,6 +4215,9 @@ function arRenderVerification() {
   for (var m = 0; m < matchedItems.length; m++) {
     var idx = matchedItems[m];
     var art = proj.articles[idx];
+    /* Multi-pass: скрыть уже верифицированные пары из списка на верификацию,
+       чтобы пользователь видел только оставшиеся "~" пары, требующие действия. */
+    if (_arHideVerified && art.status === 'verified') continue;
     var card = (proj.cards && proj.cards[art.cardIdx]) ? proj.cards[art.cardIdx] : null;
     var cardThumb = '';
     if (card && card.slots && card.slots[0]) {
