@@ -1686,8 +1686,14 @@ function _arApplyLoaded(proj, articles, fileName) {
   try { arDbClearPartialImport(proj); } catch(_) {}
   console.log('articles.js: загружено ' + articles.length + ' артикулов из ' + fileName);
 
-  /* Автоматически запустить AI-расстановку если есть ключ и незакреплённые карточки */
-  _arAutoMatchIfReady(proj);
+  /* Matching НЕ запускается автоматически после загрузки чеклиста.
+     Пользователь дожимает кнопку "Расставить (AI)" когда готов —
+     иначе добавление нескольких артикулов к существующему чеклисту
+     провоцировало полный ре-метчинг, что нежелательно. */
+  var statusEl = document.getElementById('ar-stats');
+  if (statusEl) {
+    statusEl.textContent = 'Загружено ' + articles.length + ' артикулов. Нажмите "Расставить (AI)" чтобы запустить подбор.';
+  }
 }
 
 
