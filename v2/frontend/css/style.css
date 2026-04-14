@@ -955,6 +955,25 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .pv-deselect:hover { background: rgba(0,0,0,0.6); color: #fff; }
 .pv-in-card { /* фото в карточке — без затемнения, крестик по ховеру */ }
 
+/* Индикатор «фото в карточке» — круглая зелёная галочка, левый верх.
+   Показывается всегда (в отличие от pv-deselect-крестика справа,
+   который появляется только при hover). Визуальный маркер: сразу
+   видно какие превью уже в отборе. */
+.pv-check {
+  position: absolute; top: 4px; left: 4px;
+  width: 18px; height: 18px;
+  background: #4caf50; border-radius: 50%;
+  z-index: 2;
+  pointer-events: none; /* галочка-индикатор, не кнопка */
+}
+.pv-check::after {
+  content: '';
+  position: absolute; top: 3px; left: 5px;
+  width: 5px; height: 9px;
+  border: solid #fff; border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
 /* Фильтр по рейтингу — sticky под тулбаром */
 .pv-filter {
   display: flex; align-items: center; gap: 6px;

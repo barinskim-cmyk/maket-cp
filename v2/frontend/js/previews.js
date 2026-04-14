@@ -1682,7 +1682,13 @@ function pvBuildHTML(store, used, from, to) {
     html += '<div class="pv-thumb' + orientCls + (inCard ? ' pv-in-card' : '') + '" draggable="true" data-pv-name="' + esc(pv.name) + '" data-pv-idx="' + i + '" title="' + esc(pv.name) + (noVersion ? ' [нет версии ' + PV_ACTIVE_VERSION + ']' : '') + '" onclick="pvShowFullscreen(' + i + ',event)">';
     html += '<img src="' + thumbSrc + '" loading="lazy">';
     if (noVersion) html += '<span class="pv-no-version"></span>';
-    if (inCard) html += '<button class="pv-deselect" onclick="pvToggleSelection(\'' + esc(pv.name).replace(/'/g, "\\'") + '\',event)" title="Убрать из отбора">&times;</button>';
+    /* Две разные штуки для фото-в-карточке:
+       1. pv-check (слева сверху) — индикатор статуса, visible всегда
+       2. pv-deselect (справа сверху) — кнопка удаления, visible при hover */
+    if (inCard) {
+      html += '<span class="pv-check" title="В отборе"></span>';
+      html += '<button class="pv-deselect" onclick="pvToggleSelection(\'' + esc(pv.name).replace(/'/g, "\\'") + '\',event)" title="Убрать из отбора">&times;</button>';
+    }
     /* Счётчик аннотаций ретуши */
     var aCount = rtAnnotCount(pv.name);
     if (aCount > 0) html += '<span class="pv-annot-badge">' + aCount + '</span>';
