@@ -449,14 +449,16 @@ function cpSlotHTML(slotIdx, span, hasHero) {
       }
     }
     if (!src) src = slot.dataUrl || slot.thumbUrl || '';
-    /* Если нет ни dataUrl ни thumbUrl — показать пустой слот (не битую картинку) */
-    if (!src && slot.file && typeof slot.file === 'string') {
-      src = 'images/' + slot.file;
-    }
+    /* Синтетические имена вида "slot_C_S.jpg" (см. supabase.js:385) — это
+       плейсхолдеры пустого слота, не реальные файлы. Для них и для любых
+       других случаев отсутствия src показываем пустой слот вместо
+       попытки подтянуть несуществующий "images/...". */
+    var isSynthName = slot.file && /^slot_\d+_\d+\.jpe?g$/i.test(slot.file);
     if (!src) {
       /* Файл привязан но картинки нет — показать как пустой */
+      var label = (slot.file && !isSynthName) ? slot.file : 'Нет изображения';
       return '<div class="photo-slot empty' + mainCls + '" data-slot="' + slotIdx + '">' +
-        '<div class="ph-text">' + esc(slot.file || 'Нет изображения') + '</div>' +
+        '<div class="ph-text">' + esc(label) + '</div>' +
         '</div>';
     }
     var rot = slot.rotation || 0;
@@ -701,9 +703,12 @@ function cpShowFullscreen(slotIdx, e) {
     }
   }
 
-  /* Фолбэк: простой оверлей если превью не найдено */
+  /* Фолбэк: простой оверлей если превью не найдено.
+     Если dataUrl нет — выходим (нет смысла открывать пустую картинку;
+     "images/" фолбэк был мёртвым — такой папки не существует). */
+  if (!slot.dataUrl) return;
   _cpFullscreenActive = true;
-  var src = slot.dataUrl || ('images/' + slot.file);
+  var src = slot.dataUrl;
   var rot = slot.rotation || 0;
   var rotStyle = rot ? 'transform:rotate(' + rot + 'deg)' : '';
 
