@@ -2356,8 +2356,11 @@ function _arParsePdfHybrid(file, callback) {
     /* ── ШАГ 1: Извлечь JPEG-потоки из бинарного PDF ── */
     var jpegImages = _arExtractJpegsFromBuffer(uint8);
 
-    /* ── ШАГ 2: Извлечь SKU из текста через pdf.js ── */
-    pdfjsLib.getDocument({ data: uint8 }).promise.then(function(pdf) {
+    /* ── ШАГ 2: Извлечь SKU из текста через pdf.js ──
+       ВАЖНО: pdf.js передаёт Uint8Array в worker как Transferable и
+       detach-ит исходный ArrayBuffer. Передаём копию (uint8.slice()),
+       чтобы оригинал остался живым для возможного canvas-fallback. */
+    pdfjsLib.getDocument({ data: uint8.slice() }).promise.then(function(pdf) {
 
       var allSkus = [];
       var pagesTotal = pdf.numPages;
@@ -2500,9 +2503,18 @@ function _arPairSkusWithImages(skus, images) {
  */
 function _arParsePdfCanvas(buffer, callback) {
   var statusEl = document.getElementById('ar-stats');
+  /* Guard: если buffer почему-то уже detached (например внешний вызов
+     ранее передал его в pdf.js без копии) — аккуратно сообщаем об
+     ошибке вместо TypeError из конструктора Uint8Array. */
+  if (!buffer || buffer.byteLength === 0) {
+    console.error('_arParsePdfCanvas: buffer detached или пустой — парсинг невозможен');
+    callback(null);
+    return;
+  }
   var uint8 = new Uint8Array(buffer);
 
-  pdfjsLib.getDocument({ data: uint8 }).promise.then(function(pdf) {
+  /* Передаём копию в pdf.js (он detach-ит input-буфер в worker) */
+  pdfjsLib.getDocument({ data: uint8.slice() }).promise.then(function(pdf) {
     var allArticles = [];
     var pagesTotal  = pdf.numPages;
 
