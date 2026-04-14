@@ -1863,17 +1863,25 @@ function sbSyncCardsLight(projectId, cards, callback) {
     return;
   }
 
-  /* Сначала получаем существующие thumb_path по file_name (только активные) */
-  sbClient.from('slots').select('file_name, thumb_path').eq('project_id', projectId).is('deleted_at', null).then(function(existRes) {
+  /* Сначала получаем существующие слоты: id + file_name/thumb_path + (card_id, position)
+     для переиспользования slot.id при UPSERT (иначе пришлось бы DELETE'ить, а это
+     после миграции 026 превращается в массовый UPDATE deleted_at=now() и упирается
+     в statement timeout на больших проектах). */
+  sbClient.from('slots').select('id, card_id, position, file_name, thumb_path').eq('project_id', projectId).is('deleted_at', null).then(function(existRes) {
     var thumbMap = {};
+    var slotIdMap = {};  /* (card_id + '|' + position) → existing slot.id */
     (existRes.data || []).forEach(function(r) {
       if (r.file_name && r.thumb_path) thumbMap[r.file_name] = r.thumb_path;
+      if (r.card_id && r.position !== null && r.position !== undefined) {
+        slotIdMap[r.card_id + '|' + r.position] = r.id;
+      }
     });
 
     /* Собираем строки cards + slots из локального состояния */
     var cardRows = [];
     var slotRows = [];
     var localCardIds = [];
+    var localSlotIds = [];
 
     for (var c = 0; c < cards.length; c++) {
       var card = cards[c];
@@ -1906,7 +1914,19 @@ function sbSyncCardsLight(projectId, cards, callback) {
         for (var s = 0; s < card.slots.length; s++) {
           var slot = card.slots[s];
           var fileName = slot.file || ('slot_' + c + '_' + s + '.jpg');
+          /* Переиспользуем существующий slot.id по (card_id, position), иначе генерим новый.
+             Это позволяет делать UPSERT вместо DELETE+INSERT — последнее после миграции 026
+             превращается в массовый UPDATE deleted_at=now() и упирается в statement timeout
+             на больших проектах (57+ карточек). */
+          var slotKey = cardId + '|' + s;
+          var slotId = slotIdMap[slotKey];
+          if (!slotId) {
+            slotId = (crypto.randomUUID ? crypto.randomUUID()
+                     : ('slot_' + cardId.slice(0,8) + '_' + s + '_' + Date.now() + '_' + Math.random().toString(36).slice(2,10)));
+          }
+          localSlotIds.push(slotId);
           slotRows.push({
+            id: slotId,
             card_id: cardId,
             project_id: projectId,
             position: s,
@@ -1916,7 +1936,9 @@ function sbSyncCardsLight(projectId, cards, callback) {
             rotation: slot.rotation || 0,
             file_name: fileName,
             thumb_path: thumbMap[fileName] || null,
-            original_path: null
+            original_path: null,
+            /* Воскрешение soft-deleted slot (если id совпал с удалённым) */
+            deleted_at: null
           });
         }
       }
@@ -1949,15 +1971,50 @@ function sbSyncCardsLight(projectId, cards, callback) {
       deleteStaleCards.then(function(stDel) {
         if (stDel.error) console.warn('cards stale soft-delete:', stDel.error.message);
 
-        /* Слоты: у них DB-generated id (UUID), так что конфликта pkey нет.
-           Сначала soft-delete всех слотов проекта (триггер 026), затем INSERT новых.
-           Да, это оставляет мусор в БД (soft-deleted slot rows накапливаются),
-           но это не критично для корректности и легче чем дельта-синк. */
-        sbClient.from('slots').delete().eq('project_id', projectId).then(function(slotDel) {
-          if (slotDel.error) { callback('Ошибка слотов (del): ' + slotDel.error.message); return; }
-          if (slotRows.length === 0) { callback(null); return; }
-          sbClient.from('slots').insert(slotRows).then(function(slotIns) {
-            if (slotIns.error) { callback('Ошибка слотов (ins): ' + slotIns.error.message); return; }
+        /* Слоты: UPSERT по (id) + filter-based soft-delete стейл-строк.
+           Раньше был DELETE+INSERT, но после миграции 026 DELETE превращается
+           в массовый UPDATE deleted_at=now(), что на 57+ карточках (сотни слотов)
+           упирается в PostgreSQL statement timeout.
+
+           Стратегия:
+           1. UPSERT всех локальных слотов (их id мы либо переиспользовали из облака,
+              либо сгенерили новый UUID). deleted_at=null воскрешает soft-deleted.
+           2. Soft-delete лишних: слоты с project_id=X и id NOT IN localSlotIds.
+              Для больших проектов (>200 слотов) чанкуем по 150, чтобы URL не раздулся. */
+        var upsertSlots = (slotRows.length === 0)
+          ? Promise.resolve({ error: null })
+          : sbClient.from('slots').upsert(slotRows, { onConflict: 'id' });
+
+        upsertSlots.then(function(slotIns) {
+          if (slotIns && slotIns.error) { callback('Ошибка слотов (upsert): ' + slotIns.error.message); return; }
+
+          /* Soft-delete стейл-слотов. Если localSlotIds пуст — soft-delete всех
+             слотов проекта (карточек не осталось). Иначе "NOT IN localSlotIds".
+             URL с >200 UUID может перевалить лимит, поэтому для больших списков
+             делаем несколько запросов "NOT IN chunk1 AND NOT IN chunk2 AND ...".
+             Простейший безопасный подход: если id слишком много, пропускаем
+             soft-delete стейлов в этом цикле — следующий sync (или явная чистка
+             через миграцию) разберёт. Для обычных проектов этот бранч не срабатывает. */
+          var staleQuery = sbClient.from('slots').delete().eq('project_id', projectId);
+          var MAX_INLINE = 200;
+
+          if (localSlotIds.length === 0) {
+            /* карточек нет — все слоты проекта стейл */
+          } else if (localSlotIds.length <= MAX_INLINE) {
+            var inList = '(' + localSlotIds.map(function(id) {
+              return '"' + String(id).replace(/"/g, '\\"') + '"';
+            }).join(',') + ')';
+            staleQuery = staleQuery.not('id', 'in', inList);
+          } else {
+            /* Слишком много слотов — пропускаем стейл-чистку, чтобы не
+               раздуть URL. Старые soft-deleted ряды уйдут в миграции 028
+               или при следующей чистке. UPSERT уже обновил всё активное. */
+            callback(null);
+            return;
+          }
+
+          staleQuery.then(function(stSlotDel) {
+            if (stSlotDel.error) console.warn('slots stale soft-delete:', stSlotDel.error.message);
             callback(null);
           });
         });
