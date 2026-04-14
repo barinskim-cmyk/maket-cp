@@ -387,7 +387,21 @@ function arLoadFromCloud(onDone) {
     arRenderVerification();
     arUpdateStats();
     if (typeof shAutoSave === 'function') shAutoSave();
-    if (typeof onDone === 'function') onDone(null);
+
+    /* Восстановить отклонённые пары из ai_match_decisions.
+       Это нужно чтобы повторный прогон AI на новой сессии/устройстве
+       уже знал что пользователь ранее отклонил. */
+    if (typeof sbPullActiveRejections === 'function') {
+      sbPullActiveRejections(proj, function(rerr, pairs) {
+        if (!rerr && pairs && pairs.length > 0) {
+          proj._rejectedPairs = pairs;
+          console.log('arLoadFromCloud: восстановлено ' + pairs.length + ' отклонённых пар');
+        }
+        if (typeof onDone === 'function') onDone(null);
+      });
+    } else {
+      if (typeof onDone === 'function') onDone(null);
+    }
   });
 }
 
@@ -4087,6 +4101,19 @@ function arDoMatch(skuIdx, cardIdx, silent) {
   art.cardIdx = cardIdx;
   art.status = 'matched';
 
+  /* Облако: ручная привязка (silent=false) — это сильный сигнал для ML.
+     AI-привязки (silent=true) пишет AI-метчер сам с decision='manual_link'
+     был бы неправ — это AI. Поэтому пушим ТОЛЬКО ручные клики. */
+  if (!silent && typeof sbAddMatchDecision === 'function' && art.id) {
+    sbAddMatchDecision(proj, {
+      article_id:     art.id,
+      sku:            art.sku || '',
+      card_idx:       cardIdx,
+      decision:       'manual_link',
+      ref_image_path: art._refImagePath || null
+    }, function() { /* fire-and-forget */ });
+  }
+
   /* silent=true — вызывающий код сам сделает рендер и sync в конце
      батча (см. arAutoMatchAll и _arMatchWithPdfPages). Это экономит
      десятки тяжёлых перерисовок при массовом метчинге. */
@@ -4141,6 +4168,18 @@ function arUnmatch(skuIdx) {
         rejectedAt: new Date().toISOString()
       });
       console.log('articles.js: rejected pair recorded — card ' + prevCardIdx + ' != ' + art.sku);
+
+      /* Облако: пушим в ai_match_decisions для (а) синхронизации между
+         устройствами/сессиями и (б) накопления ML training data. */
+      if (typeof sbAddMatchDecision === 'function') {
+        sbAddMatchDecision(proj, {
+          article_id:      art.id,
+          sku:             art.sku || '',
+          card_idx:        prevCardIdx,
+          decision:        'rejected',
+          ref_image_path:  art._refImagePath || null
+        }, function() { /* fire-and-forget */ });
+      }
     }
   }
 
@@ -4515,11 +4554,25 @@ function arToggleVerify(idx) {
   if (!proj || !proj.articles || !proj.articles[idx]) return;
 
   var art = proj.articles[idx];
+  var prevStatus = art.status;
   art.status = (art.status === 'verified') ? 'matched' : 'verified';
 
   /* Автопереименование карточки при верификации */
   if (art.status === 'verified') {
     _arApplyCardRename(proj, art);
+  }
+
+  /* Облако: пушим решение в ai_match_decisions (для ML и кросс-устройства).
+     'verified' = пользователь подтвердил пару; 'unverified' = откатил. */
+  if (typeof sbAddMatchDecision === 'function' && art.id && art.cardIdx >= 0) {
+    var decision = (art.status === 'verified') ? 'verified' : 'unverified';
+    sbAddMatchDecision(proj, {
+      article_id:     art.id,
+      sku:            art.sku || '',
+      card_idx:       art.cardIdx,
+      decision:       decision,
+      ref_image_path: art._refImagePath || null
+    }, function() { /* fire-and-forget */ });
   }
 
   arRenderChecklist();

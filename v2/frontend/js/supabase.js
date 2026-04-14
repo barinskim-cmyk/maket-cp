@@ -3772,6 +3772,108 @@ function sbLoadArticles(proj, callback) {
 
 
 /**
+ * ──────────────────────────────────────────────────────────────────
+ * AI Match Decisions — журнал решений пользователя по парам
+ * (карточка ↔ артикул) для двух целей:
+ *  1) Поведение AI: при следующем прогоне Расставить (AI) пары,
+ *     отклонённые ранее, исключаются из кандидатов.
+ *  2) ML training data: накопленный лог с снапшотами картинок и
+ *     контекстом — это разметка для будущей модели метчинга.
+ *
+ * Записи иммутабельны (история не редактируется).
+ * Миграция: 027_ai_match_decisions.sql
+ * ──────────────────────────────────────────────────────────────────
+ */
+
+/**
+ * Записать одно решение пользователя по паре.
+ * Вызывается из:
+ *   - arUnmatch    → decision='rejected'
+ *   - arToggleVerify (verify on)  → decision='verified'
+ *   - arToggleVerify (verify off) → decision='unverified'
+ *   - arDoMatch (ручная привязка) → decision='manual_link'
+ *
+ * @param {object} proj      — активный проект (нужен _cloudId)
+ * @param {object} payload   — { article_id, sku, card_idx, decision,
+ *                              ai_confidence?, ai_reason?,
+ *                              ref_image_path?, card_image_path? }
+ * @param {Function} callback — callback(err, recordId)
+ */
+function sbAddMatchDecision(proj, payload, callback) {
+  if (!sbClient || !proj || !proj._cloudId || !payload) {
+    if (typeof callback === 'function') callback(null, null);
+    return;
+  }
+  if (!payload.article_id || typeof payload.card_idx !== 'number' || !payload.decision) {
+    console.warn('sbAddMatchDecision: missing required fields');
+    if (typeof callback === 'function') callback('missing_fields', null);
+    return;
+  }
+
+  sbClient.rpc('add_ai_match_decision', {
+    p_project_id:      proj._cloudId,
+    p_article_id:      payload.article_id,
+    p_sku:             payload.sku || null,
+    p_card_idx:        payload.card_idx,
+    p_decision:        payload.decision,
+    p_ai_confidence:   payload.ai_confidence || null,
+    p_ai_reason:       payload.ai_reason || null,
+    p_ref_image_path:  payload.ref_image_path || null,
+    p_card_image_path: payload.card_image_path || null
+  }).then(function(resp) {
+    if (resp.error) {
+      console.warn('sbAddMatchDecision error:', resp.error.message);
+      if (typeof callback === 'function') callback(resp.error.message, null);
+      return;
+    }
+    if (typeof callback === 'function') callback(null, resp.data);
+  })['catch'](function(err) {
+    console.error('sbAddMatchDecision exception:', err);
+    if (typeof callback === 'function') callback(String(err), null);
+  });
+}
+
+
+/**
+ * Загрузить актуальные отклонения для проекта.
+ * "Актуальные" = последнее решение по паре — 'rejected' (RPC сама
+ * отбрасывает пары, у которых после rejection появилось verified).
+ * Используется при загрузке проекта чтобы восстановить _rejectedPairs.
+ *
+ * @param {object}   proj     — проект (должен иметь _cloudId)
+ * @param {Function} callback — callback(err, [{cardIdx, articleId, rejectedAt}])
+ */
+function sbPullActiveRejections(proj, callback) {
+  if (!sbClient || !proj || !proj._cloudId) {
+    if (typeof callback === 'function') callback(null, []);
+    return;
+  }
+
+  sbClient.rpc('get_active_rejections', { p_project_id: proj._cloudId })
+    .then(function(resp) {
+      if (resp.error) {
+        console.warn('sbPullActiveRejections error:', resp.error.message);
+        if (typeof callback === 'function') callback(resp.error.message, []);
+        return;
+      }
+      var rows = resp.data || [];
+      var out = [];
+      for (var i = 0; i < rows.length; i++) {
+        out.push({
+          cardIdx:    rows[i].card_idx,
+          articleId:  rows[i].article_id,
+          rejectedAt: rows[i].rejected_at
+        });
+      }
+      if (typeof callback === 'function') callback(null, out);
+    })['catch'](function(err) {
+      console.error('sbPullActiveRejections exception:', err);
+      if (typeof callback === 'function') callback(String(err), []);
+    });
+}
+
+
+/**
  * Загрузить референс-изображение артикула из Supabase Storage.
  * Загружает только если у артикула есть _refImagePath.
  *
