@@ -180,6 +180,13 @@ function cpAddCard() {
   proj.cards.push(card);
   App.currentCardIdx = proj.cards.length - 1;
   cpRenderList();
+  /* Лог создания карточки в action_log.
+     Если _cloudId ещё не установлен (первая карточка проекта) — sbLogAction
+     тихо выйдет, но после первичной заливки sbUploadProject установит _cloudId,
+     и последующие create_card будут логироваться. */
+  if (typeof sbLogAction === 'function') {
+    sbLogAction('create_card', 'card', card.id, card.name || ('Карточка ' + proj.cards.length));
+  }
   if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
 }
 
@@ -192,11 +199,15 @@ function cpDeleteCard(idx) {
   if (!proj || !proj.cards || proj.cards.length <= 0) return;
   if (!confirm('Удалить карточку ' + (idx + 1) + '?')) return;
 
+  var removedCard = proj.cards[idx];
   proj.cards.splice(idx, 1);
   if (App.currentCardIdx >= proj.cards.length) {
     App.currentCardIdx = proj.cards.length - 1;
   }
   cpRenderList();
+  if (typeof sbLogAction === 'function' && removedCard) {
+    sbLogAction('delete_card', 'card', removedCard.id, removedCard.name || ('Карточка ' + (idx + 1)));
+  }
   if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
 }
 

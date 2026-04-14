@@ -1409,11 +1409,25 @@ function shAutoSave() {
 /** @type {boolean} Блокировка: не запускать новый cloud sync пока старый идёт */
 var _shCloudSyncRunning = false;
 
+/** @type {boolean} Флаг "есть ожидающие изменения":
+ *  устанавливается каждым shCloudSyncExplicit(), очищается в начале фактического sync.
+ *  Если во время работы sync пришёл новый shCloudSyncExplicit — флаг снова true,
+ *  и после завершения текущего sync запускаем повторный (очередь длиной 1).
+ *  Без этого механизма быстрые серии изменений (напр. 57 карточек подряд) могли
+ *  потеряться: таймер срабатывал, видел _shCloudSyncRunning=true и молча выходил,
+ *  а после завершения долгой первичной заливки ничего не перезапускало sync. */
+var _shCloudSyncPending = false;
+
 /** @type {number|null} Таймер debounce для явной синхронизации */
 var _shExplicitSyncTimer = null;
 
 /** @type {number} Задержка debounce для явной синхронизации (мс) — как в v0.9 */
 var SH_EXPLICIT_SYNC_DELAY = 3000;
+
+/** @type {number} Короткая задержка повторного sync после завершения текущего (мс).
+ *  Достаточно малая чтобы pending изменения быстро долетели до облака,
+ *  достаточно большая чтобы новые действия пользователя успели "прилипнуть". */
+var SH_REFLUSH_DELAY = 500;
 
 /**
  * ОТКЛЮЧЕНА. Автосинхронизация вызывала перезапись облачных данных.
@@ -1424,6 +1438,25 @@ function shAutoCloudSync() {
 }
 
 /**
+ * Завершить цикл sync: сбросить running-флаг и, если за время работы
+ * пришли новые изменения (_shCloudSyncPending=true), запустить повторный sync.
+ * Вызывается из КАЖДОГО callback'а _shDoCloudSync и из safety-таймаута.
+ */
+function _shFinishSync() {
+  _shCloudSyncRunning = false;
+  if (_shCloudSyncPending) {
+    /* За время sync были новые изменения — запланировать повторный sync
+       через короткую паузу. Это гарантирует что 57-я карточка долетит,
+       даже если первая заливка заняла 10 секунд. */
+    if (_shExplicitSyncTimer) clearTimeout(_shExplicitSyncTimer);
+    _shExplicitSyncTimer = setTimeout(function() {
+      _shExplicitSyncTimer = null;
+      _shDoCloudSync();
+    }, SH_REFLUSH_DELAY);
+  }
+}
+
+/**
  * Явная синхронизация с облаком (debounced 3 сек, как в v0.9).
  * Несколько быстрых действий собираются в один sync.
  * Блокирует pull на время работы.
@@ -1431,6 +1464,11 @@ function shAutoCloudSync() {
 function shCloudSyncExplicit() {
   /* Пометить что есть локальные изменения — pull будет пропущен */
   if (typeof sbMarkPushDone === 'function') sbMarkPushDone();
+
+  /* Пометить что есть несинхронизированные изменения.
+     Флаг будет сброшен в начале фактического _shDoCloudSync.
+     Если sync уже идёт — флаг останется true и _shFinishSync запустит повторный. */
+  _shCloudSyncPending = true;
 
   if (_shExplicitSyncTimer) clearTimeout(_shExplicitSyncTimer);
   _shExplicitSyncTimer = setTimeout(function() {
@@ -1443,7 +1481,14 @@ function shCloudSyncExplicit() {
  * Внутренняя: выполнить облачную синхронизацию.
  */
 function _shDoCloudSync() {
+  /* Если sync уже идёт — просто выходим. _shCloudSyncPending уже true,
+     _shFinishSync после завершения увидит его и запустит повторный sync. */
   if (_shCloudSyncRunning) return;
+
+  /* Снять флаг ожидания: мы сейчас начнём sync. Если за время работы придут
+     новые изменения, shCloudSyncExplicit() снова поставит _shCloudSyncPending=true,
+     и _shFinishSync запустит повторный sync после завершения текущего. */
+  _shCloudSyncPending = false;
 
   var isOwner = (typeof sbIsLoggedIn === 'function') && sbIsLoggedIn();
   var isClient = !!window._shareToken;
@@ -1457,7 +1502,9 @@ function _shDoCloudSync() {
   var _syncSafetyTimer = setTimeout(function() {
     if (_shCloudSyncRunning) {
       console.warn('cloud-sync: safety timeout — сброс флага _shCloudSyncRunning');
-      _shCloudSyncRunning = false;
+      /* Используем _shFinishSync: если за 30 сек пришли изменения — они не потеряются,
+         а запустят повторный sync. */
+      _shFinishSync();
     }
   }, 30000);
 
@@ -1468,7 +1515,7 @@ function _shDoCloudSync() {
     _shCloudSyncRunning = true;
     sbSyncCardsLight(proj._cloudId, proj.cards || [], function(err) {
       clearTimeout(_syncSafetyTimer);
-      _shCloudSyncRunning = false;
+      _shFinishSync();
       if (typeof sbMarkPushDone === 'function') sbMarkPushDone();
       if (err) {
         console.warn('cloud-sync: ошибка:', err);
@@ -1500,7 +1547,7 @@ function _shDoCloudSync() {
     _shCloudSyncRunning = true;
     sbSaveCardsByToken(window._shareToken, proj.cards || [], function(err) {
       clearTimeout(_syncSafetyTimer);
-      _shCloudSyncRunning = false;
+      _shFinishSync();
       if (typeof sbMarkPushDone === 'function') sbMarkPushDone();
       if (err) {
         console.warn('cloud-sync (client): ошибка:', err);
@@ -1517,14 +1564,24 @@ function _shDoCloudSync() {
   if (!proj._cloudId) {
     _shCloudSyncRunning = true;
     console.log('cloud-sync: первичная загрузка "' + proj.brand + '" в облако...');
+    /* КРИТИЧНО: первичная заливка сохраняет снапшот proj.cards на момент вызова.
+       Если во время заливки пользователь добавит ещё карточек — они останутся в
+       _shCloudSyncPending=true, и _shFinishSync запустит повторный sync (на этот
+       раз через owner-путь sbSyncCardsLight, т.к. _cloudId уже установлен).
+       Так мы гарантированно догоним все карточки, добавленные во время первой
+       долгой заливки. */
     sbUploadProject(App.selectedProject, function(err, cloudId) {
       clearTimeout(_syncSafetyTimer);
-      _shCloudSyncRunning = false;
       if (err) {
         console.warn('cloud-sync: ошибка загрузки:', err);
+        /* При ошибке первичной заливки вернуть pending=true — следующий sync
+           снова попытается через owner-путь или повторит первичную заливку. */
+        _shCloudSyncPending = true;
       } else {
         console.log('cloud-sync: проект загружен, cloudId:', cloudId);
+        if (typeof _sbShowSyncStatus === 'function') _sbShowSyncStatus('Сохранено');
       }
+      _shFinishSync();
     });
     return;
   }

@@ -278,6 +278,12 @@ function sbUploadProject(projIdx, callback) {
       var savedProj = res.data;
       proj._cloudId = savedProj.id;
 
+      /* Протолкнуть все действия, накопленные в очереди до появления _cloudId
+         (create_card, add_to_slot и т.д. на свежесозданном проекте). */
+      if (typeof sbFlushPendingLog === 'function') {
+        sbFlushPendingLog(savedProj.id);
+      }
+
       // Загружаем карточки
       sbUploadCards(savedProj.id, proj.cards || [], function(err) {
         if (err) { callback(err); return; }
@@ -1557,13 +1563,42 @@ function sbStampActor(item) {
  * @param {string} [photoName]  — имя файла фото
  * @param {Object} [details]    — доп. контекст
  */
+/** @type {Array} Очередь действий, накопленных до появления proj._cloudId.
+ *  Когда первичная заливка sbUploadProject устанавливает _cloudId,
+ *  sbFlushPendingLog() проталкивает очередь в action_log.
+ *  Без этой очереди теряются все create_card / add_to_slot на свежесозданном
+ *  проекте (пока _cloudId ещё undefined). */
+var _sbPendingLogActions = [];
+
 function sbLogAction(action, targetType, targetId, targetName, photoName, details) {
   var proj = getActiveProject();
-  if (!proj || !proj._cloudId) return;
+  if (!proj) return;
   if ((proj._stage || 0) < SB_LOG_MIN_STAGE) return;
   if (!sbClient) return;
 
   var actor = sbGetActor();
+
+  /* Если облако ещё не знает о проекте — складываем в локальную очередь.
+     Очередь сбросится в action_log после того как sbUploadProject установит _cloudId. */
+  if (!proj._cloudId) {
+    _sbPendingLogActions.push({
+      ts: new Date().toISOString(),
+      action: action,
+      target_type: targetType || null,
+      target_id: targetId || null,
+      target_name: targetName || null,
+      photo_name: photoName || null,
+      actor_name: actor.name,
+      actor_role: actor.role,
+      actor_token: actor.token || null,
+      details: details || null
+    });
+    /* Защита от неограниченного роста (например, забытый несохранённый проект) */
+    if (_sbPendingLogActions.length > 2000) {
+      _sbPendingLogActions.splice(0, _sbPendingLogActions.length - 2000);
+    }
+    return;
+  }
 
   sbClient.rpc('log_action', {
     p_project_id:  proj._cloudId,
@@ -1579,6 +1614,45 @@ function sbLogAction(action, targetType, targetId, targetName, photoName, detail
   }).then(function(res) {
     if (res.error) console.warn('action_log error:', res.error.message);
   });
+}
+
+/**
+ * Проталкивает накопленные действия из _sbPendingLogActions в action_log.
+ * Вызывается из sbUploadProject сразу после установки proj._cloudId.
+ * Вызывается последовательно (по одному RPC за раз) чтобы сохранить порядок.
+ *
+ * @param {string} projectCloudId — UUID проекта в Supabase
+ * @param {function} [callback]    — callback(error) после flush
+ */
+function sbFlushPendingLog(projectCloudId, callback) {
+  if (!sbClient || !projectCloudId) { if (callback) callback(null); return; }
+  if (_sbPendingLogActions.length === 0) { if (callback) callback(null); return; }
+
+  var queue = _sbPendingLogActions.slice();
+  _sbPendingLogActions = [];
+
+  var i = 0;
+  function pushNext() {
+    if (i >= queue.length) { if (callback) callback(null); return; }
+    var ev = queue[i++];
+    sbClient.rpc('log_action', {
+      p_project_id:  projectCloudId,
+      p_share_token: ev.actor_token,
+      p_actor_name:  ev.actor_name,
+      p_actor_role:  ev.actor_role,
+      p_action:      ev.action,
+      p_target_type: ev.target_type,
+      p_target_id:   ev.target_id,
+      p_target_name: ev.target_name,
+      p_photo_name:  ev.photo_name,
+      p_details:     ev.details
+    }).then(function(res) {
+      if (res.error) console.warn('action_log flush error:', res.error.message);
+      pushNext();
+    });
+  }
+  console.log('sbFlushPendingLog: протолкнуть ' + queue.length + ' отложенных действий в action_log');
+  pushNext();
 }
 
 /**
