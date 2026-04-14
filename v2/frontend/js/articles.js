@@ -3385,12 +3385,22 @@ function _arMatchWithPdfPages(cards, skuList, pdfPages, apiKey, proj, statusEl) 
   var applied = 0;
   var idx = 0;
 
+  /* Финализация: одна перерисовка + один sync в конце батча.
+     Это избавляет UI от 50+ тяжёлых перерисовок и 50+ cloud pushes,
+     из-за которых при 57 артикулах страница висла. */
+  function finalize(msg) {
+    if (statusEl) statusEl.textContent = msg || ('AI: ' + applied + ' из ' + total + ' сопоставлено');
+    arRenderChecklist();
+    arRenderMatching();
+    arRenderVerification();
+    arUpdateStats();
+    if (typeof shAutoSave === 'function') shAutoSave();
+    if (typeof arCloudSync === 'function') arCloudSync();
+  }
+
   function processNext() {
     if (idx >= cards.length) {
-      if (statusEl) statusEl.textContent = 'AI: ' + applied + ' из ' + total + ' сопоставлено';
-      arRenderMatching();
-      arRenderVerification();
-      if (typeof shAutoSave === 'function') shAutoSave();
+      finalize();
       return;
     }
 
@@ -3470,9 +3480,10 @@ function _arMatchWithPdfPages(cards, skuList, pdfPages, apiKey, proj, statusEl) 
               var matchedSku = String(result.match).trim();
               for (var fi = 0; fi < freeSkus.length; fi++) {
                 if (freeSkus[fi].sku === matchedSku) {
-                  arDoMatch(freeSkus[fi].idx, ci.idx);
+                  /* silent=true — не рендерим и не синкаем на каждой
+                     карточке, финализация сделает это одним махом. */
+                  arDoMatch(freeSkus[fi].idx, ci.idx, true);
                   applied++;
-                  arRenderMatching();
                   break;
                 }
               }
@@ -3486,7 +3497,11 @@ function _arMatchWithPdfPages(cards, skuList, pdfPages, apiKey, proj, statusEl) 
         }
       }
       idx++;
-      setTimeout(processNext, 2500);
+      /* Лёгкая пауза 600 мс — достаточно для gpt-5.4-mini tier 2+
+         (500 RPM = ~120 мс между запросами), но оставляем запас
+         под retry-back-off. При 57 карточках 57*(запрос ~3с + 0.6с пауза)
+         ≈ 3–4 минуты вместо прежних 7–9. */
+      setTimeout(processNext, 600);
     });
   }
 
@@ -3539,10 +3554,15 @@ function _arMatchWithRefImages(cards, proj, pvByName, apiKey, statusEl) {
 
   function processNextCard() {
     if (cardIdx >= cards.length) {
+      /* Финализация батча: одна перерисовка + один sync — избегаем
+         сотен тяжёлых DOM-обновлений при 50+ карточках. */
       if (statusEl) statusEl.textContent = 'AI: ' + applied + ' из ' + total + ' сопоставлено';
+      arRenderChecklist();
       arRenderMatching();
       arRenderVerification();
+      arUpdateStats();
       if (typeof shAutoSave === 'function') shAutoSave();
+      if (typeof arCloudSync === 'function') arCloudSync();
       return;
     }
 
@@ -3589,7 +3609,7 @@ function _arMatchWithRefImages(cards, proj, pvByName, apiKey, statusEl) {
            Если лидеров ≥2 — запускаем playoff (AI сравнивает только финалистов). */
         if (allMatches.length === 0) {
           cardIdx++;
-          setTimeout(processNextCard, 1000);
+          setTimeout(processNextCard, 500);
           return;
         }
         if (allMatches.length === 1) {
@@ -3597,14 +3617,13 @@ function _arMatchWithRefImages(cards, proj, pvByName, apiKey, statusEl) {
           console.log('articles.js: card ' + ci.idx + ' single match: ' + one.sku + ' (' + one.confidence + ')');
           /* Применяем только high/medium — low отправляется в ручную верификацию */
           if (_arConfScore(one.confidence) >= 2) {
-            arDoMatch(one.artIdx, ci.idx);
+            arDoMatch(one.artIdx, ci.idx, true);
             applied++;
-            arRenderMatching();
           } else {
             console.log('articles.js: card ' + ci.idx + ' confidence too low (' + one.confidence + '), skip auto-apply');
           }
           cardIdx++;
-          setTimeout(processNextCard, 1000);
+          setTimeout(processNextCard, 500);
           return;
         }
 
@@ -3641,11 +3660,10 @@ function _arMatchWithRefImages(cards, proj, pvByName, apiKey, statusEl) {
           /* Все финалисты — дубликаты одного артикула, применяем */
           var solo = allMatches[0];
           console.log('articles.js: card ' + ci.idx + ' unanimous: ' + solo.sku);
-          arDoMatch(finalists[0].idx, ci.idx);
+          arDoMatch(finalists[0].idx, ci.idx, true);
           applied++;
-          arRenderMatching();
           cardIdx++;
-          setTimeout(processNextCard, 1000);
+          setTimeout(processNextCard, 500);
           return;
         }
 
@@ -3656,14 +3674,13 @@ function _arMatchWithRefImages(cards, proj, pvByName, apiKey, statusEl) {
         _arMatchOneCard(ci.idx, ci.imgs, ci.category, finalists, apiKey, function(finalArtIdx, finalConf) {
           if (finalArtIdx >= 0 && _arConfScore(finalConf) >= 2) {
             console.log('articles.js: card ' + ci.idx + ' playoff winner artIdx=' + finalArtIdx + ' (' + finalConf + ')');
-            arDoMatch(finalArtIdx, ci.idx);
+            arDoMatch(finalArtIdx, ci.idx, true);
             applied++;
-            arRenderMatching();
           } else {
             console.log('articles.js: card ' + ci.idx + ' playoff inconclusive, leaving for manual verification');
           }
           cardIdx++;
-          setTimeout(processNextCard, 1500);
+          setTimeout(processNextCard, 600);
         });
         return;
       }
@@ -3821,7 +3838,7 @@ function _arMatchOneCard(cardIdx, cardImgs, category, candidates, apiKey, onDone
  * @param {number} skuIdx — индекс артикула
  * @param {number} cardIdx — индекс карточки
  */
-function arDoMatch(skuIdx, cardIdx) {
+function arDoMatch(skuIdx, cardIdx, silent) {
   var proj = getActiveProject();
   if (!proj || !proj.articles) return;
 
@@ -3838,6 +3855,11 @@ function arDoMatch(skuIdx, cardIdx) {
 
   art.cardIdx = cardIdx;
   art.status = 'matched';
+
+  /* silent=true — вызывающий код сам сделает рендер и sync в конце
+     батча (см. arAutoMatchAll и _arMatchWithPdfPages). Это экономит
+     десятки тяжёлых перерисовок при массовом метчинге. */
+  if (silent) return;
 
   arRenderChecklist();
   arRenderMatching();

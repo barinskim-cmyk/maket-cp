@@ -326,18 +326,28 @@ function sbUploadProject(projIdx, callback) {
  * @param {function} callback — callback(error)
  */
 function sbUploadCards(projectId, cards, callback) {
+  /* GUARD: если новых карточек нет — НЕ трогаем облако.
+     Защита от race condition, когда sync запускается при временно-пустом
+     proj.cards. Триггер миграции 026 и так физически сохранит данные
+     (DELETE → soft-delete), но лучше вообще не пинать базу пустым пушем. */
+  if (!cards || cards.length === 0) {
+    console.warn('sbUploadCards: пустой массив карточек — пропускаем (защита от потери данных)');
+    callback(null);
+    return;
+  }
+
   /* Сначала сохраняем существующие thumb_path чтобы не потерять их */
-  sbClient.from('slots').select('file_name, thumb_path').eq('project_id', projectId).then(function(existRes) {
+  sbClient.from('slots').select('file_name, thumb_path').eq('project_id', projectId).is('deleted_at', null).then(function(existRes) {
     var thumbMap = {};
     (existRes.data || []).forEach(function(r) {
       if (r.file_name && r.thumb_path) thumbMap[r.file_name] = r.thumb_path;
     });
 
-    // Удаляем старые карточки (каскадно удалит слоты)
+    /* Soft-delete старых карточек (триггер миграции 026 превратит DELETE
+       в UPDATE deleted_at=now()). Физически ничего не стирается —
+       восстановление через SELECT restore_deleted_cards(project_id, since). */
     sbClient.from('cards').delete().eq('project_id', projectId).then(function(delRes) {
       if (delRes.error) { callback('Ошибка удаления карточек: ' + delRes.error.message); return; }
-
-      if (!cards || cards.length === 0) { callback(null); return; }
 
       // Подготовка строк cards + slots
       var cardRows = [];
@@ -709,11 +719,11 @@ function sbDownloadProject(cloudId, callback) {
       ocContainers: []
     };
 
-    // Загружаем карточки + слоты
-    sbClient.from('cards').select('*').eq('project_id', cloudId).order('position').then(function(cardRes) {
+    // Загружаем карточки + слоты (только активные — soft-deleted игнорируются)
+    sbClient.from('cards').select('*').eq('project_id', cloudId).is('deleted_at', null).order('position').then(function(cardRes) {
       if (cardRes.error) { callback('Ошибка карточек: ' + cardRes.error.message); return; }
 
-      sbClient.from('slots').select('*').eq('project_id', cloudId).order('position').then(function(slotRes) {
+      sbClient.from('slots').select('*').eq('project_id', cloudId).is('deleted_at', null).order('position').then(function(slotRes) {
         if (slotRes.error) { callback('Ошибка слотов: ' + slotRes.error.message); return; }
 
         // Группируем слоты по card_id
@@ -1460,7 +1470,7 @@ function sbGetComments(projectId, cardId, callback) {
 // ══════════════════════════════════════════════
 
 /** Минимальный этап проекта для записи в action_log */
-var SB_LOG_MIN_STAGE = 3;
+var SB_LOG_MIN_STAGE = 0; /* Логировать действия с самого начала (раньше было 3 — из-за этого на ранних этапах лог был пустой) */
 
 /**
  * Получить информацию о текущем акторе.
@@ -1689,6 +1699,15 @@ function _sbApplyComments(proj, commentsMap) {
 function sbSyncCardsLight(projectId, cards, callback) {
   if (!sbClient) { callback('Supabase не подключён'); return; }
 
+  /* GUARD: если новых карточек нет — НЕ трогаем таблицы cards/slots.
+     Обновим только метаданные проекта (OC, stage, annotations).
+     Без этой защиты старый код вызывал DELETE и очищал облако пустым пушем,
+     что при сбое INSERT приводило к полной потере данных. */
+  var _cardsEmpty = (!cards || cards.length === 0);
+  if (_cardsEmpty) {
+    console.warn('sbSyncCardsLight: пустой массив карточек — обновляем только метаданные, cards/slots не трогаем');
+  }
+
   /* Обновить other_content + oc_containers + stage в проекте.
      Когда миграция 013 (delta OC RPCs) будет развёрнута —
      дельта-операции sbOcDeltaAdd/Remove возьмут приоритет,
@@ -1711,17 +1730,24 @@ function sbSyncCardsLight(projectId, cards, callback) {
     }).eq('id', projectId).then(function() {});
   }
 
-  /* Сначала получаем существующие thumb_path по file_name */
-  sbClient.from('slots').select('file_name, thumb_path').eq('project_id', projectId).then(function(existRes) {
+  /* Пустой push — cards/slots не трогаем. Метаданные выше уже обновлены. */
+  if (_cardsEmpty) {
+    callback(null);
+    return;
+  }
+
+  /* Сначала получаем существующие thumb_path по file_name (только активные) */
+  sbClient.from('slots').select('file_name, thumb_path').eq('project_id', projectId).is('deleted_at', null).then(function(existRes) {
     var thumbMap = {};
     (existRes.data || []).forEach(function(r) {
       if (r.file_name && r.thumb_path) thumbMap[r.file_name] = r.thumb_path;
     });
 
-    /* Удаляем старые карточки (каскадно удалит слоты) */
+    /* Soft-delete старых карточек (триггер миграции 026 превращает DELETE
+       в UPDATE deleted_at=now(); физически данные сохраняются, можно
+       восстановить через SELECT restore_deleted_cards(...)). */
     sbClient.from('cards').delete().eq('project_id', projectId).then(function(delRes) {
       if (delRes.error) { callback('Ошибка удаления: ' + delRes.error.message); return; }
-      if (!cards || cards.length === 0) { callback(null); return; }
 
       var cardRows = [];
       var slotRows = [];
@@ -2023,6 +2049,20 @@ function sbPullProject(callback) {
       var _savedCardId = (App.currentCardIdx >= 0 && proj.cards && proj.cards[App.currentCardIdx])
         ? proj.cards[App.currentCardIdx].id : null;
 
+      /* ЗАЩИТА ОТ ПОТЕРИ ДАННЫХ: облако вернуло 0 карточек, а локально есть >0.
+         Возможные причины: race condition (pull между DELETE и INSERT),
+         RLS-отказ, баг в сервере. НЕ ПЕРЕТИРАЕМ локалку — лучше показать
+         предупреждение и оставить пользователю шанс спастись вручную. */
+      if (newCards.length === 0 && proj.cards && proj.cards.length > 0) {
+        console.error('sbPullProject (client): облако вернуло 0 карточек при ' + proj.cards.length + ' локальных — ОТКЛОНЕНО, локалка сохранена');
+        if (typeof _sbShowSyncStatus === 'function') {
+          _sbShowSyncStatus('Облако вернуло 0 карточек — локалка сохранена', true);
+        }
+        _sbPullRunning = false;
+        callback('skipped: empty cloud cards');
+        return;
+      }
+
       proj.cards = newCards;
       proj.otherContent = newOC;
       proj.ocContainers = newContainers;
@@ -2095,11 +2135,11 @@ function sbPullProject(callback) {
 
     var remote = projRes.data;
 
-    /* 2. Загрузить карточки + слоты параллельно */
-    sbClient.from('cards').select('*').eq('project_id', cloudId).order('position').then(function(cardRes) {
+    /* 2. Загрузить карточки + слоты параллельно (только активные) */
+    sbClient.from('cards').select('*').eq('project_id', cloudId).is('deleted_at', null).order('position').then(function(cardRes) {
       if (cardRes.error) { _sbPullRunning = false; callback(cardRes.error.message); return; }
 
-      sbClient.from('slots').select('*').eq('project_id', cloudId).order('position').then(function(slotRes) {
+      sbClient.from('slots').select('*').eq('project_id', cloudId).is('deleted_at', null).order('position').then(function(slotRes) {
         if (slotRes.error) { _sbPullRunning = false; callback(slotRes.error.message); return; }
 
         /* Группировка слотов по card_id */
@@ -2224,6 +2264,18 @@ function sbPullProject(callback) {
         /* Сохранить текущий выбор карточки по id */
         var _savedCardId2 = (App.currentCardIdx >= 0 && proj.cards && proj.cards[App.currentCardIdx])
           ? proj.cards[App.currentCardIdx].id : null;
+
+        /* ЗАЩИТА ОТ ПОТЕРИ ДАННЫХ: облако вернуло 0 карточек, а локально есть >0.
+           Не перетираем локалку — см. тот же guard в client-ветке выше. */
+        if (newCards.length === 0 && proj.cards && proj.cards.length > 0) {
+          console.error('sbPullProject: облако вернуло 0 карточек при ' + proj.cards.length + ' локальных — ОТКЛОНЕНО, локалка сохранена');
+          if (typeof _sbShowSyncStatus === 'function') {
+            _sbShowSyncStatus('Облако вернуло 0 карточек — локалка сохранена', true);
+          }
+          _sbPullRunning = false;
+          callback('skipped: empty cloud cards');
+          return;
+        }
 
         /* Применить обновления к локальному проекту */
         proj.cards = newCards;
