@@ -1711,10 +1711,88 @@ function sbGetActionLog(projectId, opts, callback) {
 //  Загрузка миниатюр в Storage
 // ══════════════════════════════════════════════
 
+/* Транслитерация кириллицы в латиницу (ГОСТ-подобная).
+   Используется в sbSanitizeStorageKey: Supabase Storage принимает только
+   ASCII-безопасные ключи, кидает 400 InvalidKey на любую кириллицу/юникод. */
+var _sbTranslitMap = {
+  'А':'A','Б':'B','В':'V','Г':'G','Д':'D','Е':'E','Ё':'E','Ж':'Zh','З':'Z',
+  'И':'I','Й':'Y','К':'K','Л':'L','М':'M','Н':'N','О':'O','П':'P','Р':'R',
+  'С':'S','Т':'T','У':'U','Ф':'F','Х':'Kh','Ц':'Ts','Ч':'Ch','Ш':'Sh',
+  'Щ':'Sch','Ъ':'','Ы':'Y','Ь':'','Э':'E','Ю':'Yu','Я':'Ya',
+  'а':'a','б':'b','в':'v','г':'g','д':'d','е':'e','ё':'e','ж':'zh','з':'z',
+  'и':'i','й':'y','к':'k','л':'l','м':'m','н':'n','о':'o','п':'p','р':'r',
+  'с':'s','т':'t','у':'u','ф':'f','х':'kh','ц':'ts','ч':'ch','ш':'sh',
+  'щ':'sch','ъ':'','ы':'y','ь':'','э':'e','ю':'yu','я':'ya'
+};
+
+/**
+ * Санитизация имени файла для ключа в Supabase Storage.
+ *
+ * Supabase отвергает любые не-ASCII символы в ключе (400 InvalidKey), поэтому
+ * для клиентов с кириллическими именами вроде "Солнце[anchor client]17774.jpg"
+ * заливка падала полностью (0/160 превью в реальном инциденте).
+ *
+ * Алгоритм:
+ *   1. Кириллицу транслитерируем в латиницу для читаемости URL.
+ *   2. Всё остальное не-ASCII заменяем на "_".
+ *   3. Финальная чистка: оставляем только [a-zA-Z0-9._-], прочее → "_".
+ *   4. Если результат ОТЛИЧАЕТСЯ от оригинала — добавляем короткий хеш
+ *      исходной строки перед расширением, чтобы два разных исходных имени
+ *      (например "ФотоА.jpg" и "ФотоБ.jpg") не коллапсировали в один ключ.
+ *
+ * Для ASCII-безопасных имён возвращает оригинал без изменений — старые
+ * (Masha) проекты не ломаются, их thumb_path в БД остаются валидны.
+ *
+ * @param {string} fileName — исходное имя
+ * @returns {string} — ASCII-safe ключ для Storage
+ */
+function sbSanitizeStorageKey(fileName) {
+  if (!fileName) return '';
+
+  /* Быстрый путь: если уже безопасно, не трогаем */
+  if (/^[a-zA-Z0-9._-]+$/.test(fileName)) return fileName;
+
+  /* Шаг 1-2: транслит + замена не-ASCII */
+  var result = '';
+  for (var i = 0; i < fileName.length; i++) {
+    var ch = fileName.charAt(i);
+    if (_sbTranslitMap[ch] !== undefined) {
+      result += _sbTranslitMap[ch];
+    } else if (ch.charCodeAt(0) < 128) {
+      result += ch;
+    } else {
+      result += '_';
+    }
+  }
+
+  /* Шаг 3: финальная чистка (например, пробелы, скобки, апострофы) */
+  result = result.replace(/[^a-zA-Z0-9._-]/g, '_');
+
+  /* Шаг 4: если что-то менялось — добавляем хеш для избежания коллизий.
+     Хеш считается от ОРИГИНАЛЬНОГО fileName, поэтому два разных оригинала
+     дают два разных хеша, даже если после санитизации совпали. */
+  if (result !== fileName) {
+    var hash = 0;
+    for (var j = 0; j < fileName.length; j++) {
+      hash = ((hash << 5) - hash) + fileName.charCodeAt(j);
+      hash = hash & 0xFFFFFFFF; // 32-bit
+    }
+    var hashStr = Math.abs(hash).toString(36);
+    var dotIdx = result.lastIndexOf('.');
+    if (dotIdx > 0) {
+      result = result.slice(0, dotIdx) + '_' + hashStr + result.slice(dotIdx);
+    } else {
+      result = result + '_' + hashStr;
+    }
+  }
+
+  return result;
+}
+
 /**
  * Загрузить base64 миниатюру в Supabase Storage.
  * @param {string} projectId
- * @param {string} fileName — имя файла
+ * @param {string} fileName — имя файла (может быть с кириллицей)
  * @param {string} base64Data — data:image/jpeg;base64,...
  * @param {function} callback — callback(error, publicUrl)
  */
@@ -1729,7 +1807,11 @@ function sbUploadThumb(projectId, fileName, base64Data, callback) {
   for (var i = 0; i < binary.length; i++) array[i] = binary.charCodeAt(i);
   var blob = new Blob([array], { type: mime });
 
-  var path = projectId + '/' + fileName;
+  /* Санитизируем имя для ключа в Storage (Supabase не принимает не-ASCII).
+     file_name в таблице previews остаётся оригинальным — санитизация
+     касается только пути в bucket. */
+  var safeName = sbSanitizeStorageKey(fileName);
+  var path = projectId + '/' + safeName;
 
   sbClient.storage.from('thumbnails').upload(path, blob, {
     contentType: mime,
