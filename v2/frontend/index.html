@@ -74,6 +74,7 @@
         <button class="btn" onclick="shOpenTeamModal()" title="Управление командой">Команда</button>
         <button class="btn" onclick="shExportProject()" title="Экспорт проекта в файл">Экспорт</button>
         <button class="btn" onclick="shImportProject()" title="Импорт проекта из файла">Импорт</button>
+        <button class="btn" onclick="dgDownloadLog()" title="Скачать лог для диагностики (отправить разработчику)">Скачать лог</button>
         <button class="btn btn-logout" onclick="authLogout()" title="Выйти из аккаунта" id="btn-logout" style="display:none">Выйти</button>
       </div>
     </div>
@@ -588,6 +589,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>if (typeof pdfjsLib !== 'undefined') pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 
+<!-- diag.js должен быть ПЕРВЫМ — иначе ранние console не попадут в буфер -->
+<script src="js/diag.js"></script>
 <script src="js/state.js"></script>
 <script src="js/nav.js"></script>
 <script src="js/shootings.js"></script>
