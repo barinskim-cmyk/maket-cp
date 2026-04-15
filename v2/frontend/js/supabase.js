@@ -697,7 +697,15 @@ function _sbInsertPreviewRows(rows, callback) {
       callback(null);
       return;
     }
-    sbClient.from('previews').insert(batches[batchIdx]).then(function(res) {
+    /* upsert с ignoreDuplicates — если строка с таким (project_id, file_name)
+       уже есть, PostgREST тихо пропустит её, а не кинет 409 Conflict.
+       Это нужно для catch-up sync: sbUploadPreviews отбирает только те имена,
+       которых нет в облаке, но пока batch летит, параллельный клиент мог
+       уже вставить ту же строку. Без upsert весь batch падал на одном дубле. */
+    sbClient.from('previews').upsert(batches[batchIdx], {
+      onConflict: 'project_id,file_name',
+      ignoreDuplicates: true
+    }).then(function(res) {
       if (res.error) { callback('Ошибка превью: ' + res.error.message); return; }
       batchIdx++;
       nextBatch();
