@@ -1645,6 +1645,26 @@ function _arOpenAIRequest(messages, maxTokens, timeoutMs, apiKey, callback, reas
       }
     }).then(function(result) {
       if (result.error) {
+        /* supabase-js оборачивает non-2xx как FunctionsHttpError; реальное
+           тело ответа лежит в error.context (Response-объект). Достаём его,
+           чтобы увидеть, что именно OpenAI вернул (иначе диагностика
+           невозможна — только generic "returned a non-2xx"). */
+        var ctx = result.error.context;
+        if (ctx && typeof ctx.text === 'function') {
+          ctx.text().then(function(bodyText) {
+            var parsedStatus = (ctx.status === 400 || ctx.status >= 500) ? ctx.status : 500;
+            try {
+              var body = JSON.parse(bodyText);
+              /* body может быть { error: {...} } от OpenAI — передаём как есть */
+              callback(JSON.stringify(body), parsedStatus);
+            } catch(_) {
+              callback(JSON.stringify({ error: { message: bodyText || result.error.message } }), parsedStatus);
+            }
+          }).catch(function() {
+            callback(JSON.stringify({ error: { message: result.error.message } }), 500);
+          });
+          return;
+        }
         var errText = result.error.message || String(result.error);
         if (errText.indexOf('FunctionsFetchError') >= 0 || errText.indexOf('not found') >= 0) {
           errText = 'Edge Function "openai-vision" не найдена. Задеплойте в Supabase.';
@@ -4131,6 +4151,15 @@ function _arMatchOneCard(cardIdx, cardImgs, category, candidates, apiKey, onDone
 
   var msgContent = [];
   msgContent.push({ type: 'text', text: promptText });
+
+  /* Диагностика: логируем первый URL карточки и первый URL кандидата,
+     чтобы понять, что именно уходит в OpenAI (если 400 — OpenAI не смог
+     скачать картинку; обычно это кириллица в URL или приватный bucket). */
+  try {
+    var dbgCardUrl = (cardImgs[0] || '').slice(0, 140);
+    var dbgCandUrl = ((cands[0] && (cands[0].refImageUrl || cands[0].refImage)) || '').slice(0, 140);
+    console.log('articles.js: card ' + cardIdx + ' → ' + cands.length + ' cands | cardURL=' + dbgCardUrl + ' | candURL=' + dbgCandUrl);
+  } catch(_) {}
 
   /* Фото карточки — отправляем ВСЕ ракурсы для лучшего сравнения */
   for (var k = 0; k < cardImgs.length; k++) {
