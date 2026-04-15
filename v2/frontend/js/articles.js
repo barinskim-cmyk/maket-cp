@@ -590,7 +590,20 @@ function arOnPageShow() {
     /* После восстановления refImages — подтянуть статусы из облака если нужно */
     if (proj._cloudId && (!proj.articles || proj.articles.length === 0)) {
       arLoadFromCloud(function(err) {
-        if (err) console.warn('arOnPageShow: cloud load failed:', err);
+        if (err) { console.warn('arOnPageShow: cloud load failed:', err); return; }
+        /* КРИТИЧНО: arLoadFromCloud заполнил proj.articles ПОСЛЕ того как
+           arDbRestoreRefImages уже вернулся (был no-op на пустом массиве).
+           Без повторного вызова refImage остаются пустыми — в UI артикулы
+           отображаются, а картинки ссылок нет. Перезапускаем restore. */
+        arDbRestoreRefImages(proj, function() {
+          /* arDbRestoreRefImages сам триггерит arRenderChecklist/Matching/Verification
+             когда что-то восстанавливает (см. line 172-174), но на случай если
+             ничего не было в IDB — редеражим явно, чтобы отразить cloud articles. */
+          arRenderChecklist();
+          arRenderMatching();
+          arRenderVerification();
+          arUpdateStats();
+        });
       });
     }
 
