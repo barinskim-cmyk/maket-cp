@@ -2491,6 +2491,14 @@ body.mob-client-mode html {
   font-size: 12px; color: #888;
 }
 
+/* ── Multi-pass фильтр: скрыть верифицированные во всех трёх блоках
+   Блок 1 (checklist tr), Блок 2 (match-row), Блок 3 (verify-item).
+   Реализовано CSS-правилом вместо innerHTML rebuild — переключение
+   чекбокса не вызывает blink/прыжок скролла. См. arToggleHideVerified. */
+#page-articles.ar-hide-verified .ar-verify-item.ar-verified,
+#page-articles.ar-hide-verified .ar-match-row.ar-verified,
+#page-articles.ar-hide-verified tr.ar-row.ar-verified { display: none; }
+
 /* ── Блок переименования ── */
 /* ── Articles: OpenAI key inline form ── */
 .ar-key-input-box {

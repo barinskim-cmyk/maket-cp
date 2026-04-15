@@ -732,8 +732,10 @@ function arRenderChecklist() {
 
   for (var i = 0; i < proj.articles.length; i++) {
     var art = proj.articles[i];
-    /* Фильтр верифицированных */
-    if (_arHideVerified && art.status === 'verified') continue;
+    /* Фильтр верифицированных теперь делается CSS-правилом
+       (класс ar-verified на строке + ar-hide-verified на #page-articles),
+       чтобы переключение чекбокса не перерисовывало таблицу и не сбрасывало
+       скролл. См. arToggleHideVerified. */
 
     var statusCls = 'ar-status-' + (art.status || 'unmatched');
     var statusText = art.status === 'verified' ? 'OK' : (art.status === 'matched' ? '~' : '--');
@@ -741,7 +743,8 @@ function arRenderChecklist() {
       ? 'Карточка ' + (art.cardIdx + 1)
       : '--';
 
-    html += '<tr class="ar-row ' + statusCls + '" data-idx="' + i + '">';
+    var verifiedCls = (art.status === 'verified') ? ' ar-verified' : '';
+    html += '<tr class="ar-row ' + statusCls + verifiedCls + '" data-idx="' + i + '">';
     html += '<td>' + (i + 1) + '</td>';
     html += '<td><span class="ar-status-dot ' + statusCls + '">' + statusText + '</span></td>';
     /* Референс-фото из каталога (если есть) */
@@ -767,18 +770,61 @@ function arRenderChecklist() {
     + '</div>';
 
   el.innerHTML = html;
+
+  /* Синхронизировать класс-флаг скрытия верифицированных */
+  var pgC = document.getElementById('page-articles');
+  if (pgC) pgC.classList.toggle('ar-hide-verified', !!_arHideVerified);
 }
 
 
 /**
  * Переключить показ/скрытие верифицированных во всех трёх списках метчинга.
  * Поддерживает multi-pass workflow: скрыл подтверждённые — продолжил с оставшимися.
+ *
+ * Реализовано через CSS-класс на #page-articles (ar-hide-verified), чтобы НЕ
+ * перерисовывать innerHTML трёх списков — раньше это вызывало blink всей
+ * страницы и прыжок скролла в начало. Сейчас переключение — мгновенный
+ * class flip + точечное обновление текстов счётчиков "N скрыто / Показаны все".
  */
 function arToggleHideVerified() {
   _arHideVerified = !_arHideVerified;
-  arRenderChecklist();
-  arRenderMatching();
-  arRenderVerification();
+
+  var pg = document.getElementById('page-articles');
+  if (pg) pg.classList.toggle('ar-hide-verified', _arHideVerified);
+
+  /* Обновить тексты счётчиков в filter-bar без пересборки DOM.
+     Каждая из трёх секций может иметь свой filter-bar со своим форматом
+     счётчика — пересчитаем верифицированные отдельно для каждого контекста. */
+  var proj = getActiveProject();
+  if (!proj || !proj.articles) return;
+
+  var verifiedTotal = 0;
+  var verifiedMatched = 0;
+  for (var vi = 0; vi < proj.articles.length; vi++) {
+    if (proj.articles[vi].status === 'verified') {
+      verifiedTotal++;
+      if (proj.articles[vi].cardIdx >= 0) verifiedMatched++;
+    }
+  }
+
+  /* Checklist bar: "N скрыто" / "Показаны все" (все верифицированные) */
+  var checklistBar = document.querySelector('#ar-checklist .ar-filter-bar > span');
+  if (checklistBar) {
+    checklistBar.textContent = _arHideVerified
+      ? (verifiedTotal + ' скрыто')
+      : 'Показаны все';
+  }
+
+  /* Matching bar: "N карточек скрыто" / "Показаны все" (верифицированные с cardIdx) */
+  var matchingBar = document.querySelector('#ar-match-rows .ar-filter-bar > span');
+  if (matchingBar) {
+    matchingBar.textContent = _arHideVerified
+      ? (verifiedMatched + ' карточек скрыто')
+      : 'Показаны все';
+  }
+
+  /* Верификация-тулбар не показывает текстовый счётчик "скрыто" — только
+     "N / M проверено" и чекбокс. Текст проверенных не меняется от toggle. */
 }
 
 
@@ -3084,14 +3130,14 @@ function arRenderMatching() {
       }
     }
 
-    /* Multi-pass: скрыть карточку, если её артикул уже верифицирован.
-       Это позволяет запускать "Расставить (AI)" повторно только по оставшимся
-       непривязанным/неподтверждённым карточкам. */
-    if (_arHideVerified && linkedArt && linkedArt.status === 'verified') continue;
+    /* Скрытие верифицированных карточек теперь через CSS
+       (ar-verified на ряду + ar-hide-verified на #page-articles),
+       чтобы тогл чекбокса не перерисовывал список и не сбрасывал скролл. */
 
     var selCard = (_arSelectedCard === c) ? ' ar-selected' : '';
+    var rowVerified = (linkedArt && linkedArt.status === 'verified') ? ' ar-verified' : '';
 
-    html += '<div class="ar-match-row">';
+    html += '<div class="ar-match-row' + rowVerified + '">';
 
     /* --- Левая половина: КАРТОЧКА --- */
     html += '<div class="ar-match-cell ar-card-item' + selCard + '" onclick="arSelectCard(' + c + ')">';
@@ -3146,6 +3192,10 @@ function arRenderMatching() {
     html += '</div>'; /* /ar-match-row */
   }
   rowsEl.innerHTML = html;
+
+  /* Синхронизировать класс-флаг скрытия верифицированных */
+  var pgM = document.getElementById('page-articles');
+  if (pgM) pgM.classList.toggle('ar-hide-verified', !!_arHideVerified);
 
   /* ── Свободные артикулы (не привязанные ни к одной карточке) ── */
   if (freeEl) {
@@ -4518,9 +4568,12 @@ function arRenderVerification() {
   for (var m = 0; m < matchedItems.length; m++) {
     var idx = matchedItems[m];
     var art = proj.articles[idx];
-    /* Multi-pass: скрыть уже верифицированные пары из списка на верификацию,
-       чтобы пользователь видел только оставшиеся "~" пары, требующие действия. */
-    if (_arHideVerified && art.status === 'verified') continue;
+    /* Multi-pass фильтр "скрывать подтверждённые": раньше здесь был
+       `continue` для верифицированных, но полное переписывание innerHTML
+       при переключении чекбокса приводило к blink + прыжку скролла.
+       Теперь рендерим все сопоставленные пары, а скрытие делается
+       CSS-правилом `#page-articles.ar-hide-verified .ar-verify-item.ar-verified`
+       (см. arToggleHideVerified). */
     var card = (proj.cards && proj.cards[art.cardIdx]) ? proj.cards[art.cardIdx] : null;
     var cardThumb = '';
     if (card && card.slots && card.slots[0]) {
@@ -4549,9 +4602,19 @@ function arRenderVerification() {
       html += '<div class="ar-verify-ref"><img src="' + art.refImage + '" alt="ref"></div>';
     }
 
+    /* Кнопка × — отменить метч. Записывает rejected-пару в
+       ai_match_decisions (через arUnmatch), чтобы AI-метчер впредь
+       не предлагал эту пару. stopPropagation — чтобы клик не
+       триггерил arToggleVerify родительского элемента. */
+    html += '<button class="ar-unmatch-btn" onclick="event.stopPropagation();arUnmatch(' + idx + ')" title="Удалить метч">x</button>';
+
     html += '</div>';
   }
   el.innerHTML = html;
+
+  /* Синхронизировать класс-флаг скрытия с текущим _arHideVerified */
+  var pgV = document.getElementById('page-articles');
+  if (pgV) pgV.classList.toggle('ar-hide-verified', !!_arHideVerified);
 
   /* Показать блок переименования если есть верифицированные */
   var renameSection = document.getElementById('ar-rename-section');

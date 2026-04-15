@@ -1029,6 +1029,18 @@ tr:hover td { background: #fafafa; }
   <td contenteditable="true" class="my-comment"></td>
 </tr>
 
+<tr data-row="verify-unmatch-and-css-toggle">
+  <td><span class="s-done">DONE</span></td>
+  <td>Артикулы</td>
+  <td contenteditable="true"><strong>Верификация: кнопка × на метче + CSS-тогл "скрывать подтверждённые" без blink</strong></td>
+  <td></td>
+  <td>Два UX-фикса в блоке верификации. (1) У каждого элемента верификации (строка "карточка+артикул") теперь есть кнопка × — клик отвязывает пару и записывает её в proj._rejectedPairs + пушит в облако как decision='rejected'. Реализовано через повторный вызов arUnmatch (event.stopPropagation, чтобы не триггерить arToggleVerify родителя). AI-метчер потом не предлагает отклонённые пары. (2) Переключение чекбокса "скрывать подтверждённые" больше не перерисовывает три списка через innerHTML — это вызывало blink всей страницы и прыжок скролла к началу. Теперь верифицированные элементы всегда рендерятся в DOM с классом .ar-verified, а скрытие делается CSS-правилом #page-articles.ar-hide-verified .ar-verified{display:none}. arToggleHideVerified только флипает класс контейнера и точечно обновляет счётчики "N скрыто / Показаны все". Скролл сохраняется, нет мигания.</td>
+  <td class="files">articles.js, style.css</td>
+  <td>--</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
 <tr data-row="ai-match-decisions">
   <td><span class="s-done">DONE</span></td>
   <td>Облако / БД / ML</td>
