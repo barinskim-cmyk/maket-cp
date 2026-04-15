@@ -1041,11 +1041,23 @@ tr:hover td { background: #fafafa; }
   <td contenteditable="true" class="my-comment"></td>
 </tr>
 
+<tr data-row="article-ref-url-fix">
+  <td><span class="s-done">DONE</span></td>
+  <td>Артикулы / Облако</td>
+  <td contenteditable="true"><strong>Fix: doubled URL при скачивании ref_image артикулов из Storage</strong></td>
+  <td>d4d6780</td>
+  <td>После push с Mac референс-картинки артикулов не подгружались — 400 Bad Request с URL вида https://.../article-refs/https://.../article-refs/&lt;projectId&gt;/&lt;file&gt;. Причина: sbUploadArticleRefImage сохранял в articles.ref_image_path полный publicUrl (через getPublicUrl), а sbDownloadArticleRefImage передавал этот URL в storage.from('article-refs').download(path), который ожидает bucket-relative путь — в итоге префикс бакета добавлялся поверх уже полного URL. Фикс: (1) sbDownloadArticleRefImage нормализует вход — если пришла строка с 'http', извлекает хвост после маркера '/article-refs/'. Это покрывает legacy-строки с полными URL. (2) sbUploadArticleRefImage теперь возвращает bucket-relative path (projectId/artId.ext), а не publicUrl — новые записи будут сразу корректные.</td>
+  <td class="files">supabase.js</td>
+  <td>--</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
 <tr data-row="verify-unmatch-and-css-toggle">
   <td><span class="s-done">DONE</span></td>
   <td>Артикулы</td>
   <td contenteditable="true"><strong>Верификация: кнопка × на метче + CSS-тогл "скрывать подтверждённые" без blink</strong></td>
-  <td></td>
+  <td>de51b01</td>
   <td>Два UX-фикса в блоке верификации. (1) У каждого элемента верификации (строка "карточка+артикул") теперь есть кнопка × — клик отвязывает пару и записывает её в proj._rejectedPairs + пушит в облако как decision='rejected'. Реализовано через повторный вызов arUnmatch (event.stopPropagation, чтобы не триггерить arToggleVerify родителя). AI-метчер потом не предлагает отклонённые пары. (2) Переключение чекбокса "скрывать подтверждённые" больше не перерисовывает три списка через innerHTML — это вызывало blink всей страницы и прыжок скролла к началу. Теперь верифицированные элементы всегда рендерятся в DOM с классом .ar-verified, а скрытие делается CSS-правилом #page-articles.ar-hide-verified .ar-verified{display:none}. arToggleHideVerified только флипает класс контейнера и точечно обновляет счётчики "N скрыто / Показаны все". Скролл сохраняется, нет мигания.</td>
   <td class="files">articles.js, style.css</td>
   <td>--</td>
