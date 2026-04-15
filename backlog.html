@@ -1029,6 +1029,18 @@ tr:hover td { background: #fafafa; }
   <td contenteditable="true" class="my-comment"></td>
 </tr>
 
+<tr data-row="preview-dedup">
+  <td><span class="s-done">DONE</span></td>
+  <td>Превью</td>
+  <td contenteditable="true"><strong>Дедуп превью в едином блоке (по file_name)</strong></td>
+  <td>4e753c6</td>
+  <td>В галерее превью на вкладке Карточки стали появляться дубли — один файл (name) двумя плитками. Добавлен защитный in-place дедуп в pvGetStore: если в proj.previews нашлись записи с одним name, сливаем в первую (folders+versions объединяем, непустые поля дубля заполняют пустые полей предыдущей), логируем с примерами, сохраняем очищенный список в IndexedDB + localStorage чтобы дубли не вернулись на reload. Исправлена race-условие в pvLoadFilesWithProgress: четыре параллельных воркера могли пройти "есть ли уже" проверку ДО async pvMakeThumbnail и оба запушить — теперь в коллбэке проверяем повторно. Дедуп инвалидируется через pvInvalidateDedup() в точках мутации (onPreviewDone, pvLoadFilesWithProgress, onNativeDropDone, pvDbRestoreProjectPreviews).</td>
+  <td class="files">previews.js</td>
+  <td>--</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
 <tr data-row="verify-unmatch-and-css-toggle">
   <td><span class="s-done">DONE</span></td>
   <td>Артикулы</td>
