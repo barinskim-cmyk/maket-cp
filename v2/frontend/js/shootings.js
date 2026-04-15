@@ -622,6 +622,35 @@ function shPhotosPerStage(proj) {
 }
 
 /**
+ * Cumulative: сколько фото УЖЕ ПРОШЛИ каждый этап (находятся дальше).
+ * cumulative[i] = кол-во фото с _stage > i (завершили этап i).
+ *
+ * Метрика «потенциал vs масштаб»:
+ * - Потенциал = все превью (proj.previews.length)
+ * - Масштаб (отбор) = фото с _stage >= 1 (прошли преотбор, вошли в отбор)
+ *
+ * @param {Object} proj
+ * @param {number[]} photoCounts — результат shPhotosPerStage()
+ * @returns {{ cumulative: number[], scale: number, potential: number }}
+ */
+function shCumulativeMetrics(proj, photoCounts) {
+  var potential = proj.previews ? proj.previews.length : 0;
+  var cumulative = [];
+  /* Для каждого этапа i: прошли = сумма фото на всех этапах ПОСЛЕ i */
+  for (var i = 0; i < PIPELINE_STAGES.length; i++) {
+    var passed = 0;
+    for (var j = i + 1; j < PIPELINE_STAGES.length; j++) {
+      passed += photoCounts[j];
+    }
+    cumulative.push(passed);
+  }
+  /* Масштаб = фото, которые прошли преотбор (этап 0) = cumulative[0].
+     Для проектов где все на этапе 0 — масштаб = 0 (отбор ещё не сформирован). */
+  var scale = cumulative[0] || 0;
+  return { cumulative: cumulative, scale: scale, potential: potential };
+}
+
+/**
  * Определить «текущий фронт» проекта — самый ранний этап, на котором ещё есть фото.
  * Все этапы до него считаются завершёнными.
  * @param {Object} proj
@@ -649,6 +678,7 @@ function renderPipeline() {
   var stage = proj._stage || 0;
   var photoCounts = shPhotosPerStage(proj);
   var totalPhotos = proj.previews ? proj.previews.length : 0;
+  var metrics = shCumulativeMetrics(proj, photoCounts);
 
   /* Кнопка синхронизации (если проект в облаке) */
   var html = '';
@@ -700,8 +730,6 @@ function renderPipeline() {
   for (var i = 0; i < PIPELINE_STAGES.length; i++) {
     var s = PIPELINE_STAGES[i];
     var cnt = photoCounts[i];
-    var pct = totalPhotos > 0 ? Math.round(cnt / totalPhotos * 100) : 0;
-
     /* Определяем состояние этапа:
        done = на этапе 0 фото И хотя бы на одном следующем есть фото (значит прошли мимо)
        active = на этапе есть фото
@@ -732,15 +760,44 @@ function renderPipeline() {
     html += '<div class="step-dot">' + (cls === 'done' ? '&#10003;' : (i + 1)) + '</div>';
     html += '<div class="step-info">';
     html += '<div class="step-name">' + esc(s.name);
-    /* Счётчик фото на этапе */
-    if (totalPhotos > 0 && cnt > 0) {
-      html += '<span class="step-photo-count">' + cnt + ' фото (' + pct + '%)</span>';
+    /* Счётчик: cumulative N/M (сколько прошли этап / масштаб)
+       Для done: "N/M" — прошли этап.
+       Для active: "N на этапе" (сколько здесь сейчас).
+       Для этапа 0: "N/потенциал" (сколько прошли преотбор из всех превью). */
+    if (totalPhotos > 0) {
+      var cum = metrics.cumulative[i];
+      if (i === 0 && metrics.potential > 0) {
+        /* Преотбор: потенциал → масштаб */
+        if (cls === 'done') {
+          html += '<span class="step-photo-count">' + cum + '/' + metrics.potential + '</span>';
+        } else if (cnt > 0) {
+          html += '<span class="step-photo-count">' + cnt + ' фото</span>';
+        }
+      } else if (i > 0 && metrics.scale > 0) {
+        /* Постпреотбор: N/масштаб для done, кол-во на этапе для active */
+        if (cls === 'done') {
+          html += '<span class="step-photo-count">' + cum + '/' + metrics.scale + '</span>';
+        } else if (cls === 'active') {
+          html += '<span class="step-photo-count">' + cnt + ' на этапе</span>';
+        }
+      } else if (cnt > 0) {
+        html += '<span class="step-photo-count">' + cnt + ' фото</span>';
+      }
     }
     html += '</div>';
 
-    /* Даты этапа */
-    if (cls === 'done' && proj._stageHistory && proj._stageHistory[i]) {
-      html += '<div class="step-note">' + proj._stageHistory[i] + '</div>';
+    /* Даты этапа: done = диапазон, active = «с [дата]» */
+    if (cls === 'done') {
+      var doneNote = '';
+      var sd = proj._stageDates && proj._stageDates[i];
+      if (sd && sd.firstEnter) {
+        var dEnter = new Date(sd.firstEnter).toLocaleDateString('ru-RU');
+        var dLeave = sd.lastLeave ? new Date(sd.lastLeave).toLocaleDateString('ru-RU') : '';
+        doneNote = dLeave && dLeave !== dEnter ? dEnter + ' — ' + dLeave : dEnter;
+      } else if (proj._stageHistory && proj._stageHistory[i]) {
+        doneNote = proj._stageHistory[i];
+      }
+      if (doneNote) html += '<div class="step-note">' + doneNote + '</div>';
     } else if (cls === 'active' && proj._stageDates && proj._stageDates[i] && proj._stageDates[i].firstEnter) {
       var enterDate = new Date(proj._stageDates[i].firstEnter);
       html += '<div class="step-note">c ' + enterDate.toLocaleDateString('ru-RU') + '</div>';
@@ -770,6 +827,20 @@ function renderPipeline() {
     html += '</div>'; /* /pipeline-step */
   }
   html += '</div>'; /* /pipeline-steps */
+
+  /* ── Строка масштаба проекта ── */
+  if (totalPhotos > 0) {
+    html += '<div class="pipeline-scale">';
+    if (metrics.scale > 0) {
+      html += 'Масштаб: ' + metrics.scale + ' фото';
+      if (metrics.potential > metrics.scale) {
+        html += ' (из ' + metrics.potential + ' превью)';
+      }
+    } else {
+      html += 'Потенциал: ' + metrics.potential + ' превью';
+    }
+    html += '</div>';
+  }
 
   /* Кнопка сверки: если есть хотя бы 2 снимка */
   if (proj._cloudId && typeof _snCachedSnapshots !== 'undefined' && _snCachedSnapshots.length >= 2) {
