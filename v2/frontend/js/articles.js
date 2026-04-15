@@ -689,6 +689,35 @@ function arOnPageShow() {
 }
 
 
+/**
+ * Хелпер: сохранить window scroll, вызвать fn (re-render), восстановить скролл.
+ *
+ * На Mac/WebKit (pywebview и Safari-based браузеры) после серии innerHTML
+ * rebuild кликнутый элемент пересоздаётся и браузер теряет focus — часто
+ * это приводит к сбросу window scroll в 0 ("страница улетает в начало").
+ * Сохраняем координату ДО rebuild и восстанавливаем через requestAnimationFrame
+ * уже после всех DOM-операций.
+ *
+ * Применяется в обработчиках кликов на блоке верификации:
+ * arToggleVerify, arUnmatch, arConfirmAll, arResetVerification.
+ *
+ * @param {Function} fn — функция с набором re-render вызовов
+ */
+function _arPreserveScroll(fn) {
+  var savedY = window.scrollY || window.pageYOffset || 0;
+  try { fn(); }
+  finally {
+    if (savedY > 0) {
+      requestAnimationFrame(function() {
+        if ((window.scrollY || window.pageYOffset || 0) !== savedY) {
+          window.scrollTo(0, savedY);
+        }
+      });
+    }
+  }
+}
+
+
 /* ──────────────────────────────────────────────
    Блок 1: Чек-лист артикулов
    ────────────────────────────────────────────── */
@@ -4283,10 +4312,14 @@ function arUnmatch(skuIdx) {
   art.cardIdx = -1;
   art.status = 'unmatched';
 
-  arRenderChecklist();
-  arRenderMatching();
-  arRenderVerification();
-  arUpdateStats();
+  /* preserve-scroll: исключаем прыжок в начало страницы при rebuild
+     трёх списков (актуально при клике × в блоке верификации). */
+  _arPreserveScroll(function() {
+    arRenderChecklist();
+    arRenderMatching();
+    arRenderVerification();
+    arUpdateStats();
+  });
   if (typeof shAutoSave === 'function') shAutoSave();
   arCloudSync();
 }
@@ -4685,15 +4718,20 @@ function arToggleVerify(idx) {
     }, function() { /* fire-and-forget */ });
   }
 
-  arRenderChecklist();
-  arRenderVerification();
-  arUpdateStats();
+  /* preserve-scroll: на Mac/WebKit innerHTML rebuild может сбросить
+     window scroll в 0 — оборачиваем все re-render вызовы в хелпер,
+     который восстанавливает позицию через requestAnimationFrame. */
+  _arPreserveScroll(function() {
+    arRenderChecklist();
+    arRenderVerification();
+    arUpdateStats();
 
-  /* Обновить отображение карточек — имя карточки поменялось,
-     сайдбар со списком карточек и заголовок активной карточки
-     должны показать новое название СРАЗУ, без переключения вкладок. */
-  if (typeof cpRenderList === 'function') cpRenderList();
-  if (typeof cpRenderCard === 'function') cpRenderCard();
+    /* Обновить отображение карточек — имя карточки поменялось,
+       сайдбар со списком карточек и заголовок активной карточки
+       должны показать новое название СРАЗУ, без переключения вкладок. */
+    if (typeof cpRenderList === 'function') cpRenderList();
+    if (typeof cpRenderCard === 'function') cpRenderCard();
+  });
 
   if (typeof shAutoSave === 'function') shAutoSave();
   arCloudSync();
@@ -4715,14 +4753,16 @@ function arConfirmAll() {
       _arApplyCardRename(proj, proj.articles[i]);
     }
   }
-  arRenderChecklist();
-  arRenderVerification();
-  arUpdateStats();
+  _arPreserveScroll(function() {
+    arRenderChecklist();
+    arRenderVerification();
+    arUpdateStats();
 
-  /* После массового подтверждения — обновить список карточек и активную карточку,
-     чтобы новые имена стали видны сразу. */
-  if (typeof cpRenderList === 'function') cpRenderList();
-  if (typeof cpRenderCard === 'function') cpRenderCard();
+    /* После массового подтверждения — обновить список карточек и активную карточку,
+       чтобы новые имена стали видны сразу. */
+    if (typeof cpRenderList === 'function') cpRenderList();
+    if (typeof cpRenderCard === 'function') cpRenderCard();
+  });
 
   if (typeof shAutoSave === 'function') shAutoSave();
   arCloudSync();
@@ -4741,9 +4781,11 @@ function arResetVerification() {
       proj.articles[i].status = 'matched';
     }
   }
-  arRenderChecklist();
-  arRenderVerification();
-  arUpdateStats();
+  _arPreserveScroll(function() {
+    arRenderChecklist();
+    arRenderVerification();
+    arUpdateStats();
+  });
   if (typeof shAutoSave === 'function') shAutoSave();
   arCloudSync();
 }
