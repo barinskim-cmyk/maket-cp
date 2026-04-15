@@ -4074,8 +4074,25 @@ function sbDownloadArticleRefImage(refImagePath, callback) {
     return;
   }
 
+  /* Нормализация: storage.from('article-refs').download(path) ожидает
+     bucket-relative путь (например "<projectId>/ar_<id>.jpeg"), но
+     исторически sbUploadArticleRefImage возвращал полный publicUrl,
+     который сохранялся в articles.ref_image_path. Поэтому может прийти
+     либо относительный путь, либо полный URL. Извлекаем хвост после
+     маркера '/article-refs/' — для URL вида
+     '.../storage/v1/object/public/article-refs/<projectId>/<file>'
+     это даст корректный relative path. */
+  var relPath = String(refImagePath);
+  if (relPath.indexOf('http') === 0) {
+    var marker = '/article-refs/';
+    var mi = relPath.indexOf(marker);
+    if (mi !== -1) {
+      relPath = relPath.substring(mi + marker.length);
+    }
+  }
+
   sbClient.storage.from('article-refs')
-    .download(refImagePath)
+    .download(relPath)
     .then(function(resp) {
       if (resp.error) {
         console.warn('sbDownloadArticleRefImage error:', resp.error.message);
@@ -4133,10 +4150,12 @@ function sbUploadArticleRefImage(projectId, artId, base64, callback) {
         if (typeof callback === 'function') callback(resp.error.message, '');
         return;
       }
-      /* Получить публичный URL */
-      var urlResp = sbClient.storage.from('article-refs').getPublicUrl(path);
-      var publicUrl = (urlResp.data && urlResp.data.publicUrl) ? urlResp.data.publicUrl : '';
-      if (typeof callback === 'function') callback(null, publicUrl);
+      /* Возвращаем bucket-relative path, а не полный publicUrl.
+         Download API (sbDownloadArticleRefImage) ожидает относительный путь;
+         хранение URL в ref_image_path приводило к doubled-URL ошибкам
+         (см. sbDownloadArticleRefImage — там есть нормализация для
+         совместимости со старыми записями). */
+      if (typeof callback === 'function') callback(null, path);
     })
     ['catch'](function(err) {
       console.error('sbUploadArticleRefImage exception:', err);
