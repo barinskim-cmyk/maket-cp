@@ -143,6 +143,9 @@ function pvDbRestoreProjectPreviews(proj, callback) {
   pvDbLoadPreviews(key, function(items) {
     if (items.length > 0) {
       proj.previews = items;
+      /* Сбросить флаг дедупа: IDB мог содержать накопленные дубли из старых
+         сохранений (до появления защиты), пусть pvGetStore перепроверит. */
+      proj._pvDedupDone = false;
       console.log('IndexedDB: восстановлено ' + items.length + ' превью для ' + proj.brand);
 
       /* Обновить dataUrl слотов карточек: заменить 300px thumb на 1200px preview */
@@ -505,7 +508,90 @@ function pvGetStore() {
   for (var i = 0; i < proj.previews.length; i++) {
     if (!proj.previews[i].folders) proj.previews[i].folders = [];
   }
+
+  /* Защитный дедуп: один файл (name) должен давать ровно ОДНУ запись в
+     proj.previews. Если нашлись дубли — сливаем в первую, оставляем
+     единственный элемент. Причина появления дублей в исторических данных
+     может быть любой: повторная загрузка той же папки, восстановление
+     из разных источников (cloud + IDB + localStorage), старые snapshot-ы
+     где в БД ещё не было unique(project_id, file_name), race в
+     pvLoadFilesWithProgress при параллельных воркерах. Делаем ОДИН раз
+     за загрузку проекта (_pvDedupDone) + при явной инвалидации через
+     pvInvalidateDedup() после мутаций массива. */
+  if (!proj._pvDedupDone && proj.previews.length > 1) {
+    _pvDedupInPlace(proj);
+    proj._pvDedupDone = true;
+  }
+
   return proj.previews;
+}
+
+/**
+ * Слить дубликаты превью по name in-place.
+ * Оставляет ПЕРВУЮ запись, вливает в неё folders+versions+непустые поля
+ * последующих. Логирует найденные дубли и сохраняет очищенный список
+ * в IndexedDB + localStorage, чтобы больше не возвращались.
+ * @param {Object} proj
+ */
+function _pvDedupInPlace(proj) {
+  if (!proj || !proj.previews || proj.previews.length < 2) return;
+  var seen = {};
+  var deduped = [];
+  var dupeNames = [];
+  for (var d = 0; d < proj.previews.length; d++) {
+    var pv = proj.previews[d];
+    if (!pv || !pv.name) continue;
+    var prev = seen[pv.name];
+    if (prev) {
+      dupeNames.push(pv.name);
+      /* Сливаем данные в первую запись */
+      if (pv.folders && pv.folders.length) {
+        if (!prev.folders) prev.folders = [];
+        for (var f = 0; f < pv.folders.length; f++) {
+          if (prev.folders.indexOf(pv.folders[f]) < 0) prev.folders.push(pv.folders[f]);
+        }
+      }
+      if (pv.versions) {
+        if (!prev.versions) prev.versions = {};
+        for (var vk in pv.versions) {
+          if (pv.versions.hasOwnProperty(vk) && !prev.versions[vk]) {
+            prev.versions[vk] = pv.versions[vk];
+          }
+        }
+      }
+      /* Предпочтение: непустые thumb/preview/path/rating/rotation дубля
+         над пустыми полями первой записи. Не перетираем валидные данные. */
+      if (!prev.thumb   && pv.thumb)   prev.thumb   = pv.thumb;
+      if (!prev.preview && pv.preview) prev.preview = pv.preview;
+      if (!prev.path    && pv.path)    prev.path    = pv.path;
+      if (!prev.rating  && pv.rating)  prev.rating  = pv.rating;
+      if (!prev.rotation && pv.rotation) prev.rotation = pv.rotation;
+      continue;
+    }
+    seen[pv.name] = pv;
+    deduped.push(pv);
+  }
+  if (dupeNames.length > 0) {
+    console.warn('pvGetStore: обнаружены дубли превью — ' + dupeNames.length +
+      ' лишних записей, слияние. Было: ' + proj.previews.length +
+      ' → стало: ' + deduped.length + '. Примеры: ' + dupeNames.slice(0, 10).join(', '));
+    proj.previews = deduped;
+    /* Сохранить очищенный список чтобы дубли не вернулись при reload */
+    try {
+      if (typeof pvDbSaveProjectPreviews === 'function') pvDbSaveProjectPreviews(proj);
+      if (typeof shAutoSave === 'function') shAutoSave();
+    } catch(e) { console.warn('_pvDedupInPlace save:', e); }
+  }
+}
+
+/**
+ * Сбросить флаг выполненного дедупа — вызывать после push в proj.previews
+ * (например из onPreviewDone / pvLoadFilesWithProgress), чтобы следующий
+ * pvGetStore перепроверил на дубли.
+ */
+function pvInvalidateDedup() {
+  var proj = getActiveProject();
+  if (proj) proj._pvDedupDone = false;
 }
 
 function ocGetStore() {
@@ -695,6 +781,7 @@ window.onPreviewDone = function(data) {
         }
       };
       proj.previews.push(newPv);
+      if (typeof pvInvalidateDedup === 'function') pvInvalidateDedup();
     }
   }
 
@@ -1046,6 +1133,7 @@ function pvTryDesktopDrop(e, dzId) {
           byName[it.name] = true;
           added++;
         }
+        if (added > 0 && typeof pvInvalidateDedup === 'function') pvInvalidateDedup();
         console.log('[pv-drop][desktop] loaded via python:', added, 'of', data.items.length);
       } else if (!data || !data.total) {
         alert('В перетянутых файлах не нашлось поддерживаемых форматов (jpg/png/tiff/heic).\n\n' +
@@ -1341,6 +1429,7 @@ function pvLoadFilesWithProgress(files, store, dzId, folderName) {
         folders: folderName ? [folderName] : []
       };
       store.push(result);
+      if (typeof pvInvalidateDedup === 'function') pvInvalidateDedup();
       onDone();
       return;
     }
@@ -1348,7 +1437,26 @@ function pvLoadFilesWithProgress(files, store, dzId, folderName) {
     pvMakeThumbnail(file, function(result) {
       if (result) {
         result.folders = folderName ? [folderName] : [];
-        store.push(result);
+        /* Финальная проверка: из-за параллельных воркеров (maxConcurrent=4)
+           между `for (var k...)` чеком выше и async-завершением pvMakeThumbnail
+           другой воркер мог добавить файл с таким же именем. Пере-проверяем. */
+        var already = false;
+        for (var kk = 0; kk < store.length; kk++) {
+          if (store[kk].name === result.name) { already = true; break; }
+        }
+        if (!already) {
+          store.push(result);
+          if (typeof pvInvalidateDedup === 'function') pvInvalidateDedup();
+        } else if (folderName) {
+          /* Уже был — мерджим только folder */
+          for (var km = 0; km < store.length; km++) {
+            if (store[km].name === result.name) {
+              if (!store[km].folders) store[km].folders = [];
+              if (store[km].folders.indexOf(folderName) < 0) store[km].folders.push(folderName);
+              break;
+            }
+          }
+        }
       }
       onDone();
     });
