@@ -4173,12 +4173,36 @@ function _arMatchOneCard(cardIdx, cardImgs, category, candidates, apiKey, onDone
   }
 
   /* Фото кандидатов: предпочитаем URL из Storage — OpenAI Vision скачает
-     сам, это экономит входные токены и трафик. Если URL нет — fallback base64. */
+     сам, это экономит входные токены и трафик. Если URL нет — fallback base64.
+
+     ВАЖНО: sbUploadArticleRefImage хранит в _refImagePath
+     bucket-relative путь (projectId/artId.jpg), а НЕ полный publicUrl.
+     Поэтому при отправке в OpenAI надо достроить публичный URL для bucket
+     'article-refs', иначе путь попадёт в ветку 'data:image/jpeg;base64,' +
+     refUrl и OpenAI отвергнет запрос как "unsupported image". */
   for (var j = 0; j < cands.length; j++) {
     var refUrl = cands[j].refImageUrl || cands[j].refImage;
     if (!refUrl) continue;
     if (refUrl.indexOf('data:') !== 0 && refUrl.indexOf('http') !== 0) {
-      refUrl = 'data:image/jpeg;base64,' + refUrl;
+      /* Эвристика: относительный storage-path содержит '/' и расширение —
+         это наш случай (<uuid>/ar_<id>.jpeg). Преобразуем в публичный URL
+         bucket 'article-refs'. Если sbClient недоступен — fallback на base64. */
+      if (refUrl.indexOf('/') > 0 && /\.(jpe?g|png|webp|gif)$/i.test(refUrl)
+          && typeof sbClient !== 'undefined' && sbClient
+          && sbClient.storage && sbClient.storage.from) {
+        try {
+          var pub = sbClient.storage.from('article-refs').getPublicUrl(refUrl);
+          if (pub && pub.data && pub.data.publicUrl) {
+            refUrl = pub.data.publicUrl;
+          } else {
+            refUrl = 'data:image/jpeg;base64,' + refUrl;
+          }
+        } catch(_) {
+          refUrl = 'data:image/jpeg;base64,' + refUrl;
+        }
+      } else {
+        refUrl = 'data:image/jpeg;base64,' + refUrl;
+      }
     }
     msgContent.push({ type: 'text', text: '--- A' + (j + 1) + ' ---' });
     msgContent.push({ type: 'image_url', image_url: { url: refUrl, detail: 'high' } });
