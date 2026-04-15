@@ -541,7 +541,12 @@ function _pvDedupInPlace(proj) {
   for (var d = 0; d < proj.previews.length; d++) {
     var pv = proj.previews[d];
     if (!pv || !pv.name) continue;
-    var prev = seen[pv.name];
+    /* Case-insensitive ключ: "DSC_001.ARW" и "dsc_001.arw" — одно фото.
+       Ранее ключ был case-sensitive, и файлы с разным регистром имени
+       расширения (часто встречается у RAW из Capture One) проскакивали
+       мимо дедупа и оставались двумя плитками в галерее. */
+    var key = pv.name.toLowerCase();
+    var prev = seen[key];
     if (prev) {
       dupeNames.push(pv.name);
       /* Сливаем данные в первую запись */
@@ -568,7 +573,7 @@ function _pvDedupInPlace(proj) {
       if (!prev.rotation && pv.rotation) prev.rotation = pv.rotation;
       continue;
     }
-    seen[pv.name] = pv;
+    seen[key] = pv;
     deduped.push(pv);
   }
   if (dupeNames.length > 0) {
@@ -1405,9 +1410,13 @@ function pvLoadFilesWithProgress(files, store, dzId, folderName) {
       return;
     }
 
-    /* ── Обычная загрузка: дубликат? мерджим папку ── */
+    /* ── Обычная загрузка: дубликат? мерджим папку ──
+       Case-insensitive сравнение: RAW из Capture One / Lightroom часто
+       приходят в разном регистре на разных этапах экспорта (DSC_001.ARW
+       vs dsc_001.arw). Без .toLowerCase() один файл давал две плитки. */
+    var fnameLc = (file.name || '').toLowerCase();
     for (var k = 0; k < store.length; k++) {
-      if (store[k].name === file.name) {
+      if ((store[k].name || '').toLowerCase() === fnameLc) {
         if (folderName && store[k].folders && store[k].folders.indexOf(folderName) < 0) {
           store[k].folders.push(folderName);
         }
@@ -1441,8 +1450,9 @@ function pvLoadFilesWithProgress(files, store, dzId, folderName) {
            между `for (var k...)` чеком выше и async-завершением pvMakeThumbnail
            другой воркер мог добавить файл с таким же именем. Пере-проверяем. */
         var already = false;
+        var rnameLc = (result.name || '').toLowerCase();
         for (var kk = 0; kk < store.length; kk++) {
-          if (store[kk].name === result.name) { already = true; break; }
+          if ((store[kk].name || '').toLowerCase() === rnameLc) { already = true; break; }
         }
         if (!already) {
           store.push(result);
