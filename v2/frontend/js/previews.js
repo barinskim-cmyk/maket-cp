@@ -183,6 +183,25 @@ function pvDbRestoreProjectPreviews(proj, callback) {
       if (slotsUpdated && typeof cpRenderCard === 'function') {
         cpRenderCard();
       }
+
+      /* Catch-up sync: если проект привязан к облаку, но в previews-таблице
+         Supabase есть не все локальные превью (или её нет вообще), — догоняем.
+         sbUploadPreviews идемпотентна: пропускает имена, у которых в облаке
+         уже есть рабочий thumb_path/preview_path. Безопасно звать при каждом
+         открытии проекта.
+
+         Без этого клиенты, загрузившие фото в проект до появления _cloudId
+         (до первой синхронизации), навсегда остаются с превью только в IDB. */
+      if (proj._cloudId && typeof sbUploadPreviews === 'function' && proj.previews && proj.previews.length > 0) {
+        sbUploadPreviews(proj._cloudId, proj.previews, function(err) {
+          if (err) {
+            console.warn('Catch-up sync превью:', err);
+            proj._pendingSync = true;
+          } else {
+            console.log('Catch-up sync: проверено ' + proj.previews.length + ' превью в облаке');
+          }
+        });
+      }
     }
     if (callback) callback();
   });
