@@ -1009,13 +1009,13 @@ function shShowDetailedPipeline() {
     overlay = document.createElement('div');
     overlay.id = 'sh-detail-overlay';
     overlay.className = 'modal-overlay';
-    overlay.innerHTML = '<div class="modal-content" style="max-width:480px;padding:24px"></div>';
+    overlay.innerHTML = '<div class="modal" style="max-width:480px;padding:24px"></div>';
     overlay.addEventListener('click', function(e) {
       if (e.target === overlay) overlay.classList.remove('open');
     });
     document.body.appendChild(overlay);
   }
-  overlay.querySelector('.modal-content').innerHTML = html;
+  overlay.querySelector('.modal').innerHTML = html;
   overlay.classList.add('open');
 }
 
