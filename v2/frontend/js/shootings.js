@@ -606,6 +606,76 @@ function shEnsurePhotoStages(proj) {
 }
 
 /**
+ * Сгенерировать короткий уникальный ID для batch-события.
+ * Формат: b_<timestamp36>_<rnd36> — 12-15 символов, читается, сортируется по времени.
+ * @returns {string}
+ */
+function shGenBatchId() {
+  return 'b_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
+}
+
+/**
+ * Записать batch-событие перемещения группы фото между этапами.
+ * Заводит уникальный id, собирает parent batch IDs из предыдущей истории фото,
+ * обновляет proj._photoLastBatch для трассировки веток.
+ *
+ * Это фундамент для tree-визуализации детального пайплайна:
+ * каждое событие знает, ИЗ КАКИХ предыдущих батчей пришли фото.
+ * Когда придёт версионирование — дерево строится из накопленной истории.
+ *
+ * @param {Object} proj — проект
+ * @param {string[]} photoNames — имена фото, которые движутся
+ * @param {number} fromStage — индекс этапа-источника
+ * @param {number} toStage — индекс этапа-цели
+ * @param {string} trigger — что вызвало переход (manual, send_client_link, client_approved, client_extra_request, auto, и т.д.)
+ * @returns {string|null} id созданного batch-события (или null если photoNames пуст)
+ */
+function shRecordBatchMove(proj, photoNames, fromStage, toStage, trigger) {
+  if (!photoNames || photoNames.length === 0) return null;
+
+  /* Инициализация структур */
+  if (!proj._stageBatches) proj._stageBatches = [];
+  if (!proj._photoLastBatch) proj._photoLastBatch = {};
+
+  /* Собрать уникальные parent batch IDs из текущей истории фото */
+  var parentSet = {};
+  for (var i = 0; i < photoNames.length; i++) {
+    var prev = proj._photoLastBatch[photoNames[i]];
+    if (prev) parentSet[prev] = true;
+  }
+  var parentBatchIds = [];
+  for (var pid in parentSet) {
+    if (parentSet.hasOwnProperty(pid)) parentBatchIds.push(pid);
+  }
+
+  /* Создать batch-событие */
+  var batchId = shGenBatchId();
+  var batch = {
+    id: batchId,
+    photos: photoNames.slice(),       /* копия для безопасности */
+    fromStage: fromStage,
+    toStage: toStage,
+    date: new Date().toISOString(),
+    trigger: trigger || 'manual',
+    count: photoNames.length,
+    parentBatchIds: parentBatchIds    /* откуда пришли — для дерева */
+  };
+  proj._stageBatches.push(batch);
+
+  /* Обновить указатель «последний batch» для каждого фото */
+  for (var j = 0; j < photoNames.length; j++) {
+    proj._photoLastBatch[photoNames[j]] = batchId;
+  }
+
+  /* Синхронизировать в облако, чтобы маршруты пережили refresh */
+  if (typeof sbSyncStageBatches === 'function') {
+    sbSyncStageBatches(proj);
+  }
+
+  return batchId;
+}
+
+/**
  * Подсчитать количество фотографий на каждом этапе пайплайна.
  * @param {Object} proj
  * @returns {number[]} массив длиной PIPELINE_STAGES.length, counts[i] = кол-во фото на этапе i
@@ -924,82 +994,193 @@ function shShowDetailedPipeline() {
   if (!proj) return;
 
   shEnsurePhotoStages(proj);
-  var photoCounts = shPhotosPerStage(proj);
-  var metrics = shCumulativeMetrics(proj, photoCounts);
+  var batches = proj._stageBatches || [];
   var totalPhotos = proj.previews ? proj.previews.length : 0;
 
+  /* ---------- Таблица триггер → человекочитаемое название ---------- */
+  var triggerLabels = {
+    'manual': 'Переход вручную',
+    'manual_advance': 'Переход этапа',
+    'send_client_link': 'Отправлено клиенту',
+    'client_approved': 'Клиент согласовал',
+    'client_extra_request': 'Клиент запросил ещё',
+    'preview_loaded': 'Превью загружены',
+    'selection_done': 'Отбор завершён',
+    'cc_loaded': 'ЦК загружена',
+    'cc_confirmed': 'ЦК подтверждена',
+    'retouch_comments': 'Комментарии отправлены',
+    'retouch_loaded': 'Ретушь загружена',
+    'retouch_approved': 'Ретушь согласована',
+    'retouch_returned': 'Ретушь возвращена',
+    'adaptation_done': 'Финал'
+  };
+
   var html = '<div class="sh-detail-pipeline">';
-  html += '<h3 style="margin:0 0 16px 0;font-size:16px">Детальный пайплайн</h3>';
+  html += '<h3 style="margin:0 0 16px 0;font-size:16px">Маршруты фотографий</h3>';
 
-  /* Полная визуализация всех этапов */
-  for (var i = 0; i < PIPELINE_STAGES.length; i++) {
-    var s = PIPELINE_STAGES[i];
-    var cnt = photoCounts[i];
-    var cum = metrics.cumulative[i];
-    var cls = '';
-    var hasPhotosAfter = false;
-    for (var j = i + 1; j < PIPELINE_STAGES.length; j++) {
-      if (photoCounts[j] > 0) { hasPhotosAfter = true; break; }
+  /* Если реальных батчей нет — синтезируем линейный таймлайн из _stageHistory
+     (для проектов, созданных до появления batch-трекинга). */
+  var synthesized = false;
+  if (batches.length === 0 && proj._stageHistory) {
+    var histKeys = [];
+    for (var _hk in proj._stageHistory) {
+      if (proj._stageHistory.hasOwnProperty(_hk) && /^\d+$/.test(_hk)) {
+        histKeys.push(parseInt(_hk, 10));
+      }
     }
-    if (cnt === 0 && hasPhotosAfter) cls = 'done';
-    else if (cnt > 0) cls = 'active';
-
-    /* Пройденные и будущие — бледные, активный — яркий */
-    var opacity = (cls === 'active') ? '1' : '0.4';
-    var fontWeight = (cls === 'active') ? '600' : '400';
-    var barWidth = 0;
-    if (totalPhotos > 0) barWidth = Math.round(cnt / totalPhotos * 100);
-
-    html += '<div style="display:flex;align-items:center;gap:12px;padding:8px 0;opacity:' + opacity + '">';
-    html += '<div style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;';
-    if (cls === 'done') html += 'background:#333;color:#fff;border:2px solid #333">';
-    else if (cls === 'active') html += 'background:#f5f5f5;color:#333;border:2px solid #333;font-weight:700">';
-    else html += 'background:#fff;color:#ccc;border:2px solid #e0e0e0">';
-    html += (cls === 'done' ? '&#10003;' : (i + 1)) + '</div>';
-
-    html += '<div style="flex:1">';
-    html += '<div style="font-size:14px;font-weight:' + fontWeight + ';color:#333">' + esc(s.name);
-    if (cnt > 0) {
-      html += ' <span style="font-size:12px;font-weight:normal;color:#888">' + cnt + ' фото</span>';
+    histKeys.sort(function(a, b) { return a - b; });
+    if (histKeys.length >= 1) {
+      var synthBatches = [];
+      var _prevId = null;
+      for (var _hi = 0; _hi < histKeys.length; _hi++) {
+        var _toH = histKeys[_hi];
+        var _fromH = (_hi === 0) ? Math.max(0, _toH - 1) : histKeys[_hi - 1];
+        if (_toH === _fromH) continue;
+        var _timeStr = proj._stageHistory[_toH] || '';
+        var _synthId = 'synth_' + _toH + '_' + _hi;
+        synthBatches.push({
+          id: _synthId,
+          photos: [],
+          fromStage: _fromH,
+          toStage: _toH,
+          date: new Date().toISOString(),
+          _dateDisplay: _timeStr,
+          trigger: 'manual',
+          count: totalPhotos,
+          parentBatchIds: _prevId ? [_prevId] : [],
+          _synthesized: true
+        });
+        _prevId = _synthId;
+      }
+      if (synthBatches.length > 0) {
+        batches = synthBatches;
+        synthesized = true;
+      }
     }
+  }
+
+  if (synthesized) {
+    html += '<div style="font-size:11px;color:#8a6d00;background:#fff8dc;padding:6px 8px;border-radius:4px;margin-bottom:12px;line-height:1.4">';
+    html += 'Маршруты реконструированы по истории этапов. Подробности ветвлений появятся при следующих переходах.';
     html += '</div>';
+  }
 
-    /* Полоска прогресса */
-    if (barWidth > 0 || cls === 'done') {
-      var bw = cls === 'done' ? Math.round(cum / (i === 0 ? metrics.potential : metrics.scale || 1) * 100) : barWidth;
-      html += '<div style="height:4px;background:#eee;border-radius:2px;margin-top:4px;overflow:hidden">';
-      html += '<div style="height:100%;width:' + Math.min(bw, 100) + '%;background:' + (cls === 'active' ? '#333' : '#999') + ';border-radius:2px"></div>';
+  if (batches.length === 0) {
+    /* Нет ни батчей, ни истории — показать текущее распределение */
+    var photoCounts = shPhotosPerStage(proj);
+    html += '<div style="color:#888;font-size:13px;margin-bottom:12px">';
+    html += 'Пока нет записанных перемещений. Текущее распределение:';
+    html += '</div>';
+    for (var i = 0; i < PIPELINE_STAGES.length; i++) {
+      if (photoCounts[i] === 0) continue;
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px">';
+      html += '<span style="color:#aaa;width:16px;text-align:right">' + (i + 1) + '</span>';
+      html += '<span>' + esc(PIPELINE_STAGES[i].name) + '</span>';
+      html += '<span style="color:#888;font-size:12px">' + photoCounts[i] + ' фото</span>';
       html += '</div>';
-      /* Детальная метрика */
-      if (cls === 'done') {
-        var denom = i === 0 ? metrics.potential : metrics.scale;
-        html += '<div style="font-size:11px;color:#aaa;margin-top:2px">Прошли: ' + cum + '/' + denom + '</div>';
-      } else if (cls === 'active') {
-        html += '<div style="font-size:11px;color:#888;margin-top:2px">' + cnt + ' на этапе</div>';
+    }
+    html += '<div style="margin-top:12px;font-size:11px;color:#bbb">';
+    html += 'Маршруты начнут записываться при переходах между этапами.</div>';
+  } else {
+    /* ---------- Дерево маршрутов ---------- */
+    /* Индекс batch по ID для быстрого поиска */
+    var batchById = {};
+    for (var bi = 0; bi < batches.length; bi++) {
+      batchById[batches[bi].id] = batches[bi];
+    }
+
+    /* Найти сколько потомков у каждого batch (для определения точек ветвления) */
+    var childCount = {};
+    for (var ci = 0; ci < batches.length; ci++) {
+      var pids = batches[ci].parentBatchIds || [];
+      for (var pi = 0; pi < pids.length; pi++) {
+        childCount[pids[pi]] = (childCount[pids[pi]] || 0) + 1;
       }
     }
 
-    /* Даты */
-    var sd = proj._stageDates && proj._stageDates[i];
-    if (sd && sd.firstEnter) {
-      var dEnter = new Date(sd.firstEnter).toLocaleDateString('ru-RU');
-      var dLeave = sd.lastLeave ? new Date(sd.lastLeave).toLocaleDateString('ru-RU') : '';
-      var dateStr = '';
-      if (cls === 'done') dateStr = dLeave && dLeave !== dEnter ? dEnter + ' — ' + dLeave : dEnter;
-      else if (cls === 'active') dateStr = 'с ' + dEnter;
-      if (dateStr) html += '<div style="font-size:11px;color:#bbb;margin-top:1px">' + dateStr + '</div>';
-    }
+    /* Рисуем хронологически (batches уже в порядке создания) */
+    for (var ri = 0; ri < batches.length; ri++) {
+      var b = batches[ri];
+      var fromName = PIPELINE_STAGES[b.fromStage] ? PIPELINE_STAGES[b.fromStage].name : ('Этап ' + b.fromStage);
+      var toName = PIPELINE_STAGES[b.toStage] ? PIPELINE_STAGES[b.toStage].name : ('Этап ' + b.toStage);
+      var label = triggerLabels[b.trigger] || b.trigger;
+      var dateStr;
+      if (b._dateDisplay) {
+        dateStr = b._dateDisplay;
+      } else {
+        var d = new Date(b.date);
+        dateStr = d.toLocaleDateString('ru-RU') + ' ' + d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+      }
+      var photoCount = b.count || (b.photos ? b.photos.length : 0);
 
-    html += '</div>'; /* /flex:1 */
-    html += '</div>'; /* /row */
+      /* Определить тип узла: обычный, ветвление, слияние */
+      var parents = b.parentBatchIds || [];
+      var isMerge = parents.length > 1;
+      var isBranch = false;
+      for (var pp = 0; pp < parents.length; pp++) {
+        if ((childCount[parents[pp]] || 0) > 1) { isBranch = true; break; }
+      }
+      var isSkip = (b.toStage - b.fromStage) > 1;
+
+      /* Цвет линии: обычный серый, ветвление — тёмный, слияние — тёмный */
+      var lineColor = (isMerge || isBranch) ? '#333' : '#ccc';
+      var dotBorder = (isMerge || isBranch) ? '2px solid #333' : '2px solid #ccc';
+      var dotBg = isMerge ? '#333' : '#fff';
+      var dotColor = isMerge ? '#fff' : '#333';
+
+      html += '<div style="display:flex;gap:10px;position:relative;min-height:44px">';
+
+      /* Вертикальная линия + точка */
+      html += '<div style="display:flex;flex-direction:column;align-items:center;width:20px;flex-shrink:0">';
+      if (ri > 0) {
+        html += '<div style="width:2px;height:8px;background:' + lineColor + '"></div>';
+      } else {
+        html += '<div style="height:8px"></div>';
+      }
+      /* Точка — кружок или ромб для ветвления */
+      if (isMerge) {
+        html += '<div style="width:12px;height:12px;border-radius:50%;background:' + dotBg + ';border:' + dotBorder + ';flex-shrink:0"></div>';
+      } else if (isBranch) {
+        html += '<div style="width:10px;height:10px;transform:rotate(45deg);background:#fff;border:' + dotBorder + ';flex-shrink:0"></div>';
+      } else {
+        html += '<div style="width:10px;height:10px;border-radius:50%;background:' + dotBg + ';border:' + dotBorder + ';flex-shrink:0"></div>';
+      }
+      if (ri < batches.length - 1) {
+        html += '<div style="width:2px;flex:1;background:#e0e0e0"></div>';
+      }
+      html += '</div>';
+
+      /* Содержимое */
+      html += '<div style="flex:1;padding-bottom:8px">';
+
+      /* Заголовок: N фото: From -> To */
+      html += '<div style="font-size:13px;font-weight:500;color:#333">';
+      html += photoCount + ' фото: ';
+      html += esc(fromName) + ' &rarr; ' + esc(toName);
+      if (isSkip) html += ' <span style="font-size:11px;color:#c62828">(пропуск)</span>';
+      html += '</div>';
+
+      /* Подробности: триггер, дата */
+      html += '<div style="font-size:11px;color:#888;margin-top:2px">';
+      html += esc(label) + ' &middot; ' + dateStr;
+      html += '</div>';
+
+      /* Индикаторы ветвления/слияния */
+      if (isMerge) {
+        html += '<div style="font-size:11px;color:#555;margin-top:2px">';
+        html += 'Слияние ' + parents.length + ' потоков';
+        html += '</div>';
+      }
+
+      html += '</div>'; /* /flex:1 */
+      html += '</div>'; /* /row */
+    }
   }
 
   /* Итого */
   html += '<div style="margin-top:12px;padding-top:8px;border-top:1px solid #eee;font-size:12px;color:#888">';
   html += 'Всего: ' + totalPhotos + ' фото';
-  if (metrics.scale > 0 && metrics.scale < metrics.potential) {
-    html += ' (отобрано ' + metrics.scale + ' из ' + metrics.potential + ')';
-  }
+  if (batches.length > 0) html += ' &middot; ' + batches.length + ' перемещений';
   html += '</div>';
   html += '</div>';
 
@@ -1009,7 +1190,7 @@ function shShowDetailedPipeline() {
     overlay = document.createElement('div');
     overlay.id = 'sh-detail-overlay';
     overlay.className = 'modal-overlay';
-    overlay.innerHTML = '<div class="modal" style="max-width:480px;padding:24px"></div>';
+    overlay.innerHTML = '<div class="modal" style="max-width:520px;padding:24px;max-height:80vh;overflow-y:auto"></div>';
     overlay.addEventListener('click', function(e) {
       if (e.target === overlay) overlay.classList.remove('open');
     });
@@ -1478,16 +1659,8 @@ function advanceStage(stageIdx, targetIdx) {
     proj._stageDates[stageIdx].lastLeave = now.toISOString();
   }
 
-  /* Batch event: группа фото переехала */
-  if (!proj._stageBatches) proj._stageBatches = [];
-  proj._stageBatches.push({
-    photos: movedPhotos,
-    fromStage: stageIdx,
-    toStage: nextStageIdx,
-    date: now.toISOString(),
-    trigger: 'manual',
-    count: movedPhotos.length
-  });
+  /* Batch event: группа фото переехала (с parent links для дерева) */
+  shRecordBatchMove(proj, movedPhotos, stageIdx, nextStageIdx, 'manual');
 
   /* Обновить проектный этап (для backward compat) — минимальный этап с фото */
   proj._stage = shProjectFront(proj);
@@ -1539,11 +1712,25 @@ function shSendClientLink() {
       var timeStr = now.toLocaleDateString('ru-RU') + ' ' + now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
       proj._stageHistory[proj._stage] = timeStr;
 
-      /* Переместить все фото до этапа client (2) — на client */
+      /* Переместить все фото до этапа client (2) — на client.
+         Группируем по исходному этапу, чтобы каждый source-этап стал отдельным batch
+         (для корректной отрисовки веток в детальном пайплайне). */
       shEnsurePhotoStages(proj);
       if (proj.previews) {
+        var movedByStage = {};
         for (var _pi = 0; _pi < proj.previews.length; _pi++) {
-          if (proj.previews[_pi]._stage < 2) proj.previews[_pi]._stage = 2;
+          var _src = proj.previews[_pi]._stage;
+          if (_src < 2) {
+            if (!movedByStage[_src]) movedByStage[_src] = [];
+            movedByStage[_src].push(proj.previews[_pi].name);
+            proj.previews[_pi]._stage = 2;
+          }
+        }
+        /* Записать batch event для каждой исходной группы */
+        for (var _src in movedByStage) {
+          if (movedByStage.hasOwnProperty(_src)) {
+            shRecordBatchMove(proj, movedByStage[_src], parseInt(_src, 10), 2, 'send_client_link');
+          }
         }
       }
 
@@ -2514,11 +2701,23 @@ function shClientRequestExtra() {
     });
   }
 
-  /* Вернуть все фото на этап 1 (Отбор фотографа) — клиент хочет дополнительные кадры */
+  /* Вернуть все фото на этап 1 (Отбор фотографа) — клиент хочет дополнительные кадры.
+     Группируем по исходному этапу для корректных batch events (ветки в дереве). */
   shEnsurePhotoStages(proj);
   if (proj.previews) {
+    var _movedByStage = {};
     for (var _pi = 0; _pi < proj.previews.length; _pi++) {
-      proj.previews[_pi]._stage = 1;
+      var _src = proj.previews[_pi]._stage;
+      if (_src !== 1) {
+        if (!_movedByStage[_src]) _movedByStage[_src] = [];
+        _movedByStage[_src].push(proj.previews[_pi].name);
+        proj.previews[_pi]._stage = 1;
+      }
+    }
+    for (var _src2 in _movedByStage) {
+      if (_movedByStage.hasOwnProperty(_src2)) {
+        shRecordBatchMove(proj, _movedByStage[_src2], parseInt(_src2, 10), 1, 'client_extra_request');
+      }
     }
   }
   proj._stage = 1;
@@ -2564,11 +2763,23 @@ function shClientApprove() {
     });
   }
 
-  /* Переместить все фото на этап 3 (Цветокоррекция) */
+  /* Переместить все фото на этап 3 (Цветокоррекция).
+     Группируем по исходному этапу для корректных batch events. */
   shEnsurePhotoStages(proj);
   if (proj.previews) {
+    var _movedByStageA = {};
     for (var _pi = 0; _pi < proj.previews.length; _pi++) {
-      if (proj.previews[_pi]._stage < 3) proj.previews[_pi]._stage = 3;
+      var _src = proj.previews[_pi]._stage;
+      if (_src < 3) {
+        if (!_movedByStageA[_src]) _movedByStageA[_src] = [];
+        _movedByStageA[_src].push(proj.previews[_pi].name);
+        proj.previews[_pi]._stage = 3;
+      }
+    }
+    for (var _src3 in _movedByStageA) {
+      if (_movedByStageA.hasOwnProperty(_src3)) {
+        shRecordBatchMove(proj, _movedByStageA[_src3], parseInt(_src3, 10), 3, 'client_approved');
+      }
     }
   }
   proj._stage = 3;

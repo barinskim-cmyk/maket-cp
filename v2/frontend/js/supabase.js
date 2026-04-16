@@ -257,6 +257,7 @@ function sbUploadProject(projIdx, callback) {
     channels: JSON.stringify(proj.channels || []),
     other_content: JSON.stringify(ocNames),
     oc_containers: JSON.stringify(ocContainersData),
+    stage_batches: proj._stageBatches || [],
     updated_at: new Date().toISOString()
   };
 
@@ -776,6 +777,8 @@ function sbDownloadProject(cloudId, callback) {
       _template: remote.template_config || null,
       _stage: remote.stage || 0,
       _stageHistory: {},
+      _stageBatches: Array.isArray(remote.stage_batches) ? remote.stage_batches : (remote.stage_batches ? JSON.parse(remote.stage_batches) : []),
+      _photoLastBatch: {},
       _deletedAt: remote.deleted_at || null,
       channels: (typeof remote.channels === 'string') ? JSON.parse(remote.channels || '[]') : (remote.channels || []),
       _ocNames: (typeof remote.other_content === 'string') ? JSON.parse(remote.other_content || '[]') : (remote.other_content || []),
@@ -893,6 +896,17 @@ function sbDownloadProject(cloudId, callback) {
           /* Загрузить историю этапов из stage_events */
           sbLoadStageHistory(cloudId, function(history) {
             proj._stageHistory = history;
+
+            /* Восстановить _photoLastBatch из _stageBatches для продолжения дерева */
+            if (proj._stageBatches && proj._stageBatches.length) {
+              for (var _sbI = 0; _sbI < proj._stageBatches.length; _sbI++) {
+                var _sbB = proj._stageBatches[_sbI];
+                var _sbP = _sbB.photos || [];
+                for (var _sbJ = 0; _sbJ < _sbP.length; _sbJ++) {
+                  proj._photoLastBatch[_sbP[_sbJ]] = _sbB.id;
+                }
+              }
+            }
 
             /* Загрузить версии (ЦК/Ретушь) из photo_versions и привязать к превью */
             _sbLoadAndAttachVersions(cloudId, proj, pvByName, function() {
@@ -2780,6 +2794,27 @@ function sbSyncStage(triggerDesc, note) {
   }).then(function(res) {
     if (res.error) console.warn('sbSyncStage: ошибка записи stage_event:', res.error.message);
     else console.log('sbSyncStage: stage_event записан для "' + stageId + '"');
+  });
+}
+
+/**
+ * Синхронизировать _stageBatches в Supabase (колонка projects.stage_batches).
+ * Вызывается после каждого shRecordBatchMove, чтобы маршруты
+ * (ветвление/слияние групп фото) пережили обновление страницы.
+ *
+ * @param {Object} proj — проект (должен иметь _cloudId)
+ */
+function sbSyncStageBatches(proj) {
+  if (!proj || !proj._cloudId) return;
+  if (!sbClient) return;
+  /* Пишут только владельцы — у клиента (share-ссылка) доступ ограничен RLS */
+  if (!sbIsLoggedIn()) return;
+
+  sbClient.from('projects').update({
+    stage_batches: proj._stageBatches || [],
+    updated_at: new Date().toISOString()
+  }).eq('id', proj._cloudId).then(function(res) {
+    if (res.error) console.warn('sbSyncStageBatches:', res.error.message);
   });
 }
 
