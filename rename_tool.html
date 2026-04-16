@@ -396,7 +396,7 @@ function downloadExport() {
   var blob = new Blob([text], {type: 'text/plain'});
   var a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'rename_[anchor client]_2026-03-23.sh';
+  a.download = 'rename_brandx_2026-03-23.sh';
   a.click();
 }
 
@@ -416,7 +416,7 @@ function downloadCSV() {
   var blob = new Blob([lines.join('\n')], {type: 'text/csv'});
   var a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'rename_[anchor client]_2026-03-23.csv';
+  a.download = 'rename_brandx_2026-03-23.csv';
   a.click();
 }
 
