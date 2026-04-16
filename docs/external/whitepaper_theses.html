@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>Maket CP — тезисы white paper v2</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f7f7f7; color: #1f1f1f; margin: 0; padding: 16px 24px 80px; }
+  h1 { font-size: 20px; margin: 0 0 6px; font-weight: 700; letter-spacing: -0.3px; }
+  .sub { color: #6a6a6a; font-size: 13px; margin-bottom: 14px; }
+  .bar { background: #fff; border: 1px solid #e2e2e2; border-radius: 6px; padding: 10px 14px; margin: 0 0 14px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .bar input[type="search"], .bar select { padding: 7px 10px; border: 1px solid #d0d0d0; border-radius: 4px; font-size: 13px; background: #fff; font-family: inherit; }
+  .bar input[type="search"] { width: 260px; }
+  .bar button { padding: 7px 14px; border: 1px solid #1f1f1f; background: #1f1f1f; color: #fff; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; font-family: inherit; }
+  .bar button.secondary { background: #fff; color: #1f1f1f; }
+  .bar button:hover { opacity: 0.85; }
+  .bar .spacer { flex: 1; }
+  .bar .stats { font-size: 12px; color: #6a6a6a; }
+  .bar .stats b { color: #1f1f1f; font-weight: 600; }
+
+  .cat-group { background: #fff; border: 1px solid #e2e2e2; border-radius: 6px; margin-bottom: 14px; overflow: hidden; }
+  .cat-head { padding: 10px 16px; background: #ececec; font-size: 13px; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase; cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none; }
+  .cat-head .count { color: #6a6a6a; font-size: 12px; font-weight: 500; text-transform: none; letter-spacing: 0; }
+  .cat-head .arrow { font-size: 11px; color: #6a6a6a; margin-right: 6px; transition: transform 0.15s; display: inline-block; }
+  .cat-head.collapsed .arrow { transform: rotate(-90deg); }
+  .cat-body.collapsed { display: none; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { background: #fafafa; text-align: left; padding: 8px 10px; font-weight: 600; border-bottom: 1px solid #e2e2e2; color: #4a4a4a; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; }
+  td { padding: 9px 10px; border-bottom: 1px solid #f0f0f0; vertical-align: top; line-height: 1.45; }
+  tr.new td:first-child { border-left: 3px solid #1f7a1f; padding-left: 7px; }
+  tr.importance-critical { background: #fffbec; }
+  tr.importance-drop { opacity: 0.5; background: #fafafa; }
+
+  .col-id { width: 40px; color: #999; font-size: 11px; font-family: "SF Mono", Menlo, monospace; }
+  .col-thesis { min-width: 340px; max-width: 520px; }
+  .col-thesis .text-view { padding: 6px 8px; white-space: pre-wrap; word-break: break-word; font-size: 13px; line-height: 1.5; color: #1f1f1f; }
+  .col-thesis textarea { width: 100%; padding: 6px 8px; border: 1px solid #d0d0d0; border-radius: 3px; font: inherit; background: #fff; color: #1f1f1f; font-size: 13px; line-height: 1.5; resize: none; overflow: hidden; box-sizing: border-box; }
+  .col-thesis textarea:focus { outline: none; border-color: #1f1f1f; }
+  .col-imp { width: 140px; }
+  .col-imp select { width: 100%; padding: 5px 6px; border: 1px solid #d0d0d0; border-radius: 3px; font: inherit; background: #fff; font-size: 12px; }
+  .col-src { width: 100px; font-size: 11px; color: #6a6a6a; }
+  .col-comment { min-width: 240px; }
+  .col-comment textarea { width: 100%; min-height: 28px; padding: 6px 8px; border: 1px solid transparent; border-radius: 3px; font: inherit; resize: none; overflow: hidden; background: transparent; font-size: 12px; color: #1f1f1f; line-height: 1.45; box-sizing: border-box; }
+  .col-comment textarea:focus, .col-comment textarea:hover { border-color: #d0d0d0; background: #fff; outline: none; }
+  .col-act { width: 36px; text-align: center; }
+  .col-act button { background: none; border: none; color: #aa3a3a; cursor: pointer; font-size: 16px; padding: 2px 6px; border-radius: 3px; }
+  .col-act button:hover { background: #fbeaea; }
+
+  .add-row { padding: 10px 16px; background: #fafafa; display: flex; gap: 8px; align-items: center; border-top: 1px solid #e2e2e2; }
+  .add-row input { flex: 1; padding: 7px 10px; border: 1px solid #d0d0d0; border-radius: 3px; font: inherit; font-size: 13px; }
+  .add-row button { padding: 7px 14px; border: 1px solid #1f1f1f; background: #fff; color: #1f1f1f; border-radius: 3px; cursor: pointer; font-size: 12px; font-weight: 600; font-family: inherit; }
+  .add-row button:hover { background: #1f1f1f; color: #fff; }
+
+  .legend { background: #fff; border: 1px solid #e2e2e2; border-radius: 6px; padding: 12px 16px; margin-bottom: 14px; font-size: 12px; color: #4a4a4a; }
+  .legend b { color: #1f1f1f; }
+  .legend .row { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 6px; }
+  .legend span.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
+
+  .saved-flash { position: fixed; bottom: 20px; right: 20px; background: #1f7a1f; color: #fff; padding: 8px 14px; border-radius: 4px; font-size: 12px; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 20; }
+  .saved-flash.show { opacity: 1; }
+
+  .float-nav { position: fixed; bottom: 20px; left: 20px; background: #1f1f1f; color: #fff; border: none; padding: 10px 14px; border-radius: 30px; font-size: 12px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.2); font-family: inherit; z-index: 20; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+  .float-nav.show { opacity: 0.9; pointer-events: auto; }
+  .float-nav:hover { opacity: 1; }
+
+  @media (max-width: 900px) { .col-src { display: none; } body { padding: 12px; } }
+</style>
+</head>
+<body>
+<h1>Maket CP — тезисы white paper <span style="font-size:11px;font-weight:500;color:#888;letter-spacing:0;text-transform:none;background:#eef5ee;padding:2px 6px;border-radius:3px;border:1px solid #cde0cd;">v2 · 2026-04-16 · +«Бренд как клиент»</span></h1>
+<div class="sub">Расставь значимость, прокомментируй, добавь свои. Всё сохраняется автоматически. Когда готово — Claude пересоберёт документ по твоим оценкам. <b style="color:#1f7a1f;">Если не видишь бейдж v2 — жёсткая перезагрузка: Cmd+Shift+R.</b></div>
+
+<div class="legend">
+  <b>Значимость:</b>
+  <div class="row">
+    <span><span class="swatch" style="background:#fffbec;border:1px solid #e3d49a"></span>Критичный — обязательно в white paper</span>
+    <span>Важный — желательно оставить</span>
+    <span>Вторичный — оставляем, но короче</span>
+    <span><span class="swatch" style="background:#fafafa;border:1px solid #d0d0d0"></span>Убрать — исключаем из документа</span>
+  </div>
+</div>
+
+<div class="bar">
+  <input type="search" id="search" placeholder="Поиск по тексту...">
+  <select id="filter-imp">
+    <option value="">Вся значимость</option>
+    <option value="critical">Критичный</option>
+    <option value="important">Важный</option>
+    <option value="secondary">Вторичный</option>
+    <option value="drop">Убрать</option>
+    <option value="">Без оценки</option>
+  </select>
+  <select id="filter-cat">
+    <option value="">Все категории</option>
+  </select>
+  <button class="secondary" id="collapse-all">Свернуть всё</button>
+  <button class="secondary" id="expand-all">Развернуть всё</button>
+  <div class="spacer"></div>
+  <div class="stats" id="stats"></div>
+  <button class="secondary" id="export-json">Экспорт JSON</button>
+  <button class="secondary" id="import-json">Импорт</button>
+  <input type="file" id="import-file" accept=".json" style="display:none">
+  <button class="secondary" id="reset-all">Сбросить оценки</button>
+</div>
+
+<div id="table-root"></div>
+
+<div class="saved-flash" id="saved-flash">Сохранено</div>
+<button class="float-nav" id="float-nav">↑ К фильтрам</button>
+
+<script>
+/* Источники тезисов. id стабильный - чтобы ревью переживало обновление списка. */
+var INITIAL_THESES = [
+  /* ─── Контекст рынка и проблема ─── */
+  { id: 'ctx_01', cat: 'Контекст рынка', src: 'Ч.I', text: 'E-commerce — визуальный бизнес. Покупатель не трогает платье, не примеряет ботинок. Всё решают фотографии — десятки на каждый артикул.' },
+  { id: 'ctx_02', cat: 'Контекст рынка', src: 'Ч.I', text: 'Одна коллекция среднего бренда: 30–60 артикулов × 6–12 кадров = 400–700 финальных фото. За съёмку 2000–3000 исходников.' },
+  { id: 'ctx_03', cat: 'Контекст рынка', src: 'Ч.I', text: 'Каждый кадр проходит 8 этапов (от превью до адаптации под каналы). Трое-четверо людей в цепочке, у каждого свой мессенджер и своя папка.' },
+  { id: 'ctx_04', cat: 'Контекст рынка', src: 'Ч.I', text: 'Съёмка давно не самая сложная часть. Сложно то, что между съёмкой и финальным кадром на маркетплейсе — и живёт оно в мессенджерах.' },
+  { id: 'ctx_05', cat: 'Контекст рынка', src: 'Ч.I', text: 'За проект фото меняет адрес 7 раз: диск → облако → почта → мессенджер → ретушёр → облако клиента → маркетплейс. Контекст теряется на каждом шаге.' },
+
+  /* ─── Пять историй ─── */
+  { id: 'pb_01', cat: 'Пять историй', src: 'Ч.I', text: '«Напомни, мы сейчас где?» — после 2–3 итераций никто не помнит, какая версия одобрена и что нужно доделать.' },
+  { id: 'pb_02', cat: 'Пять историй', src: 'Ч.I', text: '«Всё ждёт один кадр» — 30 из 35 готовы, но коллекция едет со скоростью 5 спорных. Неделя простоя.' },
+  { id: 'pb_03', cat: 'Пять историй', src: 'Ч.I', text: '«Это точно моя правка?» — на 3-й итерации непонятно, кто что просил. Нет объективной записи.' },
+  { id: 'pb_04', cat: 'Пять историй', src: 'Ч.I', text: '«Двадцать часов на мусор» — фото дошли до ретуши и были отбракованы. В следующем сезоне снимаем ровно такие же — потому что никто не помнит.' },
+  { id: 'pb_05', cat: 'Пять историй', src: 'Ч.I', text: '«А за что я плачу?» — клиент видит 300 финалов, не видит 2000 исходников и 15 итераций. Разговор про стоимость всегда тяжёлый.' },
+
+  /* ─── Философия ─── */
+  { id: 'phl_01', cat: 'Философия', src: 'Ч.II', text: 'Принцип зеркала: не создавать новое, а отражать уже идущий процесс.' },
+  { id: 'phl_02', cat: 'Философия', src: 'Ч.II', text: 'Таск-трекеры требуют двойной работы (перенеси карточку, отметь статус). В креативных командах не приживается — чат уже работает.' },
+  { id: 'phl_03', cat: 'Философия', src: 'Ч.II', text: 'Не «куда переместить фото» — а «что с ним уже произошло». Одинаково фотографу, клиенту, ретушёру.' },
+  { id: 'phl_04', cat: 'Философия', src: 'Ч.II', text: 'Один универсальный маршрут — для fashion-каталога, мебели, косметики, AI-контента. Меняется источник, не маршрут.' },
+  { id: 'phl_05', cat: 'Философия', src: 'core_message', text: '«Бизнес-аналитик для креативных команд и их заказчиков» — делает прозрачными эстетические требования и их техническое воплощение.' },
+  { id: 'phl_06', cat: 'Философия', src: 'vision', text: 'Maket CP — не DAM, не таск-трекер. Универсальная платформа для визуального контента любого типа.' },
+
+  /* ─── Ключевые сущности ─── */
+  { id: 'ent_01', cat: 'Сущности', src: 'memory', text: 'Центральная сущность — контейнер. Карточка товара, лук, группа для соцсетей, моушн-раскадровка — всё это контейнеры.' },
+  { id: 'ent_02', cat: 'Сущности', src: 'Ч.III', text: 'Контейнер содержит: категорию, слоты под ракурсы, привязку к артикулу/образу, комментарии по кадрам, статус на пайплайне.' },
+  { id: 'ent_03', cat: 'Сущности', src: 'memory', text: 'Слот — позиция в контейнере. У слота задаётся ориентация (h/v) и признак "главный". Фото кропаются под ориентацию слота.' },
+  { id: 'ent_04', cat: 'Сущности', src: 'memory', text: 'Шаблон = сохранённый пустой контейнер. Фотограф создаёт свои шаблоны, а не выбирает из пресетов.' },
+  { id: 'ent_05', cat: 'Сущности', src: 'vision', text: 'Пайплайн работает на уровне отдельной фотографии, не всего проекта. Проект — воронка, кадры на разных этапах одновременно.' },
+  { id: 'ent_06', cat: 'Сущности', src: 'memory', text: 'События проекта с автором и временем: открыл ссылку, одобрил, вернул, загрузил версию, перевёл партию.' },
+  { id: 'ent_07', cat: 'Сущности', src: 'Ч.III', text: 'Два представления истории: компактный дашборд (цифры по этапам) и детальный маршрут (git-like с ветвлениями).' },
+  { id: 'ent_08', cat: 'Сущности', src: 'memory', text: 'Мёртвые ветки — фото, отбракованные на поздних этапах. Не исчезают. Становятся аргументом для следующей съёмки.' },
+  { id: 'ent_09', cat: 'Сущности', src: 'memory', text: 'Частичное согласование на любом уровне: фото / карточка / контейнер. Несогласованное не убивается.' },
+  { id: 'ent_10', cat: 'Сущности', src: 'memory', text: 'Подписанные события — у каждого согласования есть идентификация, кто и когда.' },
+  { id: 'ent_11', cat: 'Сущности', src: 'brand-follow-up', text: 'Артикул живёт на двух уровнях: проекта (внутри одной съёмки) и бренда (сквозной через все съёмки). Сегодня работает первый, второй — ближайший шаг для повторных клиентов.' },
+
+  /* ─── UX / роли ─── */
+  { id: 'ux_01', cat: 'UX и роли', src: 'Ч.III', text: 'Три роли, одно пространство: фотограф/продюсер (десктоп), клиент (веб), ретушёр (веб).' },
+  { id: 'ux_02', cat: 'UX и роли', src: 'memory', text: 'Роли — не про права, а про позицию в процессе. Клиент-CD сам отбирает кадры, фотограф проверяет ретушь — блокировок нет.' },
+  { id: 'ux_03', cat: 'UX и роли', src: 'supabase', text: 'Магик-ссылки: клиент открывает URL и сразу внутри проекта. Без регистрации, без пароля — но с идентификацией действий.' },
+  { id: 'ux_04', cat: 'UX и роли', src: 'memory', text: 'Мобильный клиент уже работает: лента карточек, свайп-карусель по кадрам, кнопки «Согласовать» / «Вернуть» в конце.' },
+  { id: 'ux_05', cat: 'UX и роли', src: 'Ч.III', text: 'Свободная раскладка превью: фото встают в сетку как на журнальной полосе. Клиент смотрит карточки, а не 2000 файлов.' },
+  { id: 'ux_06', cat: 'UX и роли', src: 'Ч.III', text: 'Клиент и фотограф работают с одним объектом в реальном времени — без пересылок и версий файлов.' },
+  { id: 'ux_07', cat: 'UX и роли', src: 'brand-follow-up', text: 'Экран «артикул сквозь съёмки»: слева — история SKU (референс, замеры, решения), справа — все кадры по съёмкам в хронологии, вкладки сверху — по проектам.' },
+
+  /* ─── Валидация ─── */
+  { id: 'val_01', cat: 'Валидация', src: 'Ч.IV', text: 'Хаотичный клиент (референсы из Pinterest): карточка превращает хаос в план. Реакция — «О, как круто всё понятно и видно!»' },
+  { id: 'val_02', cat: 'Валидация', src: 'Ч.IV', text: 'Организованный клиент (подробный бриф): карточка сохраняет его структуру как источник правды для всей команды.' },
+  { id: 'val_03', cat: 'Валидация', src: 'Ч.IV', text: 'Ключевая цитата: «Если всё реально сохраняется — это очень удобно».' },
+  { id: 'val_04', cat: 'Валидация', src: 'memory', text: 'Продукт в пилоте с февраля 2026: коммерческие съёмки брендов одежды и обуви. Первые проекты — съёмки автора.' },
+
+  /* ─── Покрытие фаз ─── */
+  { id: 'ph_01', cat: 'Фазы проекта', src: 'Ч.III', text: 'Три фазы: до съёмки, во время, после. Сейчас Maket CP полностью покрывает "после" — там 70% боли.' },
+  { id: 'ph_02', cat: 'Фазы проекта', src: 'vision', text: 'Расширение в препродакшн через шаблоны контейнеров: клиент видит план работы ещё до выезда на студию.' },
+  { id: 'ph_03', cat: 'Фазы проекта', src: 'memory', text: 'В продакшн — выгрузка превью из Capture One через Rate Setter, клиент видит прямо во время съёмки.' },
+
+  /* ─── Монетизация ─── */
+  { id: 'mon_01', cat: 'Монетизация', src: 'Ч.V', text: 'Попроектная модель: 500 руб за проект. Никаких подписок, никаких скрытых лимитов.' },
+  { id: 'mon_02', cat: 'Монетизация', src: 'Ч.V', text: 'Пакеты для студии: 10 проектов — 4 000 руб (400 за проект), 50 — ещё дешевле.' },
+  { id: 'mon_03', cat: 'Монетизация', src: 'Ч.V', text: 'Хранение 3 месяца, продление — 100 руб на ещё 3 месяца. Без продления — экспорт финалов и архивация.' },
+  { id: 'mon_04', cat: 'Монетизация', src: 'Ч.V', text: 'Маржа на проект 88–99%. Продукт не нуждается в венчурном раунде, растёт органически.' },
+  { id: 'mon_05', cat: 'Монетизация', src: 'Ч.V', text: 'Платит сторона, которая отвечает за процесс: фотограф или студия. Бренд — участник, получает ссылку.' },
+  { id: 'mon_06', cat: 'Монетизация', src: 'Ч.V', text: 'Крупный бренд может централизованно купить пакет и раздать ссылки своим фотографам.' },
+  { id: 'mon_07', cat: 'Монетизация', src: 'brand-follow-up', text: 'Бренд-подписка (параллельно попроектной): годовой пакет для крупного клиента — безлимитные проекты, удлинённое хранение, брендированный кабинет, сквозной вид артикулов между съёмками.' },
+  { id: 'mon_08', cat: 'Монетизация', src: 'brand-follow-up', text: 'Две SKU — один продукт: фотограф платит за разовую съёмку, бренд — за сквозной порядок по сезонам. Пользуются одним и тем же интерфейсом, решают разные задачи.' },
+
+  /* ─── Конкурентный ландшафт ─── */
+  { id: 'cmp_01', cat: 'Конкуренты', src: 'Ч.VI', text: 'DAM (Bynder, Canto) — библиотека готовых ассетов. Начинается там, где Maket CP заканчивается.' },
+  { id: 'cmp_02', cat: 'Конкуренты', src: 'Ч.VI', text: 'Таск-трекеры (Asana, Trello, Notion) требуют вручную двигать карточки. В съёмках не приживается.' },
+  { id: 'cmp_03', cat: 'Конкуренты', src: 'Ч.VI', text: 'Облачные папки знают имена файлов, но не помнят смысл проекта. Контекст — в параллельных чатах.' },
+  { id: 'cmp_04', cat: 'Конкуренты', src: 'Ч.VI', text: 'Maket CP не заменяет облако — поверх файлов появляется слой смысла: этап, решение, комментарий, итерация.' },
+
+  /* ─── Бренд как клиент (повторные клиенты, сквозные артикулы) ─── */
+  { id: 'brd_01', cat: 'Бренд как клиент', src: 'brand-follow-up', text: 'Бренд — не одна съёмка, а поток. Сезон среднего бренда = 3–6 съёмок: предметка, модельная, лукбук, упаковка, соцсети, моушн, AI-контент. Один и тот же артикул проходит через несколько из них.' },
+  { id: 'brd_02', cat: 'Бренд как клиент', src: 'brand-follow-up', text: 'Сегодня артикул живёт только внутри одной съёмки. В следующей его заново заводят, заново сматчивают с референсом, заново комментируют. Для команды бренда это двойная-тройная работа на каждой новой съёмке.' },
+  { id: 'brd_03', cat: 'Бренд как клиент', src: 'brand-follow-up', text: 'Решение: артикул как сущность бренда, а не проекта. Один SKU — сквозная запись, которая накапливает связь со всеми съёмками, где этот артикул появляется.' },
+  { id: 'brd_04', cat: 'Бренд как клиент', src: 'brand-follow-up', text: 'Матчинг между съёмками по SKU и названию. В новой съёмке фотограф загружает референсы — система предлагает сматчить их с уже известными артикулами бренда. Клиент видит, какие из листа уже снимались и в каких проектах.' },
+  { id: 'brd_05', cat: 'Бренд как клиент', src: 'brand-follow-up', text: 'Сквозной экран артикула. Клиент открывает карточку SKU и видит цепочку: референс → предметка (январь) → модельная (февраль) → лукбук (март) → финалы на сайте. Одним экраном, без переключений между проектами.' },
+  { id: 'brd_06', cat: 'Бренд как клиент', src: 'brand-follow-up', text: 'Сравнение «цвет/посадка/styling через съёмки». «Платье шёлковое зелёное, арт. 2041» — цвет на предметке, цвет в каталоге, цвет в лукбуке, цвет на сайте. Клиент ловит расхождения до того, как они уедут на маркетплейс.' },
+  { id: 'brd_07', cat: 'Бренд как клиент', src: 'brand-follow-up', text: 'Мёртвые ветки на уровне артикула. Ракурс забраковали на предметке — когда стартует модельная, фотограф видит этот аргумент и делает иначе. История решений не теряется между съёмками.' },
+  { id: 'brd_08', cat: 'Бренд как клиент', src: 'brand-follow-up', text: 'Бриф на новую съёмку растёт из истории предыдущих: «На предметке платье получилось темнее реальности — на модельной поправить свет и экспозицию». Претензии клиента становятся техзаданием следующего дня.' },
+  { id: 'brd_09', cat: 'Бренд как клиент', src: 'brand-follow-up', text: 'Бренд-кабинет вместо десяти папок. Команда клиента (CD, арт-директор, бренд-менеджер) открывает один URL и видит все съёмки, всех артикулов, всю историю — независимо от того, какой фотограф снимал.' },
+  { id: 'brd_10', cat: 'Бренд как клиент', src: 'brand-follow-up', text: 'Саморастущий брендбук по артикулам. Через сезон у бренда — галерея ключевых SKU со всеми вариантами использования. Готовый базис для корпоративного DAM и рекламных кампаний без повторной разметки.' },
+  { id: 'brd_11', cat: 'Бренд как клиент', src: 'brand-follow-up', text: 'Lock-in через накопленный контекст. Чем дольше бренд в системе, тем ценнее история. Переезд возможен, но теряется связь артикулов со съёмками, решения и итерации — для среднего бренда это несколько сезонов работы.' },
+
+  /* ─── Дорожная карта ─── */
+  { id: 'rm_01', cat: 'Roadmap', src: 'Ч.VII', text: 'Q2 2026: стабилизация MVP, продвинутая история, биллинг через ЮKassa, экспорт архивов.' },
+  { id: 'rm_02', cat: 'Roadmap', src: 'Ч.VII', text: 'Q3 2026: шаблоны контейнеров в препродакшне, импорт артикулов из 1С/МойСклад, интеграция с Notion/Google Docs.' },
+  { id: 'rm_03', cat: 'Roadmap', src: 'Ч.VII', text: 'Q4 2026: живая синхронизация с Capture One Pro на площадке. Комментарии клиента с телефона прямо во время съёмки.' },
+  { id: 'rm_04', cat: 'Roadmap', src: 'Ч.VII', text: 'H1 2027: AI-группировка превью по ракурсу, автокомментарии на ретушь по эталонам бренда, модуль планирования ресурсов («Jira для фотографов»), API с маркетплейсами.' },
+  { id: 'rm_05', cat: 'Roadmap', src: 'brand-follow-up', text: 'Q3 2026: артикул как сущность бренда. Матчинг SKU между съёмками, сквозной экран артикула, сравнение «как было на предметке / как вышло в каталоге».' },
+  { id: 'rm_06', cat: 'Roadmap', src: 'brand-follow-up', text: 'Q4 2026: брендированный кабинет. Команда клиента видит все съёмки, всех артикулов, всю историю в одном месте, независимо от того, какой фотограф снимал. Основа для бренд-подписки.' },
+
+  /* ─── Неизменные принципы ─── */
+  { id: 'pr_01', cat: 'Принципы', src: 'Ч.VII', text: 'Зеркало, а не управление. Мы фиксируем, а не заставляем делать двойную работу.' },
+  { id: 'pr_02', cat: 'Принципы', src: 'Ч.VII', text: 'Контейнер в центре. Каждая новая фича проходит проверку: как это работает с контейнером.' },
+  { id: 'pr_03', cat: 'Принципы', src: 'Ч.VII', text: 'Прозрачная цена. Никаких скрытых лимитов и сложных тарифов.' },
+];
+
+var STORAGE_KEY = 'maketcp_whitepaper_theses_v1';
+
+/* state: { thesisId: { imp, comment }, newTheses: [{id, cat, text}] } */
+var state = loadState();
+
+function loadState() {
+  try {
+    var raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return { reviews: {}, added: [] };
+    var parsed = JSON.parse(raw);
+    return { reviews: parsed.reviews || {}, added: parsed.added || [] };
+  } catch (e) { return { reviews: {}, added: [] }; }
+}
+
+function saveState() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    flashSaved();
+  } catch (e) { console.error('save failed', e); }
+}
+
+var flashTimer;
+function flashSaved() {
+  var el = document.getElementById('saved-flash');
+  el.classList.add('show');
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(function () { el.classList.remove('show'); }, 1200);
+}
+
+function getReview(id) {
+  return state.reviews[id] || { imp: '', comment: '' };
+}
+
+function setReview(id, patch) {
+  state.reviews[id] = Object.assign({}, getReview(id), patch);
+  saveState();
+  renderStats();
+}
+
+function getAllTheses() {
+  return INITIAL_THESES.concat(state.added.map(function (a) {
+    return Object.assign({ isNew: true }, a);
+  }));
+}
+
+function addNewThesis(cat, text) {
+  var id = 'new_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+  state.added.push({ id: id, cat: cat, text: text, src: 'Добавлено' });
+  saveState();
+  render();
+}
+
+function removeNewThesis(id) {
+  state.added = state.added.filter(function (a) { return a.id !== id; });
+  delete state.reviews[id];
+  saveState();
+  render();
+}
+
+function getCategories() {
+  var seen = {}, list = [];
+  getAllTheses().forEach(function (t) {
+    if (!seen[t.cat]) { seen[t.cat] = true; list.push(t.cat); }
+  });
+  return list;
+}
+
+function importanceClass(imp) {
+  if (imp === 'critical') return 'importance-critical';
+  if (imp === 'drop') return 'importance-drop';
+  return '';
+}
+
+function render() {
+  var root = document.getElementById('table-root');
+  var search = document.getElementById('search').value.toLowerCase().trim();
+  var filterImp = document.getElementById('filter-imp').value;
+  var filterCat = document.getElementById('filter-cat').value;
+
+  var html = '';
+  var cats = getCategories();
+  if (filterCat) cats = cats.filter(function (c) { return c === filterCat; });
+
+  cats.forEach(function (cat) {
+    var items = getAllTheses().filter(function (t) { return t.cat === cat; });
+    items = items.filter(function (t) {
+      var review = getReview(t.id);
+      if (filterImp !== undefined && filterImp !== null && document.getElementById('filter-imp').selectedIndex > 0) {
+        /* Only apply imp filter if user chose non-default */
+        if (filterImp === '' && document.getElementById('filter-imp').selectedIndex === document.getElementById('filter-imp').options.length - 1) {
+          if (review.imp) return false;
+        } else if (filterImp !== '' && review.imp !== filterImp) return false;
+      }
+      if (search) {
+        var haystack = (t.text + ' ' + cat + ' ' + (review.comment || '')).toLowerCase();
+        if (haystack.indexOf(search) === -1) return false;
+      }
+      return true;
+    });
+    if (items.length === 0) return;
+
+    var catId = cat.replace(/\s+/g, '_');
+    html += '<div class="cat-group">';
+    html += '<div class="cat-head" data-cat="' + catId + '"><span><span class="arrow">▼</span>' + escapeHtml(cat) + '</span><span class="count">' + items.length + ' тезисов</span></div>';
+    html += '<div class="cat-body" data-cat="' + catId + '">';
+    html += '<table>';
+    html += '<tr><th class="col-id">ID</th><th class="col-thesis">Тезис</th><th class="col-imp">Значимость</th><th class="col-src">Источник</th><th class="col-comment">Комментарий</th><th class="col-act"></th></tr>';
+
+    items.forEach(function (t) {
+      var review = getReview(t.id);
+      var rowCls = importanceClass(review.imp) + (t.isNew ? ' new' : '');
+      html += '<tr class="' + rowCls + '" data-id="' + t.id + '">';
+      html += '<td class="col-id">' + escapeHtml(t.id) + '</td>';
+      if (t.isNew) {
+        html += '<td class="col-thesis"><textarea data-field="text" data-id="' + t.id + '" data-autogrow="1">' + escapeHtml(t.text) + '</textarea></td>';
+      } else {
+        html += '<td class="col-thesis"><div class="text-view">' + escapeHtml(t.text) + '</div></td>';
+      }
+      html += '<td class="col-imp"><select data-field="imp" data-id="' + t.id + '">';
+      html += '<option value=""' + (review.imp === '' ? ' selected' : '') + '>—</option>';
+      html += '<option value="critical"' + (review.imp === 'critical' ? ' selected' : '') + '>Критичный</option>';
+      html += '<option value="important"' + (review.imp === 'important' ? ' selected' : '') + '>Важный</option>';
+      html += '<option value="secondary"' + (review.imp === 'secondary' ? ' selected' : '') + '>Вторичный</option>';
+      html += '<option value="drop"' + (review.imp === 'drop' ? ' selected' : '') + '>Убрать</option>';
+      html += '</select></td>';
+      html += '<td class="col-src">' + escapeHtml(t.src || '') + '</td>';
+      html += '<td class="col-comment"><textarea data-field="comment" data-id="' + t.id + '" data-autogrow="1" placeholder="комментарий...">' + escapeHtml(review.comment || '') + '</textarea></td>';
+      html += '<td class="col-act">' + (t.isNew ? '<button data-remove="' + t.id + '" title="Удалить">×</button>' : '') + '</td>';
+      html += '</tr>';
+    });
+
+    html += '</table>';
+    html += '<div class="add-row"><input type="text" placeholder="Новый тезис в категорию «' + escapeHtml(cat) + '»..." data-addcat="' + escapeHtml(cat) + '"><button data-addbtn="' + escapeHtml(cat) + '">+ Добавить</button></div>';
+    html += '</div></div>';
+  });
+
+  /* Пустая категория для добавления новой */
+  html += '<div class="cat-group"><div class="cat-head"><span>Новая категория</span></div>';
+  html += '<div class="cat-body"><div class="add-row">';
+  html += '<input type="text" id="new-cat-name" placeholder="Название категории..." style="flex:0 0 200px">';
+  html += '<input type="text" id="new-cat-text" placeholder="Текст тезиса...">';
+  html += '<button id="add-new-cat">+ Добавить</button>';
+  html += '</div></div></div>';
+
+  root.innerHTML = html;
+  attachHandlers();
+  autogrowAll();
+  renderStats();
+  populateCategoryFilter();
+}
+
+function autogrow(el) {
+  if (!el) return;
+  el.style.height = 'auto';
+  el.style.height = (el.scrollHeight) + 'px';
+}
+
+function autogrowAll() {
+  document.querySelectorAll('textarea[data-autogrow]').forEach(function (el) {
+    autogrow(el);
+  });
+}
+
+function attachHandlers() {
+  document.querySelectorAll('[data-field]').forEach(function (el) {
+    el.addEventListener('input', function (e) {
+      var id = e.target.getAttribute('data-id');
+      var field = e.target.getAttribute('data-field');
+      var val = e.target.value;
+      if (e.target.hasAttribute('data-autogrow')) {
+        autogrow(e.target);
+      }
+      if (field === 'text') {
+        /* редактируем только новые */
+        var found = state.added.filter(function (a) { return a.id === id; })[0];
+        if (found) { found.text = val; saveState(); }
+      } else {
+        setReview(id, field === 'imp' ? { imp: val } : { comment: val });
+        if (field === 'imp') {
+          var tr = e.target.closest('tr');
+          tr.className = importanceClass(val) + (tr.classList.contains('new') ? ' new' : '');
+        }
+      }
+    });
+  });
+
+  document.querySelectorAll('[data-addbtn]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var cat = btn.getAttribute('data-addbtn');
+      var input = document.querySelector('[data-addcat="' + cat + '"]');
+      var text = input.value.trim();
+      if (!text) return;
+      addNewThesis(cat, text);
+    });
+  });
+  document.querySelectorAll('[data-addcat]').forEach(function (inp) {
+    inp.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') {
+        var cat = inp.getAttribute('data-addcat');
+        if (inp.value.trim()) addNewThesis(cat, inp.value.trim());
+      }
+    });
+  });
+
+  var addNewCatBtn = document.getElementById('add-new-cat');
+  if (addNewCatBtn) {
+    addNewCatBtn.addEventListener('click', function () {
+      var cat = document.getElementById('new-cat-name').value.trim();
+      var text = document.getElementById('new-cat-text').value.trim();
+      if (!cat || !text) return;
+      addNewThesis(cat, text);
+    });
+  }
+
+  document.querySelectorAll('[data-remove]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      if (!confirm('Удалить этот тезис?')) return;
+      removeNewThesis(btn.getAttribute('data-remove'));
+    });
+  });
+
+  document.querySelectorAll('.cat-head').forEach(function (h) {
+    h.addEventListener('click', function () {
+      var catId = h.getAttribute('data-cat');
+      if (!catId) return;
+      h.classList.toggle('collapsed');
+      var body = document.querySelector('.cat-body[data-cat="' + catId + '"]');
+      if (body) {
+        body.classList.toggle('collapsed');
+        if (!body.classList.contains('collapsed')) {
+          body.querySelectorAll('textarea[data-autogrow]').forEach(function (ta) { autogrow(ta); });
+        }
+      }
+    });
+  });
+}
+
+function renderStats() {
+  var all = getAllTheses();
+  var counts = { critical: 0, important: 0, secondary: 0, drop: 0, empty: 0 };
+  all.forEach(function (t) {
+    var r = getReview(t.id);
+    counts[r.imp || 'empty']++;
+  });
+  document.getElementById('stats').innerHTML =
+    'Всего: <b>' + all.length + '</b> · ' +
+    'Критичных: <b>' + counts.critical + '</b> · ' +
+    'Важных: <b>' + counts.important + '</b> · ' +
+    'Вторичных: <b>' + counts.secondary + '</b> · ' +
+    'Убрать: <b>' + counts.drop + '</b> · ' +
+    'Без оценки: <b>' + counts.empty + '</b>';
+}
+
+function populateCategoryFilter() {
+  var select = document.getElementById('filter-cat');
+  var current = select.value;
+  var cats = getCategories();
+  select.innerHTML = '<option value="">Все категории</option>' +
+    cats.map(function (c) { return '<option value="' + escapeHtml(c) + '"' + (c === current ? ' selected' : '') + '>' + escapeHtml(c) + '</option>'; }).join('');
+}
+
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/* Export / import */
+document.getElementById('export-json').addEventListener('click', function () {
+  var data = {
+    exportedAt: new Date().toISOString(),
+    theses: getAllTheses().map(function (t) {
+      var r = getReview(t.id);
+      return { id: t.id, cat: t.cat, text: t.text, isNew: !!t.isNew, importance: r.imp || null, comment: r.comment || '' };
+    }),
+  };
+  var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'maketcp_theses_' + new Date().toISOString().slice(0, 10) + '.json';
+  a.click();
+});
+document.getElementById('import-json').addEventListener('click', function () {
+  document.getElementById('import-file').click();
+});
+document.getElementById('import-file').addEventListener('change', function (e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  var r = new FileReader();
+  r.onload = function (ev) {
+    try {
+      var parsed = JSON.parse(ev.target.result);
+      if (!parsed.theses) throw new Error('no theses');
+      parsed.theses.forEach(function (t) {
+        state.reviews[t.id] = { imp: t.importance || '', comment: t.comment || '' };
+        if (t.isNew && !state.added.some(function (a) { return a.id === t.id; })) {
+          state.added.push({ id: t.id, cat: t.cat, text: t.text, src: 'Импорт' });
+        }
+      });
+      saveState();
+      render();
+      alert('Импорт завершён.');
+    } catch (er) { alert('Ошибка импорта: ' + er.message); }
+  };
+  r.readAsText(file);
+});
+
+document.getElementById('reset-all').addEventListener('click', function () {
+  if (!confirm('Сбросить все оценки и комментарии? Добавленные тезисы останутся.')) return;
+  state.reviews = {};
+  saveState();
+  render();
+});
+
+document.getElementById('collapse-all').addEventListener('click', function () {
+  document.querySelectorAll('.cat-head').forEach(function (h) { if (h.getAttribute('data-cat')) h.classList.add('collapsed'); });
+  document.querySelectorAll('.cat-body').forEach(function (b) { b.classList.add('collapsed'); });
+});
+document.getElementById('expand-all').addEventListener('click', function () {
+  document.querySelectorAll('.cat-head').forEach(function (h) { h.classList.remove('collapsed'); });
+  document.querySelectorAll('.cat-body').forEach(function (b) { b.classList.remove('collapsed'); });
+  autogrowAll();
+});
+
+['search', 'filter-imp', 'filter-cat'].forEach(function (id) {
+  document.getElementById(id).addEventListener('input', render);
+});
+
+/* Плавающая кнопка "К фильтрам": показать после 300px скролла */
+var floatNav = document.getElementById('float-nav');
+floatNav.addEventListener('click', function () { window.scrollTo({ top: 0, behavior: 'smooth' }); });
+window.addEventListener('scroll', function () {
+  if (window.scrollY > 300) floatNav.classList.add('show');
+  else floatNav.classList.remove('show');
+});
+
+render();
+</script>
+</body>
+</html>
