@@ -406,8 +406,8 @@ script/
 ├── C1_RateSetter_GUI.py     — tkinter standalone (Cmd+V через clipboard_get)
 └── set_photo.py             — утилита
 
-[anchor client]_cards/
-├── index.html               — карточки [anchor client] (37 карточек, drag-and-drop, undo)
+BrandX_cards/
+├── index.html               — карточки BrandX (37 карточек, drag-and-drop, undo)
 ├── cards.json               — данные карточек
 └── images/                  — 139 JPEG файлов
 ```
@@ -506,7 +506,7 @@ Share-ссылки: анонимный доступ по токену (?share=TO
 2. Готово: Rate Setter UI в web (перенесён из tkinter)
 3. Готово: v2 скелет кода: domain, services, infra, api
 4. Готово: Модульная архитектура frontend (state, nav, shootings, cards, sync, articles)
-5. Готово: Пайплайн 8 этапов, редактор карточек [anchor client]-стиль
+5. Готово: Пайплайн 8 этапов, редактор карточек BrandX-стиль
 6. Готово: Превью-панель с XMP-рейтингами, фильтрами по рейтингу и папке, дедупликацией
 7. Готово: Auth gate (Supabase Auth) -- единый для desktop и web
 8. Готово: Непрерывная авто-синхронизация с Supabase + оффлайн-режим

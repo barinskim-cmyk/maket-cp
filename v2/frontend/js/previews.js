@@ -243,7 +243,7 @@ function pvDbLoadPreviews(projKey, callback) {
 // ── Хелперы папок ──
 
 function pvFolderName(folderPath) {
-  // "/Users/masha/Photos/[anchor client]_previews" → "[anchor client]_previews"
+  // "/Users/user/Photos/BrandX_previews" → "BrandX_previews"
   if (!folderPath) return 'Без папки';
   var parts = folderPath.replace(/[\/\\]+$/, '').split(/[\/\\]/);
   return parts[parts.length - 1] || folderPath;

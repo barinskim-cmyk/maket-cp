@@ -29,7 +29,7 @@ class StageEvent:
 class Project:
     """Один проект = одна съёмка.
 
-    brand            — название бренда ([anchor client], Rendez-Vous, ...)
+    brand            — название бренда (BrandX, Partner Y, ...)
     shoot_date       — дата съёмки (ISO 8601)
     template         — шаблон карточки для всего проекта
     cards            — список карточек товара

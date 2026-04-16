@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Insights — как мы работаем с Машей над Maket CP</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 900px; margin: 40px auto; padding: 0 24px; color: #1a1a1a; line-height: 1.55; font-size: 15px; }
+  h1 { font-size: 28px; border-bottom: 2px solid #1a1a1a; padding-bottom: 12px; margin-bottom: 4px; }
+  h1 + .subtitle { color: #666; margin-bottom: 32px; font-size: 14px; }
+  h2 { font-size: 20px; margin-top: 40px; padding-top: 8px; border-top: 1px solid #ccc; }
+  h3 { font-size: 16px; margin-top: 24px; color: #333; }
+  .meta { background: #f5f5f0; padding: 14px 18px; font-size: 13px; margin: 18px 0 24px 0; }
+  .callout { background: #f0f4f7; border-left: 3px solid #5577aa; padding: 12px 16px; margin: 14px 0; font-size: 14px; }
+  .warn { background: #fdf4ea; border-left: 3px solid #c08040; padding: 12px 16px; margin: 14px 0; font-size: 14px; }
+  .good { background: #eef5ee; border-left: 3px solid #4a8a4a; padding: 12px 16px; margin: 14px 0; font-size: 14px; }
+  table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 13px; }
+  th, td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; vertical-align: top; }
+  th { background: #f5f5f0; font-weight: 600; }
+  code { background: #f0f0ec; padding: 1px 5px; font-size: 13px; border-radius: 2px; }
+  .rec { background: #fafafa; border: 1px solid #ddd; padding: 14px 18px; margin: 12px 0; }
+  .rec h4 { margin: 0 0 6px 0; font-size: 15px; }
+  .rec .what { font-size: 14px; color: #333; }
+  .rec .why { font-size: 13px; color: #666; margin-top: 6px; }
+  .kpi { display: inline-block; background: #1a1a1a; color: #fff; padding: 3px 10px; margin-right: 6px; font-size: 13px; }
+  .kpi-light { display: inline-block; background: #eee; color: #333; padding: 3px 10px; margin-right: 6px; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<h1>Insights — как мы с тобой работаем</h1>
+<div class="subtitle">Маша, это не отчёт «что мы сделали», а разбор нашей связки: где она сильная, где теряем время, что стоит поменять. Всё построено на auto-memory (42 файла) и истории коммитов Maket CP.</div>
+
+<div class="meta">
+<strong>Период:</strong> вся история Maket CP (28 марта 2026 — 15 апреля 2026, 19 дней)<br>
+<strong>Источники:</strong> 42 файла auto-memory, 307 коммитов в git, 3 задокументированных инцидента, 3 подтверждения от реальных клиентов<br>
+<strong>Что здесь будет:</strong> портрет тебя и проекта, что работает в связке, повторяющиеся слабые места, паттерны инцидентов, конкретные рекомендации, предложения по настройке памяти и workflow
+</div>
+
+<h2>1. Кто ты и что мы строим</h2>
+
+<p>Ты — коммерческий фотограф с 7 годами опыта ретуши. Строишь <strong>Maket CP</strong> — не просто DAM для фотографов, а универсальную платформу управления визуальным контентом для e-commerce. Позиционирование, которое ты сама сформулировала: «бизнес-аналитик для креативных команд и их заказчиков». Это ядро, к которому я всегда возвращаюсь при проектировании фич.</p>
+
+<p>Ключевые характеристики, которые влияют на то, как мне стоит с тобой работать:</p>
+
+<ul>
+<li><strong>Не разработчик.</strong> Я пишу код, ты валидируешь продукт и архитектурные решения. Тебе нужны технические решения с опциями и pros/cons, а не «я сделал — вот держи».</li>
+<li><strong>Commercial product mindset.</strong> Это не прототип — это продукт, который будут продавать студиям. Код-комментарии и документация обязательны.</li>
+<li><strong>Реальная обратная связь от клиентов.</strong> Ты тестируешь прототип на живых съёмках (BrandX, [test user A]). Это самый сильный сигнал качества — ни один синтетический тест так не работает.</li>
+<li><strong>Предпочтения по форме:</strong> обращение по имени, без эмодзи и иконок, чистый функциональный UI, русский язык, краткость по делу.</li>
+</ul>
+
+<h2>2. Что у нас работает хорошо</h2>
+
+<div class="good">
+<strong>Темп и ритм.</strong> 307 коммитов за 19 дней. 33 коммита 1 апреля, 38 — 11 апреля. Это не хаос — это сессии, где мы закрываем цельный слой. Ты не боишься гонять итерации, я не боюсь коммитить по мелочи.
+</div>
+
+<h3>2.1. Продуктовое мышление → память → код</h3>
+
+<p>У нас получилась рабочая цепочка: ты формулируешь продуктовый инсайт в разговоре → я сохраняю в auto-memory как <code>project_*.md</code> → потом опираюсь на это при проектировании. Примеры, которые реально влияли на код:</p>
+
+<table>
+<tr><th>Инсайт</th><th>Где отложилось</th><th>Как повлияло</th></tr>
+<tr><td>Пайплайн не линейный, карточки двигаются независимо</td><td>project_branching_pipeline.md</td><td>StageEvent с уровня проекта спустился на уровень карточки</td></tr>
+<tr><td>Убитые фото — отдельная ветка для подсчёта «бессмысленной» работы</td><td>project_dead_branches.md</td><td>Поле <code>killed_at_stage</code>, отдельная строка в дашборде</td></tr>
+<tr><td>Согласование = подписанное событие, не роль-gated</td><td>project_signed_approval.md</td><td>Ушли от пред-разметки зон ответственности, identity-recorded</td></tr>
+<tr><td>Шаблоны создаются пользователем, а не хардкодятся</td><td>project_template_design.md</td><td>Убрали CARD_TEMPLATES-пресеты, оставили 2-3 стартовых</td></tr>
+<tr><td>Три фазы (pre/prod/post)</td><td>project_three_phases.md</td><td>Мост pre→prod через шаблоны заранее — появился в роадмапе</td></tr>
+</table>
+
+<h3>2.2. Валидация на реальных съёмках</h3>
+
+<p>Три зафиксированных валидационных сигнала:</p>
+<ol>
+<li><strong>Хаотичный клиент 1:</strong> «о как круто все понятно и видно мне так нравится спасибо». Подтвердил главную ценность — структурирование.</li>
+<li><strong>Организованный клиент 2:</strong> прислал +52 неструктурированных фото сверх шаблона. Доверяет процессу.</li>
+<li><strong>Клиент 3:</strong> «если все реально сохраняется, это очень удобно». Подтвердил ценность share-ссылок.</li>
+</ol>
+<p>Это намного ценнее любых метрик. Каждый раз, когда ты возвращаешься с реальной съёмки, у нас появляется инсайт, который не получить синтетически.</p>
+
+<h3>2.3. Коллаборация по техническим решениям</h3>
+
+<p>Ты просишь предлагать опции с pros/cons и решать вместе. Это работает: решения, которые мы приняли так (IndexedDB для оффлайна, Supabase Storage для превью, gpt-5.4-mini для Vision, попроектная оплата + пакеты), ни одно не пришлось переигрывать. Когда я пытался решать за тебя — получалось хуже.</p>
+
+<h2>3. Повторяющиеся слабые места</h2>
+
+<div class="warn">
+<strong>Наблюдение номер один.</strong> Из 307 коммитов 89 начинаются с <code>fix/Fix</code> и только 55 с <code>feat/Add</code>. Это 62% правок против 38% новых фич. Часть — это нормальная доработка, но есть три паттерна, которые повторяются и которых можно было избежать.
+</div>
+
+<h3>3.1. Destructive operations без guard-rail</h3>
+
+<p><strong>Инцидент BrandX (14.04.2026):</strong> потеря карточек — сработал сценарий, где локальные изменения перезаписывали облачные. Пришлось вводить soft-delete, BEFORE DELETE триггер, лог с 0-го этапа и anti-wipe guards. Это не один коммит, а пять (<code>31b0c89</code>, <code>8a7b06a</code>, <code>995263e</code>, <code>e4a9043</code>, <code>b9cd02f</code>).</p>
+
+<p><strong>Паттерн:</strong> когда я делаю что-то, что удаляет или перезаписывает данные, я недостаточно параноик. В нашем флоу «коммит после каждой логической задачи» — это плюс, но для destructive операций он должен превращаться в «коммит + guard + ручной тест на сейв-копии».</p>
+
+<h3>3.2. Ассумпции про формат данных на границах</h3>
+
+<p>Три похожих бага за 19 дней:</p>
+<ol>
+<li><strong>Cyrillic filenames (15.04.2026).</strong> Supabase Storage кидает 400 InvalidKey на кириллицу — пришлось ввести <code>sbSanitizeStorageKey</code> с транслитом.</li>
+<li><strong>AI matching ref_image (15.04.2026).</strong> <code>_refImagePath</code> хранился как bucket-relative (<code>uuid/ar_xxx.jpeg</code>), а код оборачивал его как <code>data:image/jpeg;base64,&lt;path&gt;</code>. OpenAI отклонял это как «unsupported image».</li>
+<li><strong>Field name divergence (<code>cc</code> vs <code>color_correction</code>).</strong> Фронт и бэк разошлись в названии атрибута версии — пришлось вводить «категорически запрещён рассинхрон» как правило.</li>
+</ol>
+
+<p><strong>Паттерн:</strong> каждый раз, когда данные пересекают границу (frontend ↔ Supabase, Supabase ↔ Storage, backend ↔ OpenAI), есть риск что одна сторона ожидает один формат, другая — другой. У нас нет единого контракта, который это ловит до продакшна.</p>
+
+<h3>3.3. RLS и SECURITY DEFINER</h3>
+
+<p>Миграции <code>023</code>, <code>024</code>, <code>025</code> для Storage RLS на article-refs — это четыре итерации диагностики, прежде чем сложилась правильная политика. В memory я записал правило (<code>feedback_supabase_storage_rls.md</code>), но по-хорошему это должно было уйти в шаблон: любая новая Storage-политика начинается с этого правила.</p>
+
+<h3>3.4. Диагностика «вслепую»</h3>
+
+<p>Когда ты присылаешь console-дамп с ошибкой вроде «API error 400», я часто пытаюсь угадать, вместо того чтобы сначала попросить <strong>тело ответа</strong>. В случае с OpenAI Vision мы потеряли несколько итераций, потому что <code>supabase-js invoke()</code> прячет body в <code>error.context.text()</code>, и я это не сразу вспомнил.</p>
+
+<h2>4. Паттерны инцидентов — чему они учат</h2>
+
+<table>
+<tr><th>Инцидент</th><th>Дата</th><th>Root cause</th><th>Что надо было сделать иначе</th></tr>
+<tr><td>BrandX data loss</td><td>14.04.2026</td><td>Локальные изменения (включая пустой стейт) могли перезаписать облако; не было soft-delete</td><td>Любая операция DELETE/overwrite на продакшн-данных требует guard: подтверждение + log + soft-delete по умолчанию</td></tr>
+<tr><td>Cyrillic filenames 400</td><td>15.04.2026</td><td>Supabase Storage кидает 400 InvalidKey на не-ASCII; не знали об ограничении</td><td>Проверять ограничения внешнего API до интеграции; иметь sanitizer на входе — не после первого бага</td></tr>
+<tr><td>AI matching URL bug</td><td>15.04.2026</td><td>Storage path без схемы оборачивался как base64; OpenAI → unsupported image</td><td>При работе со Storage всегда записывать в одном виде: либо bucket-path, либо public URL. Не оба.</td></tr>
+</table>
+
+<div class="callout">
+<strong>Общий урок:</strong> два из трёх инцидентов — про то, как данные выглядят на границе систем. Решение на уровне процесса: перед интеграцией с любым внешним сервисом мы вместе пишем «контракт» (что принимает, что возвращает, что делает при ошибке) и сохраняем его в <code>reference_*.md</code>.
+</div>
+
+<h2>5. Твой workflow — что я наблюдаю</h2>
+
+<h3>5.1. Стиль сообщений</h3>
+
+<p>Ты пишешь коротко, в реальном времени. Примеры из этой сессии:</p>
+<ul>
+<li>«я тестирую у себя те же ошибки» + console dump</li>
+<li>«но вот он уже 3 карточку делает и ничего не нашел»</li>
+<li>«пока ничего делать не будем» — когда хочешь подумать</li>
+<li>«супер давай проврим сохранился ли проект» — когда доволен и идём дальше</li>
+</ul>
+
+<p>Это круто работает: мы не тратим время на формальности. Единственное, что я могу улучшить — это чаще <strong>подтверждать, что понял</strong>, прежде чем рваться в код.</p>
+
+<h3>5.2. Когда ты говоришь «стоп» и почему</h3>
+
+<p>Ты останавливаешь работу в двух случаях:</p>
+<ol>
+<li><strong>Когда чувствуешь, что надо обдумать продуктовое решение.</strong> «пока ничего делать не будем. но хочется конечно побвстрее научить его метчить. Что думаешь?» — это сигнал, что ты хочешь обсудить опции, а не чтобы я сразу писал оптимизацию.</li>
+<li><strong>Когда нужен ручной тест.</strong> Ты часто пулишь на своём Mac, тестируешь на реальной съёмке, возвращаешься с фидбэком. Это наш цикл проверки.</li>
+</ol>
+
+<h3>5.3. Где мы теряем время</h3>
+
+<ul>
+<li><strong>Дублирующие коммиты.</strong> Иногда одну и ту же задачу коммичу дважды (<code>c63b468</code> и <code>a9f75d3</code>, <code>a172576</code> и <code>6ceb408</code>) — когда push с песочницы упал и мы восстанавливаемся с Mac. Можно чище управлять состоянием веток.</li>
+<li><strong>Дуплицированная диагностика.</strong> Когда ошибка всплывает, я иногда добавляю console.log, коммичу, смотрю логи, убираю, коммичу ещё раз. Это можно делать локально, не через прод.</li>
+<li><strong>Обход блокировок окружения</strong> (<code>GIT_DIR=/tmp/maketcp_git</code>). Работает, но каждая новая сессия я трачу несколько тулколлов на воспроизведение workaround. Решение — оформить как скрипт в репозитории и вызывать его.</li>
+</ul>
+
+<h2>6. Персональные рекомендации</h2>
+
+<h3>6.1. Тебе — как формулировать задачи мне</h3>
+
+<div class="rec">
+<h4>Когда задача простая («почини баг X»)</h4>
+<div class="what">Присылай: <strong>console dump + шаги воспроизведения + ожидаемое поведение</strong>. Этого достаточно, чтобы я не гадал.</div>
+<div class="why">Пример, где это сработало идеально: бот [test user A] с CSV — сразу понятно, что проверить в Supabase.</div>
+</div>
+
+<div class="rec">
+<h4>Когда задача продуктовая («давай сделаем X лучше»)</h4>
+<div class="what">Скажи явно: <strong>«предложи опции»</strong> или <strong>«просто сделай»</strong>. Без этого я угадываю, и иногда угадываю неправильно.</div>
+<div class="why">Ты уже так делаешь в половине случаев. Если бы я это знал с первой минуты каждой задачи — не тратили бы время на «а ты хотел просто починить или спроектировать?».</div>
+</div>
+
+<div class="rec">
+<h4>Когда задача большая («вся история проекта», «все инсайты»)</h4>
+<div class="what">Дай <strong>формат выхода</strong> (HTML / docx / слайды) и <strong>уровень детализации</strong> («в двух абзацах» / «подробно со всеми примерами»).</div>
+<div class="why">Ты сегодня это сделала через AskUserQuestion — и результат на порядок лучше, чем если бы я угадывал.</div>
+</div>
+
+<div class="rec">
+<h4>Когда хочешь паузу</h4>
+<div class="what">Достаточно одной фразы: «пока не трогаем», «пока думаю». Я не буду лезть с оптимизацией.</div>
+<div class="why">Ты это уже используешь — продолжай. Я не воспринимаю это как отказ, а как «сейчас думаем, потом делаем».</div>
+</div>
+
+<h3>6.2. Мне — что исправить в себе</h3>
+
+<div class="rec">
+<h4>Сначала читать, потом писать код</h4>
+<div class="what">Перед любой задачей, затрагивающей Supabase, AI Vision, Storage или пайплайн — сначала прочитать соответствующий <code>reference_*.md</code> или <code>project_*.md</code>. У нас их 42, я не должен их игнорировать.</div>
+<div class="why">Инцидент с кириллицей — в памяти уже было правило про <code>auth.uid()</code> в политике, но про ключи Storage ничего не было. Теперь есть (<code>incident_[anchor client]_cyrillic_filenames.md</code>). Надо читать до работы, а не после инцидента.</div>
+</div>
+
+<div class="rec">
+<h4>Не гадать по console-дампу</h4>
+<div class="what">Когда приходит ошибка с внешнего API (OpenAI, Supabase, Storage), первое действие — увидеть <strong>тело ответа</strong>. Если оно спрятано (как в <code>supabase-js invoke</code>) — добавить логирование и запросить полный дамп до того, как начать чинить.</div>
+<div class="why">На AI matching мы потеряли итерацию, пытаясь угадать причину 400. Когда добавил логирование body — за 30 секунд стало ясно.</div>
+</div>
+
+<div class="rec">
+<h4>Destructive operations = три guard-rail</h4>
+<div class="what">Любой код, который удаляет, перезаписывает, очищает — проходит три проверки: (1) soft-delete по умолчанию, (2) лог события с 0-го этапа, (3) anti-wipe guard на случай «пустой стейт льётся в облако». Не по одной при инциденте — сразу три.</div>
+<div class="why">BrandX стоила одной съёмки восстановления. Это должно быть дороже, чем 10 минут на guard.</div>
+</div>
+
+<div class="rec">
+<h4>Контракт на границе до интеграции</h4>
+<div class="what">Перед подключением нового внешнего сервиса — записать в <code>reference_*.md</code>: принимаемые форматы, ограничения, error shape. До первого запроса в прод.</div>
+<div class="why">Кириллица в Storage и base64 vs URL в OpenAI — оба бага возникли потому, что я не знал ограничения. Если бы записал контракт сначала — не было бы.</div>
+</div>
+
+<h2>7. Настройка auto-memory и workflow</h2>
+
+<h3>7.1. Память — что стоит почистить</h3>
+
+<p>У нас 42 файла, 30 из них <code>project_*</code>. Есть перекрытия, которые стоит консолидировать:</p>
+
+<table>
+<tr><th>Группа</th><th>Файлы</th><th>Предложение</th></tr>
+<tr><td>Pipeline &amp; metrics</td><td>project_pipeline.md, project_pipeline_metrics.md, project_pipeline_triggers.md, project_pipeline_versions.md, project_metrics_evolution.md, project_per_photo_pipeline.md, project_photo_timestamps.md, project_dead_branches.md, project_branching_pipeline.md</td><td>Схлопнуть в 2-3 файла: <code>project_pipeline_model.md</code> (архитектура) + <code>project_pipeline_metrics.md</code> (UI/метрики) + <code>project_pipeline_events.md</code> (триггеры/таймштампы/мёртвые ветки)</td></tr>
+<tr><td>Approval &amp; roles</td><td>project_signed_approval.md, project_partial_approval.md, project_role_model.md, project_client_validation.md</td><td>Оставить как есть — у них разные углы, каждый нужен</td></tr>
+<tr><td>Template &amp; layout</td><td>project_template_design.md, project_template_future.md, project_layout_vision.md</td><td>Склеить <code>project_template_design.md</code> + <code>project_template_future.md</code> в один</td></tr>
+</table>
+
+<h3>7.2. Память — чего не хватает</h3>
+
+<ul>
+<li><strong>reference_openai_vision.md</strong> — формат payload, модель gpt-5.4-mini, reasoning_effort, ограничения по URL/base64, ожидаемый shape error body. Это спасло бы нас от двух коммитов на AI matching.</li>
+<li><strong>reference_storage_buckets.md</strong> — список бакетов (article-refs, previews, cos_versions, ai-pdf-pages), какой формат путей в каждом, как строится public URL, ограничения по именам (Cyrillic = no).</li>
+<li><strong>feedback_diagnostics.md</strong> — правило «сначала тело ответа, потом гипотеза».</li>
+<li><strong>project_active_state.md</strong> — какие модули сейчас в активной разработке (pipeline UI, articles, AI matching), какие в бэклоге, какие закрыты. Сейчас это разбросано по <code>project_status_april2026.md</code>, которому через месяц настанет «что актуально?».</li>
+</ul>
+
+<h3>7.3. Workflow — что можно оформить как автоматизацию</h3>
+
+<ul>
+<li><strong>Scripting git-workaround.</strong> Сейчас я каждую сессию воспроизвожу <code>cp -r .git /tmp/maketcp_git</code> руками. Можно оформить как <code>scripts/commit.sh</code> и вызывать одной командой.</li>
+<li><strong>Pre-commit hook для sync-правил.</strong> Если модифицирую файл, который фигурирует в <code>feedback_supabase_storage_rls.md</code>, выводить reminder. Это даже не код — это чек-лист, который я должен прокатывать сам.</li>
+<li><strong>Diff-review перед destructive миграцией.</strong> Любая миграция, которая содержит <code>DROP</code>, <code>TRUNCATE</code>, <code>DELETE</code>, <code>VACUUM</code>, — проходит через явное твоё подтверждение. Это сильнее чем «я написал — ты ревью». Это «пока ты не сказала <code>ok</code>, я не запускаю».</li>
+</ul>
+
+<h2>8. Сводка — что мы меняем с сегодня</h2>
+
+<ol>
+<li><strong>Я</strong> — перед задачей читаю релевантный <code>project_*.md</code> или <code>reference_*.md</code>. Если нужного нет — создаю.</li>
+<li><strong>Я</strong> — при любой ошибке от внешнего API запрашиваю полный body до написания гипотезы.</li>
+<li><strong>Я</strong> — при destructive-коде сразу делаю soft-delete + лог + anti-wipe. Не ждём инцидента.</li>
+<li><strong>Ты</strong> — в начале сложной задачи говоришь формат результата и уровень детализации. Одной фразой.</li>
+<li><strong>Ты</strong> — если нужна пауза, просто пишешь «думаю». Я жду.</li>
+<li><strong>Вместе</strong> — создаём 4 недостающих reference-файла (openai, storage, diagnostics, active_state) за одну сессию.</li>
+<li><strong>Вместе</strong> — схлопываем 9 pipeline-файлов в 3. Одной сессией.</li>
+</ol>
+
+<div class="good">
+<strong>Последнее.</strong> У нас сильная связка. Темп, продуктовое мышление, валидация на реальных клиентах, доверие к техническим решениям — всё это на месте. 62% fix-коммитов — это не проблема, а следствие высокой скорости итераций. Слабые места, которые я описал выше — это не «что не так с нами», это «где конкретно можно сэкономить по 30 минут за сессию». Если следовать этим 7 пунктам — следующий месяц будет заметно тише по инцидентам.
+</div>
+
+</body>
+</html>

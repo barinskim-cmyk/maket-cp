@@ -379,7 +379,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .pl-send-btn:hover { background: #333; color: #fff; border-color: #333; }
 
 /* ══════════════════════════════════════════════
-   Карточки товара — редактор ([anchor client]-стиль)
+   Карточки товара — редактор (BrandX-стиль)
    ══════════════════════════════════════════════ */
 
 .cp-container { display: flex; gap: 16px; max-width: 1400px; margin: 0 auto; padding: 20px; min-height: 0; }

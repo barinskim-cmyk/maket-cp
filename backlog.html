@@ -931,14 +931,14 @@ tr:hover td { background: #fafafa; }
   <td contenteditable="true" class="my-comment"></td>
 </tr>
 
-<tr class="section-row"><td colspan="10">Защита от потери данных (инцидент [anchor client] 14.04.2026)</td></tr>
+<tr class="section-row"><td colspan="10">Защита от потери данных (инцидент BrandX 14.04.2026)</td></tr>
 
 <tr data-row="sync-queue-pending">
   <td><span class="s-done">DONE</span></td>
   <td>Облако / Синхронизация</td>
   <td contenteditable="true"><strong>Pending-sync очередь + action_log с 0 фазы</strong></td>
   <td>995263e, b9cd02f</td>
-  <td>Follow-up инцидент 14.04.2026 (краштест): из 57 созданных карточек в облако долетела только 1. Причина — НЕ DELETE+INSERT race как в [anchor client], а флаг _shCloudSyncRunning в shootings.js: пока шла первичная долгая заливка sbUploadProject, все последующие shCloudSyncExplicit видели флаг=true и молча выходили. После завершения заливки ничего не ретриггерило sync. Фиксы: (1) добавлен _shCloudSyncPending флаг + _shFinishSync() helper — sync автоматически перезапускается если за время работы пришли новые изменения; (2) sbLogAction теперь буферизует события в _sbPendingLogActions пока _cloudId не установлен, sbFlushPendingLog проталкивает их после первичной заливки; (3) cpAddCard/cpDeleteCard теперь логируют create_card/delete_card (раньше логировались только операции со слотами); (4) DELETE+INSERT cards заменён на UPSERT с onConflict='id,project_id' (составной pkey) и deleted_at=null в payload — обходит конфликт с триггером миграции 026. Проверка на проекте краштест2: 4 карточки × 4 слота = 16 live slots, 33 log_events (7 create_card + 26 add_to_slot), 100 превью — всё долетело.</td>
+  <td>Follow-up инцидент 14.04.2026 (краштест): из 57 созданных карточек в облако долетела только 1. Причина — НЕ DELETE+INSERT race как в BrandX, а флаг _shCloudSyncRunning в shootings.js: пока шла первичная долгая заливка sbUploadProject, все последующие shCloudSyncExplicit видели флаг=true и молча выходили. После завершения заливки ничего не ретриггерило sync. Фиксы: (1) добавлен _shCloudSyncPending флаг + _shFinishSync() helper — sync автоматически перезапускается если за время работы пришли новые изменения; (2) sbLogAction теперь буферизует события в _sbPendingLogActions пока _cloudId не установлен, sbFlushPendingLog проталкивает их после первичной заливки; (3) cpAddCard/cpDeleteCard теперь логируют create_card/delete_card (раньше логировались только операции со слотами); (4) DELETE+INSERT cards заменён на UPSERT с onConflict='id,project_id' (составной pkey) и deleted_at=null в payload — обходит конфликт с триггером миграции 026. Проверка на проекте краштест2: 4 карточки × 4 слота = 16 live slots, 33 log_events (7 create_card + 26 add_to_slot), 100 превью — всё долетело.</td>
   <td class="files">shootings.js, supabase.js, cards.js</td>
   <td>--</td>
   <td class="t-cell"><span class="t-none">--</span></td>
@@ -962,7 +962,7 @@ tr:hover td { background: #fafafa; }
   <td>Облако / БД</td>
   <td contenteditable="true"><strong>Soft-delete карточек/слотов + BEFORE DELETE триггер</strong></td>
   <td>a221d30</td>
-  <td>После инцидента с потерей всех карточек в проекте [anchor client] (тестирование Викой, пустой push в облако перезатёр локальные копии у всех клиентов). Решение: миграция 026 добавляет deleted_at timestamptz в cards/slots, partial indexes WHERE deleted_at IS NULL, BEFORE DELETE триггер перехватывает любой DELETE и превращает в UPDATE deleted_at=now(). Физически удалить карточку теперь невозможно без SET LOCAL maketcp.allow_hard_delete='on'. save_cards_by_token имеет guard на пустой массив. RPC restore_deleted_cards(project_id, since) восстанавливает мягко-удалённое. JS: .is('deleted_at', null) на всех SELECT карточек/слотов, защита sbPullProject от 0-cards wipe. ТРЕБУЕТ: запустить 026_soft_delete_cards_slots.sql в Supabase Dashboard.</td>
+  <td>После инцидента с потерей всех карточек в проекте BrandX (тестирование Викой, пустой push в облако перезатёр локальные копии у всех клиентов). Решение: миграция 026 добавляет deleted_at timestamptz в cards/slots, partial indexes WHERE deleted_at IS NULL, BEFORE DELETE триггер перехватывает любой DELETE и превращает в UPDATE deleted_at=now(). Физически удалить карточку теперь невозможно без SET LOCAL maketcp.allow_hard_delete='on'. save_cards_by_token имеет guard на пустой массив. RPC restore_deleted_cards(project_id, since) восстанавливает мягко-удалённое. JS: .is('deleted_at', null) на всех SELECT карточек/слотов, защита sbPullProject от 0-cards wipe. ТРЕБУЕТ: запустить 026_soft_delete_cards_slots.sql в Supabase Dashboard.</td>
   <td class="files">026_soft_delete_cards_slots.sql, supabase.js</td>
   <td>--</td>
   <td class="t-cell"><span class="t-none">--</span></td>
@@ -974,7 +974,7 @@ tr:hover td { background: #fafafa; }
   <td>Облако / Аналитика</td>
   <td contenteditable="true"><strong>action_log с 0 этапа (раньше было с 3)</strong></td>
   <td>a221d30</td>
-  <td>SB_LOG_MIN_STAGE был 3 — из-за этого все действия на ранних этапах (превью, отбор, раскладка карточек) не логировались. Проект [anchor client] к моменту инцидента был на раннем этапе, поэтому action_log оказался пустым и восстановить карточки из лога не удалось. Снизили порог до 0 — теперь любое движение карточки/слота пишется в лог с самого начала проекта.</td>
+  <td>SB_LOG_MIN_STAGE был 3 — из-за этого все действия на ранних этапах (превью, отбор, раскладка карточек) не логировались. Проект BrandX к моменту инцидента был на раннем этапе, поэтому action_log оказался пустым и восстановить карточки из лога не удалось. Снизили порог до 0 — теперь любое движение карточки/слота пишется в лог с самого начала проекта.</td>
   <td class="files">supabase.js</td>
   <td>--</td>
   <td class="t-cell"><span class="t-none">--</span></td>
@@ -1082,7 +1082,7 @@ tr:hover td { background: #fafafa; }
   <td>Артикулы</td>
   <td contenteditable="true"><strong>Mini-batch flush + soft abort по памяти</strong></td>
   <td></td>
-  <td>Против OOM на длинных прогонах (инцидент [anchor client]). Каждые 5 карточек AI-метчер делает паузу 800мс, частично перерисовывает списки, сохраняет прогресс в облако (shAutoSave + arCloudSync) и проверяет performance.memory.usedJSHeapSize. Если heap > 85% лимита — останавливается мягко, показывает сообщение "AI остановлен: память заполнена. Обработано X/Y. Запустите ещё раз." Плюс soft timeout 60с на одну карточку: если API висит > 1 минуты — эта карточка пропускается, идём дальше. Добавлено в обе ветки: _arMatchWithPdfPages (основной путь при PDF) и _arMatchWithRefImages (fallback). Mini-batch сохранение гарантирует что если браузер всё-таки упадёт, уже сопоставленные пары не теряются — они уехали в облако каждые 5 карточек.</td>
+  <td>Против OOM на длинных прогонах (инцидент BrandX). Каждые 5 карточек AI-метчер делает паузу 800мс, частично перерисовывает списки, сохраняет прогресс в облако (shAutoSave + arCloudSync) и проверяет performance.memory.usedJSHeapSize. Если heap > 85% лимита — останавливается мягко, показывает сообщение "AI остановлен: память заполнена. Обработано X/Y. Запустите ещё раз." Плюс soft timeout 60с на одну карточку: если API висит > 1 минуты — эта карточка пропускается, идём дальше. Добавлено в обе ветки: _arMatchWithPdfPages (основной путь при PDF) и _arMatchWithRefImages (fallback). Mini-batch сохранение гарантирует что если браузер всё-таки упадёт, уже сопоставленные пары не теряются — они уехали в облако каждые 5 карточек.</td>
   <td class="files">articles.js</td>
   <td>--</td>
   <td class="t-cell"><span class="t-none">--</span></td>

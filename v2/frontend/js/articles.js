@@ -3589,7 +3589,7 @@ function _arMatchWithPdfPages(cards, skuList, pdfPages, apiKey, proj, statusEl) 
   var idx = 0;
   /* Mini-batch flush: каждые 5 карточек — частичный sync в облако +
      пауза для GC + проверка heap. Без этого на 50+ карточках
-     браузер уходит в OOM (инцидент [anchor client]). */
+     браузер уходит в OOM (инцидент BrandX). */
   var FLUSH_EVERY = 5;
   var CARD_TIMEOUT_MS = 60000;
   var HEAP_ABORT_RATIO = 0.85;
@@ -3841,7 +3841,7 @@ function _arMatchWithRefImages(cards, proj, pvByName, apiKey, statusEl) {
   var BATCH_SIZE = 10;
   /* Mini-batch flush каждые N карточек: освобождаем локальные ссылки,
      делаем паузу для GC + проверяем heap. Это мера против OOM на длинных
-     прогонах (инцидент [anchor client]: 57 карточек → сбой по памяти). */
+     прогонах (инцидент BrandX: 57 карточек → сбой по памяти). */
   var FLUSH_EVERY = 5;
   var CARD_TIMEOUT_MS = 60000; /* soft cap: 60с на одну карточку */
   var HEAP_ABORT_RATIO = 0.85; /* если heap > 85% лимита — остановиться */
@@ -4870,7 +4870,7 @@ function arUpdateStats() {
 
 
 /* ──────────────────────────────────────────────
-   Импорт старого формата проекта ([anchor client]_data.json)
+   Импорт старого формата проекта (legacy_data.json)
    ────────────────────────────────────────────── */
 
 /**

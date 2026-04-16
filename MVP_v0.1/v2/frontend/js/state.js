@@ -27,7 +27,7 @@ var App = {
    Модель шаблона:
    {
      id:       string   — уникальный ключ
-     name:     string   — имя ("[anchor client] стандарт", "DShu аксессуары")
+     name:     string   — имя ("BrandX standard", "Studio Z accessories")
      hAspect:  string   — пропорции горизонтов ("3/2", "16/9", "4/3")
      vAspect:  string   — пропорции вертикалей ("2/3", "3/4", "4/5")
      lockRows: boolean  — фиксированные ряды (slot.row из редактора)

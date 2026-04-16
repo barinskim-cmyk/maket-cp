@@ -1,5 +1,5 @@
 # Images and large binary files
-[anchor client]_cards/images/
+BrandX_cards/images/
 *.jpg
 *.jpeg
 *.png
@@ -57,6 +57,6 @@ config.local.json
 v2/frontend/config.json
 
 # Large legacy HTML files with embedded images
-[anchor client]_карточки товара.html
-[anchor client]_карточки_товара_v2.html
+BrandX_карточки товара.html
+BrandX_карточки_товара_v2.html
 _snapshots/
