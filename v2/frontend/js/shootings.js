@@ -723,17 +723,11 @@ function renderPipeline() {
     }
   }
 
-  /* ── Пайплайн: этапы + ветки встроены в каждый шаг ── */
+  /* ── Классификация этапов: done / active / future ── */
   var hasBranch = _cmtBranchActive;
-
-  html += '<div class="pipeline-steps">';
+  var stageStates = []; /* массив {cls, cnt, cum} для каждого этапа */
   for (var i = 0; i < PIPELINE_STAGES.length; i++) {
-    var s = PIPELINE_STAGES[i];
     var cnt = photoCounts[i];
-    /* Определяем состояние этапа:
-       done = на этапе 0 фото И хотя бы на одном следующем есть фото (значит прошли мимо)
-       active = на этапе есть фото
-       future = этап впереди, фото ещё не дошли */
     var cls = '';
     var hasPhotosAfter = false;
     for (var j = i + 1; j < PIPELINE_STAGES.length; j++) {
@@ -741,13 +735,24 @@ function renderPipeline() {
     }
     if (cnt === 0 && hasPhotosAfter) cls = 'done';
     else if (cnt > 0) cls = 'active';
-    /* else: future — пустой, нет фото после — cls остаётся '' */
-
-    /* Fallback для проектов без фото: используем старую логику proj._stage */
+    /* else: future — cls остаётся '' */
     if (totalPhotos === 0) {
       if (i < stage) cls = 'done';
       else if (i === stage) cls = 'active';
     }
+    stageStates.push({ cls: cls, cnt: cnt, cum: metrics.cumulative[i] });
+  }
+
+  /* ── Компактный пайплайн: рисуем ТОЛЬКО этапы с активностью ── */
+  html += '<div class="pipeline-steps">';
+  for (var i = 0; i < PIPELINE_STAGES.length; i++) {
+    var s = PIPELINE_STAGES[i];
+    var ss = stageStates[i];
+    var cnt = ss.cnt;
+    var cls = ss.cls;
+
+    /* Пропускаем этапы без активности (future) — их просто нет в UI */
+    if (!cls) continue;
 
     var isSnapshotCtx = (typeof _snActiveSnapshot !== 'undefined' && _snActiveSnapshot &&
       _snActiveSnapshot.stageId === s.id);
@@ -760,21 +765,16 @@ function renderPipeline() {
     html += '<div class="step-dot">' + (cls === 'done' ? '&#10003;' : (i + 1)) + '</div>';
     html += '<div class="step-info">';
     html += '<div class="step-name">' + esc(s.name);
-    /* Счётчик: cumulative N/M (сколько прошли этап / масштаб)
-       Для done: "N/M" — прошли этап.
-       Для active: "N на этапе" (сколько здесь сейчас).
-       Для этапа 0: "N/потенциал" (сколько прошли преотбор из всех превью). */
+    /* Счётчик: cumulative N/M для done, "N на этапе" для active */
     if (totalPhotos > 0) {
-      var cum = metrics.cumulative[i];
+      var cum = ss.cum;
       if (i === 0 && metrics.potential > 0) {
-        /* Преотбор: потенциал → масштаб */
         if (cls === 'done') {
           html += '<span class="step-photo-count">' + cum + '/' + metrics.potential + '</span>';
         } else if (cnt > 0) {
           html += '<span class="step-photo-count">' + cnt + ' фото</span>';
         }
       } else if (i > 0 && metrics.scale > 0) {
-        /* Постпреотбор: N/масштаб для done, кол-во на этапе для active */
         if (cls === 'done') {
           html += '<span class="step-photo-count">' + cum + '/' + metrics.scale + '</span>';
         } else if (cls === 'active') {
@@ -786,7 +786,7 @@ function renderPipeline() {
     }
     html += '</div>';
 
-    /* Даты этапа: done = диапазон, active = «с [дата]» */
+    /* Даты этапа: done = диапазон (бледный), active = «с [дата]» */
     if (cls === 'done') {
       var doneNote = '';
       var sd = proj._stageDates && proj._stageDates[i];
@@ -803,9 +803,9 @@ function renderPipeline() {
       html += '<div class="step-note">c ' + enterDate.toLocaleDateString('ru-RU') + '</div>';
     }
 
-    /* Кнопки действий — только на этапах с фото (active) */
+    /* Кнопки действий — только на active этапах */
     if (cls === 'active') {
-      html += '<button class="step-action" onclick="advanceStage(' + i + ')">Завершить этап</button>';
+      html += '<button class="step-action" onclick="shShowJumpMenu(' + i + ', this)">Завершить этап</button>';
       if (s.id === 'selection') {
         html += '<button class="step-action" style="border-color:#333;color:#333;margin-left:6px" onclick="shSendClientLink()">Ссылка на преотбор</button>';
       }
@@ -828,7 +828,7 @@ function renderPipeline() {
   }
   html += '</div>'; /* /pipeline-steps */
 
-  /* ── Строка масштаба проекта ── */
+  /* ── Строка масштаба + ссылка на детальный вид ── */
   if (totalPhotos > 0) {
     html += '<div class="pipeline-scale">';
     if (metrics.scale > 0) {
@@ -839,6 +839,7 @@ function renderPipeline() {
     } else {
       html += 'Потенциал: ' + metrics.potential + ' превью';
     }
+    html += ' <a href="#" onclick="shShowDetailedPipeline();return false" style="margin-left:8px;font-size:11px;color:#999;text-decoration:underline">подробнее</a>';
     html += '</div>';
   }
 
@@ -853,6 +854,169 @@ function renderPipeline() {
   html += _shRenderTimeline(proj);
 
   container.innerHTML = html;
+}
+
+/**
+ * Показать меню выбора следующего этапа (нелинейный переход).
+ * Позволяет перепрыгивать этапы — например, из «Отбор команды» сразу в «Ретушь».
+ * @param {number} currentIdx — индекс текущего active-этапа
+ * @param {HTMLElement} btn — кнопка для позиционирования
+ */
+function shShowJumpMenu(currentIdx, btn) {
+  /* Удаляем предыдущее меню если есть */
+  var old = document.getElementById('sh-jump-menu');
+  if (old) { old.remove(); return; }
+
+  var menu = document.createElement('div');
+  menu.id = 'sh-jump-menu';
+  menu.className = 'sh-jump-menu';
+
+  /* Предлагаем этапы ПОСЛЕ текущего */
+  var hasOptions = false;
+  for (var i = currentIdx + 1; i < PIPELINE_STAGES.length; i++) {
+    hasOptions = true;
+    var s = PIPELINE_STAGES[i];
+    var item = document.createElement('div');
+    item.className = 'sh-jump-item';
+    item.textContent = s.name;
+    item.setAttribute('data-idx', i);
+    item.onclick = function() {
+      var targetIdx = parseInt(this.getAttribute('data-idx'));
+      document.getElementById('sh-jump-menu').remove();
+      advanceStage(currentIdx, targetIdx);
+    };
+    menu.appendChild(item);
+  }
+
+  if (!hasOptions) {
+    /* Последний этап — просто завершаем */
+    advanceStage(currentIdx);
+    return;
+  }
+
+  /* Заголовок */
+  var header = document.createElement('div');
+  header.className = 'sh-jump-header';
+  header.textContent = 'Перейти к этапу:';
+  menu.insertBefore(header, menu.firstChild);
+
+  btn.parentNode.appendChild(menu);
+
+  /* Закрыть по клику снаружи */
+  setTimeout(function() {
+    document.addEventListener('click', function _close(e) {
+      var m = document.getElementById('sh-jump-menu');
+      if (m && !m.contains(e.target)) {
+        m.remove();
+        document.removeEventListener('click', _close);
+      }
+    });
+  }, 50);
+}
+
+/**
+ * Показать детальный пайплайн во всплывающем окне.
+ * Отображает путь групп фото по этапам: сколько фото на каждом, куда идут.
+ * Пройденные этапы — бледные, активные — яркие.
+ */
+function shShowDetailedPipeline() {
+  var proj = getActiveProject();
+  if (!proj) return;
+
+  shEnsurePhotoStages(proj);
+  var photoCounts = shPhotosPerStage(proj);
+  var metrics = shCumulativeMetrics(proj, photoCounts);
+  var totalPhotos = proj.previews ? proj.previews.length : 0;
+
+  var html = '<div class="sh-detail-pipeline">';
+  html += '<h3 style="margin:0 0 16px 0;font-size:16px">Детальный пайплайн</h3>';
+
+  /* Полная визуализация всех этапов */
+  for (var i = 0; i < PIPELINE_STAGES.length; i++) {
+    var s = PIPELINE_STAGES[i];
+    var cnt = photoCounts[i];
+    var cum = metrics.cumulative[i];
+    var cls = '';
+    var hasPhotosAfter = false;
+    for (var j = i + 1; j < PIPELINE_STAGES.length; j++) {
+      if (photoCounts[j] > 0) { hasPhotosAfter = true; break; }
+    }
+    if (cnt === 0 && hasPhotosAfter) cls = 'done';
+    else if (cnt > 0) cls = 'active';
+
+    /* Пройденные и будущие — бледные, активный — яркий */
+    var opacity = (cls === 'active') ? '1' : '0.4';
+    var fontWeight = (cls === 'active') ? '600' : '400';
+    var barWidth = 0;
+    if (totalPhotos > 0) barWidth = Math.round(cnt / totalPhotos * 100);
+
+    html += '<div style="display:flex;align-items:center;gap:12px;padding:8px 0;opacity:' + opacity + '">';
+    html += '<div style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;';
+    if (cls === 'done') html += 'background:#333;color:#fff;border:2px solid #333">';
+    else if (cls === 'active') html += 'background:#f5f5f5;color:#333;border:2px solid #333;font-weight:700">';
+    else html += 'background:#fff;color:#ccc;border:2px solid #e0e0e0">';
+    html += (cls === 'done' ? '&#10003;' : (i + 1)) + '</div>';
+
+    html += '<div style="flex:1">';
+    html += '<div style="font-size:14px;font-weight:' + fontWeight + ';color:#333">' + esc(s.name);
+    if (cnt > 0) {
+      html += ' <span style="font-size:12px;font-weight:normal;color:#888">' + cnt + ' фото</span>';
+    }
+    html += '</div>';
+
+    /* Полоска прогресса */
+    if (barWidth > 0 || cls === 'done') {
+      var bw = cls === 'done' ? Math.round(cum / (i === 0 ? metrics.potential : metrics.scale || 1) * 100) : barWidth;
+      html += '<div style="height:4px;background:#eee;border-radius:2px;margin-top:4px;overflow:hidden">';
+      html += '<div style="height:100%;width:' + Math.min(bw, 100) + '%;background:' + (cls === 'active' ? '#333' : '#999') + ';border-radius:2px"></div>';
+      html += '</div>';
+      /* Детальная метрика */
+      if (cls === 'done') {
+        var denom = i === 0 ? metrics.potential : metrics.scale;
+        html += '<div style="font-size:11px;color:#aaa;margin-top:2px">Прошли: ' + cum + '/' + denom + '</div>';
+      } else if (cls === 'active') {
+        html += '<div style="font-size:11px;color:#888;margin-top:2px">' + cnt + ' на этапе</div>';
+      }
+    }
+
+    /* Даты */
+    var sd = proj._stageDates && proj._stageDates[i];
+    if (sd && sd.firstEnter) {
+      var dEnter = new Date(sd.firstEnter).toLocaleDateString('ru-RU');
+      var dLeave = sd.lastLeave ? new Date(sd.lastLeave).toLocaleDateString('ru-RU') : '';
+      var dateStr = '';
+      if (cls === 'done') dateStr = dLeave && dLeave !== dEnter ? dEnter + ' — ' + dLeave : dEnter;
+      else if (cls === 'active') dateStr = 'с ' + dEnter;
+      if (dateStr) html += '<div style="font-size:11px;color:#bbb;margin-top:1px">' + dateStr + '</div>';
+    }
+
+    html += '</div>'; /* /flex:1 */
+    html += '</div>'; /* /row */
+  }
+
+  /* Итого */
+  html += '<div style="margin-top:12px;padding-top:8px;border-top:1px solid #eee;font-size:12px;color:#888">';
+  html += 'Всего: ' + totalPhotos + ' фото';
+  if (metrics.scale > 0 && metrics.scale < metrics.potential) {
+    html += ' (отобрано ' + metrics.scale + ' из ' + metrics.potential + ')';
+  }
+  html += '</div>';
+  html += '</div>';
+
+  /* Динамическая модалка */
+  var overlay = document.getElementById('sh-detail-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'sh-detail-overlay';
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = '<div class="modal-content" style="max-width:480px;padding:24px"></div>';
+    overlay.addEventListener('click', function(e) {
+      if (e.target === overlay) overlay.classList.remove('open');
+    });
+    document.body.appendChild(overlay);
+  }
+  overlay.querySelector('.modal-content').innerHTML = html;
+  overlay.classList.add('open');
 }
 
 /**
@@ -1264,7 +1428,7 @@ function _shRunDiff() {
  * @param {number} [stageIdx] — индекс этапа, с которого двигаем фото.
  *   Если не указан, используется proj._stage (backward compatible).
  */
-function advanceStage(stageIdx) {
+function advanceStage(stageIdx, targetIdx) {
   if (App.selectedProject < 0) return;
   var proj = App.projects[App.selectedProject];
   shEnsurePhotoStages(proj);
@@ -1274,7 +1438,8 @@ function advanceStage(stageIdx) {
   if (stageIdx >= PIPELINE_STAGES.length - 1) return; /* последний этап — некуда двигать */
 
   var currentStageObj = PIPELINE_STAGES[stageIdx];
-  var nextStageIdx = stageIdx + 1;
+  /* Нелинейный переход: targetIdx позволяет прыгнуть через этапы */
+  var nextStageIdx = (typeof targetIdx === 'number' && targetIdx > stageIdx) ? targetIdx : stageIdx + 1;
 
   /* Собираем фото на этом этапе */
   var movedPhotos = [];
