@@ -355,6 +355,13 @@ section{padding:80px 0}
 .ph-photo-name{font-size:10px;color:#fff}
 .ph-photo-comment-btn{font-size:10px;color:#fff;background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.4);border-radius:4px;padding:2px 8px;cursor:pointer}
 .ph-photo-comment-btn:hover{background:rgba(255,255,255,0.3)}
+.ph-nav{position:absolute;top:50%;transform:translateY(-50%);width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,0.85);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;color:#333;opacity:0;transition:opacity 0.2s;z-index:2;box-shadow:0 1px 3px rgba(0,0,0,0.2)}
+.ph-photo:hover .ph-nav{opacity:1}
+.ph-nav:hover{background:#fff}
+.ph-nav.prev{left:6px}
+.ph-nav.next{right:6px}
+.ph-variant-counter{position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.5);color:#fff;font-size:9px;padding:1px 6px;border-radius:8px;opacity:0;transition:opacity 0.2s;z-index:2}
+.ph-photo:hover .ph-variant-counter{opacity:1}
 
 /* Comment bubble */
 .ph-comment{margin:0 10px 8px;padding:8px 10px;background:#f8f8f8;border-radius:8px;font-size:11px;color:#555;position:relative;border:1px solid #eee}
@@ -1526,34 +1533,35 @@ function aiReset() {
 // ═══════════════════════════════════════
 var containers = [
   { name: 'Сумка T-201', photos: [
-    { name: 'T-201_front.jpg', color: C[0], hero: true },
-    { name: 'T-201_side.jpg', color: C[5] },
-    { name: 'T-201_back.jpg', color: C[6] },
-    { name: 'T-201_detail.jpg', color: C[7] }
+    { name: 'T-201_front', color: C[0], hero: true, variants: [C[0], C[5], C[8]] },
+    { name: 'T-201_side', color: C[5], variants: [C[5], C[0]] },
+    { name: 'T-201_back', color: C[6], variants: [C[6], C[7]] },
+    { name: 'T-201_detail', color: C[7], variants: [C[7]] }
   ]},
   { name: 'Кроссовки K-504', photos: [
-    { name: 'K-504_front.jpg', color: C[1], hero: true },
-    { name: 'K-504_side.jpg', color: C[8] },
-    { name: 'K-504_sole.jpg', color: C[9] },
-    { name: 'K-504_lace.jpg', color: C[10] }
+    { name: 'K-504_front', color: C[1], hero: true, variants: [C[1], C[8], C[11]] },
+    { name: 'K-504_side', color: C[8], variants: [C[8], C[1]] },
+    { name: 'K-504_sole', color: C[9], variants: [C[9]] },
+    { name: 'K-504_lace', color: C[10], variants: [C[10], C[9]] }
   ]},
   { name: 'Сандалии S-110', photos: [
-    { name: 'S-110_front.jpg', color: C[2], hero: true },
-    { name: 'S-110_strap.jpg', color: C[11] },
-    { name: 'S-110_pair.jpg', color: C[12] }
+    { name: 'S-110_front', color: C[2], hero: true, variants: [C[2], C[12]] },
+    { name: 'S-110_strap', color: C[11], variants: [C[11], C[2]] },
+    { name: 'S-110_pair', color: C[12], variants: [C[12]] }
   ]},
   { name: 'Ботинки M-320', photos: [
-    { name: 'M-320_front.jpg', color: C[3], hero: true },
-    { name: 'M-320_profile.jpg', color: C[13] },
-    { name: 'M-320_detail.jpg', color: C[14] },
-    { name: 'M-320_texture.jpg', color: C[0] }
+    { name: 'M-320_front', color: C[3], hero: true, variants: [C[3], C[13], C[14]] },
+    { name: 'M-320_profile', color: C[13], variants: [C[13], C[3]] },
+    { name: 'M-320_detail', color: C[14], variants: [C[14]] },
+    { name: 'M-320_texture', color: C[0], variants: [C[0], C[14]] }
   ]},
   { name: 'Клатч P-066', photos: [
-    { name: 'P-066_front.jpg', color: C[4], hero: true },
-    { name: 'P-066_open.jpg', color: C[7] },
-    { name: 'P-066_clasp.jpg', color: C[9] }
+    { name: 'P-066_front', color: C[4], hero: true, variants: [C[4], C[7]] },
+    { name: 'P-066_open', color: C[7], variants: [C[7], C[4]] },
+    { name: 'P-066_clasp', color: C[9], variants: [C[9]] }
   ]}
 ];
+var variantIdx = {}; // key: "ci_pi" -> current variant index
 
 var comments = {}; // key: "ci_pi" -> string
 var activeComment = null; // "ci_pi"
@@ -1571,9 +1579,18 @@ function renderFeed() {
     for (var pi = 0; pi < cont.photos.length; pi++) {
       var ph = cont.photos[pi];
       var key = ci + '_' + pi;
-      html += '<div class="ph-photo' + (ph.hero ? ' hero-photo' : '') + '" data-key="' + key + '" onclick="toggleComment(\'' + key + '\')">';
-      html += '<div class="ph-photo-img" style="background:' + ph.color + ';opacity:0.65"></div>';
-      html += '<div class="ph-photo-overlay"><span class="ph-photo-name">' + ph.name + '</span>';
+      var vi = variantIdx[key] || 0;
+      var vc = ph.variants ? ph.variants.length : 1;
+      var curColor = (ph.variants && ph.variants[vi]) ? ph.variants[vi] : ph.color;
+      var varName = ph.name + '_' + String.fromCharCode(97 + vi) + '.jpg';
+      html += '<div class="ph-photo' + (ph.hero ? ' hero-photo' : '') + '" data-key="' + key + '">';
+      html += '<div class="ph-photo-img" style="background:' + curColor + ';opacity:0.65"></div>';
+      if (vc > 1) {
+        html += '<div class="ph-variant-counter">' + (vi + 1) + ' / ' + vc + '</div>';
+        if (vi > 0) html += '<button class="ph-nav prev" onclick="event.stopPropagation();navVariant(\'' + key + '\',-1)">&#8249;</button>';
+        if (vi < vc - 1) html += '<button class="ph-nav next" onclick="event.stopPropagation();navVariant(\'' + key + '\',1)">&#8250;</button>';
+      }
+      html += '<div class="ph-photo-overlay" onclick="toggleComment(\'' + key + '\')"><span class="ph-photo-name">' + varName + '</span>';
       html += '<span class="ph-photo-comment-btn">Комментарий</span></div></div>';
       // Comment input
       html += '<div class="ph-comment-input' + (activeComment === key ? ' active' : '') + '" id="ci_' + key + '">';
@@ -1591,6 +1608,19 @@ function renderFeed() {
   updateStats();
 }
 renderFeed();
+
+function navVariant(key, dir) {
+  var parts = key.split('_');
+  var ci = parseInt(parts[0]), pi = parseInt(parts[1]);
+  var ph = containers[ci].photos[pi];
+  var vc = ph.variants ? ph.variants.length : 1;
+  var cur = variantIdx[key] || 0;
+  var next = cur + dir;
+  if (next >= 0 && next < vc) {
+    variantIdx[key] = next;
+    renderFeed();
+  }
+}
 
 function toggleComment(key) {
   activeComment = activeComment === key ? null : key;
