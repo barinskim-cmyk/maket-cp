@@ -590,7 +590,7 @@ footer p{font-size:13px;color:#aaa}
 <section class="mission section" id="mission">
   <div class="container fade-up">
     <div class="mission-title">Наша цель</div>
-    <div class="mission-headline">Система для людей, а не люди для системы</div>
+    <div class="mission-headline">Система для людей,<br>а не люди для системы</div>
     <div class="mission-cards">
       <div class="mission-card">
         <div class="mission-card-num">01</div>
@@ -622,17 +622,17 @@ footer p{font-size:13px;color:#aaa}
       <div class="pain-card fade-up">
         <div class="pain-num">01</div>
         <h3>Хаос в коммуникациях</h3>
-        <p>2000+ фото на съёмку. Клиент получает папку с файлами и должен как-то сообщить, что ему нравится. Скриншоты в мессенджерах, голосовые, таблицы с номерами файлов.</p>
+        <p>2000+ фото за съёмку, 300 в преотборе. Клиент получает папку с файлами и должен как-то сообщить, что ему нравится. Скриншоты в мессенджерах, голосовые, таблицы с номерами файлов.</p>
       </div>
       <div class="pain-card fade-up delay-1">
         <div class="pain-num">02</div>
         <h3>Разрыв между инструментами</h3>
-        <p>Capture One для обработки, Excel для чек-листов, мессенджеры для согласований, облако для передачи файлов. Информация размазана по 5 инструментам.</p>
+        <p>Capture One для обработки, Excel для чек-листов, мессенджеры для согласований, облако для передачи файлов. Информация размазана по 5 инструментам. Все вручную синхронизируют информацию — и она теряется.</p>
       </div>
       <div class="pain-card fade-up delay-2">
         <div class="pain-num">03</div>
-        <h3>Невидимый статус</h3>
-        <p>Команда не знает, на каком этапе каждая фотография. Клиент не знает, когда будет готово. Руководитель узнаёт о проблемах, когда уже поздно.</p>
+        <h3>Где сейчас какие фото?</h3>
+        <p>Часть фото отправили как срочное, 10 забраковали по дороге, остальные на разных этапах. Поток не движется целиком от этапа к этапу — и никто не знает, где сейчас какие фотографии. Готовое пересылается в 10-й раз вместе с тремя кадрами на доработку.</p>
       </div>
       <div class="pain-card fade-up delay-1">
         <div class="pain-num">04</div>
@@ -643,6 +643,22 @@ footer p{font-size:13px;color:#aaa}
         <div class="pain-num">05</div>
         <h3>Тема папок не раскрыта</h3>
         <p>Только папок становится больше 2, а их непременно больше двух — структура рассыпается. Переименовали файл — потерялась связь с исходником. Весь процесс держится на живых файлах, а не на данных.</p>
+      </div>
+      <div class="pain-card fade-up">
+        <div class="pain-num">06</div>
+        <h3>Все ждет один кадр</h3>
+        <p>30 из 35 карточек готовы, но съемка едет со скоростью 5 спорных. Неделя простоя, потому что самые сложные кадры блокируют процесс.</p>
+      </div>
+      
+      <div class="pain-card fade-up">
+        <div class="pain-num">07</div>
+        <h3>Чаты и папки победили систему</h3>
+        <p>Разработали систему внутри, но команда саботирует: нужно называть файлы строго по шаблону, сохранять в определенную папку, заполнять поля вручную. Куча ограничений — люди возвращаются в мессенджеры.</p>
+      </div>
+      <div class="pain-card fade-up delay-1">
+        <div class="pain-num">08</div>
+        <h3>Отчёты без метрик</h3>
+        <p>Нужны цифры — процент брака, SLA, OTIF, время на итерацию — но считать неоткуда. Данные в чатах и папках, метрики собирают вручную по памяти.</p>
       </div>
       <div class="pain-card highlight fade-up delay-3">
         <div class="pain-num">30-50%</div>
@@ -934,6 +950,33 @@ footer p{font-size:13px;color:#aaa}
       <div class="data-stat"><div class="num">100%</div><div class="lbl">История каждого кадра</div></div>
       <div class="data-stat"><div class="num">0</div><div class="lbl">Потерянных связей</div></div>
       <div class="data-stat"><div class="num">EU</div><div class="lbl">Серверы в Европе</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Metrics ── -->
+<section class="section" id="metrics" style="background:#fafafa">
+  <div class="container">
+    <div class="features-header fade-up">
+      <h2>Метрики, которые считают себя сами</h2>
+      <p>Каждое действие в Maket CP залогировано: кто, когда, что сделал. Вам не нужно вести таблицы — выберите ключевые метрики, а система посчитает за вас.</p>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:32px">
+      <div class="pain-card fade-up" style="background:#fff">
+        <div class="pain-num" style="color:#bbb">Время</div>
+        <h3>SLA и turnaround</h3>
+        <p>Среднее время на этап, от загрузки до финала, время реакции клиента на share-ссылку, задержки между итерациями.</p>
+      </div>
+      <div class="pain-card fade-up delay-1" style="background:#fff">
+        <div class="pain-num" style="color:#bbb">Качество</div>
+        <h3>Брак и итерации</h3>
+        <p>Процент брака, количество итераций до согласования, first-pass rate (одобрено с первого раза), доля фото с комментариями.</p>
+      </div>
+      <div class="pain-card fade-up delay-2" style="background:#fff">
+        <div class="pain-num" style="color:#bbb">Доставка</div>
+        <h3>OTIF и утилизация</h3>
+        <p>Вовремя и в полном объёме, сколько из отснятого дошло до финала, скорость ретушёра, где скапливается очередь.</p>
+      </div>
     </div>
   </div>
 </section>
@@ -1495,19 +1538,22 @@ function fillSlot(slot, pi) {
 var pipeData = [
   { name: 'Превью (преотбор)', detail: 'Загрузка папки, создание превью', metrics: '248 фото загружено', current: 0, total: 248 },
   { name: 'Отбор команды', detail: 'Рейтинги, карточки, раскладка', metrics: '186 из 248 отобрано', current: 186, total: 248 },
-  { name: 'Отбор клиента', detail: 'Share-ссылка, согласование, правки', metrics: '176 одобрено, 10 на проверке', current: 176, total: 186 }
+  { name: 'Отбор клиента', detail: 'Share-ссылка, согласование, правки', metrics: '176 одобрено, 10 на проверке', current: 176, total: 186 },
+  { name: 'Цветокоррекция', detail: 'Цветокоррекция и грейдинг', metrics: '0 готово, 176 в работе', current: 0, total: 176 },
+  { name: 'Комментарии на ретушь', detail: 'Замечания к фото перед ретушью', metrics: '10 из 176 — есть комментарии', current: 10, total: 176 }
 ];
 // Future stages (planned, not yet in production)
-var pipeFuture = ['Цветокоррекция', 'Комментарии на ретушь', 'Ретушь', 'Согласование ретуши', 'Адаптация к каналам'];
-var pipeActive = 2; // current front stage
+var pipeFuture = ['Ретушь', 'Согласование ретуши', 'Адаптация к каналам'];
+var pipeDone = [0, 1]; // completed stages
+var pipeActiveStages = [2, 3, 4]; // multiple active stages simultaneously
 
 function renderPipeline() {
   var html = '';
   for (var i = 0; i < pipeData.length; i++) {
-    var cls = i < pipeActive ? 'done' : (i === pipeActive ? 'active' : 'future');
+    var cls = pipeDone.indexOf(i) !== -1 ? 'done' : (pipeActiveStages.indexOf(i) !== -1 ? 'active' : 'future');
     var pct = pipeData[i].total > 0 ? Math.round(pipeData[i].current / pipeData[i].total * 100) : 0;
     html += '<div class="pipe-step ' + cls + '" onclick="clickPipeStep(' + i + ')">' +
-      '<div class="pipe-dot">' + (i < pipeActive ? '&#10003;' : (i + 1)) + '</div>' +
+      '<div class="pipe-dot">' + (pipeDone.indexOf(i) !== -1 ? '&#10003;' : (i + 1)) + '</div>' +
       '<div class="pipe-step-info"><div class="pipe-step-name">' + pipeData[i].name + '</div>' +
       '<div class="pipe-step-detail">' + pipeData[i].detail + '</div>' +
       '<div class="pipe-step-metrics">' + pipeData[i].metrics + '</div>' +
@@ -1527,8 +1573,6 @@ function renderPipeline() {
 renderPipeline();
 
 function clickPipeStep(idx) {
-  pipeActive = idx;
-  renderPipeline();
   showToast(pipeData[idx].name + ': ' + pipeData[idx].metrics);
 }
 
