@@ -254,6 +254,8 @@ section{padding:80px 0}
 .cl-comments-list{display:flex;flex-direction:column;gap:3px}
 .cl-comment{font-size:10px;color:#555;padding:5px 8px;background:#f8f8f8;border-radius:4px}
 .cl-comment .cl-author{font-weight:600;margin-right:4px;color:#333}
+.cl-comment.group{background:#fff3e0;border-left:2px solid #f5a623}
+.cl-comment-scope{font-size:9px;color:#999;font-style:italic}
 .cl-rename{margin-top:2px}
 .cl-rename-row{display:flex;align-items:center;gap:6px;font-size:10px;font-family:monospace}
 .cl-rename-old{color:#999;text-decoration:line-through}
@@ -639,6 +641,7 @@ footer p{font-size:13px;color:#aaa}
         <h2>Вся структура -- вокруг одной фотографии</h2>
         <p>В реальном процессе одно фото живёт сразу в нескольких контекстах: карточка товара в соотношении 2:3, подборка для SMM в 4:5, баннер для лендинга в 16:9. Фотограф, клиент, стилист и ретушёр работают с одним кадром -- но у каждого своя задача.</p>
         <p>Maket показывает все комментарии рядом. Фотограф просит сделать теплее, клиент -- холоднее. Стилист говорит не трогать кожу, клиент -- почистить. Вы увидите все противоречия до того, как они станут переделкой.</p>
+        <p>Комментарий к карточке автоматически применяется ко всем фото внутри -- не нужно писать одно и то же пять раз.</p>
       </div>
       <div class="card-life fade-up delay-1" id="cardLife"></div>
     </div>
@@ -1311,6 +1314,7 @@ function fillSlot(slot, pi) {
   html += '<div class="cl-comment"><span class="cl-author">Фотограф:</span> сделать теплее</div>';
   html += '<div class="cl-comment"><span class="cl-author">Клиент:</span> сделать холоднее, почистить кожу</div>';
   html += '<div class="cl-comment"><span class="cl-author">Стилист:</span> не трогать кожу</div>';
+  html += '<div class="cl-comment group"><span class="cl-author">Клиент</span> <span class="cl-comment-scope">Карточка: Сумка T-201</span><br>сделать цвет изделия более насыщенным</div>';
   html += '</div></div>';
   // Article rename
   html += '<div><div class="cl-section-title">Артикул</div>';
