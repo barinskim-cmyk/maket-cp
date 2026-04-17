@@ -189,7 +189,7 @@ section{padding:80px 0}
 .card-demo-toolbar{display:flex;align-items:center;gap:0;background:#fafafa;border-bottom:1px solid #eee;padding:0 10px}
 .card-demo-subtab{font-size:10px;padding:7px 10px;color:#999;border-bottom:2px solid transparent;cursor:default}
 .card-demo-subtab.active{color:#333;font-weight:600;border-bottom-color:#333}
-.card-demo-body{display:flex;min-height:320px}
+.card-demo-body{display:flex;height:320px;overflow:hidden}
 /* Sidebar */
 .cd-sidebar{width:110px;background:#fff;border-right:1px solid #eee;padding:8px;flex-shrink:0;display:flex;flex-direction:column;gap:3px}
 .cd-sidebar-title{font-size:9px;color:#999;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px}
@@ -720,6 +720,21 @@ footer p{font-size:13px;color:#aaa}
   </div>
 </section>
 
+
+<!-- ── Data, not files ── -->
+<section class="data-section">
+  <div class="container fade-up">
+    <h2>Данные, а не файлы</h2>
+    <p>Maket работает с данными о фотографиях, а не с самими файлами. Переименуйте, переместите — структура не сломается. Потому что она существует в базе данных, а не в файловой системе.</p>
+    <div class="data-stats">
+      <div class="data-stat"><div class="num">100%</div><div class="lbl">История каждого кадра</div></div>
+      <div class="data-stat"><div class="num">0</div><div class="lbl">Потерянных связей</div></div>
+      <div class="data-stat"><div class="num">EU</div><div class="lbl">Серверы в Европе</div></div>
+    </div>
+  </div>
+</section>
+
+
 <!-- ── Demo 1.5: Data around one photo ── -->
 <section class="demo-section alt" id="demo-card-life">
   <div class="container">
@@ -735,6 +750,7 @@ footer p{font-size:13px;color:#aaa}
     </div>
   </div>
 </section>
+
 
 <!-- ── Demo 2: Pipeline ── -->
 <section class="demo-section" id="demo-pipeline">
@@ -756,6 +772,35 @@ footer p{font-size:13px;color:#aaa}
     </div>
   </div>
 </section>
+
+
+<!-- ── Metrics ── -->
+<section class="section" id="metrics" style="background:#fafafa">
+  <div class="container">
+    <div class="features-header fade-up">
+      <h2>Метрики, которые считают себя сами</h2>
+      <p>Каждое действие в Maket CP залогировано: кто, когда, что сделал. Вам не нужно вести таблицы — выберите ключевые метрики, а система посчитает за вас.</p>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:32px">
+      <div class="pain-card fade-up" style="background:#fff">
+        <div class="pain-num" style="color:#bbb">Время</div>
+        <h3>SLA и turnaround</h3>
+        <p>Среднее время на этап, от загрузки до финала, время реакции клиента на share-ссылку, задержки между итерациями.</p>
+      </div>
+      <div class="pain-card fade-up delay-1" style="background:#fff">
+        <div class="pain-num" style="color:#bbb">Качество</div>
+        <h3>Брак и итерации</h3>
+        <p>Процент брака, количество итераций до согласования, first-pass rate (одобрено с первого раза), доля фото с комментариями.</p>
+      </div>
+      <div class="pain-card fade-up delay-2" style="background:#fff">
+        <div class="pain-num" style="color:#bbb">Доставка</div>
+        <h3>OTIF и утилизация</h3>
+        <p>Вовремя и в полном объёме, сколько из отснятого дошло до финала, скорость ретушёра, где скапливается очередь.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
 
 <!-- ── Demo 2.5: AI Articles ── -->
 <section class="demo-section alt" id="demo-ai">
@@ -794,6 +839,7 @@ footer p{font-size:13px;color:#aaa}
     </div>
   </div>
 </section>
+
 
 <!-- ── Demo 3: Mobile Approval ── -->
 <section class="demo-section" id="demo-approve">
@@ -851,158 +897,81 @@ footer p{font-size:13px;color:#aaa}
   </div>
 </section>
 
+
 <!-- ── Compare: Why not task tracker / DAM ── -->
 <section class="compare-section section" id="compare">
   <div class="container">
     <div class="compare-header fade-up">
-      <h2>Почему не таск-трекер и не DAM</h2>
-      <p>Существующие инструменты решают часть задачи. Ни один не покрывает весь цикл коммерческой съёмки.</p>
+      <h2>Почему не таск-трекер и не DAM</h2>
+      <p>Мы не ещё один инструмент, который нужно внедрять. Maket CP — это система, которая подстраивается под ваш процесс, а не наоборот.</p>
     </div>
-    <div class="fade-up delay-1">
-      <table class="compare-table">
-        <thead>
-          <tr>
-            <th style="width:30%">Задача</th>
-            <th style="width:23%">Таск-трекеры</th>
-            <th style="width:23%">DAM-системы</th>
-            <th style="width:24%" class="col-maket">Maket CP</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Визуальная структура (карточки, лукбуки, контейнеры)</td>
-            <td><span class="compare-miss">--</span> Задачи и списки</td>
-            <td><span class="compare-miss">--</span> Папки и теги</td>
-            <td class="col-maket"><span class="compare-check">+</span> Шаблоны, слоты, drag-and-drop</td>
-          </tr>
-          <tr>
-            <td>Согласование с клиентом</td>
-            <td><span class="compare-miss">--</span> Комментарии к задаче</td>
-            <td><span class="compare-miss">--</span> Скачать архив, ответить письмом</td>
-            <td class="col-maket"><span class="compare-check">+</span> Ссылка, мобильный UI, решение с подписью</td>
-          </tr>
-          <tr>
-            <td>Пайплайн по каждому фото</td>
-            <td><span class="compare-miss">--</span> Статус проекта, не фото</td>
-            <td><span class="compare-miss">--</span> Нет пайплайна</td>
-            <td class="col-maket"><span class="compare-check">+</span> Per-photo tracking, триггеры, SLA</td>
-          </tr>
-          <tr>
-            <td>Связь с RAW-редактором</td>
-            <td><span class="compare-miss">--</span> Не знает про фото</td>
-            <td>Частично (импорт)</td>
-            <td class="col-maket"><span class="compare-check">+</span> Двусторонняя синхронизация COS</td>
-          </tr>
-          <tr>
-            <td>Переименование по артикулам</td>
-            <td><span class="compare-miss">--</span></td>
-            <td><span class="compare-miss">--</span> Ручное или скрипты</td>
-            <td class="col-maket"><span class="compare-check">+</span> Чек-лист + AI Vision</td>
-          </tr>
-          <tr>
-            <td>Работа разных ролей в одной системе</td>
-            <td>Частично (все видят всё)</td>
-            <td><span class="compare-miss">--</span> Только фотограф/ретушёр</td>
-            <td class="col-maket"><span class="compare-check">+</span> Фотограф, клиент, стилист, ретушёр</td>
-          </tr>
-        </tbody>
-      </table>
-      <div class="compare-verdict">Таск-трекеры не понимают фотографии. DAM-системы не понимают процесс. Maket — между ними.</div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;margin-top:40px" class="fade-up delay-1">
+
+      <div style="background:#fff;border-radius:10px;padding:32px 28px;border:1px solid #eee">
+        <div style="font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#cc4444;margin-bottom:12px">Taск-трекер</div>
+        <h3 style="font-size:18px;margin-bottom:12px;color:#333">Работа сверху работы</h3>
+        <p style="font-size:14px;color:#777;line-height:1.55;margin-bottom:0">Задают маршрут проекта — но что делать, когда ситуация требует другого маршрута? Перестраивать доску? Креативная команда бросит трекер через неделю, потому что это ещё одна система, которую нужно кормить данными.</p>
+      </div>
+
+      <div style="background:#fff;border-radius:10px;padding:32px 28px;border:1px solid #eee">
+        <div style="font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#cc4444;margin-bottom:12px">DAM-система</div>
+        <h3 style="font-size:18px;margin-bottom:12px;color:#333">Папки и теги вручную</h3>
+        <p style="font-size:14px;color:#777;line-height:1.55;margin-bottom:0">Нужно проставлять теги, раскладывать по папкам, следить за именами файлов. Это работа библиотекаря, а не фотографа. И главное — DAM не знает ваш процесс: нет пайплайна, нет согласований, нет ролей.</p>
+      </div>
+
+      <div style="background:#333;border-radius:10px;padding:32px 28px;border:1px solid #333">
+        <div style="font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:rgba(255,255,255,0.5);margin-bottom:12px">Maket CP</div>
+        <h3 style="font-size:18px;margin-bottom:12px;color:#fff">Процесс фиксирует себя сам</h3>
+        <p style="font-size:14px;color:rgba(255,255,255,0.7);line-height:1.55;margin-bottom:0">Теги проставляются автоматически. Статус каждой фотографии обновляется по действиям, а не по кнопке. Все участники видят процесс и могут влиять на него. Один инструмент для всех ролей. Порог входа — клик по ссылке.</p>
+      </div>
+
     </div>
+
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:24px" class="fade-up delay-2">
+      <div style="text-align:center;padding:16px;background:#fff;border-radius:8px;border:1px solid #f0f0f0">
+        <div style="font-size:24px;font-weight:700;color:#e0e0e0;margin-bottom:4px">30 мин</div>
+        <div style="font-size:13px;color:#999">на обучение команды</div>
+      </div>
+      <div style="text-align:center;padding:16px;background:#fff;border-radius:8px;border:1px solid #f0f0f0">
+        <div style="font-size:24px;font-weight:700;color:#e0e0e0;margin-bottom:4px">0</div>
+        <div style="font-size:13px;color:#999">ручных тегов и статусов</div>
+      </div>
+      <div style="text-align:center;padding:16px;background:#333;border-radius:8px">
+        <div style="font-size:24px;font-weight:700;color:rgba(255,255,255,0.25);margin-bottom:4px">1 клик</div>
+        <div style="font-size:13px;color:rgba(255,255,255,0.6)">вход для клиента</div>
+      </div>
+    </div>
+
+    <div class="compare-verdict fade-up delay-2" style="margin-top:32px">Таск-трекеры задают маршрут. DAM хранит файлы. Maket CP фиксирует реальный процесс — для каждой фотографии и каждого участника.</div>
   </div>
 </section>
 
-<!-- ── Beta ── -->
+
+<!-- ── Beta: what works + what\'s next ── -->
 <section class="beta-section section" id="beta">
-  <div class="container fade-up">
-    <h2>Maket CP в стадии беты</h2>
-    <p>Мы уже используем Maket на реальных коммерческих съёмках. Ядро работает, но продукт развивается — и вы можете влиять на то, каким он станет.</p>
-    <p>Бета — это не "сырой софт". Это возможность получить инструмент, заточенный под ваш процесс. Мы слушаем каждого участника и меняем приоритеты на основе реальных сценариев.</p>
-    <div class="beta-cards">
-      <div class="beta-card">
-        <div class="beta-card-icon">&#9998;</div>
-        <h4>Влияйте на развитие</h4>
-        <p>Ваши задачи определяют, что мы делаем следующим. Фичи растут из реальных съёмок, а не из фантазий.</p>
-      </div>
-      <div class="beta-card">
-        <div class="beta-card-icon">&#9888;</div>
-        <h4>Честно о рисках</h4>
-        <p>Бета — значит, что-то может не работать. Мы чиним быстро, но если вам нужно "всё из коробки" — пока рано.</p>
-      </div>
-      <div class="beta-card">
-        <div class="beta-card-icon">&#9733;</div>
-        <h4>Что мы ждём от вас</h4>
-        <p>Реальные съёмки, честную обратную связь, терпение к багам. Взамен — инструмент, который строится вокруг вашего процесса.</p>
-      </div>
-    </div>
-    <div class="beta-cta">
-      <button class="btn-main" onclick="document.getElementById('cta').scrollIntoView({behavior:'smooth'})">Подать заявку на бету</button>
-    </div>
-  </div>
-</section>
-
-<!-- ── Data, not files ── -->
-<section class="data-section">
-  <div class="container fade-up">
-    <h2>Данные, а не файлы</h2>
-    <p>Maket работает с данными о фотографиях, а не с самими файлами. Переименуйте, переместите — структура не сломается. Потому что она существует в базе данных, а не в файловой системе.</p>
-    <div class="data-stats">
-      <div class="data-stat"><div class="num">100%</div><div class="lbl">История каждого кадра</div></div>
-      <div class="data-stat"><div class="num">0</div><div class="lbl">Потерянных связей</div></div>
-      <div class="data-stat"><div class="num">EU</div><div class="lbl">Серверы в Европе</div></div>
-    </div>
-  </div>
-</section>
-
-<!-- ── Metrics ── -->
-<section class="section" id="metrics" style="background:#fafafa">
   <div class="container">
     <div class="features-header fade-up">
-      <h2>Метрики, которые считают себя сами</h2>
-      <p>Каждое действие в Maket CP залогировано: кто, когда, что сделал. Вам не нужно вести таблицы — выберите ключевые метрики, а система посчитает за вас.</p>
+      <h2>Бета: что уже работает и что впереди</h2>
+      <p>Мы уже используем Maket на реальных коммерческих съёмках. Ядро работает, продукт развивается — и вы можете влиять на то, каким он станет.</p>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:32px">
-      <div class="pain-card fade-up" style="background:#fff">
-        <div class="pain-num" style="color:#bbb">Время</div>
-        <h3>SLA и turnaround</h3>
-        <p>Среднее время на этап, от загрузки до финала, время реакции клиента на share-ссылку, задержки между итерациями.</p>
-      </div>
-      <div class="pain-card fade-up delay-1" style="background:#fff">
-        <div class="pain-num" style="color:#bbb">Качество</div>
-        <h3>Брак и итерации</h3>
-        <p>Процент брака, количество итераций до согласования, first-pass rate (одобрено с первого раза), доля фото с комментариями.</p>
-      </div>
-      <div class="pain-card fade-up delay-2" style="background:#fff">
-        <div class="pain-num" style="color:#bbb">Доставка</div>
-        <h3>OTIF и утилизация</h3>
-        <p>Вовремя и в полном объёме, сколько из отснятого дошло до финала, скорость ретушёра, где скапливается очередь.</p>
-      </div>
-    </div>
-  </div>
-</section>
 
-<!-- ── Features ── -->
-<section class="features" id="features">
-  <div class="container">
-    <div class="features-header fade-up">
-      <h2>Что уже работает</h2>
-      <p>Maket CP используется на реальных коммерческих съёмках в fashion, retail и ecommerce.</p>
-    </div>
+    <h3 class="fade-up" style="margin-top:40px;margin-bottom:20px;color:#333">Что уже работает</h3>
     <div class="feat-grid">
       <div class="feat-card fade-up">
         <div class="feat-icon">&#9634;</div>
         <h3>Карточки</h3>
-        <p>Карточка товара, лук, группа для соцсетей — шаблоны и drag-and-drop.</p>
+        <p>Карточка товара, лук, группа для соцсетей — шаблоны и drag-and-drop.</p>
       </div>
       <div class="feat-card fade-up delay-1">
         <div class="feat-icon">&#9683;</div>
-        <h3>Синхронизация с Capture One</h3>
-        <p>Автоматическая связь в один клик. Рейтинги и ключевые слова пишутся в COS-файлы.</p>
+        <h3>Синхронизация с Capture One</h3>
+        <p>Автоматическая связь в один клик. Рейтинги и ключевые слова пишутся в COS-файлы.</p>
       </div>
       <div class="feat-card fade-up delay-2">
         <div class="feat-icon">&#9776;</div>
         <h3>Пайплайн</h3>
-        <p>8 этапов от предпродакшна до адаптации. Автоматические триггеры, метрики по каждому.</p>
+        <p>8 этапов от предпродакшна до адаптации. Автоматические триггеры, метрики по каждому.</p>
       </div>
       <div class="feat-card fade-up">
         <div class="feat-icon">&#9729;</div>
@@ -1012,28 +981,53 @@ footer p{font-size:13px;color:#aaa}
       <div class="feat-card fade-up delay-1">
         <div class="feat-icon">&#8644;</div>
         <h3>Согласование с телефона</h3>
-        <p>Клиент листает фото, комментирует и согласовывает — всё или частично. Без регистрации.</p>
+        <p>Клиент листает фото, комментирует и согласовывает — всё или частично. Без регистрации.</p>
       </div>
       <div class="feat-card fade-up delay-2">
         <div class="feat-icon">&#9874;</div>
         <h3>Артикулы и переименование</h3>
-        <p>Привязка к SKU, массовое переименование. Файлы на месте, данные обновляются.</p>
+        <p>Привязка к SKU, массовое переименование. Файлы на месте, данные обновляются.</p>
       </div>
-      <div class="feat-card fade-up">
+    </div>
+
+    <h3 class="fade-up" style="margin-top:40px;margin-bottom:20px;color:#333">Что впереди</h3>
+    <div class="feat-grid">
+      <div class="feat-card fade-up" style="border-left:3px solid #e0e0e0">
         <div class="feat-icon">&#9878;</div>
-        <h3>Сравнение версий (diff)</h3>
-        <p>Что добавилось, что убралось — разница между состояниями карточки наглядно.</p>
+        <h3>Ретушь-задания</h3>
+        <p>Дефект-чеклист, стилевые шкалы, маркеры на фото. Ретушёр получает задание внутри системы.</p>
       </div>
-      <div class="feat-card fade-up delay-1">
-        <div class="feat-icon">&#9733;</div>
-        <h3>Частичное согласование</h3>
-        <p>Клиент отправляет часть карточек дальше, остальные остаются на доработке. Ничего не теряется.</p>
-      </div>
-      <div class="feat-card fade-up delay-2">
+      <div class="feat-card fade-up delay-1" style="border-left:3px solid #e0e0e0">
         <div class="feat-icon">&#9881;</div>
         <h3>AI-распознавание</h3>
-        <p>Автоматическое соотнесение фото с артикулами через компьютерное зрение. В разработке.</p>
+        <p>Автоматическое соотнесение фото с артикулами через компьютерное зрение.</p>
       </div>
+      <div class="feat-card fade-up delay-2" style="border-left:3px solid #e0e0e0">
+        <div class="feat-icon">&#9733;</div>
+        <h3>Планирование съёмок</h3>
+        <p>План vs факт, шаблоны съёмочных дней, загрузка команды. Jira для фотографов.</p>
+      </div>
+    </div>
+
+    <div class="beta-cards" style="margin-top:40px">
+      <div class="beta-card">
+        <div class="beta-card-icon">&#9998;</div>
+        <h4>Влияйте на развитие</h4>
+        <p>Ваши задачи определяют, что мы делаем следующим. Фичи растут из реальных съёмок.</p>
+      </div>
+      <div class="beta-card">
+        <div class="beta-card-icon">&#9888;</div>
+        <h4>Честно о рисках</h4>
+        <p>Бета — значит, что-то может не работать. Мы чиним быстро, но если вам нужно «всё из коробки» — пока рано.</p>
+      </div>
+      <div class="beta-card">
+        <div class="beta-card-icon">&#9733;</div>
+        <h4>Что мы ждём от вас</h4>
+        <p>Реальные съёмки, честную обратную связь, терпение к багам. Взамен — инструмент под ваш процесс.</p>
+      </div>
+    </div>
+    <div class="beta-cta">
+      <button class="btn-main" onclick="document.getElementById('cta').scrollIntoView({behavior:'smooth'})">Подать заявку на бету</button>
     </div>
   </div>
 </section>
