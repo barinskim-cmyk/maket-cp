@@ -144,6 +144,17 @@ section{padding:80px 0}
 .hero-art-status.verified{background:#e3f2fd;color:#1565c0}
 
 /* ── Problem Section ── */
+/* ── Mission ── */
+.mission{background:#fff;text-align:center}
+.mission-title{font-size:14px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#999;margin-bottom:12px}
+.mission-headline{font-size:28px;font-weight:700;color:#333;margin-bottom:36px;max-width:560px;margin-left:auto;margin-right:auto;line-height:1.3}
+.mission-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:28px;max-width:840px;margin:0 auto}
+.mission-card{text-align:center}
+.mission-card-num{font-size:36px;font-weight:700;color:#e8e8e8;margin-bottom:8px}
+.mission-card h3{font-size:16px;color:#333;margin-bottom:8px}
+.mission-card p{font-size:14px;color:#777;line-height:1.5}
+@media(max-width:768px){.mission-cards{grid-template-columns:1fr}}
+
 .problem{background:#fafafa}
 .problem-header{text-align:center;max-width:640px;margin:0 auto 48px}
 .problem-header h2{margin-bottom:12px}
@@ -569,6 +580,31 @@ footer p{font-size:13px;color:#aaa}
             <div class="hero-sync" id="heroSync"></div>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Mission ── -->
+<section class="mission section" id="mission">
+  <div class="container fade-up">
+    <div class="mission-title">Наша цель</div>
+    <div class="mission-headline">Система для людей, а не люди для системы</div>
+    <div class="mission-cards">
+      <div class="mission-card">
+        <div class="mission-card-num">01</div>
+        <h3>Свобода, а не контроль</h3>
+        <p>Структура, которая ускоряет и освобождает. Не добавляет ещё одну обязанность -- убирает десять ненужных.</p>
+      </div>
+      <div class="mission-card">
+        <div class="mission-card-num">02</div>
+        <h3>Прозрачность как двигатель</h3>
+        <p>Когда команда и клиент видят процесс -- процесс начинает развиваться. Прозрачность даёт толчок, а не только контроль.</p>
+      </div>
+      <div class="mission-card">
+        <div class="mission-card-num">03</div>
+        <h3>Отражение, а не навязывание</h3>
+        <p>Maket не создаёт новый процесс. Он делает видимым тот, который у вас уже есть -- и помогает его улучшить.</p>
       </div>
     </div>
   </div>
