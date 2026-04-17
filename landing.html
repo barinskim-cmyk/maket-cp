@@ -1382,6 +1382,8 @@ var aiArticles = [
   { sku: 'ALX-P066', name: 'Клатч серебро', color: C[4] }
 ];
 var aiCardNames = ['Сумка T-201','Кроссовки K-504','Сандалии S-110','Ботинки M-320','Клатч P-066'];
+// Shuffled order: cards start mixed, then rearrange to match articles
+var aiShuffle = [3, 0, 4, 1, 2]; // initial display order (Ботинки, Сумка, Клатч, Кроссовки, Сандалии)
 var aiRenames = [
   { old: 'IMG_4201_front.jpg', new_name: 'ALX-T201_front_01.jpg' },
   { old: 'IMG_4202_front.jpg', new_name: 'ALX-K504_front_01.jpg' },
@@ -1402,11 +1404,17 @@ var aiMatched = false;
       '<div class="ai-item-thumb"><div class="ai-item-thumb-color" style="background:' + aiArticles[i].color + ';opacity:0.6"></div></div>' +
       '<div><div class="ai-item-sku">' + aiArticles[i].sku + '</div>' +
       '<div class="ai-item-name">' + aiArticles[i].name + '</div></div></div>';
-    h2 += '<div class="ai-item" id="aiCard' + i + '">' +
-      '<div class="ai-item-thumb"><div class="ai-item-thumb-color" style="background:' + C[i] + ';opacity:0.5"></div></div>' +
-      '<div class="ai-item-name">' + aiCardNames[i] + '</div></div>';
+  }
+  // Cards in shuffled order
+  for (var j = 0; j < aiShuffle.length; j++) {
+    var si = aiShuffle[j];
+    h2 += '<div class="ai-item" id="aiCard' + si + '" data-correct="' + si + '" style="order:' + j + '">' +
+      '<div class="ai-item-thumb"><div class="ai-item-thumb-color" style="background:' + C[si] + ';opacity:0.5"></div></div>' +
+      '<div class="ai-item-name">' + aiCardNames[si] + '</div></div>';
   }
   cl.innerHTML = h1;
+  cards.style.display = 'flex';
+  cards.style.flexDirection = 'column';
   cards.innerHTML = h2;
   // Pre-render rename list (hidden)
   var rl = document.getElementById('aiRenameList');
@@ -1427,34 +1435,59 @@ function aiRunMatch() {
   btn.disabled = true;
   document.getElementById('aiStatus').textContent = 'AI расставляет артикулы...';
 
-  // Animate matches one by one
-  var idx = 0;
-  var timer = setInterval(function() {
-    if (idx >= aiArticles.length) {
-      clearInterval(timer);
-      btn.classList.remove('loading');
-      btn.disabled = false;
-      btn.textContent = 'Сбросить';
-      aiMatched = true;
-      document.getElementById('aiStatus').textContent = '5 из 5 сопоставлено';
-      // Show renames
-      document.getElementById('aiResults').classList.add('visible');
-      var ri = 0;
-      var renTimer = setInterval(function() {
-        if (ri >= aiRenames.length) { clearInterval(renTimer); return; }
-        document.getElementById('aiRen' + ri).classList.add('visible');
-        ri++;
-      }, 200);
-      showToast('AI сопоставил 5 артикулов с карточками');
-      return;
+  // Step 1: rearrange cards to correct order (animated via CSS transition on order)
+  // We use translateY trick: measure positions, then swap
+  var cardEls = [];
+  for (var k = 0; k < 5; k++) { cardEls.push(document.getElementById('aiCard' + k)); }
+  // Record current positions
+  var startRects = {};
+  for (var k = 0; k < 5; k++) { startRects[k] = cardEls[k].getBoundingClientRect(); }
+  // Set correct order
+  for (var k = 0; k < 5; k++) { cardEls[k].style.order = k; }
+  // FLIP: calc deltas and animate
+  for (var k = 0; k < 5; k++) {
+    var endRect = cardEls[k].getBoundingClientRect();
+    var dy = startRects[k].top - endRect.top;
+    if (dy !== 0) {
+      cardEls[k].style.transition = 'none';
+      cardEls[k].style.transform = 'translateY(' + dy + 'px)';
+      // Force reflow
+      cardEls[k].offsetHeight;
+      cardEls[k].style.transition = 'transform 0.5s ease';
+      cardEls[k].style.transform = 'translateY(0)';
     }
-    var art = document.getElementById('aiArt' + idx);
-    var card = document.getElementById('aiCard' + idx);
-    if (art) art.classList.add('matched');
-    if (card) card.classList.add('matched');
-    idx++;
-    document.getElementById('aiStatus').textContent = 'Сопоставлено: ' + idx + ' из 5...';
-  }, 500);
+  }
+
+  // Step 2: after rearrange, highlight matches one by one
+  setTimeout(function() {
+    var idx = 0;
+    var timer = setInterval(function() {
+      if (idx >= aiArticles.length) {
+        clearInterval(timer);
+        btn.classList.remove('loading');
+        btn.disabled = false;
+        btn.textContent = 'Сбросить';
+        aiMatched = true;
+        document.getElementById('aiStatus').textContent = '5 из 5 сопоставлено';
+        // Show renames
+        document.getElementById('aiResults').classList.add('visible');
+        var ri = 0;
+        var renTimer = setInterval(function() {
+          if (ri >= aiRenames.length) { clearInterval(renTimer); return; }
+          document.getElementById('aiRen' + ri).classList.add('visible');
+          ri++;
+        }, 200);
+        showToast('AI сопоставил 5 артикулов с карточками');
+        return;
+      }
+      var art = document.getElementById('aiArt' + idx);
+      var card = document.getElementById('aiCard' + idx);
+      if (art) art.classList.add('matched');
+      if (card) card.classList.add('matched');
+      idx++;
+      document.getElementById('aiStatus').textContent = 'Сопоставлено: ' + idx + ' из 5...';
+    }, 400);
+  }, 600);
 }
 
 function aiReset() {
@@ -1464,8 +1497,24 @@ function aiReset() {
     var card = document.getElementById('aiCard' + i);
     var ren = document.getElementById('aiRen' + i);
     if (art) art.classList.remove('matched');
-    if (card) card.classList.remove('matched');
+    if (card) { card.classList.remove('matched'); card.style.transition = 'none'; card.style.transform = ''; }
     if (ren) ren.classList.remove('visible');
+  }
+  // Restore shuffled order with FLIP animation
+  var cardEls = [];
+  for (var k = 0; k < 5; k++) { cardEls.push(document.getElementById('aiCard' + k)); }
+  var startRects = {};
+  for (var k = 0; k < 5; k++) { startRects[k] = cardEls[k].getBoundingClientRect(); }
+  for (var j = 0; j < aiShuffle.length; j++) { cardEls[aiShuffle[j]].style.order = j; }
+  for (var k = 0; k < 5; k++) {
+    var endRect = cardEls[k].getBoundingClientRect();
+    var dy = startRects[k].top - endRect.top;
+    if (dy !== 0) {
+      cardEls[k].style.transform = 'translateY(' + dy + 'px)';
+      cardEls[k].offsetHeight;
+      cardEls[k].style.transition = 'transform 0.5s ease';
+      cardEls[k].style.transform = 'translateY(0)';
+    }
   }
   document.getElementById('aiResults').classList.remove('visible');
   document.getElementById('aiMatchBtn').innerHTML = '<span class="ai-spinner"></span>Расставить (AI)';
