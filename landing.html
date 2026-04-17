@@ -69,17 +69,32 @@ section{padding:80px 0}
 .app-screen.active{display:block}
 @keyframes fadeScreen{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 
-/* Hero: Containers grid */
-.demo-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.demo-card{background:#fff;border-radius:6px;overflow:hidden;border:1px solid #e8e8e8;transition:border-color 0.2s,transform 0.2s}
-.demo-card:hover{border-color:#333;transform:translateY(-2px)}
-.demo-card-img{width:100%;aspect-ratio:4/5;position:relative;overflow:hidden}
-.demo-card-img .shimmer{position:absolute;inset:0;background:linear-gradient(90deg,#e8e8e8 25%,#f0f0f0 50%,#e8e8e8 75%);background-size:200% 100%;animation:shimmer 2s infinite}
-@keyframes shimmer{to{background-position:-200% 0}}
-.demo-card-label{padding:6px 8px;font-size:10px;color:#888;display:flex;justify-content:space-between;align-items:center}
-.demo-card-status{display:inline-block;width:6px;height:6px;border-radius:50%;background:#4caf50}
-.demo-card-status.pending{background:#ff9800}
-.demo-card-status.waiting{background:#e0e0e0}
+/* Hero: Mini card editor (3-column) */
+.hero-cp{display:flex;height:100%;gap:0;background:#fff;border-radius:6px;overflow:hidden;border:1px solid #e8e8e8}
+.hero-cp-side{width:80px;border-right:1px solid #eee;padding:6px;display:flex;flex-direction:column;gap:2px;overflow-y:auto}
+.hero-cp-side-title{font-size:7px;color:#999;text-transform:uppercase;letter-spacing:0.3px;margin-bottom:2px}
+.hero-cp-side-item{padding:3px 5px;border-radius:3px;font-size:8px;color:#777;line-height:1.3}
+.hero-cp-side-item.active{background:#333;color:#fff}
+.hero-cp-side-item .hcat{font-size:7px;opacity:0.5}
+.hero-cp-center{flex:1;padding:8px;display:flex;flex-direction:column}
+.hero-cp-meta{font-size:9px;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:4px}
+.hero-cp-meta .tmpl{font-weight:400;font-size:8px;color:#999;font-style:italic}
+.hero-cp-slots{flex:1;display:flex;flex-direction:column;gap:2px}
+.hero-cp-row{display:flex;gap:2px;align-items:flex-start}
+.hero-cp-slot{border:1.5px dashed #ccc;border-radius:2px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;background:#fafafa}
+.hero-cp-slot.main{border-color:#333}
+.hero-cp-slot.filled{border-style:solid;border-color:#e0e0e0}
+.hero-cp-slot .sc{position:absolute;inset:0}
+.hero-cp-slot .sl{font-size:7px;color:#ccc}
+.hero-cp-nav{font-size:8px;color:#999;text-align:center;margin-top:4px}
+.hero-cp-pv{width:60px;border-left:1px solid #eee;padding:6px;display:flex;flex-direction:column;gap:2px;overflow-y:auto}
+.hero-cp-pv-title{font-size:7px;color:#999;text-transform:uppercase;margin-bottom:2px}
+.hero-cp-pv-thumb{width:100%;aspect-ratio:1;border-radius:2px;position:relative;overflow:hidden}
+.hero-cp-pv-thumb .sc{position:absolute;inset:0}
+/* Hero: Другое (free containers) */
+.hero-oc-container{background:#fff;border-radius:6px;border:1px solid #e8e8e8;padding:8px;margin-bottom:6px}
+.hero-oc-title{font-size:9px;font-weight:600;margin-bottom:4px}
+.hero-oc-grid{display:flex;gap:3px}
 
 /* Hero: Projects list */
 .hero-projects{display:flex;flex-direction:column;gap:6px}
@@ -157,27 +172,93 @@ section{padding:80px 0}
 .demo-hint{font-size:13px;color:#999;padding:8px 14px;background:#f5f5f5;border-radius:6px;display:inline-block}
 @media(max-width:768px){.demo-layout,.demo-layout.reverse{grid-template-columns:1fr;direction:ltr}.demo-layout.reverse>*{direction:ltr}}
 
-/* ── Demo: Container Builder ── */
-.card-demo{background:#fff;border-radius:12px;border:1px solid #e0e0e0;overflow:hidden;box-shadow:0 2px 20px rgba(0,0,0,0.06)}
-.card-demo-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #eee;background:#fafafa}
-.card-demo-header span{font-size:13px;font-weight:600}
-.card-demo-body{padding:16px;display:flex;gap:16px;min-height:280px}
-.card-slots{flex:1;display:flex;flex-direction:column;gap:8px}
-.card-slot{border:2px dashed #ddd;border-radius:6px;padding:0;aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;transition:all 0.25s;position:relative;overflow:hidden;cursor:pointer}
-.card-slot.slot-hero{aspect-ratio:3/2;border-width:2px}
+/* ── Demo: Card Editor (3-column like real app) ── */
+.card-demo{background:#f5f5f5;border-radius:12px;border:1px solid #e0e0e0;overflow:hidden;box-shadow:0 2px 20px rgba(0,0,0,0.06)}
+.card-demo-toolbar{display:flex;align-items:center;gap:0;background:#fafafa;border-bottom:1px solid #eee;padding:0 10px}
+.card-demo-subtab{font-size:10px;padding:7px 10px;color:#999;border-bottom:2px solid transparent;cursor:default}
+.card-demo-subtab.active{color:#333;font-weight:600;border-bottom-color:#333}
+.card-demo-body{display:flex;min-height:320px}
+/* Sidebar */
+.cd-sidebar{width:110px;background:#fff;border-right:1px solid #eee;padding:8px;flex-shrink:0;display:flex;flex-direction:column;gap:3px}
+.cd-sidebar-title{font-size:9px;color:#999;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px}
+.cd-sidebar-item{padding:5px 7px;border-radius:4px;font-size:10px;cursor:pointer;transition:all 0.15s;color:#555}
+.cd-sidebar-item:hover{background:#f0f0f0}
+.cd-sidebar-item.active{background:#333;color:#fff}
+.cd-sidebar-item .cd-cat{font-size:9px;opacity:0.5}
+.cd-sidebar-add{padding:6px;border:1.5px dashed #ccc;border-radius:4px;font-size:10px;color:#999;text-align:center;cursor:pointer;margin-top:4px}
+.cd-sidebar-add:hover{border-color:#333;color:#333}
+/* Card view (center) */
+.cd-view{flex:1;background:#fff;padding:12px;display:flex;flex-direction:column;min-width:0}
+.cd-meta{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+.cd-meta-name{font-size:13px;font-weight:600}
+.cd-meta-btn{padding:2px 8px;font-size:9px;border:1px solid #ddd;background:#fff;border-radius:3px;color:#888;cursor:default}
+.cd-meta-tmpl{font-size:9px;color:#999;font-style:italic}
+.cd-layout{flex:1;display:flex;flex-direction:column;gap:3px}
+.cd-layout-row{display:flex;gap:3px;align-items:flex-start}
+.card-slot{border:2px dashed #ccc;border-radius:3px;display:flex;align-items:center;justify-content:center;transition:all 0.25s;position:relative;overflow:hidden;cursor:pointer;background:#fafafa}
 .card-slot.filled{border-style:solid;border-color:#e0e0e0;background:#e8e8e8}
 .card-slot.filled.confirmed{border-color:#4caf50}
-.card-slot .slot-label{font-size:11px;color:#bbb;pointer-events:none}
+.card-slot.main-slot{border-color:#333;border-style:dashed}
+.card-slot.main-slot.filled{border-style:solid;border-color:#333}
+.card-slot .slot-label{font-size:9px;color:#ccc;pointer-events:none}
 .card-slot.filled .slot-label{display:none}
-.card-slot .slot-img{position:absolute;inset:0;width:100%;height:100%;border-radius:4px}
+.card-slot .slot-img{position:absolute;inset:0;width:100%;height:100%;border-radius:1px}
 .card-slot.drag-over{border-color:#333;border-style:solid;background:rgba(0,0,0,0.02)}
-.photo-tray{width:80px;display:flex;flex-direction:column;gap:6px;padding-top:4px}
-.photo-tray-label{font-size:10px;color:#aaa;text-align:center;margin-bottom:4px}
-.tray-thumb{width:64px;height:64px;border-radius:4px;cursor:grab;transition:all 0.2s;border:2px solid transparent;position:relative;overflow:hidden}
-.tray-thumb:hover{border-color:#333;transform:scale(1.05)}
+.cd-nav{display:flex;justify-content:center;align-items:center;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid #f0f0f0}
+.cd-select-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:8px}
+.cd-select-cell{aspect-ratio:1;border-radius:3px;position:relative;overflow:hidden;border:1px solid #e0e0e0}
+.cd-select-cell.rated{border-color:#4caf50}
+.cd-select-cell .cd-stars{position:absolute;top:2px;left:2px;font-size:7px;color:#f5a623}
+/* Other: free containers */
+.oc-container-card{background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:10px;margin-bottom:8px}
+.oc-container-header{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.oc-container-name{font-size:11px;font-weight:600;color:#333}
+.oc-container-tmpl{font-size:9px;color:#999;font-style:italic}
+.oc-container-add{padding:10px;border:1.5px dashed #ccc;border-radius:6px;text-align:center;font-size:11px;color:#999;cursor:pointer}
+.cd-nav-btn{padding:3px 10px;font-size:10px;border:1px solid #ddd;background:#f5f5f5;border-radius:4px;cursor:pointer;color:#888}
+.cd-nav-counter{font-size:10px;color:#999}
+/* Preview panel (right) */
+.cd-previews{width:120px;background:#fff;border-left:1px solid #eee;padding:8px;flex-shrink:0;display:flex;flex-direction:column;overflow-y:auto}
+.cd-pv-title{font-size:9px;color:#999;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px}
+.cd-pv-count{font-size:9px;color:#999;margin-bottom:4px}
+.cd-pv-filter{display:flex;gap:1px;margin-bottom:6px}
+.cd-pv-star{font-size:11px;color:#ccc;cursor:pointer}
+.cd-pv-star.active{color:#f5a623}
+.cd-pv-gallery{display:flex;flex-wrap:wrap;gap:3px}
+.tray-thumb{width:calc(50% - 2px);aspect-ratio:1;border-radius:3px;cursor:grab;transition:all 0.15s;border:2px solid transparent;position:relative;overflow:hidden}
+.tray-thumb:hover{border-color:#333}
 .tray-thumb:active{cursor:grabbing;opacity:0.5}
-.tray-thumb.used{opacity:0.25;pointer-events:none}
-.tray-color{position:absolute;inset:0;border-radius:2px}
+.tray-thumb.used{opacity:0.2;pointer-events:none}
+.tray-thumb .pv-check-demo{position:absolute;top:2px;left:2px;width:10px;height:10px;background:#4caf50;border-radius:50%;display:none}
+.tray-thumb.used .pv-check-demo{display:block}
+.tray-color{position:absolute;inset:0;border-radius:1px}
+
+/* ── Demo: Card Life (data around one photo) ── */
+.card-life{background:#fff;border-radius:12px;border:1px solid #e0e0e0;overflow:hidden;box-shadow:0 2px 20px rgba(0,0,0,0.06);padding:24px;max-width:480px}
+.cl-center{display:flex;gap:20px;align-items:flex-start}
+.cl-photo{width:120px;height:160px;border-radius:6px;flex-shrink:0;position:relative;overflow:hidden;border:2px solid #333}
+.cl-photo-color{position:absolute;inset:0}
+.cl-photo-name{position:absolute;bottom:0;left:0;right:0;padding:5px 8px;background:rgba(0,0,0,0.6);color:#fff;font-size:9px;font-family:monospace}
+.cl-photo-badges{position:absolute;top:6px;left:6px;display:flex;flex-direction:column;gap:3px}
+.cl-badge{font-size:8px;padding:2px 5px;border-radius:3px;color:#fff;font-weight:600}
+.cl-badge.rate5{background:#4caf50}
+.cl-badge.approved{background:#333}
+.cl-info{flex:1;display:flex;flex-direction:column;gap:12px;min-width:0}
+.cl-section-title{font-size:9px;color:#999;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px}
+.cl-tags{display:flex;flex-direction:column;gap:4px}
+.cl-tag{padding:5px 10px;border-radius:4px;font-size:10px;border:1px solid #e0e0e0;background:#fafafa;color:#555;display:flex;align-items:center;gap:6px}
+.cl-tag-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.cl-tag-dot.product{background:#333}
+.cl-tag-dot.social{background:#f5a623}
+.cl-ratio{font-size:9px;color:#999;margin-left:auto;font-style:italic}
+.cl-comments-list{display:flex;flex-direction:column;gap:3px}
+.cl-comment{font-size:10px;color:#555;padding:5px 8px;background:#f8f8f8;border-radius:4px}
+.cl-comment .cl-author{font-weight:600;margin-right:4px;color:#333}
+.cl-rename{margin-top:2px}
+.cl-rename-row{display:flex;align-items:center;gap:6px;font-size:10px;font-family:monospace}
+.cl-rename-old{color:#999;text-decoration:line-through}
+.cl-rename-arrow{color:#4caf50;font-weight:bold;font-family:sans-serif}
+.cl-rename-new{color:#333;font-weight:600}
 
 /* ── Demo: Pipeline ── */
 .pipeline-demo{background:#fff;border-radius:12px;border:1px solid #e0e0e0;overflow:hidden;box-shadow:0 2px 20px rgba(0,0,0,0.06);padding:20px 24px}
@@ -200,6 +281,45 @@ section{padding:80px 0}
 .pipe-step-detail{font-size:11px;color:#999;margin-top:2px}
 .pipe-step.active .pipe-step-detail{color:#888}
 .pipe-step-metrics{font-size:11px;color:#888;margin-top:2px}
+.pipe-step-bar{height:3px;background:#e0e0e0;border-radius:2px;margin-top:4px;overflow:hidden}
+.pipe-step-bar-fill{height:100%;background:#333;border-radius:2px;transition:width 0.6s ease}
+.pipe-step.done .pipe-step-bar-fill{background:#999}
+.pipe-step.active .pipe-step-bar-fill{background:#333}
+.pipe-future{margin-top:12px;padding-top:12px;border-top:1px dashed #e0e0e0;font-size:11px;color:#bbb}
+.pipe-future-title{font-weight:600;margin-bottom:4px;color:#ccc}
+.pipe-future-list{display:flex;flex-wrap:wrap;gap:4px 12px}
+
+/* ── Demo: AI Articles ── */
+.ai-demo{background:#fff;border-radius:12px;border:1px solid #e0e0e0;overflow:hidden;box-shadow:0 2px 20px rgba(0,0,0,0.06);max-width:480px}
+.ai-demo-header{padding:10px 16px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center}
+.ai-demo-header h4{font-size:12px;font-weight:600;margin:0}
+.ai-demo-header .ai-status{font-size:10px;color:#999}
+.ai-cols{display:flex;gap:0;border-bottom:1px solid #f0f0f0}
+.ai-col{flex:1;padding:10px 12px}
+.ai-col + .ai-col{border-left:1px solid #f0f0f0}
+.ai-col-title{font-size:9px;color:#999;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px}
+.ai-item{display:flex;align-items:center;gap:6px;padding:4px 0;font-size:10px;transition:all 0.3s}
+.ai-item-thumb{width:28px;height:28px;border-radius:3px;flex-shrink:0;position:relative;overflow:hidden}
+.ai-item-thumb-color{position:absolute;inset:0}
+.ai-item-name{color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ai-item-sku{font-weight:600;color:#333}
+.ai-item.matched{background:rgba(76,175,80,0.06);border-radius:4px;padding:4px}
+.ai-item.matched .ai-item-name{color:#333}
+.ai-btn-wrap{padding:12px;text-align:center}
+.ai-btn{display:inline-block;padding:8px 20px;background:#333;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;transition:all 0.2s}
+.ai-btn:hover{background:#555;transform:translateY(-1px)}
+.ai-btn:disabled{background:#ddd;color:#999;cursor:default;transform:none}
+.ai-btn .ai-spinner{display:none;width:12px;height:12px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.6s linear infinite;margin-right:6px;vertical-align:middle}
+.ai-btn.loading .ai-spinner{display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ai-results{padding:0 12px 12px;display:none}
+.ai-results.visible{display:block}
+.ai-results-title{font-size:9px;color:#999;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px}
+.ai-rename-item{font-size:10px;font-family:monospace;padding:3px 6px;border-radius:3px;opacity:0;transform:translateX(-8px);transition:all 0.3s}
+.ai-rename-item.visible{opacity:1;transform:translateX(0)}
+.ai-rename-item .old{color:#999;text-decoration:line-through}
+.ai-rename-item .arr{color:#4caf50;margin:0 4px}
+.ai-rename-item .new{color:#333;font-weight:600}
 
 /* ── Demo: Mobile Approval (full phone) ── */
 .phone-wrap{max-width:340px;margin:0 auto}
@@ -349,6 +469,7 @@ footer p{font-size:13px;color:#aaa}
       <a href="#problem" onclick="this.parentNode.classList.remove('open')">Проблема</a>
       <a href="#demo-container" onclick="this.parentNode.classList.remove('open')">Карточки</a>
       <a href="#demo-pipeline" onclick="this.parentNode.classList.remove('open')">Пайплайн</a>
+      <a href="#demo-ai" onclick="this.parentNode.classList.remove('open')">Артикулы</a>
       <a href="#demo-approve" onclick="this.parentNode.classList.remove('open')">Согласование</a>
       <a href="#features" onclick="this.parentNode.classList.remove('open')">Возможности</a>
       <a href="#cta" class="nav-cta" onclick="this.parentNode.classList.remove('open')">Попробовать</a>
@@ -389,10 +510,14 @@ footer p{font-size:13px;color:#aaa}
           <div class="app-screen active" id="screen-content">
             <div class="content-subtabs" id="contentSubtabs">
               <span class="content-subtab active" onclick="contentSubtab(this,'cont-cards')">Карточки</span>
+              <span class="content-subtab" onclick="contentSubtab(this,'cont-other')">Другое</span>
               <span class="content-subtab" onclick="contentSubtab(this,'cont-select')">Отбор</span>
             </div>
             <div class="content-sub active" id="cont-cards">
-              <div class="demo-cards" id="heroCards"></div>
+              <div class="hero-cp" id="heroCards"></div>
+            </div>
+            <div class="content-sub" id="cont-other">
+              <div id="heroOther" style="padding:4px"></div>
             </div>
             <div class="content-sub" id="cont-select">
               <div class="hero-gallery" id="heroGallery"></div>
@@ -454,61 +579,126 @@ footer p{font-size:13px;color:#aaa}
   </div>
 </section>
 
-<!-- ── Demo 1: Container Builder ── -->
+<!-- ── Demo 1: Structure Builder ── -->
 <section class="demo-section" id="demo-container">
   <div class="container">
     <div class="demo-layout">
       <div class="demo-text fade-up">
-        <div class="label">Карточки</div>
-        <h2>Перетащите фото в карточку -- и она готова</h2>
-        <p>Карточка -- центральная сущность в Maket. Карточка товара, лук, группа для соцсетей, раскадровка. Шаблон задаёт сетку слотов, команда заполняет их фотографиями.</p>
-        <p>Каждый участник видит, что уже собрано и чего не хватает. Клиент согласовывает карточки, а не тысячи файлов.</p>
-        <div class="demo-hint">Попробуйте: перетащите фото из полки в слоты карточки (или кликайте)</div>
+        <div class="label">Структура</div>
+        <h2>Нет ничего проще, чем создать структуру</h2>
+        <p>Вы уже знаете, как устроена съёмка: карточки товаров, подборки для SMM, материалы для PR. Maket не навязывает новый процесс -- он отражает тот, который уже есть. Перетащите фото в карточку -- структура готова.</p>
+        <p>Фотограф, стилист, ретушёр, клиент -- все работают в одной системе. Каждый видит свою часть, но ничего не теряется.</p>
+        <div class="demo-hint">Переключайте вкладки, выбирайте карточки в списке и перетаскивайте фото в слоты</div>
       </div>
       <div class="card-demo fade-up delay-1">
-        <div class="card-demo-header">
-          <span>Карточка: Сумка ALX T-201</span>
-          <span style="font-size:11px;color:#888">Шаблон 1+3</span>
+        <div class="card-demo-toolbar">
+          <div class="card-demo-subtab active" onclick="switchDemoTab('cards',this)">Карточки</div>
+          <div class="card-demo-subtab" onclick="switchDemoTab('other',this)">Другое</div>
+          <div class="card-demo-subtab" onclick="switchDemoTab('select',this)">Отбор</div>
         </div>
-        <div class="card-demo-body">
-          <div class="card-slots" id="cardSlots">
-            <div class="card-slot slot-hero" data-slot="0" ondragover="slotDragOver(event)" ondrop="slotDrop(event)" ondragleave="slotDragLeave(event)">
-              <span class="slot-label">Главное фото</span>
+        <div class="card-demo-body" id="cdBody">
+          <div class="cd-sidebar" id="cdSidebar"></div>
+          <div class="cd-view" id="cdView">
+            <div class="cd-meta">
+              <span class="cd-meta-name" id="cdCardName"></span>
+              <span class="cd-meta-btn">&#8592;</span>
+              <span class="cd-meta-tmpl" id="cdTmplName"></span>
             </div>
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
-              <div class="card-slot" data-slot="1" ondragover="slotDragOver(event)" ondrop="slotDrop(event)" ondragleave="slotDragLeave(event)">
-                <span class="slot-label">Ракурс 2</span>
-              </div>
-              <div class="card-slot" data-slot="2" ondragover="slotDragOver(event)" ondrop="slotDrop(event)" ondragleave="slotDragLeave(event)">
-                <span class="slot-label">Ракурс 3</span>
-              </div>
-              <div class="card-slot" data-slot="3" ondragover="slotDragOver(event)" ondrop="slotDrop(event)" ondragleave="slotDragLeave(event)">
-                <span class="slot-label">Детали</span>
-              </div>
+            <div class="cd-layout" id="cardSlots"></div>
+            <div class="cd-nav">
+              <span class="cd-nav-btn" onclick="navCard(-1)">Назад</span>
+              <span class="cd-nav-counter" id="cdNavCounter">1 / 5</span>
+              <span class="cd-nav-btn" onclick="navCard(1)">Вперёд</span>
             </div>
           </div>
-          <div class="photo-tray" id="photoTray"></div>
+          <div class="cd-view" id="cdSelectView" style="display:none">
+            <div class="cd-meta">
+              <span class="cd-meta-name">Отбор</span>
+              <span class="cd-meta-tmpl">186 из 248 отобрано</span>
+            </div>
+            <div class="cd-select-grid" id="selectGrid"></div>
+          </div>
+          <div class="cd-view" id="cdOtherView" style="display:none;flex:1;overflow-y:auto"></div>
+          <div class="cd-previews" id="cdPreviews">
+            <div class="cd-pv-title">Фото</div>
+            <div class="cd-pv-count" id="cdPvCount">5 фото</div>
+            <div class="cd-pv-gallery" id="photoTray"></div>
+          </div>
         </div>
       </div>
     </div>
   </div>
 </section>
 
+<!-- ── Demo 1.5: Data around one photo ── -->
+<section class="demo-section alt" id="demo-card-life">
+  <div class="container">
+    <div class="demo-layout reverse">
+      <div class="demo-text fade-up">
+        <div class="label">Данные</div>
+        <h2>Вся структура -- вокруг одной фотографии</h2>
+        <p>В реальном процессе одно фото живёт сразу в нескольких контекстах: карточка товара в соотношении 2:3, подборка для SMM в 4:5, баннер для лендинга в 16:9. Фотограф, клиент, стилист и ретушёр работают с одним кадром -- но у каждого своя задача.</p>
+        <p>Maket показывает все комментарии рядом. Фотограф просит сделать теплее, клиент -- холоднее. Стилист говорит не трогать кожу, клиент -- почистить. Вы увидите все противоречия до того, как они станут переделкой.</p>
+      </div>
+      <div class="card-life fade-up delay-1" id="cardLife"></div>
+    </div>
+  </div>
+</section>
+
 <!-- ── Demo 2: Pipeline ── -->
-<section class="demo-section alt" id="demo-pipeline">
+<section class="demo-section" id="demo-pipeline">
   <div class="container">
     <div class="demo-layout reverse">
       <div class="demo-text fade-up">
         <div class="label">Пайплайн</div>
         <h2>Видно, на каком этапе каждое фото</h2>
-        <p>Maket автоматически отслеживает прогресс: какие фото отсняты, какие одобрены, какие ушли на ретушь. Не нужно спрашивать -- достаточно посмотреть.</p>
-        <p>Пайплайн работает по триггерам: вы совершаете действие, система фиксирует переход. Никаких ручных обновлений статусов.</p>
-        <div class="demo-hint">Попробуйте: нажмите на этапы, чтобы увидеть переходы</div>
+        <p>Maket отслеживает прогресс по каждой фотографии: загрузка, отбор, согласование с клиентом. Вместо вопросов "а что с моими фото?" -- один взгляд на дашборд.</p>
+        <p>Пайплайн работает по триггерам: поставили рейтинг -- фото перешло на отбор. Клиент нажал "одобрить" -- переход на следующий этап. Автоматически.</p>
+        <div class="demo-hint">Нажмите на этап, чтобы увидеть детали</div>
       </div>
       <div class="pipeline-demo fade-up delay-1">
         <div class="pipe-title">Каталог SS26</div>
-        <div class="pipe-project">248 фото / 62 карточки</div>
+        <div class="pipe-project">248 фото / 62 карточки / 5 категорий</div>
         <div class="pipe-steps" id="pipeSteps"></div>
+        <div class="pipe-future" id="pipeFuture"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Demo 2.5: AI Articles ── -->
+<section class="demo-section alt" id="demo-ai">
+  <div class="container">
+    <div class="demo-layout">
+      <div class="demo-text fade-up">
+        <div class="label">Артикулы</div>
+        <h2>Загрузите чек-лист -- AI расставит артикулы</h2>
+        <p>Загружаете PDF-каталог от бренда с артикулами и референсами. Maket извлекает SKU и картинки. Нажимаете "Расставить (AI)" -- и система сопоставляет артикулы с карточками по визуальному сходству.</p>
+        <p>После подтверждения все файлы переименовываются: IMG_4201.jpg становится ALX-T201_front_01.jpg. Автоматически, через Rate Setter.</p>
+        <div class="demo-hint">Нажмите "Расставить (AI)" чтобы увидеть как это работает</div>
+      </div>
+      <div class="ai-demo fade-up delay-1">
+        <div class="ai-demo-header">
+          <h4>Артикулы</h4>
+          <span class="ai-status" id="aiStatus">5 артикулов / 5 карточек</span>
+        </div>
+        <div class="ai-cols">
+          <div class="ai-col">
+            <div class="ai-col-title">Чек-лист (PDF)</div>
+            <div id="aiChecklist"></div>
+          </div>
+          <div class="ai-col">
+            <div class="ai-col-title">Карточки</div>
+            <div id="aiCards"></div>
+          </div>
+        </div>
+        <div class="ai-btn-wrap">
+          <button class="ai-btn" id="aiMatchBtn" onclick="aiRunMatch()"><span class="ai-spinner"></span>Расставить (AI)</button>
+        </div>
+        <div class="ai-results" id="aiResults">
+          <div class="ai-results-title">Переименование файлов</div>
+          <div id="aiRenameList"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -754,16 +944,55 @@ setInterval(function() {
   if (tab) heroTab(tab);
 }, 5000);
 
-// ── Hero: Containers screen ──
+// ── Hero: Containers screen (mini card editor) ──
 (function() {
-  var names = ['T-201 Front','T-201 Side','T-201 Detail','K-504 Front','K-504 Back','S-110 Pack','S-110 Side','M-320 Front','M-320 Detail'];
-  var html = '';
-  for (var i = 0; i < 9; i++) {
-    var st = i < 4 ? '' : (i < 7 ? ' pending' : ' waiting');
-    html += '<div class="demo-card"><div class="demo-card-img" style="background:' + C[i] + ';opacity:0.5">' + (i >= 7 ? '<div class="shimmer"></div>' : '') + '</div>' +
-      '<div class="demo-card-label"><span>' + names[i] + '</span><span class="demo-card-status' + st + '"></span></div></div>';
+  var sidebar = [
+    { name: 'Сумка T-201', cat: 'Сумки', active: true },
+    { name: 'Кроссовки K-504', cat: 'Обувь' },
+    { name: 'Сандалии S-110', cat: 'Обувь' },
+    { name: 'Клатч P-066', cat: 'Сумки' }
+  ];
+  var shtml = '<div class="hero-cp-side"><div class="hero-cp-side-title">Карточки</div>';
+  for (var i = 0; i < sidebar.length; i++) {
+    shtml += '<div class="hero-cp-side-item' + (sidebar[i].active ? ' active' : '') + '">' + sidebar[i].name + '<div class="hcat">' + sidebar[i].cat + '</div></div>';
   }
-  document.getElementById('heroCards').innerHTML = html;
+  shtml += '</div>';
+  // Center: card editor
+  shtml += '<div class="hero-cp-center"><div class="hero-cp-meta">Сумка ALX T-201 <span class="tmpl">Шаблон 1+3</span></div>';
+  shtml += '<div class="hero-cp-slots">';
+  shtml += '<div class="hero-cp-row" style="flex:2"><div class="hero-cp-slot main filled" style="flex:1;aspect-ratio:3/2"><div class="sc" style="background:' + C[0] + ';opacity:0.6"></div></div></div>';
+  shtml += '<div class="hero-cp-row" style="flex:1">';
+  shtml += '<div class="hero-cp-slot filled" style="flex:1;aspect-ratio:1"><div class="sc" style="background:' + C[1] + ';opacity:0.6"></div></div>';
+  shtml += '<div class="hero-cp-slot filled" style="flex:1;aspect-ratio:1"><div class="sc" style="background:' + C[2] + ';opacity:0.6"></div></div>';
+  shtml += '<div class="hero-cp-slot" style="flex:1;aspect-ratio:1"><span class="sl">Детали</span></div>';
+  shtml += '</div></div>';
+  shtml += '<div class="hero-cp-nav">1 / 4</div></div>';
+  // Preview panel
+  shtml += '<div class="hero-cp-pv"><div class="hero-cp-pv-title">Фото</div>';
+  for (var j = 0; j < 4; j++) {
+    shtml += '<div class="hero-cp-pv-thumb"><div class="sc" style="background:' + C[j] + ';opacity:0.6"></div></div>';
+  }
+  shtml += '</div>';
+  document.getElementById('heroCards').innerHTML = shtml;
+})();
+
+// ── Hero: Другое screen (free containers) ──
+(function() {
+  var containers = [
+    { name: 'SMM', slots: 3, ratio: '9/14' },
+    { name: 'PR', slots: 2, ratio: '3/4' },
+    { name: 'Landing', slots: 3, ratio: '16/9' }
+  ];
+  var html = '';
+  for (var i = 0; i < containers.length; i++) {
+    var ct = containers[i];
+    html += '<div class="hero-oc-container"><div class="hero-oc-title">' + ct.name + '</div><div class="hero-oc-grid">';
+    for (var j = 0; j < ct.slots; j++) {
+      html += '<div class="hero-cp-slot" style="flex:1;aspect-ratio:' + ct.ratio + ';min-height:20px"><span class="sl">' + (j + 1) + '</span></div>';
+    }
+    html += '</div></div>';
+  }
+  document.getElementById('heroOther').innerHTML = html;
 })();
 
 // ── Hero: Projects screen ──
@@ -842,20 +1071,191 @@ setInterval(function() {
 })();
 
 // ═══════════════════════════════════════
-// Demo 1: Container drag-and-drop
+// Demo 1: Structure builder (real app UI)
 // ═══════════════════════════════════════
 var photoNames = ['IMG_4201','IMG_4202','IMG_4203','IMG_4204','IMG_4205'];
 var slotState = {};
+var activeDemoTab = 'cards';
+var activeCardIdx = 0;
 
-(function() {
-  var tray = document.getElementById('photoTray');
-  var html = '<div class="photo-tray-label">Фото</div>';
-  for (var i = 0; i < 5; i++) {
-    html += '<div class="tray-thumb" draggable="true" data-photo="' + i + '" ondragstart="thumbDragStart(event)" title="' + photoNames[i] + '">' +
-      '<div class="tray-color" style="background:' + C[i] + ';opacity:0.7"></div></div>';
+var demoData = {
+  cards: {
+    sidebar: [
+      { name: 'Сумка T-201', cat: 'Сумки' },
+      { name: 'Кроссовки K-504', cat: 'Обувь' },
+      { name: 'Сандалии S-110', cat: 'Обувь' },
+      { name: 'Ботинки M-320', cat: 'Обувь' },
+      { name: 'Клатч P-066', cat: 'Сумки' }
+    ],
+    addLabel: '+ Карточка',
+    items: [
+      { name: 'Сумка ALX T-201', tmpl: 'Шаблон 1+3', rows: [
+        [{ label: 'Главное фото', hero: true, flex: 1, ratio: '3/2' }],
+        [{ label: 'Ракурс 2', flex: 1, ratio: '1/1' }, { label: 'Ракурс 3', flex: 1, ratio: '1/1' }, { label: 'Детали', flex: 1, ratio: '1/1' }]
+      ]},
+      { name: 'Кроссовки K-504', tmpl: 'Шаблон 1+4', rows: [
+        [{ label: 'Главное', hero: true, flex: 1, ratio: '3/2' }],
+        [{ label: 'Бок', flex: 1, ratio: '1/1' }, { label: 'Подошва', flex: 1, ratio: '1/1' }, { label: 'Шнуровка', flex: 1, ratio: '1/1' }, { label: 'Пара', flex: 1, ratio: '1/1' }]
+      ]},
+      { name: 'Сандалии S-110', tmpl: 'Шаблон 1+2', rows: [
+        [{ label: 'Главное', hero: true, flex: 1, ratio: '3/2' }],
+        [{ label: 'Ремешок', flex: 1, ratio: '1/1' }, { label: 'Пара', flex: 1, ratio: '1/1' }]
+      ]},
+      { name: 'Ботинки M-320', tmpl: 'Шаблон 1+3', rows: [
+        [{ label: 'Главное', hero: true, flex: 1, ratio: '3/2' }],
+        [{ label: 'Профиль', flex: 1, ratio: '1/1' }, { label: 'Детали', flex: 1, ratio: '1/1' }, { label: 'Текстура', flex: 1, ratio: '1/1' }]
+      ]},
+      { name: 'Клатч P-066', tmpl: 'Шаблон 1+2', rows: [
+        [{ label: 'Главное', hero: true, flex: 1, ratio: '3/2' }],
+        [{ label: 'Открытый', flex: 1, ratio: '1/1' }, { label: 'Застёжка', flex: 1, ratio: '1/1' }]
+      ]}
+    ]
+  },
+  other: {
+    items: [
+      { name: 'SMM', tmpl: 'Свободная раскладка', rows: [
+        [{ label: 'Сторис 1', flex: 1, ratio: '9/14' }, { label: 'Сторис 2', flex: 1, ratio: '9/14' }, { label: 'Сторис 3', flex: 1, ratio: '9/14' }]
+      ]},
+      { name: 'PR', tmpl: 'Свободная раскладка', rows: [
+        [{ label: 'Образ', hero: true, flex: 1, ratio: '3/4' }],
+        [{ label: 'Крупный план', flex: 1, ratio: '3/2' }, { label: 'Деталь', flex: 1, ratio: '3/2' }]
+      ]},
+      { name: 'Landing', tmpl: 'Свободная раскладка', rows: [
+        [{ label: 'Баннер', hero: true, flex: 2, ratio: '16/9' }, { label: 'Превью', flex: 1, ratio: '1/1' }],
+        [{ label: 'Фото 1', flex: 1, ratio: '1/1' }, { label: 'Фото 2', flex: 1, ratio: '1/1' }, { label: 'Фото 3', flex: 1, ratio: '1/1' }]
+      ]}
+    ]
   }
-  tray.innerHTML = html;
-})();
+};
+
+function switchDemoTab(tab, el) {
+  activeDemoTab = tab;
+  activeCardIdx = 0;
+  slotState = {};
+  document.querySelectorAll('.card-demo-subtab').forEach(function(t) { t.classList.remove('active'); });
+  if (el) el.classList.add('active');
+  if (tab === 'select') {
+    document.getElementById('cdSidebar').style.display = 'none';
+    document.getElementById('cdView').style.display = 'none';
+    document.getElementById('cdPreviews').style.display = 'none';
+    document.getElementById('cdSelectView').style.display = '';
+    document.getElementById('cdOtherView').style.display = 'none';
+    renderSelectView();
+  } else if (tab === 'other') {
+    document.getElementById('cdSidebar').style.display = 'none';
+    document.getElementById('cdView').style.display = 'none';
+    document.getElementById('cdPreviews').style.display = 'none';
+    document.getElementById('cdSelectView').style.display = 'none';
+    document.getElementById('cdOtherView').style.display = '';
+    renderOtherView();
+  } else {
+    document.getElementById('cdSidebar').style.display = '';
+    document.getElementById('cdView').style.display = '';
+    document.getElementById('cdPreviews').style.display = '';
+    document.getElementById('cdSelectView').style.display = 'none';
+    document.getElementById('cdOtherView').style.display = 'none';
+    renderCardView();
+  }
+}
+
+function selectSidebarCard(idx) {
+  activeCardIdx = idx;
+  slotState = {};
+  renderCardView();
+}
+
+function navCard(dir) {
+  var data = demoData[activeDemoTab];
+  if (!data) return;
+  var n = activeCardIdx + dir;
+  if (n >= 0 && n < data.items.length) { activeCardIdx = n; slotState = {}; renderCardView(); }
+}
+
+function renderCardView() {
+  var data = demoData[activeDemoTab];
+  if (!data) return;
+  // Sidebar
+  var shtml = '<div class="cd-sidebar-title">Карточки</div>';
+  for (var i = 0; i < data.sidebar.length; i++) {
+    shtml += '<div class="cd-sidebar-item' + (i === activeCardIdx ? ' active' : '') + '" onclick="selectSidebarCard(' + i + ')">' +
+      data.sidebar[i].name + '<div class="cd-cat">' + data.sidebar[i].cat + '</div></div>';
+  }
+  shtml += '<div class="cd-sidebar-add">' + data.addLabel + '</div>';
+  document.getElementById('cdSidebar').innerHTML = shtml;
+  // Card meta
+  var card = data.items[activeCardIdx];
+  document.getElementById('cdCardName').textContent = card.name;
+  document.getElementById('cdTmplName').textContent = card.tmpl;
+  document.getElementById('cdNavCounter').textContent = (activeCardIdx + 1) + ' / ' + data.items.length;
+  // Slots
+  var html = '', si = 0;
+  for (var r = 0; r < card.rows.length; r++) {
+    html += '<div class="cd-layout-row">';
+    for (var c = 0; c < card.rows[r].length; c++) {
+      var s = card.rows[r][c];
+      html += '<div class="card-slot' + (s.hero ? ' main-slot' : '') + '" data-slot="' + si + '" style="flex:' + s.flex + ';aspect-ratio:' + s.ratio + '" ' +
+        'ondragover="slotDragOver(event)" ondrop="slotDrop(event)" ondragleave="slotDragLeave(event)">' +
+        '<span class="slot-label">' + s.label + '</span></div>';
+      si++;
+    }
+    html += '</div>';
+  }
+  document.getElementById('cardSlots').innerHTML = html;
+  // Photo tray
+  var tray = document.getElementById('photoTray'), th = '';
+  for (var i = 0; i < 5; i++) {
+    th += '<div class="tray-thumb" draggable="true" data-photo="' + i + '" ondragstart="thumbDragStart(event)" title="' + photoNames[i] + '">' +
+      '<div class="tray-color" style="background:' + C[i] + ';opacity:0.7"></div><div class="pv-check-demo"></div></div>';
+  }
+  tray.innerHTML = th;
+  // Click-to-fill
+  document.querySelectorAll('#cardSlots .card-slot').forEach(function(slot) {
+    slot.addEventListener('click', function() {
+      if (slot.classList.contains('filled')) return;
+      for (var i = 0; i < 5; i++) {
+        var used = false;
+        for (var k in slotState) { if (slotState[k] === i) { used = true; break; } }
+        if (!used) { fillSlot(slot, i); return; }
+      }
+    });
+  });
+}
+
+function renderSelectView() {
+  var g = document.getElementById('selectGrid'), h = '';
+  for (var i = 0; i < 12; i++) {
+    var ci = i % C.length, rated = i < 8;
+    h += '<div class="cd-select-cell' + (rated ? ' rated' : '') + '">' +
+      '<div style="position:absolute;inset:0;background:' + C[ci] + ';opacity:0.5"></div>' +
+      (rated ? '<div class="cd-stars">★★★★★</div>' : '') + '</div>';
+  }
+  g.innerHTML = h;
+}
+
+renderCardView();
+
+function renderOtherView() {
+  var data = demoData.other;
+  if (!data) return;
+  var html = '';
+  for (var i = 0; i < data.items.length; i++) {
+    var item = data.items[i];
+    html += '<div class="oc-container-card">';
+    html += '<div class="oc-container-header"><span class="oc-container-name">' + item.name + '</span><span class="oc-container-tmpl">' + item.tmpl + '</span></div>';
+    for (var r = 0; r < item.rows.length; r++) {
+      html += '<div class="cd-layout-row">';
+      for (var c = 0; c < item.rows[r].length; c++) {
+        var s = item.rows[r][c];
+        html += '<div class="card-slot' + (s.hero ? ' main-slot' : '') + '" style="flex:' + s.flex + ';aspect-ratio:' + s.ratio + '">' +
+          '<span class="slot-label">' + s.label + '</span></div>';
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+  html += '<div class="oc-container-add">+ Контейнер</div>';
+  document.getElementById('cdOtherView').innerHTML = html;
+}
 
 function thumbDragStart(e) { e.dataTransfer.setData('text/plain', e.target.getAttribute('data-photo')); }
 function slotDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }
@@ -876,72 +1276,197 @@ function fillSlot(slot, pi) {
   var thumb = document.querySelector('.tray-thumb[data-photo="' + pi + '"]');
   if (thumb) thumb.classList.add('used');
   showToast(photoNames[pi] + ' -> слот ' + (parseInt(si) + 1));
-  if (Object.keys(slotState).length >= 4) {
+  var totalSlots = document.querySelectorAll('#cardSlots .card-slot').length;
+  if (Object.keys(slotState).length >= totalSlots) {
     setTimeout(function() {
       document.querySelectorAll('.card-slot.filled').forEach(function(s) { s.classList.add('confirmed'); });
-      showToast('Карточка собрана! Готова к согласованию.');
+      showToast('Готово! Все слоты заполнены.');
     }, 400);
   }
 }
 
-document.querySelectorAll('.card-slot').forEach(function(slot) {
-  slot.addEventListener('click', function() {
-    if (slot.classList.contains('filled')) return;
-    for (var i = 0; i < 5; i++) {
-      var used = false;
-      for (var k in slotState) { if (slotState[k] === i) { used = true; break; } }
-      if (!used) { fillSlot(slot, i); return; }
-    }
-  });
-});
+// ═══════════════════════════════════════
+// Demo 1.5: Data around one photo
+// ═══════════════════════════════════════
+(function() {
+  var cl = document.getElementById('cardLife');
+  if (!cl) return;
+  var html = '<div class="cl-center">';
+  // Photo
+  html += '<div class="cl-photo"><div class="cl-photo-color" style="background:' + C[0] + ';opacity:0.65"></div>';
+  html += '<div class="cl-photo-badges"><span class="cl-badge rate5">5 stars</span><span class="cl-badge approved">OK</span></div>';
+  html += '<div class="cl-photo-name">IMG_4201_front.jpg</div></div>';
+  // Info
+  html += '<div class="cl-info">';
+  // Belongs to
+  html += '<div><div class="cl-section-title">Используется в</div>';
+  html += '<div class="cl-tags">';
+  html += '<div class="cl-tag"><span class="cl-tag-dot product"></span>Карточка: Сумка T-201 <span class="cl-ratio">2:3</span></div>';
+  html += '<div class="cl-tag"><span class="cl-tag-dot social"></span>Контейнер: SMM <span class="cl-ratio">4:5</span></div>';
+  html += '<div class="cl-tag"><span class="cl-tag-dot social"></span>Контейнер: PR <span class="cl-ratio">16:9</span></div>';
+  html += '</div></div>';
+  // Comments
+  html += '<div><div class="cl-section-title">Комментарии</div>';
+  html += '<div class="cl-comments-list">';
+  html += '<div class="cl-comment"><span class="cl-author">Фотограф:</span> сделать теплее</div>';
+  html += '<div class="cl-comment"><span class="cl-author">Клиент:</span> сделать холоднее, почистить кожу</div>';
+  html += '<div class="cl-comment"><span class="cl-author">Стилист:</span> не трогать кожу</div>';
+  html += '</div></div>';
+  // Article rename
+  html += '<div><div class="cl-section-title">Артикул</div>';
+  html += '<div class="cl-rename"><div class="cl-rename-row">';
+  html += '<span class="cl-rename-old">IMG_4201_front.jpg</span>';
+  html += '<span class="cl-rename-arrow">&rarr;</span>';
+  html += '<span class="cl-rename-new">ALX-T201_front_01.jpg</span>';
+  html += '</div></div></div>';
+  html += '</div></div>';
+  cl.innerHTML = html;
+})();
 
 // ═══════════════════════════════════════
 // Demo 2: Pipeline
 // ═══════════════════════════════════════
+// Active stages (real app: PIPELINE_STAGES with beta:true + partially working)
 var pipeData = [
-  { name: 'Предпродакшн', detail: 'Бриф, мудборд, планирование', metrics: '62 карточки запланировано' },
-  { name: 'Съёмка', detail: 'Студия, предметка + модели', metrics: '248 из 248 отснято' },
-  { name: 'Отбор', detail: 'Rate Setter, синхронизация', metrics: '186 отобрано из 248' },
-  { name: 'Раскладка', detail: 'Карточки, шаблоны', metrics: '58 из 62 карточек' },
-  { name: 'Согласование', detail: 'Share-ссылка клиенту', metrics: '42 одобрено, 16 на проверке' },
-  { name: 'Ретушь', detail: 'Комментарии, ТЗ ретушёру', metrics: '30 сдано, 12 в работе' },
-  { name: 'Финал', detail: 'Финальная версия', metrics: '24 готово к выгрузке' },
-  { name: 'Адаптация', detail: 'Ресайз, маркетплейсы', metrics: '' }
+  { name: 'Превью (преотбор)', detail: 'Загрузка папки, создание превью', metrics: '248 фото загружено', current: 0, total: 248 },
+  { name: 'Отбор команды', detail: 'Рейтинги, карточки, раскладка', metrics: '186 из 248 отобрано', current: 186, total: 248 },
+  { name: 'Отбор клиента', detail: 'Share-ссылка, согласование, правки', metrics: '42 одобрено, 16 на проверке', current: 42, total: 186 }
 ];
-var pipeActive = 4;
+// Future stages (planned, not yet in production)
+var pipeFuture = ['Цветокоррекция', 'Комментарии на ретушь', 'Ретушь', 'Согласование ретуши', 'Адаптация к каналам'];
+var pipeActive = 2; // current front stage
 
 function renderPipeline() {
   var html = '';
   for (var i = 0; i < pipeData.length; i++) {
     var cls = i < pipeActive ? 'done' : (i === pipeActive ? 'active' : 'future');
+    var pct = pipeData[i].total > 0 ? Math.round(pipeData[i].current / pipeData[i].total * 100) : 0;
     html += '<div class="pipe-step ' + cls + '" onclick="clickPipeStep(' + i + ')">' +
       '<div class="pipe-dot">' + (i < pipeActive ? '&#10003;' : (i + 1)) + '</div>' +
       '<div class="pipe-step-info"><div class="pipe-step-name">' + pipeData[i].name + '</div>' +
       '<div class="pipe-step-detail">' + pipeData[i].detail + '</div>' +
-      (pipeData[i].metrics && cls !== 'future' ? '<div class="pipe-step-metrics">' + pipeData[i].metrics + '</div>' : '') +
+      '<div class="pipe-step-metrics">' + pipeData[i].metrics + '</div>' +
+      '<div class="pipe-step-bar"><div class="pipe-step-bar-fill" style="width:' + pct + '%"></div></div>' +
       '</div></div>';
   }
   document.getElementById('pipeSteps').innerHTML = html;
+  // Future stages
+  var fhtml = '<div class="pipe-future-title">Скоро:</div><div class="pipe-future-list">';
+  for (var j = 0; j < pipeFuture.length; j++) {
+    fhtml += '<span>' + pipeFuture[j] + '</span>';
+    if (j < pipeFuture.length - 1) fhtml += '<span style="color:#ddd">/</span>';
+  }
+  fhtml += '</div>';
+  document.getElementById('pipeFuture').innerHTML = fhtml;
 }
 renderPipeline();
 
 function clickPipeStep(idx) {
-  if (idx === pipeActive + 1 && idx < pipeData.length) {
-    pipeActive = idx; renderPipeline(); showToast('Этап: ' + pipeData[idx].name);
-  }
+  pipeActive = idx;
+  renderPipeline();
+  showToast(pipeData[idx].name + ': ' + pipeData[idx].metrics);
 }
 
-var pipeAutoTimer;
-var pipeObs = new IntersectionObserver(function(entries) {
-  if (entries[0].isIntersecting) {
-    clearInterval(pipeAutoTimer);
-    pipeAutoTimer = setInterval(function() {
-      pipeActive = pipeActive < pipeData.length - 1 ? pipeActive + 1 : 0;
-      renderPipeline();
-    }, 4000);
-  } else { clearInterval(pipeAutoTimer); }
-}, { threshold: 0.3 });
-pipeObs.observe(document.getElementById('demo-pipeline'));
+// ═══════════════════════════════════════
+// Demo 2.5: AI Article matching
+// ═══════════════════════════════════════
+var aiArticles = [
+  { sku: 'ALX-T201', name: 'Сумка тоут бежевая', color: C[0] },
+  { sku: 'ALX-K504', name: 'Кроссовки белые', color: C[1] },
+  { sku: 'ALX-S110', name: 'Сандалии плетёные', color: C[2] },
+  { sku: 'ALX-M320', name: 'Ботинки чёрные', color: C[3] },
+  { sku: 'ALX-P066', name: 'Клатч серебро', color: C[4] }
+];
+var aiCardNames = ['Сумка T-201','Кроссовки K-504','Сандалии S-110','Ботинки M-320','Клатч P-066'];
+var aiRenames = [
+  { old: 'IMG_4201_front.jpg', new_name: 'ALX-T201_front_01.jpg' },
+  { old: 'IMG_4202_front.jpg', new_name: 'ALX-K504_front_01.jpg' },
+  { old: 'IMG_4203_front.jpg', new_name: 'ALX-S110_front_01.jpg' },
+  { old: 'IMG_4204_front.jpg', new_name: 'ALX-M320_front_01.jpg' },
+  { old: 'IMG_4205_front.jpg', new_name: 'ALX-P066_front_01.jpg' }
+];
+var aiMatched = false;
+
+(function() {
+  // Render checklist
+  var cl = document.getElementById('aiChecklist');
+  var cards = document.getElementById('aiCards');
+  if (!cl || !cards) return;
+  var h1 = '', h2 = '';
+  for (var i = 0; i < aiArticles.length; i++) {
+    h1 += '<div class="ai-item" id="aiArt' + i + '">' +
+      '<div class="ai-item-thumb"><div class="ai-item-thumb-color" style="background:' + aiArticles[i].color + ';opacity:0.6"></div></div>' +
+      '<div><div class="ai-item-sku">' + aiArticles[i].sku + '</div>' +
+      '<div class="ai-item-name">' + aiArticles[i].name + '</div></div></div>';
+    h2 += '<div class="ai-item" id="aiCard' + i + '">' +
+      '<div class="ai-item-thumb"><div class="ai-item-thumb-color" style="background:' + C[i] + ';opacity:0.5"></div></div>' +
+      '<div class="ai-item-name">' + aiCardNames[i] + '</div></div>';
+  }
+  cl.innerHTML = h1;
+  cards.innerHTML = h2;
+  // Pre-render rename list (hidden)
+  var rl = document.getElementById('aiRenameList');
+  var rh = '';
+  for (var j = 0; j < aiRenames.length; j++) {
+    rh += '<div class="ai-rename-item" id="aiRen' + j + '">' +
+      '<span class="old">' + aiRenames[j].old + '</span>' +
+      '<span class="arr">&rarr;</span>' +
+      '<span class="new">' + aiRenames[j].new_name + '</span></div>';
+  }
+  rl.innerHTML = rh;
+})();
+
+function aiRunMatch() {
+  if (aiMatched) { aiReset(); return; }
+  var btn = document.getElementById('aiMatchBtn');
+  btn.classList.add('loading');
+  btn.disabled = true;
+  document.getElementById('aiStatus').textContent = 'AI расставляет артикулы...';
+
+  // Animate matches one by one
+  var idx = 0;
+  var timer = setInterval(function() {
+    if (idx >= aiArticles.length) {
+      clearInterval(timer);
+      btn.classList.remove('loading');
+      btn.disabled = false;
+      btn.textContent = 'Сбросить';
+      aiMatched = true;
+      document.getElementById('aiStatus').textContent = '5 из 5 сопоставлено';
+      // Show renames
+      document.getElementById('aiResults').classList.add('visible');
+      var ri = 0;
+      var renTimer = setInterval(function() {
+        if (ri >= aiRenames.length) { clearInterval(renTimer); return; }
+        document.getElementById('aiRen' + ri).classList.add('visible');
+        ri++;
+      }, 200);
+      showToast('AI сопоставил 5 артикулов с карточками');
+      return;
+    }
+    var art = document.getElementById('aiArt' + idx);
+    var card = document.getElementById('aiCard' + idx);
+    if (art) art.classList.add('matched');
+    if (card) card.classList.add('matched');
+    idx++;
+    document.getElementById('aiStatus').textContent = 'Сопоставлено: ' + idx + ' из 5...';
+  }, 500);
+}
+
+function aiReset() {
+  aiMatched = false;
+  for (var i = 0; i < 5; i++) {
+    var art = document.getElementById('aiArt' + i);
+    var card = document.getElementById('aiCard' + i);
+    var ren = document.getElementById('aiRen' + i);
+    if (art) art.classList.remove('matched');
+    if (card) card.classList.remove('matched');
+    if (ren) ren.classList.remove('visible');
+  }
+  document.getElementById('aiResults').classList.remove('visible');
+  document.getElementById('aiMatchBtn').innerHTML = '<span class="ai-spinner"></span>Расставить (AI)';
+  document.getElementById('aiStatus').textContent = '5 артикулов / 5 карточек';
+}
 
 // ═══════════════════════════════════════
 // Demo 3: Mobile client approval
