@@ -1089,6 +1089,128 @@ tr:hover td { background: #fafafa; }
   <td contenteditable="true" class="my-comment"></td>
 </tr>
 
+<tr class="section-row"><td colspan="10">UX Polish (по результатам design-critique, апрель 2026)</td></tr>
+
+<tr data-row="ux-overflow-menu">
+  <td><span class="s-todo">TODO</span></td>
+  <td>Съёмки / UI</td>
+  <td><strong>Overflow-меню в шапке "Съёмки"</strong></td>
+  <td></td>
+  <td>7 кнопок в ряд перегружают шапку. Оставить prominent: "Новая съёмка" (primary) + "Поделиться". Остальное (Команда, Экспорт, Импорт, Скачать лог) убрать в overflow-меню "...". Кнопку "Выйти" перенести в status-bar.</td>
+  <td class="files">index.html, style.css, shootings.js</td>
+  <td><span class="p-high">P0</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="ux-rename-subtabs">
+  <td><span class="s-todo">TODO</span></td>
+  <td>Контент / UI</td>
+  <td><strong>Переименовать subtabs: "Карточки товара" -> "Контейнеры", "Other" -> "Прочее", "Отбор" -> "Все фото"</strong></td>
+  <td></td>
+  <td>"Other" на английском посреди русского UI непонятно для клиентов. "Карточки товара" не соответствует терминологии "контейнеры". Единый язык во всём интерфейсе.</td>
+  <td class="files">index.html</td>
+  <td><span class="p-high">P0</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="ux-empty-state-actions">
+  <td><span class="s-todo">TODO</span></td>
+  <td>Все экраны / UI</td>
+  <td><strong>Empty-states с кнопками-действиями</strong></td>
+  <td></td>
+  <td>Вкладки Артикулы/Контент показывают текст "Выберите съёмку" без возможности действия. Добавить кнопку [Создать съёмку] или [Открыть последнюю] прямо в empty-state. Убрать тупики.</td>
+  <td class="files">index.html, shootings.js, nav.js</td>
+  <td><span class="p-med">P1</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="ux-status-bar-contrast">
+  <td><span class="s-todo">TODO</span></td>
+  <td>UI / Статус</td>
+  <td><strong>Статус-бар: повысить контраст при изменениях (save/sync)</strong></td>
+  <td></td>
+  <td>Сейчас font-size:12px, color:#aaa -- практически невидим. При изменении статуса на 2-3сек поднимать контраст до #555 + добавить цветную точку-индикатор (зелёная=sync, оранжевая=saving).</td>
+  <td class="files">style.css, supabase.js, shootings.js</td>
+  <td><span class="p-med">P1</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="ux-modal-escape">
+  <td><span class="s-todo">TODO</span></td>
+  <td>UI / Модалки</td>
+  <td><strong>Escape-закрытие модалок + focus-trap</strong></td>
+  <td></td>
+  <td>Нет keydown-обработчика для Esc, Tab убегает за модалку, нет aria-modal. Добавить в openModal(): Esc-закрытие, focus-trap через querySelectorAll внутри модалки, role="dialog" + aria-modal="true".</td>
+  <td class="files">nav.js, index.html</td>
+  <td><span class="p-med">P1</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="ux-onboarding-hints">
+  <td><span class="s-todo">TODO</span></td>
+  <td>Контент / Превью</td>
+  <td><strong>Coach-marks при первом использовании</strong></td>
+  <td></td>
+  <td>Нет подсказок что фото можно перетаскивать из превью в слоты, что рейтинг ставится кликом, что есть фильтр по звёздам. При первом использовании (localStorage-флаг) показать 2-3 tooltip-подсказки. Или хотя бы текст под drop-zone.</td>
+  <td class="files">previews.js, cards.js, style.css</td>
+  <td><span class="p-low">P2</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="ux-ratesetter-simplify">
+  <td><span class="s-todo">TODO</span></td>
+  <td>Синхронизация / UI</td>
+  <td><strong>Упрощение Rate Setter UI</strong></td>
+  <td></td>
+  <td>6 интерактивных элементов для одного действия. По умолчанию показывать "Все файлы + Запустить". "Только изменения" как второй вариант. "Пробный запуск" -- чекбокс/toggle вместо отдельной кнопки. Режим "Папка" за expandable-панелью "Дополнительно".</td>
+  <td class="files">index.html, sync.js, style.css</td>
+  <td><span class="p-low">P2</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="ux-contrast-fix">
+  <td><span class="s-todo">TODO</span></td>
+  <td>CSS / Accessibility</td>
+  <td><strong>Контраст текста: #aaa -> #767676 минимум (WCAG AA)</strong></td>
+  <td></td>
+  <td>color:#aaa на белом = 2.3:1 (не проходит AA). color:#bbb = 1.8:1. Минимум #767676 для текста 4.5:1. Пройтись по всем #aaa/#bbb/#ccc в style.css и поднять до читаемого уровня.</td>
+  <td class="files">style.css</td>
+  <td><span class="p-low">P2</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="ux-focus-visible">
+  <td><span class="s-todo">TODO</span></td>
+  <td>CSS / Accessibility</td>
+  <td><strong>:focus-visible стили для клавиатурной навигации</strong></td>
+  <td></td>
+  <td>Нет видимого фокуса при Tab-навигации. Добавить глобальный :focus-visible стиль (outline:2px solid #333). Добавить alt на img в превью/слотах.</td>
+  <td class="files">style.css, previews.js, cards.js</td>
+  <td><span class="p-low">P3</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="ux-pipeline-width">
+  <td><span class="s-todo">TODO</span></td>
+  <td>Съёмки / CSS</td>
+  <td><strong>Pipeline-панель: адаптивная ширина</strong></td>
+  <td></td>
+  <td>Фиксированная 380px. На 1280px сжимает список, на 1920px визуально оторвана. Заменить на flex:0 0 clamp(320px,30%,420px).</td>
+  <td class="files">style.css</td>
+  <td><span class="p-low">P3</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
 </tbody>
 </table>
 
