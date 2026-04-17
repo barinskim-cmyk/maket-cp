@@ -806,45 +806,6 @@ footer p{font-size:13px;color:#aaa}
 </section>
 
 
-<!-- ── Demo 2.5: AI Articles ── -->
-<section class="demo-section alt" id="demo-ai">
-  <div class="container">
-    <div class="demo-layout">
-      <div class="demo-text fade-up">
-        <div class="label">Артикулы</div>
-        <h2>Загрузите чек-лист — AI расставит артикулы</h2>
-        <p>Загружаете PDF-каталог от бренда с артикулами и референсами. Maket извлекает SKU и картинки. Нажимаете "Расставить (AI)" — и система сопоставляет артикулы с карточками по визуальному сходству.</p>
-        <p>После подтверждения все файлы переименовываются: IMG_4201.jpg становится ALX-T201_front_01.jpg. Автоматически, через Rate Setter.</p>
-        <div class="demo-hint">Нажмите "Расставить (AI)" чтобы увидеть как это работает</div>
-      </div>
-      <div class="ai-demo fade-up delay-1">
-        <div class="ai-demo-header">
-          <h4>Артикулы</h4>
-          <span class="ai-status" id="aiStatus">5 артикулов / 5 карточек</span>
-        </div>
-        <div class="ai-cols">
-          <div class="ai-col">
-            <div class="ai-col-title">Чек-лист (PDF)</div>
-            <div id="aiChecklist"></div>
-          </div>
-          <div class="ai-col">
-            <div class="ai-col-title">Карточки</div>
-            <div id="aiCards"></div>
-          </div>
-        </div>
-        <div class="ai-btn-wrap">
-          <button class="ai-btn" id="aiMatchBtn" onclick="aiRunMatch()"><span class="ai-spinner"></span>Расставить (AI)</button>
-        </div>
-        <div class="ai-results" id="aiResults">
-          <div class="ai-results-title">Переименование файлов</div>
-          <div id="aiRenameList"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-
 <!-- ── Demo 3: Mobile Approval ── -->
 <section class="demo-section" id="demo-approve">
   <div class="container">
@@ -895,6 +856,45 @@ footer p{font-size:13px;color:#aaa}
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ── Demo 2.5: AI Articles ── -->
+<section class="demo-section alt" id="demo-ai">
+  <div class="container">
+    <div class="demo-layout">
+      <div class="demo-text fade-up">
+        <div class="label">Артикулы</div>
+        <h2>Загрузите чек-лист — AI расставит артикулы</h2>
+        <p>Загружаете PDF-каталог от бренда с артикулами и референсами. Maket извлекает SKU и картинки. Нажимаете "Расставить (AI)" — и система сопоставляет артикулы с карточками по визуальному сходству.</p>
+        <p>После подтверждения все файлы переименовываются: IMG_4201.jpg становится ALX-T201_front_01.jpg. Автоматически, через Rate Setter.</p>
+        <div class="demo-hint">Нажмите "Расставить (AI)" чтобы увидеть как это работает</div>
+      </div>
+      <div class="ai-demo fade-up delay-1">
+        <div class="ai-demo-header">
+          <h4>Артикулы</h4>
+          <span class="ai-status" id="aiStatus">5 артикулов / 5 карточек</span>
+        </div>
+        <div class="ai-cols">
+          <div class="ai-col">
+            <div class="ai-col-title">Чек-лист (PDF)</div>
+            <div id="aiChecklist"></div>
+          </div>
+          <div class="ai-col">
+            <div class="ai-col-title">Карточки</div>
+            <div id="aiCards"></div>
+          </div>
+        </div>
+        <div class="ai-btn-wrap">
+          <button class="ai-btn" id="aiMatchBtn" onclick="aiRunMatch()"><span class="ai-spinner"></span>Расставить (AI)</button>
+        </div>
+        <div class="ai-results" id="aiResults">
+          <div class="ai-results-title">Переименование файлов</div>
+          <div id="aiRenameList"></div>
         </div>
       </div>
     </div>
