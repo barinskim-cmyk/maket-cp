@@ -503,6 +503,18 @@ section{padding:80px 0}
 .data-stat .num{font-size:36px;font-weight:700;color:#fff}
 .data-stat .lbl{font-size:13px;color:rgba(255,255,255,0.5);margin-top:4px}
 
+
+/* Mobile: hide detail text behind "подробнее" */
+.demo-more-btn{display:none}
+@media(max-width:768px){
+.demo-text:not(.dm-expanded) .demo-point-detail,
+.demo-text:not(.dm-expanded) > p{display:none}
+.demo-more-btn{display:inline-block;font-size:13px;color:#999;cursor:pointer;padding:6px 0;margin-top:4px;border:none;background:none;font-family:inherit;text-decoration:underline;text-underline-offset:2px}
+.demo-more-btn:hover{color:#555}
+.demo-text.dm-expanded .demo-more-btn span::after{content:' ↑'}
+.demo-text:not(.dm-expanded) .demo-more-btn span::after{content:' ↓'}
+}
+
 /* ── CTA ── */
 .cta-section{text-align:center;padding:80px 0 100px}
 .cta-section h2{margin-bottom:12px}
@@ -725,6 +737,7 @@ footer p{font-size:13px;color:#aaa}
 <div class="demo-point-lead">Все работают в одной системе.</div>
 <div class="demo-point-detail">Фотограф, стилист, ретушёр, клиент — каждый видит свою часть и ничего не теряется.</div>
 </div>
+        <button class="demo-more-btn" onclick="this.closest('.demo-text').classList.toggle('dm-expanded')"><span>подробнее</span></button>
         <div class="demo-hint">Переключайте вкладки, выбирайте карточки в списке и перетаскивайте фото в слоты</div>
       </div>
       <div class="card-demo fade-up delay-1">
@@ -801,6 +814,7 @@ footer p{font-size:13px;color:#aaa}
 <div class="demo-point-lead">Вы увидите все противоречия до того, как они станут переделкой.</div>
 </div>
         <p>Комментарий к карточке автоматически применяется ко всем фото внутри — не нужно писать одно и то же пять раз.</p>
+        <button class="demo-more-btn" onclick="this.closest('.demo-text').classList.toggle('dm-expanded')"><span>подробнее</span></button>
       </div>
       <div class="card-life fade-up delay-1" id="cardLife"></div>
     </div>
@@ -827,6 +841,7 @@ footer p{font-size:13px;color:#aaa}
 <div class="demo-point-lead">Maket работает с данными — задачи идут параллельно</div>
 <div class="demo-point-detail">Фотограф делает цветокоррекцию, клиент оставляет комментарии — ретушёр получает всё вместе.</div>
 </div>
+        <button class="demo-more-btn" onclick="this.closest('.demo-text').classList.toggle('dm-expanded')"><span>подробнее</span></button>
         <div class="demo-hint">Нажмите на этап, чтобы увидеть детали</div>
       </div>
       <div class="pipeline-demo fade-up delay-1">
@@ -887,6 +902,7 @@ footer p{font-size:13px;color:#aaa}
 <div class="demo-point-lead">Понятно, кто и когда принял решение</div>
 <div class="demo-point-detail">Решение фиксируется с именем и временем.</div>
 </div>
+        <button class="demo-more-btn" onclick="this.closest('.demo-text').classList.toggle('dm-expanded')"><span>подробнее</span></button>
         <div class="demo-hint">Попробуйте: посмотрите соседние кадры свайпом. Ваш выбор автоматически сохраняется</div>
       </div>
       <div class="fade-up delay-1">
@@ -950,6 +966,7 @@ footer p{font-size:13px;color:#aaa}
 <div class="demo-point-lead">После подтверждения все файлы переименовываются в считанные секунды</div>
 <div class="demo-point-detail">IMG_4201.jpg становится ALX-T201_front_01.jpg</div>
 </div>
+        <button class="demo-more-btn" onclick="this.closest('.demo-text').classList.toggle('dm-expanded')"><span>подробнее</span></button>
         <div class="demo-hint">Нажмите "Расставить (AI)" чтобы увидеть как это работает</div>
       </div>
       <div class="ai-demo fade-up delay-1">
