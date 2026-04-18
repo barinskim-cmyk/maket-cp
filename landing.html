@@ -871,7 +871,7 @@ footer p{font-size:13px;color:#aaa}
         <div class="label">Артикулы</div>
         <h2>Загрузите чек-лист — AI расставит артикулы</h2>
         <p>Загружаете PDF-каталог от бренда с артикулами и референсами. Maket извлекает SKU и картинки. Нажимаете "Расставить (AI)" — и система сопоставляет артикулы с карточками по визуальному сходству.</p>
-        <p>После подтверждения все файлы переименовываются: IMG_4201.jpg становится ALX-T201_front_01.jpg. Автоматически, через Rate Setter.</p>
+        <p>После подтверждения все файлы переименовываются: IMG_4201.jpg становится ALX-T201_front_01.jpg. Автоматически.</p>
         <div class="demo-hint">Нажмите "Расставить (AI)" чтобы увидеть как это работает</div>
       </div>
       <div class="ai-demo fade-up delay-1">
@@ -969,8 +969,8 @@ footer p{font-size:13px;color:#aaa}
       </div>
       <div class="feat-card fade-up delay-1">
         <div class="feat-icon">&#9683;</div>
-        <h3>Синхронизация с Capture One</h3>
-        <p>Автоматическая связь в один клик. Рейтинги и ключевые слова пишутся в COS-файлы.</p>
+        <h3>Синхронизация метаданных</h3>
+        <p>Рейтинги и отбор синхронизируются автоматически. Одно действие в системе — данные обновляются везде.</p>
       </div>
       <div class="feat-card fade-up delay-2">
         <div class="feat-icon">&#9776;</div>
@@ -1279,9 +1279,9 @@ setInterval(function() {
 (function() {
   var items = [
     { icon: 'C1', iconBg: '#e8e8e8', name: 'Capture One 23', status: 'connected', label: 'Подключён' },
-    { icon: 'RS', iconBg: '#f0f0f0', name: 'Rate Setter', status: 'ready', label: 'Готов к записи' },
-    { icon: 'COS', iconBg: '#f5f5f5', name: 'COS-файлы', status: 'connected', label: '186 обновлено' },
-    { icon: 'XMP', iconBg: '#f0f0f0', name: 'XMP-метаданные', status: 'connected', label: 'Синхронизировано' },
+    { icon: 'RS', iconBg: '#f0f0f0', name: 'Rate Setter', status: 'ready', label: 'Готов' },
+    { icon: 'MD', iconBg: '#f5f5f5', name: 'Метаданные', status: 'connected', label: '186 обновлено' },
+    { icon: 'XMP', iconBg: '#f0f0f0', name: 'Метаданные файлов', status: 'connected', label: 'Синхронизировано' },
     { icon: 'DB', iconBg: '#f5f5f5', name: 'Облако Supabase', status: 'connected', label: 'EU, 248 фото' },
     { icon: '...', iconBg: '#fafafa', name: 'PIM-интеграция', status: 'waiting', label: 'Скоро' }
   ];
