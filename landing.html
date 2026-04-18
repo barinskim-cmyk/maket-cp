@@ -522,6 +522,10 @@ footer p{font-size:13px;color:#aaa}
 
 
 /* ── Lead + detail text pattern ── */
+.demo-point{position:relative;padding-left:18px;margin-bottom:14px}
+.demo-point::before{content:'';position:absolute;left:0;top:8px;width:7px;height:7px;border-radius:50%;background:#333}
+.demo-point-lead{font-size:16px;font-weight:600;color:#333;line-height:1.5;margin-bottom:4px}
+.demo-point-detail{font-size:14px;color:#999;line-height:1.6}
 .text-lead{font-size:16px;font-weight:500;color:#333;margin-bottom:6px;line-height:1.5}
 .text-detail{font-size:14px;color:#999;line-height:1.6;margin-bottom:14px}
 .text-detail:last-child{margin-bottom:0}
@@ -777,8 +781,10 @@ footer p{font-size:13px;color:#aaa}
         <h2>Вся структура в каждой фотографии</h2>
         <p>В реальном процессе одно фото живёт сразу в нескольких контекстах: карточка товара в соотношении 2:3, подборка для SMM в 4:5, баннер для лендинга в 16:9. Фотограф, клиент, стилист и ретушёр работают с одним кадром — но у каждого своя задача.</p>
         <p>Maket показывает все комментарии рядом. Фотограф просит сделать теплее, клиент — холоднее. Стилист говорит не трогать кожу, клиент — почистить. Вы увидите все противоречия до того, как они станут переделкой.</p>
-        <p class="text-lead">Комментарий к карточке автоматически применяется ко всем фото внутри.</p>
-<p class="text-detail">Не нужно писать одно и то же пять раз.</p>
+        <div class="demo-point">
+<div class="demo-point-lead">Комментарий к карточке автоматически применяется ко всем фото внутри</div>
+<div class="demo-point-detail">Не нужно писать одно и то же пять раз.</div>
+</div>
       </div>
       <div class="card-life fade-up delay-1" id="cardLife"></div>
     </div>
@@ -793,10 +799,18 @@ footer p{font-size:13px;color:#aaa}
       <div class="demo-text fade-up">
         <div class="label">Пайплайн</div>
         <h2>Видно, на каком этапе каждое фото</h2>
-        <p class="text-lead">Maket отслеживает прогресс по каждой фотографии: загрузка, отбор, согласование с клиентом.</p>
-<p class="text-detail">Вместо вопросов "а что с моими фото?" — один взгляд на дашборд.</p>
-        <p class="text-lead">Пайплайн работает по триггерам: поставили рейтинг — фото перешло на отбор.</p>
-<p class="text-detail">Клиент нажал «одобрить» — переход на следующий этап. Автоматически. А так как Maket работает с данными, задачи идут параллельно: фотограф делает цветокоррекцию, клиент оставляет комментарии — ретушёр получает всё вместе.</p>
+        <div class="demo-point">
+<div class="demo-point-lead">Maket отслеживает прогресс по каждой фотографии</div>
+<div class="demo-point-detail">Загрузка, отбор, согласование с клиентом. Вместо вопросов "а что с моими фото?" — один взгляд на дашборд.</div>
+</div>
+        <div class="demo-point">
+<div class="demo-point-lead">Пайплайн работает по триггерам</div>
+<div class="demo-point-detail">Поставили рейтинг — фото перешло на отбор. Клиент нажал «одобрить» — переход на следующий этап. Автоматически.</div>
+</div>
+<div class="demo-point">
+<div class="demo-point-lead">Maket работает с данными — задачи идут параллельно</div>
+<div class="demo-point-detail">Фотограф делает цветокоррекцию, клиент оставляет комментарии — ретушёр получает всё вместе.</div>
+</div>
         <div class="demo-hint">Нажмите на этап, чтобы увидеть детали</div>
       </div>
       <div class="pipeline-demo fade-up delay-1">
@@ -815,8 +829,10 @@ footer p{font-size:13px;color:#aaa}
   <div class="container">
     <div class="features-header fade-up">
       <h2>Метрики, которые считают себя сами</h2>
-      <p class="text-lead">Каждое действие в Maket CP залогировано: кто, когда, что сделал.</p>
-<p class="text-detail">Вам не нужно вести таблицы — выберите ключевые метрики, а система посчитает за вас.</p>
+      <div class="demo-point">
+<div class="demo-point-lead">Каждое действие в Maket CP залогировано: кто, когда, что сделал.</div>
+<div class="demo-point-detail">Вам не нужно вести таблицы — выберите ключевые метрики, а система посчитает за вас.</div>
+</div>
     </div>
     <div class="grid-3" style="margin-top:32px">
       <div class="pain-card fade-up" style="background:#fff">
@@ -846,8 +862,18 @@ footer p{font-size:13px;color:#aaa}
       <div class="demo-text fade-up">
         <div class="label">Согласование</div>
         <h2>Клиент видит все фото, управляет отбором и комментариями с любого устройства</h2>
-        <p>Клиент открывает ссылку с телефона. Вертикальная лента карточек — внутри каждой все фотографии. Листайте варианты в слоте свайпом, чтобы сравнить ракурсы. Не нравится кадр — удалите одним нажатием, и фотограф сразу видит, что нужна замена.</p>
-        <p>Комментарий оставляется к карточке целиком — одно замечание распространяется на все фото внутри. Клиент или продюсер могут завершить этап самостоятельно: согласовать полностью, согласовать частично или вернуть на доработку. Решение фиксируется с именем и временем — понятно, кто и когда принял решение.</p>
+        <div class="demo-point">
+<div class="demo-point-lead">Клиент открывает ссылку с телефона</div>
+<div class="demo-point-detail">Вертикальная лента карточек — внутри каждой все фотографии. Листайте варианты свайпом, чтобы сравнить ракурсы. Не нравится кадр — удалите одним нажатием.</div>
+</div>
+<div class="demo-point">
+<div class="demo-point-lead">Комментарий к карточке — одно замечание на все фото внутри</div>
+<div class="demo-point-detail">Клиент или продюсер могут завершить этап: согласовать полностью, частично или вернуть на доработку.</div>
+</div>
+<div class="demo-point">
+<div class="demo-point-lead">Понятно, кто и когда принял решение</div>
+<div class="demo-point-detail">Решение фиксируется с именем и временем.</div>
+</div>
         <div class="demo-hint">Попробуйте: посмотрите соседние кадры свайпом. Ваш выбор автоматически сохраняется</div>
       </div>
       <div class="fade-up delay-1">
@@ -904,8 +930,10 @@ footer p{font-size:13px;color:#aaa}
         <div class="label">Артикулы</div>
         <h2>Загрузите чек-лист — AI расставит артикулы</h2>
         <p>Загружаете PDF-каталог от бренда с артикулами и референсами. Maket извлекает SKU и картинки. Нажимаете "Расставить (AI)" — и система сопоставляет артикулы с карточками по визуальному сходству.</p>
-        <p class="text-lead">После подтверждения все файлы переименовываются в считанные секунды.</p>
-<p class="text-detail">IMG_4201.jpg становится ALX-T201_front_01.jpg</p>
+        <div class="demo-point">
+<div class="demo-point-lead">После подтверждения все файлы переименовываются в считанные секунды</div>
+<div class="demo-point-detail">IMG_4201.jpg становится ALX-T201_front_01.jpg</div>
+</div>
         <div class="demo-hint">Нажмите "Расставить (AI)" чтобы увидеть как это работает</div>
       </div>
       <div class="ai-demo fade-up delay-1">
