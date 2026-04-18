@@ -58,10 +58,10 @@ section{padding:80px 0}
 
 /* ── Hero App Preview ── */
 .hero-app{background:#fff;border-radius:12px;box-shadow:0 4px 40px rgba(0,0,0,0.1);overflow:hidden;border:1px solid #e0e0e0}
-.app-titlebar{display:flex;align-items:center;gap:8px;padding:10px 14px;background:#f8f8f8;border-bottom:1px solid #eee;position:relative}
-.app-dot{width:10px;height:10px;border-radius:50%;position:relative;z-index:1}
+.app-titlebar{display:flex;align-items:center;gap:8px;padding:10px 14px;background:#f8f8f8;border-bottom:1px solid #eee}
+.app-dot{width:10px;height:10px;border-radius:50%}
 .app-dot.r{background:#ff5f57}.app-dot.y{background:#febc2e}.app-dot.g{background:#28c840}
-.app-titlebar-text{position:absolute;left:0;right:0;text-align:center;font-size:12px;color:#999;pointer-events:none}
+.app-titlebar-text{flex:1;text-align:center;font-size:12px;color:#999}
 .app-nav{display:flex;background:#fff;border-bottom:1px solid #eee;padding:0 12px}
 .app-nav-tab{padding:10px 18px;font-size:12px;color:#888;border-bottom:2px solid transparent;cursor:pointer;transition:all 0.15s;user-select:none}
 .app-nav-tab:hover{color:#555}
@@ -567,7 +567,7 @@ footer p{font-size:13px;color:#aaa}
       <div class="hero-app fade-up delay-2">
         <div class="app-titlebar">
           <div class="app-dot r"></div><div class="app-dot y"></div><div class="app-dot g"></div>
-          <div class="app-titlebar-text">Maket CP <span style="color:#ccc;font-size:10px">beta 1.0.2</span></div>
+          <div class="app-titlebar-text">Maket CP</div>
         </div>
         <div class="app-nav" id="heroNav">
           <div class="app-nav-tab" data-screen="shootings" onclick="heroTab(this)">Съёмки</div>
