@@ -107,16 +107,31 @@ class ArticleService:
         # 3. Извлечь изображения с координатами
         images_data = self._extract_page_images(page)
 
-        # 4. Сопоставить артикулы с ближайшими изображениями
+        # 4. Сопоставить артикулы с изображениями строго по строке (1:1)
+        # Порог: картинка должна быть в пределах одной строки (~50pt).
+        # Каждая картинка назначается максимум одному артикулу.
+        ROW_THRESHOLD = 50  # максимальное расстояние по Y между артикулом и картинкой
+        used_images: set[int] = set()  # индексы уже назначенных картинок
+
         result: list[dict] = []
         for item in sku_items:
             ref_image = ''
             if images_data:
-                # Найти ближайшее изображение по Y-позиции
-                best_img = min(images_data, key=lambda img: abs(img['y'] - item['y']))
-                # Если изображение не слишком далеко (в пределах 200pt)
-                if abs(best_img['y'] - item['y']) < 200:
-                    ref_image = best_img.get('base64', '')
+                # Найти ближайшее НЕиспользованное изображение в пределах строки
+                best_img = None
+                best_dist = ROW_THRESHOLD + 1
+                for idx, img in enumerate(images_data):
+                    if idx in used_images:
+                        continue
+                    dist = abs(img['y'] - item['y'])
+                    if dist < best_dist:
+                        best_dist = dist
+                        best_img = (idx, img)
+
+                if best_img and best_dist <= ROW_THRESHOLD:
+                    ref_image = best_img[1].get('base64', '')
+                    used_images.add(best_img[0])
+                # Если картинки нет в пределах строки — оставляем refImage пустым
 
             result.append({
                 'sku': item['sku'],
