@@ -98,6 +98,8 @@ function sbDoSignup() {
   if (!name) { errEl.textContent = 'Введите имя'; errEl.style.display = 'block'; return; }
   if (!email) { errEl.textContent = 'Введите email'; errEl.style.display = 'block'; return; }
   if (!pass || pass.length < 6) { errEl.textContent = 'Пароль минимум 6 символов'; errEl.style.display = 'block'; return; }
+  var consentEl = document.getElementById('inp-signup-consent');
+  if (consentEl && !consentEl.checked) { errEl.textContent = 'Подтвердите согласие на обработку данных'; errEl.style.display = 'block'; return; }
 
   sbSignup(email, pass, name, function(err, user) {
     if (err) {
@@ -414,6 +416,8 @@ function authDoSignup() {
   if (!name) { errEl.textContent = 'Введите имя'; return; }
   if (!email) { errEl.textContent = 'Введите email'; return; }
   if (!pass || pass.length < 6) { errEl.textContent = 'Пароль минимум 6 символов'; return; }
+  var consentEl = document.getElementById('auth-signup-consent');
+  if (consentEl && !consentEl.checked) { errEl.textContent = 'Подтвердите согласие на обработку данных'; return; }
 
   sbSignup(email, pass, name, function(err, user) {
     if (err) {
