@@ -1988,8 +1988,24 @@ function partialSubmit() {
 function submitBeta() {
   var email = document.getElementById('ctaEmail').value;
   if (!email || email.indexOf('@') < 0) { showToast('Введите корректный email'); return; }
-  showToast('Заявка отправлена! Мы свяжемся с вами.');
-  document.getElementById('ctaEmail').value = '';
+  var btn = document.querySelector('.cta-form .btn-main');
+  if (btn) { btn.disabled = true; btn.textContent = 'Отправляем...'; }
+  fetch('https://mukiyeuxulasvtlpckjf.supabase.co/functions/v1/beta-notify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email, source: 'landing' })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.success) {
+      showToast('Заявка отправлена! Мы свяжемся с вами.');
+      document.getElementById('ctaEmail').value = '';
+    } else {
+      showToast('Ошибка, попробуйте ещё раз');
+    }
+  }).catch(function() {
+    showToast('Ошибка сети, попробуйте ещё раз');
+  }).finally(function() {
+    if (btn) { btn.disabled = false; btn.textContent = 'Подать заявку'; }
+  });
 }
 </script>
 
