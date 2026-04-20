@@ -1153,12 +1153,17 @@ footer p{font-size:13px;color:#aaa}
       <input class="cta-input" type="email" placeholder="Ваш рабочий email" id="ctaEmail">
       <button class="btn-main" onclick="submitBeta()">Подать заявку</button>
     </div>
+    <label style="display:flex;align-items:flex-start;gap:8px;max-width:460px;margin:12px auto 0;font-size:12px;color:#999;cursor:pointer;line-height:1.4">
+      <input type="checkbox" id="ctaConsent" style="margin-top:2px;flex-shrink:0">
+      <span>Нажимая кнопку, вы соглашаетесь с <a href="/maket-cp/privacy.html" target="_blank" style="color:#666;text-decoration:underline">политикой обработки персональных данных</a></span>
+    </label>
   </div>
 </section>
 
 <footer>
   <div class="container">
     <p>Maket CP — Москва — Мария Баринская — barinski.m@gmail.com — 2026</p>
+    <p style="margin-top:6px"><a href="/maket-cp/privacy.html" style="color:#999;font-size:12px;text-decoration:underline">Политика конфиденциальности</a></p>
   </div>
 </footer>
 
@@ -1988,6 +1993,7 @@ function partialSubmit() {
 function submitBeta() {
   var email = document.getElementById('ctaEmail').value;
   if (!email || email.indexOf('@') < 0) { showToast('Введите корректный email'); return; }
+  if (!document.getElementById('ctaConsent').checked) { showToast('Подтвердите согласие на обработку данных'); return; }
   var btn = document.querySelector('.cta-form .btn-main');
   if (btn) { btn.disabled = true; btn.textContent = 'Отправляем...'; }
   fetch('https://mukiyeuxulasvtlpckjf.supabase.co/functions/v1/beta-notify', {
