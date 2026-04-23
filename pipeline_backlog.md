@@ -9,7 +9,7 @@
 > - `pipeline_mockup.html` — визуальный макет трёх метрик и ветвления.
 > - `backlog.html` — общий бэклог проекта со статусами и тестами.
 
-Дата последнего обновления: 2026-04-14.
+Дата последнего обновления: 2026-04-14. (Частичный apдейт статусов 2026-04-23 — см. changelog внизу.)
 
 ---
 
@@ -108,7 +108,7 @@
 
 | ID | Приоритет | Задача | Статус | Зависит от | Готово когда |
 |----|-----------|--------|--------|------------|---------------|
-| A1 | P0 | Ввести поле `_stage` на объекте фото (frontend state + Supabase `previews`/`photo_versions`) | todo | — | миграция применена, все фото в проекте имеют `_stage` |
+| A1 | P0 | Ввести поле `_stage` на объекте фото (frontend state + Supabase `previews`/`photo_versions`) | **done (frontend)** — в коде с commit 6fadafc (см. BETA_SCOPE.md:5, shootings.js:170,219,229,304). Prod-миграция `_stage`-колонки в БД — уточнить у PA. | — | миграция применена, все фото в проекте имеют `_stage` |
 | A2 | P0 | Миграция: проставить всем существующим фото стартовый `_stage='preselection'` | todo | A1 | в БД нет фото с `_stage=null` |
 | A3 | P0 | Единый справочник этапов (JS + Python + SQL CHECK) | todo | A1 | три источника синхронны, есть unit-тест сравнения |
 | A4 | P0 | Timestamps на фото: `entered_queue_at`, `entered_work_at`, `uploaded_at`, `approved_at`, `killed_at` | todo | A1 | поля есть в БД, фронт их пишет на переходах |
@@ -205,7 +205,7 @@
 
 | ID | Приоритет | Задача | Статус | Зависит от | Готово когда |
 |----|-----------|--------|--------|------------|---------------|
-| H1 | P0 | Таблица `photo_versions` (см. spec#data-version) | todo | — | миграция прошла |
+| H1 | P0 | Таблица `photo_versions` (см. spec#data-version) | **partially done** — DDL существует в `v2/backend/migrations/001_photo_versions.sql` + `v2/supabase/all_pending_migrations.sql`; ещё не в номерной последовательности. Proposal `v2/supabase/proposed-photo_versions.sql` готов. Prod-проверка — PA до 2026-04-30. | — | миграция прошла |
 | H2 | P0 | Загрузка версии → запись в `photo_versions` + preview-генерация | todo | H1 | upload работает, preview появляется |
 | H3 | P1 | UI переключения активной preview-версии в превью-панели | todo | H2 | можно смотреть CC v1, CC v2, retouch v1 |
 | H4 | P1 | Связка версии с COS keyword (persistent photo ID) | todo | H1 | в COS проставляется ID, сохраняется на reimport |
@@ -297,3 +297,10 @@
 - **Проверка синхронизации:** раз в спринт сверяться с `pipeline_spec.html` и `MEMORY.md` — если там появились новые концепции, отразить здесь.
 - **Приоритизация:** P0 задачи блокируют всё остальное. Не начинать P1 пока не закрыты P0 соответствующего блока.
 - **Связь с общим `backlog.html`:** крупные задачи (на уровне эпиков: «ввести _stage на фото», «загрузка версий», «undo») должны параллельно появиться в `backlog.html` с отдельными подзадачами под тесты Maша.
+
+
+---
+
+## Changelog
+
+- **2026-04-23 (autonomous cleanup).** Обновлены статусы A1 и H1 из `todo` в `done (frontend)` / `partially done` на основании фактического использования в коде. A1: per-photo pipeline есть на фронте с commit 6fadafc. H1: DDL существует в `v2/backend/migrations/001_photo_versions.sql`, но не в номерной последовательности `v2/supabase/`; предложенная миграция — `proposed-photo_versions.sql`. Подробнее — `docs/agents/dev/photo_versions-migration-proposal.md` и `audits/coordinator-reconciliation-2026-04-23.md` п.2.1, 2.2.

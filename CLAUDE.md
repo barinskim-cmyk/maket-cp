@@ -1,8 +1,11 @@
 # Maket CP -- Инструкции для Claude
 
 ## Проект
-Maket CP -- DAM для коммерческих фотографов. Desktop-first web app (pywebview + Python).
-Владелец: Masha (barinski.m@gmail.com), коммерческий фотограф.
+
+Maket CP — платформа для визуального продакшена. Отражает реальный процесс команды — вы видите его и управляете по-настоящему. Экономит время и деньги. (locked Version A, 2026-04-23; см. `strategy-2026.md` раздел 1.)
+
+Desktop-first web app (pywebview + Python) + веб-клиент для заказчиков/ретушёров.
+Владелец: Masha (barinski.m@gmail.com), коммерческий фотограф. Продукт родился из её собственной практики, но ICP — команда продакшена и владелец проекта; фотограф — канал (bottom-up motion), не основной покупатель.
 
 ## Git: обязательные правила
 
@@ -130,12 +133,12 @@ else { /* browser fallback */ }
 ## Как читать бэклог Masha
 
 Masha оставляет комментарии в:
-- `audit_edits.json` -- правки к аудиту экранов
-- `backlog_edits.json` -- правки к бэклогу задач
 - Колонка "Мои комментарии" в backlog.html (авто-сохраняется в localStorage)
 - Колонка "Тест" в backlog.html -- результаты ручного тестирования
 
-В начале каждой сессии проверить наличие этих файлов и прочитать комментарии Masha.
+В начале каждой сессии проверить backlog.html и прочитать комментарии Masha.
+
+(Ранее планировались файлы `audit_edits.json` и `backlog_edits.json`, но механика упразднена в пользу backlog.html/localStorage — см. changelog.)
 
 ## Запуск
 
@@ -149,6 +152,12 @@ cd v2/backend && pip3 install Pillow && python3 main.py
 - Выбор папки (только drag-and-drop)
 - Rate Setter (нужен Python для записи .cos)
 - Сохранение проекта в файл
+
+## Changelog — canonize Version A (2026-04-23 autonomous cleanup)
+
+- Заменил «DAM для коммерческих фотографов» на locked Version A (см. `strategy-2026.md` раздел 1 и `audits/coordinator-reconciliation-2026-04-23.md` п.1.3, 2.3).
+- Убрал упоминание несуществующих `audit_edits.json` / `backlog_edits.json` — канал de-facto упразднён (см. reconciliation audit п.2.6, 4.14).
+- Источник правды: `strategy-2026.md:10`.
 
 ## Важно помнить
 
