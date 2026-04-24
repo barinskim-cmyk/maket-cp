@@ -6,8 +6,19 @@
 
 ## Текущий статус
 
-**Статус:** active — Phase 5 (Q2 tactical strategy), 2026-04-23.
-**Следующая активация:** неделя 1 (28 апр – 4 мая) — сбор ответов Маши на 10 open questions; параллельно мониторинг триггеров (см. audit §5).
+**Статус:** active — Phase 6 (Tier-1 locked, v1.0 ready for lawyer review), 2026-04-24.
+**Следующая активация:** до 30 мая 2026 — live-lawyer consultation Q2 (обязательный trigger), см. `regulatory-watch.md` запись от 2026-04-24. Подробный бриф юристу — собрать в неделю 2 (5–11 мая).
+
+### v1.0 drafts — status
+
+| Документ | Версия | Статус |
+|---|---|---|
+| Публичная оферта | `drafts/oferta-v1.0.md` | READY for live-lawyer review; 7 Tier-1 locked (2026-04-24); 11 Tier-2 defaults применены автономно LC; ⚠️ маркеры сняты полностью. |
+| Политика конфиденциальности | `drafts/privacy-policy-v1.0.md` | READY for live-lawyer review; 1 Tier-1 locked (§8.3 РКН); 8 Tier-2 defaults применены; ⚠️ маркеры сняты полностью. |
+| DPA | `drafts/dpa-skeleton-v0.9.md` | skeleton без изменений; активируется по запросу Заказчика. |
+| Triage defaults | `drafts/defaults-triage-2026-04-24.md` | исходный документ (locked basis для v1.0). |
+
+**Blocker для публикации:** review живого юриста + внесение формальных полей (ИНН, ОГРНИП, фактические реквизиты).
 
 ---
 
@@ -98,6 +109,7 @@
 
 ## Changelog
 
+- **2026-04-24** — Tier-1 locked Машей (7 решений). LC выпустил `oferta-v1.0.md` и `privacy-policy-v1.0.md` — ready for live-lawyer review. Tier-2 defaults применены автономно LC (~20 штук суммарно). Все ⚠️ маркеры сняты. Trigger: live-lawyer consultation до 30 мая 2026.
 - **2026-04-23** — inaugural activation, Phase 3 individual audit. Skeleton юр-лейна создан: understanding, audit, key-docs-index, status, regulatory-watch, 3 drafts skeleton. LC переходит в standby.
 
 ---
