@@ -1,3 +1,23 @@
+---
+type: status
+status: locked
+owner: LC
+created: 2026-04-24
+updated: 2026-04-24
+tags:
+  - legal
+  - ongoing
+  - legal-lane
+  - locked
+related:
+  - "[[agent-team-v2]]"
+  - "[[strategy-2026]]"
+priority: high
+cycle: ongoing
+---
+
+> **TL;DR:** **Обновляется:** при активации (cyclical, по триггерам). В standby — `standby since <date>, last activity <...>`.
+
 # Legal Counsel (LC) — Status
 
 **Обновляется:** при активации (cyclical, по триггерам). В standby — `standby since <date>, last activity <...>`.

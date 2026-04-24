@@ -1,3 +1,19 @@
+---
+type: doc
+status: locked
+owner: Masha
+created: 2026-04-23
+updated: 2026-04-24
+tags:
+  - ongoing
+  - locked
+related: []
+priority: critical
+cycle: ongoing
+---
+
+> **TL;DR:** Команда из 6 агентов: 4 Core (работают постоянно) + 2 Specialist (активируются циклично).
+
 # Agent Team v2 — Maket CP
 
 **Дата:** 2026-04-23

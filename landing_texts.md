@@ -1,3 +1,18 @@
+---
+type: doc
+status: deprecated
+owner: Masha
+created: 2026-04-24
+updated: 2026-04-24
+tags:
+  - ongoing
+related: []
+priority: medium
+cycle: ongoing
+---
+
+> **TL;DR:** <!-- DEPRECATED — 2026-04-23
+
 <!--
 DEPRECATED — 2026-04-23
 

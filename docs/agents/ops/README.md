@@ -1,3 +1,23 @@
+---
+type: doc
+status: active
+owner: CoS
+created: 2026-04-24
+updated: 2026-04-24
+tags:
+  - ops
+  - ongoing
+  - ops-lane
+  - reference
+related:
+  - "[[agent-team-v2]]"
+  - "[[strategy-2026]]"
+priority: reference
+cycle: ongoing
+---
+
+> **TL;DR:** Стратегические артефакты лейна Chief of Staff (CoS). Лейн-ownership по `agent-team-v2.md` раздел 4.
+
 # /docs/agents/ops/
 
 Стратегические артефакты лейна Chief of Staff (CoS). Лейн-ownership по `agent-team-v2.md` раздел 4.

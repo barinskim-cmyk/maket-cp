@@ -1,3 +1,24 @@
+---
+type: playbook
+status: active
+owner: GS
+created: 2026-04-23
+updated: 2026-04-24
+tags:
+  - commercial
+  - ongoing
+  - marketing
+  - client-a
+  - playbook
+related:
+  - "[[agent-team-v2]]"
+  - "[[strategy-2026]]"
+priority: medium
+cycle: ongoing
+---
+
+> **TL;DR:** **Дата:** 2026-04-23 **Автор:** GS (Phase 6, autonomous overnight task). **Версия:** v1 (первая волна Q2, draft для ревью Маши и CX). **Скоуп:** outbound-касания Q2 для photographer-led motion (Ставка 5) и вторичный канал для владельцев продакшенов через чемпионов-фотографов.
+
 # Outbound Playbook v1 — Growth Strategist
 
 **Дата:** 2026-04-23

@@ -1,3 +1,23 @@
+---
+type: doc
+status: active
+owner: CoS
+created: 2026-04-24
+updated: 2026-04-24
+tags:
+  - ops
+  - q2
+  - ops-lane
+  - client-a
+related:
+  - "[[strategy-2026]]"
+  - "[[automation-rules]]"
+priority: medium
+cycle: Q2
+---
+
+> **TL;DR:** **Период цикла:** 2026-04-28 – 2026-05-11 (2 недели) **Goal card:** `/goals/current.md` **Состояние:** DRAFT (собран CoS 2026-04-23 на базе Q2-стратегий агентов). Ждёт proposals от агентов + approval Маши в четверг 7 мая. **Формат:** каждый task — ≤ 3 строки, с owner / week / deps / recommendation.
+
 # Cycle 1 Review — Task Proposals
 
 **Период цикла:** 2026-04-28 – 2026-05-11 (2 недели)

@@ -1,3 +1,22 @@
+---
+type: doc
+status: active
+owner: CoS
+created: 2026-04-24
+updated: 2026-04-24
+tags:
+  - ops
+  - ongoing
+  - ops-lane
+  - reference
+related:
+  - "[[release-review-playbook]]"
+priority: reference
+cycle: ongoing
+---
+
+> **TL;DR:** **Статус:** активный процесс. **Владелец процесса:** QA (реализация), CoS (SLA, эскалация), CX (первичный triage). **Инициализирован:** 2026-04-23 overnight, QA lane.
+
 # Maket CP — Bug Tracker (файловый)
 
 **Статус:** активный процесс.

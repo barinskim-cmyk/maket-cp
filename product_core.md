@@ -1,3 +1,19 @@
+---
+type: doc
+status: locked
+owner: Masha
+created: 2026-04-24
+updated: 2026-04-24
+tags:
+  - ongoing
+  - locked
+related: []
+priority: high
+cycle: ongoing
+---
+
+> **TL;DR:** Платформа для визуального продакшена. Отражает реальный процесс команды — вы видите его и управляете по-настоящему. Экономит время и деньги.
+
 # Maket CP -- Ядро продукта
 
 ## Что это

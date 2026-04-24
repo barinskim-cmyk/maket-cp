@@ -1,3 +1,24 @@
+---
+type: doc
+status: deprecated
+owner: CoS
+created: 2026-04-24
+updated: 2026-04-24
+tags:
+  - ops
+  - ongoing
+  - ops-lane
+  - client-a
+  - reference
+related:
+  - "[[strategy-2026]]"
+  - "[[automation-rules]]"
+priority: reference
+cycle: ongoing
+---
+
+> **TL;DR:** Координаты CoS-артефактов для execution loop (`strategy-2026.md`, `agent-team-v2.md` фаза 7).
+
 # /goals/
 
 Координаты CoS-артефактов для execution loop (`strategy-2026.md`, `agent-team-v2.md` фаза 7).

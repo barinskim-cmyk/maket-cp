@@ -1,3 +1,18 @@
+---
+type: doc
+status: active
+owner: Team
+created: 2026-04-24
+updated: 2026-04-24
+tags:
+  - ongoing
+related: []
+priority: medium
+cycle: ongoing
+---
+
+> **TL;DR:** Полная версия с таблицами: user_scenarios.docx. Этот файл -- .md-версия для быстрого доступа Claude.
+
 # Maket CP -- Пользовательские сценарии
 
 **v2.2 | 01.04.2026**

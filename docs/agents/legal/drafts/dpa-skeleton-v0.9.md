@@ -1,3 +1,24 @@
+---
+type: draft
+status: draft
+owner: LC
+created: 2026-04-24
+updated: 2026-04-24
+tags:
+  - legal
+  - ongoing
+  - legal-lane
+  - client-a
+  - draft
+related:
+  - "[[agent-team-v2]]"
+  - "[[strategy-2026]]"
+priority: medium
+cycle: ongoing
+---
+
+> **TL;DR:** **Версия:** v0.9 (расширенный draft из резерва; **не final**) **Дата draft'а:** 2026-04-23 **Автор:** Legal Counsel (LC), ассистент. **Предшествующий документ:** `dpa-template-skeleton.md` v0.1 (2026-04-23).
+
 # Соглашение об обработке Персональных данных (DPA) — Maket CP
 
 **Версия:** v0.9 (расширенный draft из резерва; **не final**)

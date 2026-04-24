@@ -1,3 +1,23 @@
+---
+type: template
+status: active
+owner: LC
+created: 2026-04-24
+updated: 2026-04-24
+tags:
+  - legal
+  - ongoing
+  - legal-lane
+  - client-a
+related:
+  - "[[agent-team-v2]]"
+  - "[[strategy-2026]]"
+priority: medium
+cycle: ongoing
+---
+
+> **TL;DR:** Template для еженедельной заметки Маши по результатам check-in call'а с кандидатом во время engagement-test'а.
+
 # 05 — Weekly check-in template
 
 Template для еженедельной заметки Маши по результатам check-in call'а с кандидатом во время engagement-test'а.

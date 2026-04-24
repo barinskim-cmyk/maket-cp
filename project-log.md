@@ -1,3 +1,19 @@
+---
+type: log
+status: locked
+owner: Masha
+created: 2026-04-24
+updated: 2026-04-24
+tags:
+  - ongoing
+  - locked
+related: []
+priority: critical
+cycle: ongoing
+---
+
+> **TL;DR:** Еженедельный операционный лог проекта. Ведётся CoS, подписывается Машей на weekly strategy review (пятница 15 мин).
+
 # Project Log — Maket CP
 
 Еженедельный операционный лог проекта. Ведётся CoS, подписывается Машей на weekly strategy review (пятница 15 мин).

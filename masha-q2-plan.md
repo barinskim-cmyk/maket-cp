@@ -1,3 +1,21 @@
+---
+type: plan
+status: locked
+owner: Masha
+created: 2026-04-24
+updated: 2026-04-24
+tags:
+  - strategy
+  - q2
+  - client-a
+  - locked
+related: []
+priority: critical
+cycle: Q2
+---
+
+> **TL;DR:** (что ты лично делаешь в Q2)
+
 # Masha Q2 2026 — Personal Action Plan
 
 **Период:** апрель — июнь 2026 (Q2).

@@ -1,3 +1,25 @@
+---
+type: plan
+status: locked
+owner: GS
+created: 2026-04-23
+updated: 2026-04-24
+tags:
+  - commercial
+  - strategy
+  - q2
+  - marketing
+  - tactical
+  - locked
+related:
+  - "[[agent-team-v2]]"
+  - "[[strategy-2026]]"
+priority: high
+cycle: Q2
+---
+
+> **TL;DR:** Q2 для GS — это не маркетинговый запуск, а **подготовка photographer-led motion к Q3** на минимально достаточных материалах. Цель квартала: к концу июня иметь 30–50 фотографов в активной открытой бете, 1+ фотографа-евангелиста, который привёл бренд, 2–3 отправленные outbound-волны с замеренной конверсией и готовый [test user A] case study. Позиционирование locked на Version A; ни один внешний текс
+
 # Q2 Tactical Strategy — Growth Strategist
 
 **Дата:** 2026-04-23

@@ -1,3 +1,23 @@
+---
+type: brief
+status: active
+owner: CX
+created: 2026-04-24
+updated: 2026-04-24
+tags:
+  - commercial
+  - ongoing
+  - clients
+  - client-a
+related:
+  - "[[agent-team-v2]]"
+  - "[[strategy-2026]]"
+priority: medium
+cycle: ongoing
+---
+
+> **TL;DR:** **Дата:** 2026-04-24 **Цель документа:** подготовка Маши к разговору с owner'ами [anchor client] о том, как мы можем (и в каком формате) упоминать [anchor client]� как пилот-клиента Maket CP в outbound и на лендинге. **Формат разговора:** 20–30 мин, лучше очно или voice-call. Этот brief — приложение, которое можно отдать заранее (1 страница, без давления).
+
 # [anchor client] — brief для разговора с owner'ами о кейс-стади
 
 **Дата:** 2026-04-24

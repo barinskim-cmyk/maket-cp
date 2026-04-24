@@ -1,3 +1,22 @@
+---
+type: doc
+status: active
+owner: CoS
+created: 2026-04-24
+updated: 2026-04-24
+tags:
+  - ops
+  - ongoing
+  - ops-lane
+  - reference
+related:
+  - "[[agent-team-v2]]"
+priority: reference
+cycle: ongoing
+---
+
+> **TL;DR:** CoS-артефакты по engagement-тестам кофаундеров (Ставка 2 из `strategy-2026.md`). Не путать с `/docs/agents/` — там живут Q2-стратегии и артефакты 7 AI-агентов команды.
+
 # /agents/
 
 CoS-артефакты по engagement-тестам кофаундеров (Ставка 2 из `strategy-2026.md`). Не путать с `/docs/agents/` — там живут Q2-стратегии и артефакты 7 AI-агентов команды.

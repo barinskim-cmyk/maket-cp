@@ -1,3 +1,24 @@
+---
+type: doc
+status: active
+owner: CoS
+created: 2026-04-24
+updated: 2026-04-24
+tags:
+  - ops
+  - ongoing
+  - ops-lane
+  - client-a
+  - reference
+related:
+  - "[[strategy-2026]]"
+  - "[[automation-rules]]"
+priority: reference
+cycle: ongoing
+---
+
+> **TL;DR:** Координаты task proposals + approval gate артефакты. Сюда попадают предложения 7 агентов на цикл, которые проходят approval gate Маши (см. `agent-team-v2.md` execution loop).
+
 # /tasks/
 
 Координаты task proposals + approval gate артефакты. Сюда попадают предложения 7 агентов на цикл, которые проходят approval gate Маши (см. `agent-team-v2.md` execution loop).

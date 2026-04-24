@@ -1,3 +1,24 @@
+---
+type: plan
+status: active
+owner: QA
+created: 2026-04-23
+updated: 2026-04-24
+tags:
+  - qa
+  - strategy
+  - q2
+  - qa-lane
+  - tactical
+related:
+  - "[[agent-team-v2]]"
+  - "[[strategy-2026]]"
+priority: high
+cycle: Q2
+---
+
+> **TL;DR:** QA-лейн в Q2 строится с нуля под одну главную цель — не допустить регрессий в «продаваемом ядре» Ставки 4 (автопереименование, Rate Setter sync, share-link, канал-адаптация, owner-dashboard). Масштаб усилий зафиксирован решением Маши: опция **c** — 10+ часов в спринт на автотесты, Playwright/Cypress в CI с blocking gate, плюс advisory-слой от Chrome-agent. Это не идеальная test pyramid, а тактичес
+
 # QA — Тактическая стратегия Q2 2026
 
 **Дата:** 2026-04-23

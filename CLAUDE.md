@@ -1,3 +1,19 @@
+---
+type: doc
+status: locked
+owner: Masha
+created: 2026-04-24
+updated: 2026-04-24
+tags:
+  - ongoing
+  - locked
+related: []
+priority: critical
+cycle: ongoing
+---
+
+> **TL;DR:** Maket CP — платформа для визуального продакшена. Отражает реальный процесс команды — вы видите его и управляете по-настоящему. Экономит время и деньги. (locked Version A, 2026-04-23; см.
+
 # Maket CP -- Инструкции для Claude
 
 ## Проект

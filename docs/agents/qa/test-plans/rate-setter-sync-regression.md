@@ -1,3 +1,24 @@
+---
+type: doc
+status: active
+owner: QA
+created: 2026-04-24
+updated: 2026-04-24
+tags:
+  - qa
+  - ongoing
+  - qa-lane
+  - client-a
+related:
+  - "[[agent-team-v2]]"
+  - "[[strategy-2026]]"
+  - "[[release-review-playbook]]"
+priority: medium
+cycle: ongoing
+---
+
+> **TL;DR:** **Автор:** Product Architect, overnight autonomous pass (2026-04-23). **Для:** QA-лейн, как основа Playwright-реализации. **Companion:** `docs/agents/dev/rate-setter-sync-analysis-2026-04-23.md`, `docs/agents/dev/rate-setter-sync-fixes-proposal-2026-04-23.md`. **Формат:** human-readable сценарии, которые QA переведёт в `.spec.ts`.
+
 # Rate Setter sync — регрессионный test plan
 
 **Автор:** Product Architect, overnight autonomous pass (2026-04-23).

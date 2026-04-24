@@ -1,3 +1,18 @@
+---
+type: doc
+status: active
+owner: Masha
+created: 2026-04-24
+updated: 2026-04-24
+tags:
+  - ongoing
+related: []
+priority: critical
+cycle: ongoing
+---
+
+> **TL;DR:** Maket CP -- DAM для коммерческих фотографов. Desktop-first web app (pywebview + Python). Владелец: Masha (barinski.m@gmail.com), коммерческий фотограф.
+
 # Maket CP -- Инструкции для Claude
 
 ## Проект

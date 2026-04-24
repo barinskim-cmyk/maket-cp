@@ -1,3 +1,19 @@
+---
+type: doc
+status: active
+owner: Team
+created: 2026-04-24
+updated: 2026-04-24
+tags:
+  - ongoing
+  - reference
+related: []
+priority: reference
+cycle: ongoing
+---
+
+> **TL;DR:** **Статус:** Skeleton. CI ещё не настроен. **Автор первоначальной структуры:** Product Architect, overnight pass 2026-04-23.
+
 # Maket CP — End-to-End тесты (Playwright)
 
 **Статус:** Skeleton. CI ещё не настроен.

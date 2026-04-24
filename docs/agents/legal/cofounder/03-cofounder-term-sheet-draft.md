@@ -1,3 +1,25 @@
+---
+type: draft
+status: draft
+owner: LC
+created: 2026-04-24
+updated: 2026-04-24
+tags:
+  - legal
+  - ongoing
+  - legal-lane
+  - client-a
+  - belarus-brand
+  - draft
+related:
+  - "[[agent-team-v2]]"
+  - "[[strategy-2026]]"
+priority: medium
+cycle: ongoing
+---
+
+> **TL;DR:** **DRAFT TERM SHEET — для обсуждения.** Финализируется после успешного engagement-test'а (конец июня 2026). Требует review юристом перед подписанием. Применяется НЕ ранее, чем оба стороны подтвердили намерение идти в cofounder-формат.
+
 # 03 — Cofounder term sheet (DRAFT)
 
 **DRAFT TERM SHEET — для обсуждения.** Финализируется после успешного engagement-test'а (конец июня 2026). Требует review юристом перед подписанием. Применяется НЕ ранее, чем оба стороны подтвердили намерение идти в cofounder-формат.

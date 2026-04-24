@@ -1,3 +1,22 @@
+---
+type: spec
+status: active
+owner: PA
+created: 2026-04-23
+updated: 2026-04-24
+tags:
+  - product
+  - ongoing
+  - dev
+related:
+  - "[[agent-team-v2]]"
+  - "[[strategy-2026]]"
+priority: medium
+cycle: ongoing
+---
+
+> **TL;DR:** Таблица `photo_versions` активно используется в коде (`v2/frontend/js/supabase.js` и `previews.js`), но **отсутствует в номерной последовательности миграций `v2/supabase/002-029`**. Reconciliation audit расценил это как potential blocker для QA / staging.
+
 # photo_versions — proposal по миграции
 
 **Дата:** 2026-04-23 (update: 2026-04-23 overnight — финализирован 030)

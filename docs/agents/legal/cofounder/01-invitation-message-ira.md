@@ -1,3 +1,23 @@
+---
+type: doc
+status: active
+owner: LC
+created: 2026-04-24
+updated: 2026-04-24
+tags:
+  - legal
+  - ongoing
+  - legal-lane
+  - client-a
+related:
+  - "[[agent-team-v2]]"
+  - "[[strategy-2026]]"
+priority: medium
+cycle: ongoing
+---
+
+> **TL;DR:** Дата: 2026-04-24. Версия: draft v1.0 (для проверки Машей перед отправкой). Канал: Telegram / WhatsApp / email — на выбор. Длина: 1 экран.
+
 # 01 — Invitation message (Ира)
 
 Дата: 2026-04-24. Версия: draft v1.0 (для проверки Машей перед отправкой).

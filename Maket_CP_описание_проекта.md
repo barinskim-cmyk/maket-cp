@@ -1,3 +1,19 @@
+---
+type: doc
+status: locked
+owner: Masha
+created: 2026-04-24
+updated: 2026-04-24
+tags:
+  - ongoing
+  - locked
+related: []
+priority: high
+cycle: ongoing
+---
+
+> **TL;DR:** *Описание проекта | Апрель 2026 (v2.3)*
+
 # MAKET CP
 
 ## Платформа для визуального продакшена

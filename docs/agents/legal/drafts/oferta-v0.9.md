@@ -1,3 +1,22 @@
+---
+type: doc
+status: active
+owner: LC
+created: 2026-04-24
+updated: 2026-04-24
+tags:
+  - legal
+  - ongoing
+  - legal-lane
+related:
+  - "[[agent-team-v2]]"
+  - "[[strategy-2026]]"
+priority: medium
+cycle: ongoing
+---
+
+> **TL;DR:** **Версия:** v0.9 (draft) **Дата draft'а:** 2026-04-23 **Автор:** Legal Counsel (LC), ассистент. **Предшествующий документ:** `oferta-skeleton.md` v0.1 (2026-04-23).
+
 # Публичная оферта на предоставление доступа к платформе Maket CP
 
 **Версия:** v0.9 (draft)

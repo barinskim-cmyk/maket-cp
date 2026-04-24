@@ -1,3 +1,22 @@
+---
+type: doc
+status: active
+owner: GS
+created: 2026-04-23
+updated: 2026-04-24
+tags:
+  - commercial
+  - ongoing
+  - marketing
+related:
+  - "[[agent-team-v2]]"
+  - "[[strategy-2026]]"
+priority: medium
+cycle: ongoing
+---
+
+> **TL;DR:** В первые 2 волны Q2 (11–24 мая 2026) тестируем **2 канала параллельно**: личную сеть Маши (Канал 1, тёплый) и Telegram-каналы ретушёров (Канал 2, холодный). Это минимальный expendable-эксперимент, который даёт ответ на вопрос «работает ли хук автопереименования в принципе». Общий объём первой волны — **20–30 сообщений** (10–15 DM + 2–3 insertion в публичные каналы). Отправляет лично Маша (DM) и Ма
+
 # Channel Testing Plan v1 — Growth Strategist
 
 **Дата:** 2026-04-23

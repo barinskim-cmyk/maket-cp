@@ -1,3 +1,23 @@
+---
+type: draft
+status: draft
+owner: LC
+created: 2026-04-24
+updated: 2026-04-24
+tags:
+  - legal
+  - ongoing
+  - legal-lane
+  - draft
+related:
+  - "[[agent-team-v2]]"
+  - "[[strategy-2026]]"
+priority: medium
+cycle: ongoing
+---
+
+> **TL;DR:** **Статус:** draft-скелет, не публиковать без review живого юриста. **Версия:** v0.1, 2026-04-23. **Автор:** Legal Counsel (LC). **Применимое право:** 152-ФЗ РФ (основа) + GDPR (для международных клиентов, как best practice) + белорусский закон №99-З (базовая совместимость).
+
 # Политика конфиденциальности Maket CP — skeleton
 
 **Статус:** draft-скелет, не публиковать без review живого юриста.

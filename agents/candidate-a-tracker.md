@@ -1,3 +1,22 @@
+---
+type: doc
+status: active
+owner: CoS
+created: 2026-04-24
+updated: 2026-04-24
+tags:
+  - ops
+  - ongoing
+  - ops-lane
+  - client-a
+related:
+  - "[[agent-team-v2]]"
+priority: medium
+cycle: ongoing
+---
+
+> **TL;DR:** **Ставка:** 2 (two-track engagement test кофаундера, `strategy-2026.md` раздел 3.2) **Формат теста:** 6 недель реальной работы на конкретной задаче ([anchor client] pack — упаковка кейса для outbound в продакшены). **Owner test:** CoS (tracker + weekly check-in). **Owner decision:** Masha (единственная оценивает emotional fit и strategic sense, не делегируется).
+
 # Candidate A — Engagement Test Tracker
 
 **Ставка:** 2 (two-track engagement test кофаундера, `strategy-2026.md` раздел 3.2)

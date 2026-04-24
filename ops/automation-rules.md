@@ -1,3 +1,24 @@
+---
+type: playbook
+status: locked
+owner: CoS
+created: 2026-04-24
+updated: 2026-04-24
+tags:
+  - ops
+  - ongoing
+  - ops-lane
+  - client-a
+  - belarus-brand
+  - playbook
+  - locked
+related: []
+priority: critical
+cycle: ongoing
+---
+
+> **TL;DR:** **Версия:** v0 (2026-04-23, overnight batch) **Next revision:** v1 к неделе 11 (2026-07-07 — Q2 retro) **Source of truth:** `agent-team-v2.md` раздел "Automation rules (T-01 — T-07)" **Owner:** Chief of Staff.
+
 # Automation Rules — CoS Playbook
 
 **Версия:** v0 (2026-04-23, overnight batch)

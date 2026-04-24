@@ -1,3 +1,25 @@
+---
+type: brief
+status: locked
+owner: LC
+created: 2026-04-24
+updated: 2026-04-24
+tags:
+  - legal
+  - ongoing
+  - legal-lane
+  - client-a
+  - belarus-brand
+  - locked
+related:
+  - "[[agent-team-v2]]"
+  - "[[strategy-2026]]"
+priority: high
+cycle: ongoing
+---
+
+> **TL;DR:** Дата: 2026-04-24. Версия: draft v1.0 (отправляется кандидату после его yes-ответа на invitation). Кандидат: A (remote, Таиланд). Длительность: 4-6 недель.
+
 # 02 — Engagement-test brief: [anchor client] pack design
 
 Дата: 2026-04-24. Версия: draft v1.0 (отправляется кандидату после его yes-ответа на invitation).

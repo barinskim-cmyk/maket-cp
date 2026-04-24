@@ -1,3 +1,24 @@
+---
+type: template
+status: active
+owner: LC
+created: 2026-04-24
+updated: 2026-04-24
+tags:
+  - legal
+  - ongoing
+  - legal-lane
+  - client-a
+  - belarus-brand
+related:
+  - "[[agent-team-v2]]"
+  - "[[strategy-2026]]"
+priority: medium
+cycle: ongoing
+---
+
+> **TL;DR:** **Простое соглашение о неразглашении.** Применяется на время engagement-test'а (4-6 недель) и далее в течение 2 лет после его окончания. Это рабочий draft для engagement-test'а; при переходе в cofounder-формат NDA перезаключается или поглощается полноценным shareholder agreement.
+
 # 04 — NDA Template (Engagement-test period)
 
 **Простое соглашение о неразглашении.** Применяется на время engagement-test'а (4-6 недель) и далее в течение 2 лет после его окончания. Это рабочий draft для engagement-test'а; при переходе в cofounder-формат NDA перезаключается или поглощается полноценным shareholder agreement.

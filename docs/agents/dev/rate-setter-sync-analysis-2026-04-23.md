@@ -1,3 +1,24 @@
+---
+type: doc
+status: active
+owner: PA
+created: 2026-04-24
+updated: 2026-04-24
+tags:
+  - product
+  - ongoing
+  - dev
+  - client-a
+related:
+  - "[[agent-team-v2]]"
+  - "[[strategy-2026]]"
+  - "[[release-review-playbook]]"
+priority: medium
+cycle: ongoing
+---
+
+> **TL;DR:** Rate Setter — это не одна функция, а **четыре несинхронизированных участка**: UI-инициация (`sync.js`), Python-сервис (`RateSetterService` + `CosRepository`), облачный stage-event (`sbSyncStage`), snapshot (`snCreateSnapshot`). Каждый участок имеет «проваливающиеся» пути ошибок, где данные теряются молча (swallow-catch в callback'ах, `console.warn` вместо пользовательского уведомления, нет идемпот
+
 # Rate Setter sync — анализ рисков (2026-04-23)
 
 **Автор:** Product Architect, overnight autonomous pass.

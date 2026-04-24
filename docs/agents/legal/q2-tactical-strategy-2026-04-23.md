@@ -1,3 +1,25 @@
+---
+type: plan
+status: active
+owner: LC
+created: 2026-04-23
+updated: 2026-04-24
+tags:
+  - legal
+  - strategy
+  - q2
+  - legal-lane
+  - client-a
+  - tactical
+related:
+  - "[[agent-team-v2]]"
+  - "[[strategy-2026]]"
+priority: high
+cycle: Q2
+---
+
+> **TL;DR:** 1. **Q2-минимум LC** = два документа: финальная оферта для [anchor client] (PDF к подписи) + обновлённая privacy policy на лендинге. Всё остальное — парковка с триггерами. 2. **Дедлайн оферты** — 8 июня 2026 (за неделю до первого чека [anchor client] 15 июня по `masha-q2-plan.md`). 3. **Дедлайн privacy** — 8 июня 2026 (одной публикацией с офертой; ссылка из лендинга и регистрационной формы). 4. **
+
 # Q2 Tactical Strategy — Legal Counsel (LC)
 
 **Дата:** 2026-04-23

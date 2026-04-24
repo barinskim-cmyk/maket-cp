@@ -1,3 +1,24 @@
+---
+type: playbook
+status: locked
+owner: CoS
+created: 2026-04-24
+updated: 2026-04-24
+tags:
+  - ops
+  - ongoing
+  - ops-lane
+  - playbook
+  - locked
+related:
+  - "[[agent-team-v2]]"
+  - "[[automation-rules]]"
+priority: high
+cycle: ongoing
+---
+
+> **TL;DR:** **Версия:** v0 (2026-04-23, overnight batch) **Next revision:** v1 к неделе 11 (2026-07-07 — Q2 retro), по опыту первых 2-3 реальных gate'ов. **Source of truth:** `agent-team-v2.md` раздел "Execution loop" + Q2-стратегии всех 7 агентов (их "Release review gate" секции). **Owner:** Chief of Staff (оркестрация), каждый agent подписывает свою часть.
+
 # Release Review Playbook — CoS + 7 lanes
 
 **Версия:** v0 (2026-04-23, overnight batch)

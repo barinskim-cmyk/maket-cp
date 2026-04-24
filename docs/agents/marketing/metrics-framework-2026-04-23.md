@@ -1,3 +1,24 @@
+---
+type: doc
+status: active
+owner: GS
+created: 2026-04-23
+updated: 2026-04-24
+tags:
+  - commercial
+  - strategy
+  - ongoing
+  - marketing
+  - client-a
+related:
+  - "[[agent-team-v2]]"
+  - "[[strategy-2026]]"
+priority: medium
+cycle: ongoing
+---
+
+> **TL;DR:** **Дата:** 2026-04-23 **Автор:** GS (Phase 6, autonomous overnight task). **Версия:** v1 (первое предложение фреймворка, уточняется после замеров [test user A] в середине мая). **Скоуп:** как замеряем value-impact Maket CP у фотографов, продакшенов, брендов — для outbound-proofpoints, case study, pitch-deck, pricing justification.
+
 # Metrics Framework «До/После» — v1
 
 **Дата:** 2026-04-23

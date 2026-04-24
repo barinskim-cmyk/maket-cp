@@ -1,3 +1,22 @@
+---
+type: doc
+status: active
+owner: CoS
+created: 2026-04-24
+updated: 2026-04-24
+tags:
+  - ops
+  - ongoing
+  - ops-lane
+related:
+  - "[[strategy-2026]]"
+  - "[[agent-team-v2]]"
+priority: medium
+cycle: ongoing
+---
+
+> **TL;DR:** Автор: Claude (Opus 4.6), автономный проход по результатам inaugural reconciliation audit. Источник: `audits/coordinator-reconciliation-2026-04-23.md` раздел 4 (20 вопросов) + приоритизация в разделе 5.
+
 # Триаж открытых вопросов — 2026-04-23
 
 Автор: Claude (Opus 4.6), автономный проход по результатам inaugural reconciliation audit.

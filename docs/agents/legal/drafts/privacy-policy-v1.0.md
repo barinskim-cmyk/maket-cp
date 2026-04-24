@@ -1,3 +1,24 @@
+---
+type: doc
+status: locked
+owner: LC
+created: 2026-04-24
+updated: 2026-04-24
+tags:
+  - legal
+  - ongoing
+  - legal-lane
+  - client-a
+  - locked
+related:
+  - "[[agent-team-v2]]"
+  - "[[strategy-2026]]"
+priority: high
+cycle: ongoing
+---
+
+> **TL;DR:** **Версия:** v1.0 (ready for live-lawyer review) **Дата:** 2026-04-24 **Автор:** Legal Counsel (LC), ассистент. **Предшествующие документы:** `privacy-policy-v0.9.md` (2026-04-23); `privacy.html` (публичная версия, 2026-04-20). **Связанный документ:** `oferta-v1.0.md` (2026-04-24). **Применимое право:** 152-ФЗ РФ (основа).
+
 # Политика конфиденциальности Maket CP
 
 **Версия:** v1.0 (ready for live-lawyer review)

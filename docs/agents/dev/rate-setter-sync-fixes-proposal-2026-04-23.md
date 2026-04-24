@@ -1,3 +1,23 @@
+---
+type: spec
+status: active
+owner: PA
+created: 2026-04-24
+updated: 2026-04-24
+tags:
+  - product
+  - ongoing
+  - dev
+related:
+  - "[[agent-team-v2]]"
+  - "[[strategy-2026]]"
+  - "[[release-review-playbook]]"
+priority: medium
+cycle: ongoing
+---
+
+> **TL;DR:** **Автор:** Product Architect, overnight autonomous pass. **Companion:** `rate-setter-sync-analysis-2026-04-23.md`. Риски R-01 … R-06 ссылаются на раздел 2 анализа. **Статус:** предложения к merge.
+
 # Rate Setter sync — предложения фиксов (2026-04-23)
 
 **Автор:** Product Architect, overnight autonomous pass.

@@ -1,3 +1,23 @@
+---
+type: doc
+status: active
+owner: CoS
+created: 2026-04-24
+updated: 2026-04-24
+tags:
+  - ops
+  - ongoing
+  - ops-lane
+  - client-a
+related:
+  - "[[strategy-2026]]"
+  - "[[automation-rules]]"
+priority: medium
+cycle: ongoing
+---
+
+> **TL;DR:** **Период:** 2026-04-28 – 2026-05-18 (3 недели) **Ставки:** 1 (юр-разблокировка), 3 (anchor sales prep), 4 (стабилизация ядра), 5 (photographer-led prep) **Подписал:** [⏳ Маша, 2026-04-__] **Сформулировано CoS:** 2026-04-23 на базе Q2-стратегий всех 7 агентов + `strategy-2026.md` + `masha-q2-plan.md`.
+
 # Goal Card — Cycle 1
 
 **Период:** 2026-04-28 – 2026-05-18 (3 недели)

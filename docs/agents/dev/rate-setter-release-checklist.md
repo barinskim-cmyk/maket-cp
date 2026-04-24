@@ -1,3 +1,23 @@
+---
+type: doc
+status: active
+owner: PA
+created: 2026-04-24
+updated: 2026-04-24
+tags:
+  - product
+  - ongoing
+  - dev
+related:
+  - "[[agent-team-v2]]"
+  - "[[strategy-2026]]"
+  - "[[release-review-playbook]]"
+priority: medium
+cycle: ongoing
+---
+
+> **TL;DR:** **Автор:** Product Architect, overnight pass 2026-04-23. **Назначение:** обязательный прогон перед любым релизом (push в main), который затрагивает Rate Setter sync-лейер. **Companion:** `rate-setter-sync-analysis-2026-04-23.md`, `rate-setter-sync-fixes-proposal-2026-04-23.md`, `qa/test-plans/rate-setter-sync-regression.md`.
+
 # Rate Setter — Pre-Release Checklist
 
 **Автор:** Product Architect, overnight pass 2026-04-23.

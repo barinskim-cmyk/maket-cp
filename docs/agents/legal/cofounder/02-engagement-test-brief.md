@@ -1,3 +1,24 @@
+---
+type: brief
+status: active
+owner: LC
+created: 2026-04-24
+updated: 2026-04-24
+tags:
+  - legal
+  - ongoing
+  - legal-lane
+  - client-a
+  - belarus-brand
+related:
+  - "[[agent-team-v2]]"
+  - "[[strategy-2026]]"
+priority: medium
+cycle: ongoing
+---
+
+> **TL;DR:** Дата: 2026-04-24. Версия: draft v2.1. Кандидат: Ира (remote, Таиланд). Длительность: 4-6 недель.
+
 # 02 — Engagement-test brief: коммерческая роль (Ира)
 
 Дата: 2026-04-24. Версия: draft v2.1.

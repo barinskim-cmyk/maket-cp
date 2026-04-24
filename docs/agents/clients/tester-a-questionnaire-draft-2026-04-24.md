@@ -1,3 +1,25 @@
+---
+type: draft
+status: draft
+owner: CX
+created: 2026-04-24
+updated: 2026-04-24
+tags:
+  - commercial
+  - ongoing
+  - clients
+  - client-a
+  - tester-a
+  - draft
+related:
+  - "[[agent-team-v2]]"
+  - "[[strategy-2026]]"
+priority: medium
+cycle: ongoing
+---
+
+> **TL;DR:** **Дата:** 2026-04-24 **Респондент:** [тестер A] (`{victoria_email}`) **Роль:** единственный active user из [anchor client] на сегодня; владелец проекта `[anchor client]` в Maket CP с 14.04.2026. **Цель документа:** заполнить draft по памяти Маши + цифрам из Supabase (ниже), затем подтвердить с Викторией коротким 15-мин звонком.
+
 # [тестер A] ([anchor client]) — questionnaire draft
 
 **Дата:** 2026-04-24

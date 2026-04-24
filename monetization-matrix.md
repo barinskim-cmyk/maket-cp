@@ -1,3 +1,19 @@
+---
+type: doc
+status: active
+owner: Masha
+created: 2026-04-23
+updated: 2026-04-24
+tags:
+  - ongoing
+  - client-a
+related: []
+priority: critical
+cycle: ongoing
+---
+
+> **TL;DR:** **Статус:** СКЕЛЕТ — не источник правды, ждёт заполнения/решения Маши. **Дата:** 2026-04-23 (создан Claude в autonomous cleanup по результатам reconciliation audit п.1.4 и 4.4). **Референс:** `audits/coordinator-reconciliation-2026-04-23.md` п.1.4; `project_monetization.md` (memory); `strategy-2026.md` раздел 3 ставка 3; `project_brand_client_continuity.md` (memory).
+
 # Monetization matrix — Maket CP (черновик для заполнения Машей)
 
 **Статус:** СКЕЛЕТ — не источник правды, ждёт заполнения/решения Маши.

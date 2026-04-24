@@ -1,3 +1,22 @@
+---
+type: doc
+status: active
+owner: LC
+created: 2026-04-24
+updated: 2026-04-24
+tags:
+  - legal
+  - ongoing
+  - legal-lane
+related:
+  - "[[agent-team-v2]]"
+  - "[[strategy-2026]]"
+priority: medium
+cycle: ongoing
+---
+
+> **TL;DR:** **Дата:** 2026-04-24 **Источник:** `oferta-v0.9.md`, `privacy-policy-v0.9.md` **Цель:** разгрузить Машу — не идти по всем 47 ⚠️ defaults подряд, а решить только критичные осознанно. Tier 2 пробежать списком. Tier 3 — фактически принять как есть.
+
 # Triage defaults в LC drafts — для review Маши
 
 **Дата:** 2026-04-24
