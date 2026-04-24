@@ -66,3 +66,9 @@ v2/frontend/config.json
 BrandX_карточки товара.html
 BrandX_карточки_товара_v2.html
 _snapshots/
+
+# PII / private docs — никогда не коммитить
+*-pii.md
+*-private.md
+contacts.md
+**/contacts.md
