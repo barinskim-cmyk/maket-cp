@@ -1,0 +1,26 @@
+// ─────────────────────────────────────────────────────────────
+//  auto-rename-happy.spec.ts.draft
+//
+//  Скелет. Активируется, когда:
+//    - поднят локальный dev-server (pywebview HTTP-мост или
+//      статичная раздача v2/frontend/index.html на :5173);
+//    - есть тестовая папка с seeded-фото и артикулами;
+//    - закреплён контракт AI Vision (см. reference_openai_vision.md).
+//
+//  Playwright-конфиг игнорирует `**/*.draft` / `**/*.draft.ts`,
+//  в прогон файл не попадает.
+// ─────────────────────────────────────────────────────────────
+
+import { test, expect } from '@playwright/test';
+
+test.fixme('happy-path: upload → match → rename', async ({ page }) => {
+  // TODO(auto-rename): запустить dev-server с тестовой папкой.
+  // await page.goto(process.env.MAKET_BASE_URL || 'http://localhost:5173');
+  // await page.click('[data-testid="nav-articles"]');
+  // await uploadFixtureImages(page, ['sku-001.jpg', 'sku-002.jpg']);
+  // await page.click('[data-testid="articles-match"]');
+  // await expect(page.locator('.ar-status-matched')).toHaveCount(2);
+  // await page.click('[data-testid="articles-rename"]');
+  // await expect(page.getByText(/переименовано: 2/i)).toBeVisible();
+  expect(true).toBe(true);
+});

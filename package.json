@@ -1,0 +1,16 @@
+{
+  "name": "maket-cp-e2e",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Maket CP — e2e test harness only. Production app is pywebview+vanilla JS and does NOT depend on this package.json.",
+  "scripts": {
+    "test:e2e": "playwright test",
+    "test:e2e:landing": "playwright test --project=landing-chromium",
+    "test:e2e:product": "playwright test --project=product-chromium",
+    "test:e2e:report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.47.0",
+    "typescript": "^5.4.0"
+  }
+}

@@ -1,0 +1,42 @@
+name: E2E Tests
+
+# Пока тесты не стабилизировались, continue-on-error на run-шаге —
+# красный e2e не блочит merge. Снять флаг после 2-х зелёных прогонов
+# подряд (см. tests/e2e/README.md — "Activation policy").
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        # package-lock.json может отсутствовать (dev-only harness); fallback на install.
+        run: npm ci || npm install
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright tests
+        env:
+          MAKET_LANDING_URL: https://barinskim-cmyk.github.io/maket-landing/
+        run: npx playwright test
+        continue-on-error: true
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

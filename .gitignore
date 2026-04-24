@@ -40,6 +40,12 @@ venv/
 
 # Node (if ever used)
 node_modules/
+package-lock.json
+
+# Playwright
+playwright-report/
+test-results/
+playwright/.cache/
 
 # Backlog edits (user's local state)
 *_edits.json

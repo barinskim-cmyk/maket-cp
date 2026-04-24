@@ -1,0 +1,28 @@
+// ─────────────────────────────────────────────────────────────
+//  share-link-basic.spec.ts.draft
+//
+//  Скелет. Активируется, когда:
+//    - есть стабильный auth-fixture (тестовый Supabase-юзер);
+//    - есть тестовый проект с seeded share-link;
+//    - понятен контракт /share/:token и роль viewer.
+//
+//  Сейчас файл помечен как .draft — Playwright-конфиг игнорирует
+//  `**/*.draft` и `**/*.draft.ts`, тест в прогон не попадает.
+// ─────────────────────────────────────────────────────────────
+
+import { test, expect } from '@playwright/test';
+
+test.fixme('share link opens project in viewer mode', async ({ page }) => {
+  // TODO(share-link): получить токен через Supabase API-fixture.
+  // const token = await seedShareLink({ projectId: '…', role: 'viewer' });
+  // await page.goto(`/share/${token}`);
+  // await expect(page.locator('[data-testid="project-title"]')).toBeVisible();
+  // await expect(page.getByRole('button', { name: /удалить/i })).toBeHidden();
+  expect(true).toBe(true);
+});
+
+test.fixme('invalid share token shows friendly error', async ({ page }) => {
+  // await page.goto('/share/not-a-real-token');
+  // await expect(page.getByText(/ссылка недействительна/i)).toBeVisible();
+  expect(true).toBe(true);
+});
