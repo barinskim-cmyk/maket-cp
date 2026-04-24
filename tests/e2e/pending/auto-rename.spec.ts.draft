@@ -1,0 +1,392 @@
+// ═══════════════════════════════════════════════════════════════
+//  auto-rename.spec.ts.draft — Playwright skeleton
+//
+//  Status: DRAFT. DO NOT RUN IN CI.
+//  The `.draft` extension is a guard so the Playwright runner does
+//  not pick it up. To activate:
+//    1. Ensure playwright.config.ts exists (PA wave N+1).
+//    2. Ensure all TODOs below have real implementations.
+//    3. Rename `.draft` → `.spec.ts`.
+//    4. Confirm with QA that fixtures are ready.
+//
+//  Scope:
+//    Smoke-coverage of the article-based auto-rename tool. Covers
+//    the happy path plus the edge cases we saw fail in production
+//    (Cyrillic filenames, name collisions, large batches) and the
+//    undo/redo flow.
+//
+//  Source of truth:
+//    - docs/agents/qa/test-plans/auto-rename.md (TODO: write)
+//    - Maket_CP_Инструкция_переименование.docx (product spec)
+//    - bugs/README.md (area='auto-rename')
+//
+//  Author of skeleton: QA lane, overnight 2026-04-23.
+// ═══════════════════════════════════════════════════════════════
+
+import { test, expect, Page, BrowserContext } from '@playwright/test';
+
+// ───────────────────────────────────────────────────────────────
+//  Configuration / fixtures
+// ───────────────────────────────────────────────────────────────
+
+// TODO(qa): real staging URL.
+const BASE_URL = process.env.MAKET_BASE_URL || 'http://localhost:5173';
+
+// Test account with permission to run auto-rename on its projects.
+const QA_OWNER_EMAIL = process.env.QA_OWNER_EMAIL || 'qa-owner@maket.test';
+const QA_OWNER_PWD   = process.env.QA_OWNER_PWD   || '';
+
+// Fixture batches under tests/e2e/fixtures/auto-rename/ — populated by
+// PA wave N+1. Each fixture is a folder with a known set of files,
+// enough that collisions / edge cases are deterministic.
+//
+// TODO(qa): create these fixtures. Suggested content:
+//   - /small        — 10 mixed CR3/JPG files, latin names, no collisions.
+//   - /cyrillic     — 10 CR3 files with Cyrillic stems and cyrillic SKUs.
+//   - /collisions   — 10 files whose target names already exist in the
+//                     destination (to force _1 / _2 suffixing).
+//   - /specials     — 10 files with emoji, spaces, punctuation in stems.
+//   - /large        — 100+ files, all latin, to stress large batches.
+const FIXTURE_SMALL      = 'tests/e2e/fixtures/auto-rename/small';
+const FIXTURE_CYRILLIC   = 'tests/e2e/fixtures/auto-rename/cyrillic';
+const FIXTURE_COLLISIONS = 'tests/e2e/fixtures/auto-rename/collisions';
+const FIXTURE_SPECIALS   = 'tests/e2e/fixtures/auto-rename/specials';
+const FIXTURE_LARGE      = 'tests/e2e/fixtures/auto-rename/large';
+
+// Default rename rule template expected by the product spec. The UI
+// exposes a rule editor; tests should reference the slug, not the
+// literal string, to survive spec rewording.
+// TODO(qa): sync with UI once rule slugs are stable.
+const DEFAULT_RULE_SLUG = 'brand_article_index';
+
+// ───────────────────────────────────────────────────────────────
+//  Setup / teardown
+// ───────────────────────────────────────────────────────────────
+
+test.beforeEach(async ({ page }) => {
+  // TODO(qa): loginAsOwner + create a disposable project per test.
+  // The rename tool operates on a project scope, so each test gets
+  // a fresh project to avoid cross-test contamination.
+});
+
+test.afterEach(async ({ page }) => {
+  // TODO(qa): delete the disposable project; clean up Supabase Storage.
+  // Files in `uploads` bucket for this project_id must be purged
+  // explicitly — Storage RLS does not cascade on project delete.
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  Happy path
+// ═══════════════════════════════════════════════════════════════
+
+test.describe('Auto-rename — happy path', () => {
+
+  test('AR-REG-01: Upload batch, default rule applies successfully', async ({ page }) => {
+    // Pre-condition:
+    //   - Disposable project with `brand` and `articles` configured.
+    //   - FIXTURE_SMALL available.
+    //
+    // Steps:
+    //   1. page.goto(BASE_URL + '/#project/<disposable>/rename');
+    //   2. Upload FIXTURE_SMALL via input[type=file] (10 files).
+    //   3. Wait until each file has a proposed new name in the preview
+    //      table ([data-test="rename-preview-row"]).
+    //   4. Verify rule selector shows DEFAULT_RULE_SLUG.
+    //   5. Click [data-test="rename-apply"].
+    //   6. Wait for toast "Переименовано: 10".
+    //
+    // Expected:
+    //   - All 10 files appear with names matching the default pattern
+    //     e.g. `<brand>_<article>_<NN>.<ext>`.
+    //   - Supabase `files` table contains 10 rows with `status='renamed'`.
+    //   - No file kept its original name.
+    //
+    // Rationale: if this smoke fails, nothing else in the suite is
+    // meaningful — it is the baseline.
+    //
+    // TODO(qa): implement.
+    test.fixme(true, 'Not yet implemented');
+  });
+
+  test('AR-REG-02: Custom rule can be edited and applied', async ({ page }) => {
+    // Steps:
+    //   1. Upload FIXTURE_SMALL.
+    //   2. Click [data-test="rename-rule-edit"].
+    //   3. In the rule builder, change separator from `_` to `-`.
+    //   4. Change ext casing from lower to preserve.
+    //   5. Save as a project-local rule (not global).
+    //   6. Apply.
+    //
+    // Expected:
+    //   - New file names use `-` as separator.
+    //   - Extension casing is preserved (so `.CR3` stays `.CR3`,
+    //     `.jpg` stays `.jpg`).
+    //   - The edited rule is stored on the project, not on the user
+    //     profile (verify via Supabase rules table: project_id is set).
+    //   - Re-opening the rename tool on another project does NOT show
+    //     this rule (project-scoped, not user-scoped).
+    //
+    // TODO(qa): implement, including service-role verification.
+    test.fixme(true, 'Not yet implemented');
+  });
+
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  Collisions
+// ═══════════════════════════════════════════════════════════════
+
+test.describe('Auto-rename — collisions', () => {
+
+  test('AR-REG-03: Name collisions produce deterministic _1 / _2 suffixing', async ({ page }) => {
+    // Pre-condition:
+    //   - Project already contains files with names that FIXTURE_COLLISIONS
+    //     is going to produce on apply. Seed this deterministically
+    //     via service-role before the test.
+    //
+    // Steps:
+    //   1. Upload FIXTURE_COLLISIONS.
+    //   2. Apply default rule.
+    //
+    // Expected:
+    //   - No file fails.
+    //   - Colliding names receive `_1`, `_2`, ... suffixes in the order
+    //     the files appear in the upload list (stable, not random).
+    //   - Preview table shows the suffix BEFORE apply, so the user is
+    //     never surprised after the fact.
+    //
+    // Alternative accepted behaviour (TODO: confirm with PM):
+    //   - Collisions block apply, and the user must resolve each one
+    //     manually. Whichever the product chose — this test asserts
+    //     the *documented* behaviour, not both.
+    //
+    // TODO(qa): implement with the decided policy.
+    test.fixme(true, 'Not yet implemented');
+  });
+
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  Special characters
+// ═══════════════════════════════════════════════════════════════
+
+test.describe('Auto-rename — special characters', () => {
+
+  test('AR-REG-04: Cyrillic filenames are handled correctly', async ({ page }) => {
+    // Reproduces the 2026-04-15 [anchor client] incident at the rename layer
+    // (not the storage layer — that is covered by rate-setter-sync).
+    //
+    // Pre-condition: FIXTURE_CYRILLIC with stems like `Солнце_17774.CR3`.
+    //
+    // Steps:
+    //   1. Upload FIXTURE_CYRILLIC.
+    //   2. Preview must compute new names without throwing.
+    //   3. Apply default rule.
+    //
+    // Expected:
+    //   - No 400 InvalidKey from Storage.
+    //   - `files.original_name` preserves the Cyrillic stem verbatim
+    //     (users need to find the file later by its Russian name).
+    //   - `files.storage_path` is ASCII-only (transliterated).
+    //   - UI shows the Cyrillic name, not the transliterated one.
+    //
+    // Severity contract: if this fails for any reason, open bug with
+    // severity=critical (same rationale as [anchor client] incident — it
+    // blocks the entire Russian-speaking ICP).
+    //
+    // TODO(qa): implement + check absence of `400 InvalidKey` in
+    // network log.
+    test.fixme(true, 'Not yet implemented');
+  });
+
+  test('AR-REG-05: Emoji and whitespace in stems are normalised or rejected safely', async ({ page }) => {
+    // Pre-condition: FIXTURE_SPECIALS contains files named like
+    //   "IMG 0001 🔥.jpg", "photo (final).CR3", "  leading_space.jpg".
+    //
+    // Steps:
+    //   1. Upload FIXTURE_SPECIALS.
+    //   2. Inspect preview table.
+    //
+    // Expected (documented behaviour, whichever the product chose):
+    //   Option A — normalise: emoji stripped, whitespace collapsed,
+    //     preview shows sanitised name, apply succeeds.
+    //   Option B — reject: those rows are marked with warning icon
+    //     and are excluded from apply; the user can fix stems manually.
+    //
+    // This test asserts Option A or Option B but NOT both. The
+    // product decision lives in Maket_CP_Инструкция_переименование.docx.
+    //
+    // TODO(qa): implement with the current documented behaviour. If
+    // behaviour changes, update this test in the same PR as the fix.
+    test.fixme(true, 'Not yet implemented');
+  });
+
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  Cancel / undo
+// ═══════════════════════════════════════════════════════════════
+
+test.describe('Auto-rename — cancel / undo', () => {
+
+  test('AR-REG-06: Cancelling a rename restores original names', async ({ page }) => {
+    // Pre-condition: Upload FIXTURE_SMALL, apply, wait for completion.
+    //
+    // Steps:
+    //   1. Immediately after apply, press Ctrl+Z (or click Undo).
+    //   2. Wait for "Переименование отменено" toast.
+    //
+    // Expected:
+    //   - All 10 files have their original stems restored.
+    //   - `files.status` returns to `uploaded` (not `renamed`).
+    //   - An undo history entry is recorded (visible in activity log).
+    //   - Storage paths are restored (or the rename was a pure DB-rename
+    //     with no storage move — confirm with product spec).
+    //
+    // Rationale: the Ctrl+Z contract is global in Maket CP. Auto-rename
+    // is one of the highest-blast-radius operations, so undo must work.
+    //
+    // TODO(qa): implement + verify undo does NOT double-rename if
+    // pressed twice in a row.
+    test.fixme(true, 'Not yet implemented');
+  });
+
+  test('AR-REG-07: Undo → Redo round-trips cleanly', async ({ page }) => {
+    // Steps:
+    //   1. Upload FIXTURE_SMALL.
+    //   2. Apply rename.
+    //   3. Ctrl+Z → wait for revert.
+    //   4. Ctrl+Shift+Z (or Redo button) → wait for re-apply.
+    //
+    // Expected:
+    //   - After redo, file names match exactly what they were after
+    //     the original apply (not a fresh re-compute — the names must
+    //     be identical, including any _N suffixes from collisions).
+    //   - No duplicate Supabase rows; `files` table still has 10 rows.
+    //
+    // Edge: redo after an unrelated action (say, after clicking on a
+    // different file) should *not* redo the rename. Out-of-scope for
+    // this skeleton; covered by separate undo/redo spec.
+    //
+    // TODO(qa): implement.
+    test.fixme(true, 'Not yet implemented');
+  });
+
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  Scale / concurrency
+// ═══════════════════════════════════════════════════════════════
+
+test.describe('Auto-rename — scale and concurrency', () => {
+
+  test('AR-REG-08: Large batch (100+ files) completes without errors', async ({ page }) => {
+    // Pre-condition: FIXTURE_LARGE with 100+ files.
+    //
+    // Steps:
+    //   1. Upload FIXTURE_LARGE.
+    //   2. Apply default rule.
+    //   3. Wait for completion (timeout raised via test.setTimeout).
+    //
+    // Expected:
+    //   - All files renamed.
+    //   - Browser does not crash, memory profile stays under a sensible
+    //     ceiling (this is hard to assert in Playwright — at minimum,
+    //     no `page.crash` event, no `uncaughtException`).
+    //   - Apply wall-clock time scales roughly linearly with the
+    //     small-batch baseline; record the number for trend tracking.
+    //
+    // Marker: this test belongs in the `load` project in
+    // playwright.config.ts so that it runs only nightly, not per PR.
+    //
+    // TODO(qa): set test.setTimeout(5 * 60_000).
+    test.fixme(true, 'Not yet implemented');
+  });
+
+  test('AR-REG-09: Concurrent uploads from two tabs do not conflict', async ({ browser }) => {
+    // Two owner sessions (same user, two tabs) upload different
+    // batches to the same project at the same time.
+    //
+    // Steps:
+    //   const ctxA = await browser.newContext({ storageState: 'qa-owner.json' });
+    //   const ctxB = await browser.newContext({ storageState: 'qa-owner.json' });
+    //   const pA = await ctxA.newPage();
+    //   const pB = await ctxB.newPage();
+    //   // navigate both to the same project's rename screen ...
+    //   await Promise.all([
+    //     uploadFixture(pA, FIXTURE_SMALL),
+    //     uploadFixture(pB, FIXTURE_COLLISIONS),
+    //   ]);
+    //   await Promise.all([applyRename(pA), applyRename(pB)]);
+    //
+    // Expected:
+    //   - Both batches complete.
+    //   - Final file set is the union of both batches (no lost uploads).
+    //   - Collision rules still produce stable _N suffixes, and no two
+    //     files end up with identical names.
+    //   - No 500 from Supabase; no RLS false-negative.
+    //
+    // TODO(qa): implement. This test is expected to be flaky until
+    // concurrency story is hardened — keep fixme until the PA merges
+    // optimistic locking on the `files` table.
+    test.fixme(true, 'Not yet implemented');
+  });
+
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  Helpers (TODO: extract to helpers/auto-rename.ts)
+// ═══════════════════════════════════════════════════════════════
+
+async function uploadFixture(page: Page, fixturePath: string): Promise<void> {
+  // TODO(qa): use page.setInputFiles on input[type=file].
+}
+
+async function applyRename(page: Page): Promise<void> {
+  // TODO(qa): click the apply button, wait for toast or completion.
+}
+
+async function createDisposableProject(ownerPage: Page): Promise<string> {
+  // TODO(qa): create via UI or Supabase service-role. Return project_id.
+  return '';
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Notes for QA
+// ═══════════════════════════════════════════════════════════════
+
+/*
+  Wave order (when to activate what):
+
+  Wave 1 — activate first, after fixtures exist:
+    - AR-REG-01 (happy path smoke).
+    - AR-REG-04 (cyrillic — this is the regression guard for the
+      [anchor client] incident; arguably more important than 01 for trust).
+    - AR-REG-06 (undo).
+
+  Wave 2 — after small-scale waves are stable:
+    - AR-REG-02, 03 (custom rule, collisions).
+    - AR-REG-05 (specials).
+    - AR-REG-07 (redo).
+
+  Wave 3 — nightly / weekly only:
+    - AR-REG-08 (large batch — load job).
+    - AR-REG-09 (concurrency — flaky until locking lands).
+
+  Fixtures required (PA wave N+1):
+    - The five fixture folders listed above, each checked in with
+      deterministic file content. CR3 files are large; prefer JPG
+      stand-ins where the product logic does not inspect file content.
+
+  Dependencies:
+    - /api/signup is NOT required here (we use service-role seeded
+      accounts, not fresh signup).
+    - Rename tool must accept a `dryRun` flag for preview; if it does
+      not, AR-REG-03 (collisions) cannot assert preview-before-apply
+      and would need to be split.
+
+  Out of scope for this draft:
+    - OCR-based article detection from reference image (article tool).
+    - Legacy rename import from `maket_rename.py` / `maket_rename.bat`.
+    - Multi-project batch rename (not a product feature at this stage).
+*/

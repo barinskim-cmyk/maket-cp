@@ -1,0 +1,359 @@
+// ═══════════════════════════════════════════════════════════════
+//  share-link.spec.ts.draft — Playwright skeleton
+//
+//  Status: DRAFT. DO NOT RUN IN CI.
+//  The `.draft` extension is a guard so the Playwright runner does
+//  not pick it up. To activate:
+//    1. Ensure playwright.config.ts exists (PA wave N+1).
+//    2. Ensure all TODOs below have real implementations.
+//    3. Rename `.draft` → `.spec.ts`.
+//    4. Confirm with QA that fixtures are ready.
+//
+//  Activation gate:
+//    Активирует: PA, после того как `auto-rename` и
+//    `rate-setter-sync` smoke-тесты зелёные. До этого момента
+//    share-link — второстепенный flow, а базовые потоки ещё
+//    не стабильны → прогонять share-link раньше значит ловить
+//    ложные падения от несвязанных регрессий.
+//
+//  Source of truth:
+//    - docs/agents/qa/test-plans/share-link.md (TODO: write)
+//    - bugs/README.md (bug lifecycle / severity / area='share-link')
+//
+//  Coverage focus:
+//    - Create share-link for a project.
+//    - Open share-link as unauthenticated guest.
+//    - Guest sees the expected set of photos (scope honoured).
+//    - Guest can leave a comment (if permission granted).
+//    - Share-link can be revoked by owner.
+//    - Revoked link returns friendly error, not 500.
+//    - Invalid / malformed token returns 404 friendly.
+//
+//  Author of skeleton: QA lane, overnight 2026-04-23.
+// ═══════════════════════════════════════════════════════════════
+
+import { test, expect, Page, BrowserContext } from '@playwright/test';
+
+// ───────────────────────────────────────────────────────────────
+//  Configuration / fixtures
+// ───────────────────────────────────────────────────────────────
+
+// TODO(qa): point at real staging URL or feature-flagged prod.
+const BASE_URL = process.env.MAKET_BASE_URL || 'http://localhost:5173';
+
+// TODO(qa): env vars with test credentials (1Password entry).
+const QA_OWNER_EMAIL = process.env.QA_OWNER_EMAIL || 'qa-owner@maket.test';
+const QA_OWNER_PWD   = process.env.QA_OWNER_PWD   || '';
+
+// Share-link fixture project: pre-seeded project with a known set of
+// cards + photos so expectations are deterministic.
+// TODO(qa): seed via Supabase service-role in a beforeAll, or rely on
+// a persistent fixture project kept in staging db.
+const FIXTURE_PROJECT_SLUG = 'qa-share-link-fixture';
+
+// Time-to-open budget for guest: if a share-link takes longer than
+// this to render photos, that is itself a bug (UX regression).
+const GUEST_OPEN_BUDGET_MS = 4000;
+
+// ───────────────────────────────────────────────────────────────
+//  Setup / teardown
+// ───────────────────────────────────────────────────────────────
+
+test.beforeEach(async ({ page }) => {
+  // TODO(qa): loginAsOwner(page, QA_OWNER_EMAIL, QA_OWNER_PWD).
+  // Prefer Supabase Auth API over UI click-through — faster, less flaky.
+});
+
+test.afterEach(async ({ page }) => {
+  // TODO(qa): revoke any share-links created during the test to avoid
+  // cross-test contamination. Query `share_links` via service-role
+  // and DELETE by project_id = FIXTURE_PROJECT_SLUG.
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  Happy path — create / open / scope
+// ═══════════════════════════════════════════════════════════════
+
+test.describe('Share-link — happy path', () => {
+
+  test('SL-REG-01: Owner can create a share-link for a project', async ({ page }) => {
+    // Pre-condition: logged in as owner, FIXTURE_PROJECT_SLUG exists.
+    //
+    // Steps:
+    //   1. page.goto(BASE_URL + '/#project/' + FIXTURE_PROJECT_SLUG);
+    //   2. page.click('[data-test="share-link-button"]');
+    //   3. Wait for modal: page.waitForSelector('[data-test="share-modal"]');
+    //   4. page.click('[data-test="share-create"]');
+    //   5. Read URL from input[data-test="share-url"].
+    //
+    // Expected:
+    //   - URL matches /share/[a-f0-9-]{36}/ token pattern.
+    //   - `share_links` row exists with status='active'.
+    //   - Token is unique per click (idempotency not required here).
+    //
+    // TODO(qa): implement — selectors are guesses, align with DAD markup.
+    test.fixme(true, 'Not yet implemented');
+  });
+
+  test('SL-REG-02: Share-link opens for an unauthenticated guest', async ({ browser }) => {
+    // Requires two contexts so the guest has no session.
+    //
+    // Steps:
+    //   const ownerCtx = await browser.newContext({ storageState: 'qa-owner.json' });
+    //   const guestCtx = await browser.newContext(); // anonymous
+    //   const ownerPage = await ownerCtx.newPage();
+    //   // ... create share-link via ownerPage (reuse SL-REG-01 helper) ...
+    //   const shareUrl = await createShareLink(ownerPage, FIXTURE_PROJECT_SLUG);
+    //   const guestPage = await guestCtx.newPage();
+    //   const started = Date.now();
+    //   await guestPage.goto(shareUrl);
+    //   await guestPage.waitForSelector('[data-test="share-gallery"]');
+    //   const elapsed = Date.now() - started;
+    //
+    // Expected:
+    //   - No auth-gate shown.
+    //   - Guest sees gallery within GUEST_OPEN_BUDGET_MS.
+    //   - No console errors of level "error".
+    //
+    // TODO(qa): implement.
+    test.fixme(true, 'Not yet implemented');
+  });
+
+  test('SL-REG-03: Guest sees exactly the photos in the share scope', async ({ browser }) => {
+    // Scope here = the set of photos the owner included when creating
+    // the link. Assumes the link was created with scope = "all approved
+    // cards in project" (default scope per current product spec).
+    //
+    // Pre-condition: FIXTURE_PROJECT_SLUG has a deterministic set of
+    //   - 12 approved photos
+    //   - 5 rejected photos (must NOT leak to guest)
+    //   - 3 draft photos (must NOT leak)
+    //
+    // Steps:
+    //   1. Owner creates share-link with default scope.
+    //   2. Guest opens URL.
+    //   3. Count [data-test="share-photo-tile"] elements.
+    //   4. Read data-photo-id attribute on each tile.
+    //
+    // Expected:
+    //   - Exactly 12 tiles rendered.
+    //   - Set of photo IDs === set of approved photos from fixture.
+    //   - No 'rejected' or 'draft' IDs leak into DOM.
+    //
+    // Rationale: this is the single test that guards against RLS drift.
+    // If this passes, scope-leak is unlikely. If it fails, assume
+    // critical severity → open bug with area='share-link'.
+    //
+    // TODO(qa): implement + wire to a service-role helper that returns
+    //   expected photo IDs as a JS array.
+    test.fixme(true, 'Not yet implemented');
+  });
+
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  Permissions — comment allowed / disallowed
+// ═══════════════════════════════════════════════════════════════
+
+test.describe('Share-link — permissions', () => {
+
+  test('SL-REG-04: Guest can leave a comment when comment-perm is enabled', async ({ browser }) => {
+    // Pre-condition: owner creates link with permissions = { comment: true }.
+    //
+    // Steps:
+    //   1. createShareLink(ownerPage, FIXTURE_PROJECT_SLUG, { comment: true }).
+    //   2. Guest opens URL.
+    //   3. Click on a photo tile → opens lightbox.
+    //   4. Find comment textarea, type "QA smoke comment".
+    //   5. Submit.
+    //
+    // Expected:
+    //   - Comment appears in DOM immediately (optimistic render).
+    //   - Supabase `comments` table has a new row with author=<guest-hash>.
+    //   - Owner sees the comment in the cards editor without reload (if
+    //     realtime is connected) or after reload (fallback).
+    //
+    // Edge: comment body is trimmed of leading/trailing whitespace.
+    //   Empty comment must be rejected client-side (no POST).
+    //
+    // TODO(qa): implement.
+    test.fixme(true, 'Not yet implemented');
+  });
+
+  test('SL-REG-05: Guest cannot comment when comment-perm is disabled', async ({ browser }) => {
+    // Pre-condition: owner creates link with permissions = { comment: false }.
+    //
+    // Steps:
+    //   1. createShareLink(ownerPage, FIXTURE_PROJECT_SLUG, { comment: false }).
+    //   2. Guest opens URL.
+    //   3. Open lightbox.
+    //
+    // Expected:
+    //   - Comment textarea is not rendered at all (preferred) OR is
+    //     rendered as read-only with tooltip "Комментарии отключены".
+    //   - If guest tries to POST comment via crafted request directly
+    //     to `comments` endpoint — RLS must reject with 403.
+    //   - No `comments` row inserted.
+    //
+    // Rationale: this is as much a security test as a UX test. If
+    // frontend hides the textarea but RLS allows insert, that's a
+    // critical severity bug (malicious guest could spam).
+    //
+    // TODO(qa): implement + include raw supabase-js insert attempt.
+    test.fixme(true, 'Not yet implemented');
+  });
+
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  Revocation lifecycle
+// ═══════════════════════════════════════════════════════════════
+
+test.describe('Share-link — revocation', () => {
+
+  test('SL-REG-06: Owner can revoke an active share-link', async ({ page }) => {
+    // Pre-condition: owner created a share-link earlier.
+    //
+    // Steps:
+    //   1. page.goto(BASE_URL + '/#project/' + FIXTURE_PROJECT_SLUG);
+    //   2. Open share-link manager modal.
+    //   3. Click [data-test="share-revoke"] on an active link.
+    //   4. Confirm destructive-action dialog.
+    //
+    // Expected:
+    //   - `share_links` row status changes from 'active' to 'revoked'.
+    //   - Modal reflects the new state (strikethrough or "Отозвана" badge).
+    //   - No cached token remains in localStorage.
+    //
+    // TODO(qa): implement.
+    test.fixme(true, 'Not yet implemented');
+  });
+
+  test('SL-REG-07: A revoked share-link does not grant access', async ({ browser }) => {
+    // Steps:
+    //   1. Owner creates share-link.
+    //   2. Guest A opens it → success (prime the cache).
+    //   3. Owner revokes it.
+    //   4. Guest B opens the same URL.
+    //   5. Guest A refreshes their tab.
+    //
+    // Expected:
+    //   - Guest B sees friendly error: "Ссылка больше не действует".
+    //     Page title / h1 is understandable, no stack trace, no 500.
+    //   - Guest A's refresh also sees friendly error (cached HTML must
+    //     not survive revocation — verify via realtime or next request).
+    //   - Network returns 403 or 410 (Gone); 500 is a bug.
+    //
+    // Edge: if the guest already has cards cached in memory and the
+    // owner revokes mid-session — current product decision (TODO: confirm
+    // with CoS) is that the guest is *not* force-logged-out, but any
+    // new request (comment, photo load) fails with same friendly error.
+    //
+    // TODO(qa): implement.
+    test.fixme(true, 'Not yet implemented');
+  });
+
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  Invalid / malformed input
+// ═══════════════════════════════════════════════════════════════
+
+test.describe('Share-link — invalid input', () => {
+
+  test('SL-REG-08: Invalid token returns a friendly 404, not a stack trace', async ({ browser }) => {
+    // Steps:
+    //   1. const guestPage = await (await browser.newContext()).newPage();
+    //   2. await guestPage.goto(BASE_URL + '/share/not-a-real-token-abc');
+    //   3. await guestPage.goto(BASE_URL + '/share/<valid-uuid-but-nonexistent>');
+    //
+    // Expected for both:
+    //   - HTTP status is 404 or the SPA renders a 404 state client-side
+    //     (accept either because Netlify/GH Pages fallback is 200+SPA).
+    //   - Page contains a human message: "Ссылка не найдена" and a
+    //     link back to maket.cp (home).
+    //   - No console error of level "error".
+    //   - No Supabase RLS violation logged (valid UUID probe must not
+    //     reveal existence via timing — worth a follow-up test later).
+    //
+    // TODO(qa): implement two cases (garbage string + valid-UUID-shape).
+    test.fixme(true, 'Not yet implemented');
+  });
+
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  Helpers (TODO: extract to helpers/share-link.ts)
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Create a share-link via UI; return its URL.
+ * TODO(qa): implement.
+ */
+async function createShareLink(
+  page: Page,
+  projectSlug: string,
+  permissions: { comment: boolean } = { comment: false }
+): Promise<string> {
+  // TODO: page.click(...), page.fill(...), read URL from input.
+  return '';
+}
+
+/**
+ * Revoke share-link by URL token. TODO(qa): implement.
+ */
+async function revokeShareLinkByToken(ownerPage: Page, token: string): Promise<void> {
+  // TODO
+}
+
+/**
+ * Fetch expected photo IDs for FIXTURE_PROJECT_SLUG via Supabase
+ * service-role, filtered by scope (approved only for default scope).
+ * TODO(qa): implement in helpers/supabase.ts.
+ */
+async function fetchExpectedPhotoIds(projectSlug: string): Promise<string[]> {
+  return [];
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Notes for QA
+// ═══════════════════════════════════════════════════════════════
+
+/*
+  Wave order (prerequisites before activating this spec):
+
+  Wave 1 — must be green:
+    - rate-setter-sync.spec.ts        (RS-REG-01, 02, 06, 07)
+    - auto-rename.spec.ts             (AR-REG-01 smoke)
+  Otherwise share-link failures will be falsely attributed to
+  share-link logic when they are actually regressions upstream.
+
+  Wave 2 — this spec:
+    - SL-REG-01, 02, 03 (happy path + scope).
+    - SL-REG-08 (invalid input).
+
+  Wave 3 — after share-link permission UI lands (DAD, TBD):
+    - SL-REG-04, 05 (comment permission).
+    - SL-REG-06, 07 (revocation).
+
+  Fixtures required:
+    - A persistent FIXTURE_PROJECT_SLUG project in staging Supabase,
+      seeded with deterministic set of approved/rejected/draft photos.
+    - Two test auth identities: qa-owner + a dummy "guest-hash" marker
+      used by comments table.
+
+  Selectors:
+    - Use `data-test="..."` attributes exclusively, not classes or
+      structural nth-child. Request DAD to add these in the share-link
+      modal and share-gallery view.
+
+  Backend dependencies:
+    - `/api/signup` is NOT required for this spec (guest is anon).
+    - `share_links` table + RLS policy + revocation flag must be live.
+
+  Out of scope for this draft:
+    - Token rotation / expiry (separate spec: share-link-rotation).
+    - Signed approval events from guests (separate spec).
+    - Analytics on share-link opens (separate spec, out of product scope
+      for beta).
+*/
