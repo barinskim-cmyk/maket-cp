@@ -1,0 +1,283 @@
+// ═══════════════════════════════════════════════════════════════
+//  photo-versions.spec.ts.draft — Playwright skeleton
+//
+//  Статус: DRAFT. НЕ ЗАПУСКАТЬ В CI.
+//  Расширение `.draft` — защитный суффикс, чтобы Playwright-runner
+//  его не подхватывал. Для активации:
+//    1. Миграция v2/supabase/030_photo_versions.sql применена на staging/prod.
+//    2. Bucket postprod и storage policies настроены.
+//    3. Feature flag `enable_photo_versions_e2e` = true (опционально).
+//    4. playwright.config.ts и helpers/supabase.ts существуют (см. TODO).
+//    5. Переименовать `.draft` → `.spec.ts`.
+//    6. Подтвердить с QA, что fixtures готовы.
+//
+//  Source of truth:
+//    v2/supabase/030_photo_versions.sql
+//    docs/agents/dev/photo_versions-migration-proposal.md
+//    v2/frontend/js/supabase.js:2886-3132 (CRUD)
+//    v2/frontend/js/supabase.js:3874-3896 (realtime)
+//
+//  Автор skeleton'а: PA, 2026-04-23 overnight batch.
+// ═══════════════════════════════════════════════════════════════
+
+import { test, expect, Page, BrowserContext } from '@playwright/test';
+
+// ───────────────────────────────────────────────────────────────
+//  Конфигурация и фикстуры
+// ───────────────────────────────────────────────────────────────
+
+// TODO(qa): указать реальный URL staging / feature-flagged prod.
+const BASE_URL = process.env.MAKET_BASE_URL || 'http://localhost:5173';
+
+// TODO(qa): переменные окружения с тестовыми кредами.
+const QA_OWNER_EMAIL  = process.env.QA_OWNER_EMAIL  || 'qa-owner@maket.test';
+const QA_OWNER_PWD    = process.env.QA_OWNER_PWD    || '';
+const QA_MEMBER_EMAIL = process.env.QA_MEMBER_EMAIL || 'qa-client@maket.test';
+const QA_MEMBER_PWD   = process.env.QA_MEMBER_PWD   || '';
+
+// TODO(qa): путь к fixture с .jpg + .cos (1 фото, 3 stage'а).
+const FIXTURE_PHOTO_JPG = 'tests/e2e/fixtures/photo-versions/sample.jpg';
+const FIXTURE_PHOTO_COS = 'tests/e2e/fixtures/photo-versions/sample.cos';
+
+// TODO(qa): настроить Supabase service-role клиент.
+// Выделить в helpers/supabase.ts:
+//   - insertPhotoVersion(version: PhotoVersionRow): Promise<string>
+//   - queryPhotoVersions(projectId: string): Promise<PhotoVersionRow[]>
+//   - deletePhotoVersion(id: string): Promise<void>
+//   - subscribeRealtime(projectId: string, onInsert: (row) => void): Promise<Channel>
+
+// ───────────────────────────────────────────────────────────────
+//  Setup / teardown
+// ───────────────────────────────────────────────────────────────
+
+let testProjectId: string = '';
+
+test.beforeEach(async ({ page }) => {
+  // TODO: login as owner, create clean project
+  // testProjectId = await createTestProject('pv-e2e-' + Date.now());
+});
+
+test.afterEach(async ({ page }) => {
+  // TODO: cleanup — resetPhotoVersions, deleteTestProject
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  Happy path — основные операции
+// ═══════════════════════════════════════════════════════════════
+
+test.describe('photo_versions — happy path', () => {
+
+  test('PV-REG-01: Upload cc-файла создаёт строку в photo_versions', async ({ page }) => {
+    // Pre-condition:
+    //   - testProjectId создан
+    //   - bucket postprod существует
+    //
+    // Steps:
+    //   1. await page.goto(`${BASE_URL}#project/${testProjectId}/postprod`);
+    //   2. Select фото IMG_0001.CR3 → upload-as-version('color_correction').
+    //   3. Загрузить FIXTURE_PHOTO_JPG как превью.
+    //   4. Wait log "pvSyncVersions: загружено 1/1".
+    //   5. Через service-role: queryPhotoVersions(testProjectId).
+    //
+    // Expected:
+    //   - Ровно 1 строка.
+    //   - stage = 'color_correction', version_num = 1.
+    //   - preview_path = `${testProjectId}/IMG_0001/color_correction_1.jpg`.
+    //   - selected = false (по default).
+    //   - created_at ≈ now() ± 30s.
+    //   - created_by = auth.uid() owner-а.
+    //   - metadata = {} (пустой jsonb).
+    //
+    // TODO: QA implements.
+    test.fixme(true, 'Not yet implemented');
+  });
+
+  test('PV-REG-02: Select/deselect версии — ровно одна selected=true на (photo, stage)', async ({ page }) => {
+    // Pre-condition:
+    //   - 3 версии IMG_0001.CR3 stage='color_correction' (version_num 1..3).
+    //
+    // Steps:
+    //   1. await page.evaluate((vid) => window.sbSelectPhotoVersion(vid, ...), version2Id);
+    //   2. queryPhotoVersions → проверить: selected=true только у version_num=2.
+    //   3. await page.evaluate((vid) => window.sbSelectPhotoVersion(vid, ...), version3Id);
+    //   4. queryPhotoVersions → selected=true только у version_num=3, у 2 → false.
+    //
+    // Expected:
+    //   - В любой момент времени: COUNT(*) WHERE selected=true AND
+    //     (project_id, photo_name, stage) group by → ровно 1.
+    //
+    // TODO: QA implements (зависит от F-08 concurrency — для race-кейса см. PV-REG-04).
+    test.fixme(true, 'Not yet implemented');
+  });
+
+  test('PV-REG-03: Unique constraint блокирует дубликат (project_id, photo_name, stage, version_num)', async ({ page }) => {
+    // Pre-condition:
+    //   - Уже существует: (testProjectId, 'IMG_0001.CR3', 'color_correction', 1).
+    //
+    // Steps:
+    //   1. Попытаться вставить ту же комбинацию через service-role:
+    //      await insertPhotoVersion({project_id: testProjectId,
+    //        photo_name: 'IMG_0001.CR3', stage: 'color_correction', version_num: 1, ...});
+    //
+    // Expected:
+    //   - Ошибка 23505 unique_violation.
+    //   - Текст: 'duplicate key value violates unique constraint
+    //     "photo_versions_project_id_photo_name_stage_version_num_key"'.
+    //   - ИЛИ: upsert через supabase.js:sbSavePhotoVersion перезаписывает запись
+    //     (onConflict-путь) и возвращает один ряд, а не два.
+    //
+    // TODO: QA implements — проверить оба сценария (raw INSERT и upsert через клиент).
+    test.fixme(true, 'Not yet implemented');
+  });
+
+  test('PV-REG-04: RLS — guest (share-link без регистрации) не видит чужие photo_versions', async ({ browser }) => {
+    // Pre-condition:
+    //   - Owner-проект A с 3 версиями.
+    //   - Owner-проект B с 3 версиями (другой owner, другая share-link).
+    //   - Anon-контекст (без auth) открыл share-link проекта A.
+    //
+    // Steps:
+    //   1. const anonCtx = await browser.newContext();
+    //   2. const pageA = await anonCtx.newPage();
+    //   3. await pageA.goto(`${BASE_URL}#share/${shareTokenA}`);
+    //   4. const rowsA = await pageA.evaluate(() =>
+    //        window.sbClient.from('photo_versions').select('*'));
+    //   5. expect(rowsA.data.length).toBe(3);
+    //   6. expect(rowsA.data.every(r => r.project_id === projectA)).toBeTruthy();
+    //
+    // Expected:
+    //   - Анонимный клиент видит только 3 строки проекта A.
+    //   - Проект B — не виден (не в `get_shared_project_ids()`).
+    //   - UPDATE/INSERT/DELETE из anon-контекста → RLS-block (42501 insufficient_privilege).
+    //
+    // TODO: QA implements.
+    test.fixme(true, 'Not yet implemented');
+  });
+
+  test('PV-REG-05: Realtime subscribe получает INSERT в течение 5s', async ({ browser }) => {
+    // Pre-condition:
+    //   - photo_versions в publication supabase_realtime (проверка 3 в proposal).
+    //   - Owner-контекст + service-role клиент.
+    //
+    // Steps:
+    //   1. const ownerCtx = await browser.newContext({ storageState: 'qa-owner.json' });
+    //   2. const page = await ownerCtx.newPage();
+    //   3. await page.goto(`${BASE_URL}#project/${testProjectId}/postprod`);
+    //   4. Ожидать в consoleLog строку 'realtime photo_versions: SUBSCRIBED'.
+    //   5. Через service-role: INSERT INTO photo_versions (...) VALUES (...).
+    //   6. Ожидать в consoleLog в течение 5s: 'realtime: новая версия — IMG_NEW.CR3'.
+    //
+    // Expected:
+    //   - INSERT доставлен через postgres_changes канал.
+    //   - _sbApplyVersionUpdate вызван (можно spy через page.exposeFunction).
+    //
+    // TODO: QA implements — нужна проверка и в RLS-контексте (guest не должен
+    //       получать realtime-события чужих проектов).
+    test.fixme(true, 'Not yet implemented (зависит от realtime publication)');
+  });
+
+  test('PV-REG-06: ON DELETE CASCADE — удаление проекта удаляет photo_versions', async ({ page }) => {
+    // Pre-condition:
+    //   - testProjectId с 5 photo_versions.
+    //
+    // Steps:
+    //   1. const beforeCount = (await queryPhotoVersions(testProjectId)).length;
+    //   2. expect(beforeCount).toBe(5);
+    //   3. Через service-role: DELETE FROM projects WHERE id = testProjectId;
+    //      (или hard-delete — soft-delete триггер на projects нет, только cards/slots.)
+    //   4. const afterCount = (await queryPhotoVersions(testProjectId)).length;
+    //
+    // Expected:
+    //   - afterCount = 0.
+    //   - FK project_id ON DELETE CASCADE отработал.
+    //   - Storage-файлы НЕ удаляются автоматически (это делает клиент
+    //     через sbDeletePhotoVersion) — помечать как TODO для отдельного cleanup.
+    //
+    // TODO: QA implements.
+    test.fixme(true, 'Not yet implemented');
+  });
+
+  test('PV-REG-07: Update метаданных — updated_at автоматически обновляется', async ({ page }) => {
+    // Pre-condition:
+    //   - 1 photo_version только что создан, created_at = updated_at.
+    //
+    // Steps:
+    //   1. const rowBefore = await queryPhotoVersions(testProjectId)[0];
+    //   2. await new Promise(r => setTimeout(r, 1500));  // чтобы ∆t ≥ 1s
+    //   3. Через service-role: UPDATE photo_versions SET metadata = '{"ai_score": 0.9}'::jsonb WHERE id = rowBefore.id;
+    //   4. const rowAfter = await queryPhotoVersions(testProjectId)[0];
+    //
+    // Expected:
+    //   - rowAfter.metadata = {ai_score: 0.9}.
+    //   - rowAfter.updated_at > rowBefore.updated_at.
+    //   - rowAfter.created_at === rowBefore.created_at (не меняется).
+    //   - Триггер trg_photo_versions_touch_updated_at отработал.
+    //
+    // TODO: QA implements — эта же механика проверяет, что
+    //       BEFORE UPDATE триггер не ломает RLS (UPDATE от member-а проходит).
+    test.fixme(true, 'Not yet implemented');
+  });
+
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  Helpers (TODO: вынести в helpers/supabase.ts)
+// ═══════════════════════════════════════════════════════════════
+
+async function loginAsOwner(page: Page, email: string, pwd: string): Promise<void> {
+  // TODO: реализовать через Supabase Auth API или через UI.
+}
+
+async function createTestProject(name: string): Promise<string> {
+  // TODO: INSERT INTO projects через service-role, вернуть UUID.
+  return '';
+}
+
+async function queryPhotoVersions(projectId: string): Promise<any[]> {
+  // TODO: service-role SELECT * FROM photo_versions WHERE project_id = $1.
+  return [];
+}
+
+async function insertPhotoVersion(row: any): Promise<string> {
+  // TODO: service-role INSERT, вернуть id.
+  return '';
+}
+
+async function deletePhotoVersion(id: string): Promise<void> {
+  // TODO
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Примечания для QA
+// ═══════════════════════════════════════════════════════════════
+
+/*
+  Порядок реализации (после apply 030):
+
+  Wave 1 (core CRUD, 1-2 дня):
+    - PV-REG-01 (upload → insert)
+    - PV-REG-03 (unique constraint)
+    - PV-REG-06 (cascade delete)
+    - PV-REG-07 (updated_at trigger)
+
+  Wave 2 (RLS + select, 1 день):
+    - PV-REG-02 (select/deselect)
+    - PV-REG-04 (RLS guest isolation)
+
+  Wave 3 (realtime, требует staging с включённым realtime):
+    - PV-REG-05 (realtime INSERT)
+
+  Связанные тесты:
+    - rate-setter-sync.spec.ts.draft::RS-REG-03 (COS upload создаёт photo_version).
+    - rate-setter-sync.spec.ts.draft::RS-REG-11 (concurrent select — расширяет PV-REG-02).
+
+  Данные для фикстур:
+    - tests/e2e/fixtures/photo-versions/sample.jpg — 300x200 JPG, <50KB.
+    - tests/e2e/fixtures/photo-versions/sample.cos — минимальный Capture One sidecar.
+    - tests/e2e/fixtures/photo-versions/cyrillic/Солнце_17774.jpg — для sanity-check.
+
+  Playwright config notes:
+    - test.describe.serial — если тесты меняют общий state (например PV-REG-02 требует
+      3 версии, созданные предыдущим тестом). Иначе parallel.
+    - retries=1, timeout=30s базово; realtime-тест PV-REG-05 — timeout=15s с явным wait.
+*/
