@@ -1,0 +1,25 @@
+# /agents/
+
+CoS-артефакты по engagement-тестам кофаундеров (Ставка 2 из `strategy-2026.md`). Не путать с `/docs/agents/` — там живут Q2-стратегии и артефакты 7 AI-агентов команды.
+
+## Содержимое
+
+- `candidate-a-tracker.md` — 6-недельный tracker наблюдений по 5 критериям.
+- `candidate-a-midpoint.md` — отчёт mid-point (появляется на неделе 6).
+- `candidate-a-decision.md` — свод по итогам 6 недель, recommendation CoS, решение Маши (появляется на неделе 12).
+- `candidate-b-tracker.md` — аналогично для параллельного трека (активируется по решению Маши; в cycle 1 — в standby).
+
+## Правила
+
+1. Одна строка в tracker'е на каждую weekly встречу. Не эссе — короткая оценка и факт.
+2. 5 критериев (из `cofounder-package.md`): responsiveness, initiative, quality, emotional fit, strategic sense.
+3. Decision-meeting готовит CoS, решает Маша. CoS не делает вывод за неё.
+4. Если кандидат отваливается в середине — отмечаем факт в tracker и закрываем decision раньше срока.
+
+## Связанные артефакты
+
+- `cofounder-package.md` (корень проекта) — 5 критериев, формат оффера.
+- `strategy-2026.md` раздел "Ставка 2" — рамка решения.
+- `masha-q2-plan.md` — роль Маши в тесте (наблюдатель + решатель).
+
+**Owner:** Chief of Staff (tracker + recommendation), Masha (decision).
