@@ -72,3 +72,27 @@ _snapshots/
 *-private.md
 contacts.md
 **/contacts.md
+
+# --- PII safeguard (added 2026-04-24 after filter-repo scrub) ---
+# Block accidental commits of client-name files. If you need a legitimate
+# file with one of these tokens, override per-file with `git add -f <path>`.
+**/*ekonika*
+**/*Ekonika*
+**/*EKONIKA*
+**/*Эконика*
+**/*ЭКОНИКА*
+**/*эконика*
+**/*moiseeva*
+**/*Moiseeva*
+**/*Моисеева*
+**/*markformelle*
+**/*Markformelle*
+**/*MarkFormelle*
+**/*MARKFORMELLE*
+**/*Mark Formelle*
+**/*Марк Формель*
+# Allow placeholders/labels (already-scrubbed output):
+!**/client-a*
+!**/tester-a*
+!**/surname-hidden*
+# --- end PII safeguard ---
