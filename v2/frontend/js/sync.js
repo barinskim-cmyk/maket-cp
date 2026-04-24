@@ -107,6 +107,40 @@ function rsClearAutoFill() {
 }
 
 /**
+ * Проверить, включён ли новый путь Rate Setter sync (F-01/F-02).
+ * Включается через localStorage.setItem('DEBUG_RATESETTER_FIX', '1').
+ * @returns {boolean}
+ */
+function _rsSyncFixEnabled() {
+  try {
+    var v = localStorage.getItem('DEBUG_RATESETTER_FIX');
+    return v === '1' || v === 'true' || v === 'on';
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Очистить строку-имя до stem: убрать путь (если пользователь вставил
+ * полный путь), затем расширение. Возвращает пустую строку, если
+ * после очистки ничего не осталось.
+ *
+ * Используется F-02 для preview-валидации перед отправкой в Rate Setter.
+ * @param {string} line
+ * @returns {string}
+ */
+function _rsCleanLineToStem(line) {
+  var s = String(line || '').trim();
+  if (!s) return '';
+  /* Убрать путь (и Windows, и Unix) — взять только basename. */
+  var slash = Math.max(s.lastIndexOf('/'), s.lastIndexOf('\\'));
+  if (slash >= 0) s = s.slice(slash + 1);
+  /* Убрать расширение изображения. */
+  s = s.replace(/\.(jpe?g|tiff?|png|cr[23w]|nef|arw|raf|dng|psd|psb)$/i, '');
+  return s.trim();
+}
+
+/**
  * Запустить Rate Setter.
  * @param {boolean} dryRun — тестовый прогон (без записи .cos)
  */
@@ -124,6 +158,36 @@ function runRateSetter(dryRun) {
   if (mode === 'text') {
     payload.text_list = document.getElementById('rs-text').value;
     if (!payload.text_list.trim()) { alert('Введите список имён'); return; }
+
+    /* F-02 (за feature-flag): guard на пустой stems + warning при >50% отсева.
+       Без флага — поведение идентично старому. */
+    if (_rsSyncFixEnabled()) {
+      var rawLines = payload.text_list.split(/\r?\n/);
+      var originalLines = [];
+      var previewStems = [];
+      for (var ln = 0; ln < rawLines.length; ln++) {
+        var trimmed = rawLines[ln].trim();
+        if (trimmed.length === 0) continue;
+        originalLines.push(trimmed);
+        var stem = _rsCleanLineToStem(trimmed);
+        if (stem.length > 0) previewStems.push(stem);
+      }
+
+      if (previewStems.length === 0) {
+        alert('После очистки имён список пустой. Проверьте, что вы вводите имена файлов, а не пути или пустые строки.');
+        return;
+      }
+
+      /* Warning: если после очистки осталось <50% от ввода — спросить. */
+      if (originalLines.length > 0 &&
+          previewStems.length < originalLines.length * 0.5) {
+        var msg = 'Из ' + originalLines.length + ' строк распознано только ' +
+                  previewStems.length + ' имён. ' +
+                  'Возможно, вы вставили пути или лишние символы.\n\n' +
+                  'Продолжить синхронизацию с ' + previewStems.length + ' именами?';
+        if (!confirm(msg)) return;
+      }
+    }
   } else {
     payload.source_dir = document.getElementById('rs-source-dir').value;
     if (!payload.source_dir) { alert('Выберите папку-источник'); return; }
@@ -188,6 +252,22 @@ window.onRateSetterDone = function(result) {
     'Без изменений: <span>' + (result.unchanged || 0) + '</span> | ' +
     'Не найдено: <span>' + (result.missing || 0) + '</span> | ' +
     'Ошибок: <span>' + (result.errors || 0) + '</span>';
+
+  /* F-02 (за feature-flag): если Python вернул updated=0 И unchanged=0 —
+     явно сообщить пользователю, что ничего не произошло. Без этого
+     UI показывал "success" при полном отсутствии эффекта (см. analysis §2.5). */
+  if (_rsSyncFixEnabled() &&
+      (result.updated || 0) === 0 &&
+      (result.unchanged || 0) === 0) {
+    var logEl = document.getElementById('rs-log');
+    if (logEl) {
+      logEl.innerHTML += '<span class="log-err">Ничего не обновлено. ' +
+        'Проверьте путь к сессии Capture One и список имён.</span>\n';
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+    /* Не записываем stage_event — поведение стало фиктивным. */
+    return;
+  }
 
   /* Записать событие успешной синхронизации (скрытый этап пайплайна) */
   if (result.updated > 0 || result.unchanged > 0) {

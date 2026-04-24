@@ -71,6 +71,10 @@ function sbInit() {
 
   sbClient = supabase.createClient(SB_URL, SB_ANON);
 
+  /* F-01: восстановить pending-queue до первых сетевых вызовов.
+     Безопасно при отключённом флаге — queue просто не пополняется. */
+  try { sbRestoreStageQueue(); } catch (e) {}
+
   // Проверяем текущую сессию
   sbClient.auth.getSession().then(function(res) {
     if (res.data && res.data.session) {
@@ -207,6 +211,14 @@ function sbOnAuthChange(event, session) {
     console.log('supabase.js: Вошли как', sbUser.email);
     /* Разблокировать приложение */
     if (typeof authUnlock === 'function') authUnlock();
+    /* F-01: при логине попытаться протолкнуть накопленные stage_events.
+       Выполнится только если флаг включён И очередь непустая. */
+    try {
+      if (typeof _rsFixEnabled === 'function' && _rsFixEnabled() &&
+          typeof sbFlushStageQueue === 'function') {
+        sbFlushStageQueue();
+      }
+    } catch (e) {}
   } else if (event === 'SIGNED_OUT') {
     sbUser = null;
     console.log('supabase.js: Вышли');
@@ -2748,10 +2760,144 @@ function sbStopAutoPull() {
 // Синхронизация этапов пайплайна (stage + stage_events)
 // ══════════════════════════════════════════════
 
+/* ══════════════════════════════════════════════
+   F-01 Rate Setter sync fixes — инфраструктура
+   ══════════════════════════════════════════════
+
+   Feature-flag защищает новое поведение. Включается через:
+       localStorage.setItem('DEBUG_RATESETTER_FIX', '1')
+   Выключается (возврат к старому поведению):
+       localStorage.removeItem('DEBUG_RATESETTER_FIX')
+
+   Источники: docs/agents/dev/rate-setter-sync-fixes-proposal-2026-04-23.md
+   (разделы F-01, F-02). См. также audit-2026-04-23.md и
+   rate-setter-sync-analysis-2026-04-23.md.
+*/
+
+/**
+ * Проверить, включён ли новый путь Rate Setter sync (F-01/F-02).
+ * По умолчанию выключен — старое поведение сохраняется полностью.
+ * @returns {boolean}
+ */
+function _rsFixEnabled() {
+  try {
+    var v = localStorage.getItem('DEBUG_RATESETTER_FIX');
+    return v === '1' || v === 'true' || v === 'on';
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Мягкий toast/alert для ошибок sync. Не блокирует UI.
+ * Если в окружении есть свой uiToast — используем его.
+ * Иначе — неинвазивная полоска через document.body.
+ * @param {string} msg
+ * @param {*} [detail]
+ */
+function sbShowError(msg, detail) {
+  try { console.error('[rs-sync error]', msg, detail); } catch (e) {}
+  try {
+    if (typeof uiToast === 'function') {
+      uiToast(msg, 'error');
+      return;
+    }
+  } catch (e) {}
+  /* Минимальный fallback-toast (без фреймворков). Masha просила без emoji. */
+  try {
+    if (typeof document === 'undefined' || !document.body) return;
+    var t = document.createElement('div');
+    t.setAttribute('data-rs-toast', '1');
+    t.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:99999;' +
+      'background:#b00020;color:#fff;padding:10px 14px;border-radius:6px;' +
+      'font:14px/1.4 system-ui, sans-serif;max-width:360px;box-shadow:0 4px 12px rgba(0,0,0,.25);';
+    t.textContent = String(msg);
+    document.body.appendChild(t);
+    setTimeout(function() {
+      if (t && t.parentNode) t.parentNode.removeChild(t);
+    }, 6000);
+  } catch (e) {}
+}
+
+/* Очередь отложенных stage_events (localStorage-backed). */
+var _sbPendingStageEvents = [];
+var _SB_STAGE_QUEUE_KEY = 'maket_pending_stage_events_v1';
+
+/**
+ * Загрузить очередь из localStorage при старте приложения.
+ * Безопасно вызывать повторно.
+ */
+function sbRestoreStageQueue() {
+  try {
+    var raw = localStorage.getItem(_SB_STAGE_QUEUE_KEY);
+    _sbPendingStageEvents = raw ? (JSON.parse(raw) || []) : [];
+  } catch (e) {
+    _sbPendingStageEvents = [];
+  }
+}
+
+/**
+ * Сохранить текущую очередь в localStorage (cap 500).
+ */
+function sbPersistStageQueue() {
+  try {
+    if (_sbPendingStageEvents.length > 500) {
+      _sbPendingStageEvents = _sbPendingStageEvents.slice(-500);
+    }
+    localStorage.setItem(_SB_STAGE_QUEUE_KEY, JSON.stringify(_sbPendingStageEvents));
+  } catch (e) {}
+}
+
+/**
+ * Протолкнуть отложенные stage_events при восстановлении связи / после login.
+ * Каждая попытка увеличивает _retry. После 5 ретраев — записи откидываются
+ * и пользователю показывается toast с агрегированным сообщением.
+ */
+function sbFlushStageQueue() {
+  if (!sbClient || !sbIsLoggedIn()) return;
+  if (!_sbPendingStageEvents || _sbPendingStageEvents.length === 0) return;
+
+  var queue = _sbPendingStageEvents.slice();
+  _sbPendingStageEvents = [];
+  sbPersistStageQueue();
+
+  var giveUp = 0;
+  queue.forEach(function(ev) {
+    var payload = {
+      project_id:   ev.project_id,
+      stage_id:     ev.stage_id,
+      trigger_desc: ev.trigger_desc || null,
+      note:         ev.note || null
+    };
+    sbClient.from('stage_events').insert(payload).then(function(res) {
+      if (res.error) {
+        ev._retry = (ev._retry || 0) + 1;
+        if (ev._retry < 5) {
+          _sbPendingStageEvents.push(ev);
+          sbPersistStageQueue();
+        } else {
+          giveUp++;
+          if (giveUp === 1) {
+            sbShowError('Не удалось сохранить событие этапа после 5 попыток', ev);
+          }
+        }
+      }
+    });
+  });
+}
+
 /**
  * Синхронизировать текущий этап проекта с облаком.
  * 1. Обновляет projects.stage
  * 2. Вставляет запись в stage_events (история)
+ *
+ * Поведение по умолчанию (без DEBUG_RATESETTER_FIX) — legacy-путь, совместим
+ * с тем что был до 2026-04-24.
+ *
+ * При DEBUG_RATESETTER_FIX=1 включаются:
+ *   - idempotency 3s (anti double-click по ключу project|stage|trigger)
+ *   - pending-queue в localStorage при сетевых сбоях
+ *   - toast-уведомления об ошибках (через sbShowError)
  *
  * @param {string} [triggerDesc] — описание триггера ("preview_loaded", "client_approved", etc.)
  * @param {string} [note] — доп. заметка (например время из _stageHistory)
@@ -2768,33 +2914,78 @@ function sbSyncStage(triggerDesc, note) {
   var stage = proj._stage || 0;
   var cloudId = proj._cloudId;
 
-  /* 1. Обновить stage в projects (только владелец; клиент обновляет через sbUploadProject) */
-  if (isOwner) {
-    sbClient.from('projects').update({
-      stage: stage,
-      updated_at: new Date().toISOString()
-    }).eq('id', cloudId).then(function(res) {
-      if (res.error) console.warn('sbSyncStage: ошибка обновления stage:', res.error.message);
-      else console.log('sbSyncStage: stage=' + stage + ' сохранён');
-    });
-  }
-
-  /* 2. Вставить запись в stage_events */
   var stageIds = ['preselect', 'selection', 'client', 'color', 'retouch_task', 'retouch', 'retouch_ok', 'adaptation'];
   /* Записываем событие о завершённом этапе (stage - 1) если stage > 0,
      иначе записываем установку на этап 0 */
   var completedIdx = stage > 0 ? stage - 1 : 0;
   var stageId = stageIds[completedIdx] || ('stage_' + completedIdx);
 
-  sbClient.from('stage_events').insert({
+  var useFix = _rsFixEnabled();
+
+  /* Idempotency: skip если то же самое событие отправлялось <3 сек назад.
+     Защита от двойного клика "Запуск" и от программных повторных триггеров. */
+  if (useFix) {
+    var key = cloudId + '|' + stageId + '|' + (triggerDesc || '');
+    var now = Date.now();
+    if (window._lastStageEventKey === key &&
+        window._lastStageEventAt &&
+        (now - window._lastStageEventAt) < 3000) {
+      console.log('sbSyncStage: skip duplicate within 3s (' + key + ')');
+      return;
+    }
+    window._lastStageEventKey = key;
+    window._lastStageEventAt = now;
+  }
+
+  /* 1. Обновить stage в projects (только владелец; клиент обновляет через sbUploadProject) */
+  if (isOwner) {
+    sbClient.from('projects').update({
+      stage: stage,
+      updated_at: new Date().toISOString()
+    }).eq('id', cloudId).then(function(res) {
+      if (res.error) {
+        console.warn('sbSyncStage: ошибка обновления stage:', res.error.message);
+        if (useFix) {
+          sbShowError('Не удалось обновить этап проекта в облаке', res.error);
+        }
+      } else {
+        console.log('sbSyncStage: stage=' + stage + ' сохранён');
+      }
+    });
+  }
+
+  /* 2. Вставить запись в stage_events */
+  var event = {
     project_id: cloudId,
     stage_id: stageId,
     trigger_desc: triggerDesc || null,
     note: note || null
-  }).then(function(res) {
-    if (res.error) console.warn('sbSyncStage: ошибка записи stage_event:', res.error.message);
-    else console.log('sbSyncStage: stage_event записан для "' + stageId + '"');
-  });
+  };
+
+  var insertPromise = sbClient.from('stage_events').insert(event);
+
+  if (useFix) {
+    insertPromise.then(function(res) {
+      if (res.error) {
+        console.warn('sbSyncStage: offline/RLS? в очередь:', res.error.message);
+        _sbPendingStageEvents.push(event);
+        sbPersistStageQueue();
+        sbShowError('Событие этапа отложено — повтор при восстановлении связи', res.error);
+      } else {
+        console.log('sbSyncStage: stage_event записан для "' + stageId + '"');
+      }
+    })['catch'](function(err) {
+      _sbPendingStageEvents.push(event);
+      sbPersistStageQueue();
+      sbShowError('Событие этапа отложено (сбой сети)', err);
+    });
+  } else {
+    /* LEGACY: console.warn-only, как было до 2026-04-24. */
+    insertPromise.then(function(res) {
+      if (res.error) console.warn('sbSyncStage: ошибка записи stage_event:', res.error.message);
+      else console.log('sbSyncStage: stage_event записан для "' + stageId + '"');
+    });
+  }
 }
 
 /**
@@ -4433,4 +4624,17 @@ if (typeof window !== 'undefined') {
       sbCheckShareToken();
     }, 100);
   });
+
+  /* F-01: при восстановлении сети — попытаться протолкнуть отложенные
+     stage_events. Работает только если флаг DEBUG_RATESETTER_FIX включён. */
+  try {
+    window.addEventListener('online', function() {
+      try {
+        if (typeof _rsFixEnabled === 'function' && _rsFixEnabled() &&
+            typeof sbFlushStageQueue === 'function') {
+          sbFlushStageQueue();
+        }
+      } catch (e) {}
+    });
+  } catch (e) {}
 }
