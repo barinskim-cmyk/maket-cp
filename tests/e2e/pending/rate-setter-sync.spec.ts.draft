@@ -1,0 +1,373 @@
+// ═══════════════════════════════════════════════════════════════
+//  rate-setter-sync.spec.ts.draft — Playwright skeleton
+//
+//  Статус: DRAFT. НЕ ЗАПУСКАТЬ В CI.
+//  Расширение `.draft` — защитный суффикс, чтобы Playwright-runner
+//  его не подхватывал. Для активации:
+//    1. Убедиться, что playwright.config.ts существует (PA wave N+1).
+//    2. Проверить, что все TODO ниже реализованы.
+//    3. Переименовать `.draft` → `.spec.ts`.
+//    4. Подтвердить с QA, что fixtures готовы.
+//
+//  Source of truth:
+//    docs/agents/qa/test-plans/rate-setter-sync-regression.md
+//    docs/agents/dev/rate-setter-sync-analysis-2026-04-23.md
+//    docs/agents/dev/rate-setter-sync-fixes-proposal-2026-04-23.md
+//
+//  Автор skeleton'а: Product Architect, 2026-04-23 overnight pass.
+// ═══════════════════════════════════════════════════════════════
+
+import { test, expect, Page, BrowserContext } from '@playwright/test';
+
+// ───────────────────────────────────────────────────────────────
+//  Конфигурация и фикстуры
+// ───────────────────────────────────────────────────────────────
+
+// TODO(qa): указать реальный URL staging / feature-flagged prod.
+const BASE_URL = process.env.MAKET_BASE_URL || 'http://localhost:5173';
+
+// TODO(qa): переменные окружения с тестовыми кредами.
+const QA_OWNER_EMAIL = process.env.QA_OWNER_EMAIL || 'qa-owner@maket.test';
+const QA_OWNER_PWD   = process.env.QA_OWNER_PWD   || '';
+const QA_CLIENT_EMAIL = process.env.QA_CLIENT_EMAIL || 'qa-client@maket.test';
+const QA_CLIENT_PWD   = process.env.QA_CLIENT_PWD   || '';
+
+// TODO(qa): путь к fixture session Capture One.
+const FIXTURE_SESSION = 'tests/e2e/fixtures/capture-one-session';
+
+// TODO(qa): настроить Supabase service-role клиент для data-integrity checks.
+// Выделить отдельный модуль helpers/supabase.ts с вспомогательными функциями:
+//   - createTestProject(name: string): Promise<string>
+//   - resetPhotoVersions(projectId: string): Promise<void>
+//   - queryPhotoVersions(projectId: string): Promise<PhotoVersion[]>
+//   - queryStageEvents(projectId: string): Promise<StageEvent[]>
+//   - deleteTestProject(projectId: string): Promise<void>
+
+// ───────────────────────────────────────────────────────────────
+//  Setup / teardown
+// ───────────────────────────────────────────────────────────────
+
+test.beforeEach(async ({ page }) => {
+  // TODO: login flow
+  // await loginAsOwner(page, QA_OWNER_EMAIL, QA_OWNER_PWD);
+});
+
+test.afterEach(async ({ page }) => {
+  // TODO: cleanup test-project, photo_versions, localStorage queue
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  Happy path
+// ═══════════════════════════════════════════════════════════════
+
+test.describe('Rate Setter — happy path', () => {
+
+  test('RS-REG-01: Базовый run в text-режиме', async ({ page }) => {
+    // TODO: Pre-condition — создать проект с 10 файлами + fixture session.
+    //
+    // Steps:
+    //   1. await page.goto(BASE_URL + '#rs');
+    //   2. await page.click('#rs-auto-fill');
+    //   3. const text = await page.inputValue('#rs-text');
+    //   4. expect(text.split('\n').length).toBe(10);
+    //   5. await page.fill('#rs-session-dir', FIXTURE_SESSION);
+    //   6. await page.click('#rs-run-btn-dry');
+    //   7. await page.waitForSelector('.log-dry:nth-of-type(10)');
+    //   8. await page.click('#rs-run-btn');
+    //   9. await page.waitForSelector('#rs-result:not([style*="display: none"])');
+    //
+    // Expected:
+    //   - result text contains "Обновлено: 10"
+    //   - stage_events has new row with trigger_desc='co_sync_done'
+    //   - snapshots has new row
+    //
+    // TODO: QA implements
+    test.fixme(true, 'Not yet implemented');
+  });
+
+  test('RS-REG-02: Dry run не меняет облако и не пишет .bak', async ({ page }) => {
+    // TODO: см. rate-setter-sync-regression.md RS-REG-02
+    test.fixme(true, 'Not yet implemented');
+  });
+
+  test('RS-REG-03: COS round-trip — upload в bucket + photo_versions (F-03)', async ({ page }) => {
+    // Критический test после F-03 merge.
+    //
+    // Pre-condition:
+    //   - photo_versions миграция применена
+    //   - bucket postprod с policies
+    //   - Feature flag enable_cos_sync = true
+    //
+    // Steps:
+    //   1. Run Rate Setter with upload_cos=true.
+    //   2. Wait log "Upload .cos files: 5 (iter 1)".
+    //   3. Wait log "Upload complete: 5 ok, 0 failed".
+    //   4. Query photo_versions via service-role client.
+    //
+    // Expected:
+    //   - 5 rows with stage='color_correction', version_num=1, cos_path !== ''
+    //   - 5 files in Storage postprod
+    //
+    // TODO: QA implements
+    test.fixme(true, 'Not yet implemented (F-03 not merged)');
+  });
+
+  test('RS-REG-04: Повторный run — delta iter 2', async ({ page }) => {
+    // TODO: Pre-condition — RS-REG-03 выполнен.
+    test.fixme(true, 'Not yet implemented');
+  });
+
+  test('RS-REG-05: Ретушёр видит рейтинги через share-link', async ({ browser }) => {
+    // Требует двух контекстов: owner + anon.
+    //
+    // TODO:
+    //   const ownerCtx = await browser.newContext();
+    //   const anonCtx = await browser.newContext();
+    //   ...
+    test.fixme(true, 'Not yet implemented');
+  });
+
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  Edge cases
+// ═══════════════════════════════════════════════════════════════
+
+test.describe('Rate Setter — edge cases', () => {
+
+  test('RS-REG-06: Пустой stems после clean — graceful abort (F-02)', async ({ page }) => {
+    // Steps:
+    //   1. Navigate to #rs.
+    //   2. Fill textarea with dots/empty lines.
+    //   3. Click run.
+    //
+    // Expected:
+    //   - alert dialog "После очистки имён список пустой"
+    //   - no stage_events inserted
+    //
+    // TODO: QA implements
+    test.fixme(true, 'Not yet implemented');
+  });
+
+  test('RS-REG-07: Warning dialog при >50% отсева (F-02)', async ({ page }) => {
+    // TODO: see test-plans/rate-setter-sync-regression.md
+    test.fixme(true, 'Not yet implemented');
+  });
+
+  test('RS-REG-08: Cyrillic photo_name — sanitize (F-04, incident 2026-04-15)', async ({ page }) => {
+    // Воспроизводит [anchor client] cyrillic инцидент.
+    //
+    // Pre-condition:
+    //   - project with 3 files: Солнце_17774.CR3, Солнце_17775.CR3, IMG_0001.CR3
+    //   - fixtures/capture-one-session with matching .cos
+    //
+    // Expected:
+    //   - photo_versions.photo_name contains Cyrillic as-is
+    //   - cos_path is ASCII-only
+    //   - no 400 InvalidKey errors in console
+    //
+    // TODO: QA implements (F-03 + F-04 must be merged first)
+    test.fixme(true, 'Not yet implemented (F-03, F-04 dependency)');
+  });
+
+  test('RS-REG-09: Strip tails edge case (документирование поведения)', async ({ page }) => {
+    // "IMG_0002 copy 2.jpg" → current behavior: MISS (strip_tail не рекурсивный).
+    // Test фиксирует текущее поведение как regression baseline.
+    //
+    // TODO: если потом добавится рекурсивный strip_tail — тест обновить.
+    test.fixme(true, 'Not yet implemented');
+  });
+
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  Error surfacing / resilience
+// ═══════════════════════════════════════════════════════════════
+
+test.describe('Rate Setter — error surfacing (F-01)', () => {
+
+  test('RS-REG-10: Offline run + reconnect flush', async ({ page, context }) => {
+    // Steps:
+    //   1. Run online — baseline работает.
+    //   2. await context.setOffline(true);
+    //   3. Run Rate Setter.
+    //   4. Verify localStorage['maket_pending_stage_events_v1'] has 1 entry.
+    //   5. Verify toast shown: "Событие отложено. Повтор при восстановлении связи."
+    //   6. await context.setOffline(false);
+    //   7. Trigger sbFlushStageQueue() via page.evaluate(() => sbFlushStageQueue()).
+    //   8. Wait 3s.
+    //   9. Verify localStorage queue empty.
+    //   10. Verify stage_events has new row.
+    //
+    // TODO: implement after F-01 merge
+    test.fixme(true, 'Not yet implemented (F-01 dependency)');
+  });
+
+  test('RS-REG-12: Double-click idempotency (3s cooldown)', async ({ page }) => {
+    // TODO:
+    //   await page.evaluate(() => {
+    //     rsSyncCompleted({ updated: 1 });
+    //     rsSyncCompleted({ updated: 1 });  // второй в пределах 3s
+    //   });
+    // Expected: stage_events += 1 (не 2).
+    test.fixme(true, 'Not yet implemented (F-01 dependency)');
+  });
+
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  Concurrency / race conditions
+// ═══════════════════════════════════════════════════════════════
+
+test.describe('Rate Setter — concurrency (F-08)', () => {
+
+  test('RS-REG-11: Concurrent select photo version', async ({ browser }) => {
+    // Два пользователя одновременно вызывают sbSelectPhotoVersion.
+    //
+    // TODO:
+    //   const ownerCtx = await browser.newContext({ storageState: 'qa-owner.json' });
+    //   const memberCtx = await browser.newContext({ storageState: 'qa-client.json' });
+    //   const pA = await ownerCtx.newPage();
+    //   const pB = await memberCtx.newPage();
+    //   ...navigate both...
+    //   await Promise.all([
+    //     pA.evaluate(() => sbSelectPhotoVersion('v1-id', ...)),
+    //     pB.evaluate(() => sbSelectPhotoVersion('v2-id', ...))
+    //   ]);
+    //   // Query DB → exactly one selected=true.
+    //
+    // TODO: implement after F-08 merge
+    test.fixme(true, 'Not yet implemented (F-08 dependency)');
+  });
+
+  test('RS-REG-14: Stale snapshot cache — fresh refresh (F-06)', async ({ page }) => {
+    // TODO: создать 3-й snapshot в БД минуя local cache (service-role), потом delta.
+    test.fixme(true, 'Not yet implemented (F-06 dependency)');
+  });
+
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  Partial failure
+// ═══════════════════════════════════════════════════════════════
+
+test.describe('Rate Setter — partial failure', () => {
+
+  test('RS-REG-13: Interrupted upload не создаёт ложных photo_versions', async ({ page, context }) => {
+    // Steps:
+    //   1. Run Rate Setter на 10 файлах.
+    //   2. После 4-го — context.setOffline(true).
+    //   3. Wait upload end.
+    //   4. Query photo_versions.
+    //
+    // Expected:
+    //   - ≤ 4 rows (not 10).
+    //   - UI log shows "Upload complete: 4 ok, 6 failed".
+    //
+    // TODO: implement after F-03 merge
+    test.fixme(true, 'Not yet implemented (F-03 dependency)');
+  });
+
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  Load / back-pressure
+// ═══════════════════════════════════════════════════════════════
+
+test.describe('Rate Setter — back-pressure', () => {
+
+  test('RS-REG-15: 500 files — polyproject stress', async ({ page }) => {
+    // Нагрузочный тест, длительный (>10 мин). В CI — опциональный job.
+    //
+    // Пометка для QA: расширить timeout до 20 мин.
+    //   test.setTimeout(20 * 60 * 1000);
+    //
+    // TODO: implement с fixture 500-file session.
+    test.fixme(true, 'Not yet implemented');
+  });
+
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  Data integrity (run per release, не per commit)
+// ═══════════════════════════════════════════════════════════════
+
+test.describe('Rate Setter — data integrity (pre-release only)', () => {
+
+  test.skip('DI-01: Нет двух selected=true в одном (project, photo, stage)', async ({ page }) => {
+    // TODO: SELECT ... GROUP BY ... HAVING COUNT(*) > 1;
+    // Expected: 0 rows.
+  });
+
+  test.skip('DI-02: Все cos_path — ASCII', async ({ page }) => {
+    // TODO: SELECT ... WHERE cos_path !~ '^[A-Za-z0-9._/-]+$';
+    // Expected: 0 rows.
+  });
+
+  test.skip('DI-03: stage_events монотонны по created_at', async ({ page }) => {
+    // TODO: LAG(created_at) check.
+  });
+
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  Helpers (TODO: вынести в отдельный helpers/ модуль)
+// ═══════════════════════════════════════════════════════════════
+
+async function loginAsOwner(page: Page, email: string, pwd: string): Promise<void> {
+  // TODO: реализовать через Supabase Auth API (быстрее, чем UI click-through)
+  // или через UI (надёжнее, но медленнее).
+}
+
+async function createTestProject(name: string): Promise<string> {
+  // TODO: вернуть project UUID.
+  return '';
+}
+
+async function queryPhotoVersions(projectId: string): Promise<any[]> {
+  // TODO: использовать service-role ключ.
+  return [];
+}
+
+async function queryStageEvents(projectId: string): Promise<any[]> {
+  // TODO
+  return [];
+}
+
+async function resetLocalStorage(context: BrowserContext): Promise<void> {
+  // TODO: очистить maket_pending_stage_events_v1 и другие queue'и
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Примечания для QA
+// ═══════════════════════════════════════════════════════════════
+
+/*
+  Порядок реализации:
+
+  Wave 1 (после F-01 merge):
+    - RS-REG-01, 02 (baseline)
+    - RS-REG-06, 07 (empty stems)
+    - RS-REG-10, 12 (error surfacing)
+
+  Wave 2 (после F-03 + F-04 + photo_versions migration):
+    - RS-REG-03, 04, 05 (round-trip)
+    - RS-REG-08 (cyrillic)
+    - RS-REG-13 (partial failure)
+
+  Wave 3 (после F-06, F-08):
+    - RS-REG-11 (concurrent select)
+    - RS-REG-14 (snapshot refresh)
+
+  Wave 4 (nightly / weekly only):
+    - RS-REG-15 (load test)
+    - DI-* (data integrity)
+
+  Без этого порядка большинство тестов тривиально падает на недоступных
+  фичах — выглядит как баг QA, а на самом деле просто фича не реализована.
+
+  Playwright config plans (следующая волна PA):
+    - playwright.config.ts: retries=1, timeout=30s по умолчанию, 10 min для load.
+    - Отдельный project "load" для RS-REG-15, запускается только nightly.
+    - GitHub Actions workflow .github/workflows/e2e.yml — запуск на PR + ночной cron.
+*/
