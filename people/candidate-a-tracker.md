@@ -93,7 +93,7 @@ cycle: ongoing
 
 ## Mid-point (неделя 6)
 
-**CoS пишет `/agents/candidate-a-midpoint.md`** — структура:
+**CoS пишет `/people/candidate-a-midpoint.md`** — структура:
 
 ```markdown
 # Candidate A — Mid-point Review (неделя 6)
@@ -128,7 +128,7 @@ cycle: ongoing
 
 ## Decision meeting (неделя 12)
 
-**CoS пишет `/agents/candidate-a-decision.md`** — структура:
+**CoS пишет `/people/candidate-a-decision.md`** — структура:
 
 ```markdown
 # Candidate A — Decision Meeting
@@ -137,8 +137,8 @@ Participants: Masha, CoS
 Duration: 30-60 минут
 
 ## Входные данные
-- `/agents/candidate-a-tracker.md` (6 строк)
-- `/agents/candidate-a-midpoint.md`
+- `/people/candidate-a-tracker.md` (6 строк)
+- `/people/candidate-a-midpoint.md`
 - Наблюдения Маши на weekly check-ins (fit + strategic sense)
 
 ## Сводная оценка
@@ -204,7 +204,7 @@ Exit message: <1 абзац>
 - Решение Маши запустить B параллельно (подходит для скаут-фазы до mid-point A).
 - Или — если A отвалился / не фитит до mid-point — B активируется с двумя вариантами: 6-недельный тест или accelerated 3-недельный test.
 
-Отдельный tracker появится при активации — `/agents/candidate-b-tracker.md`.
+Отдельный tracker появится при активации — `/people/candidate-b-tracker.md`.
 
 ---
 

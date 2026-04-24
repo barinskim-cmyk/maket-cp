@@ -97,7 +97,7 @@ cycle: Q2
 - [ ] **CoS-3.** `/project-log.md` — starter + первая запись 23.04 + первая запись 24.04. W1. Deliverable: ✅ файл создан 2026-04-23.
 - [ ] **CoS-4.** `/ops/automation-rules.md` — T-01..T-07, trigger/action/success/failure/example. W1. Deliverable: ✅ файл создан 2026-04-23.
 - [ ] **CoS-5.** `/ops/release-review-playbook.md` — матрица состава, status card, escalation. W1. Deliverable: ✅ файл создан 2026-04-23.
-- [ ] **CoS-6.** `/agents/candidate-a-tracker.md` — 6 недель × 5 критериев + decision form. W1. Deliverable: ✅ файл создан 2026-04-23.
+- [ ] **CoS-6.** `/people/candidate-a-tracker.md` — 6 недель × 5 критериев + decision form. W1. Deliverable: ✅ файл создан 2026-04-23.
 - [ ] **CoS-7.** Первая встреча кандидата A ([anchor client] pack как задача). W1. Deps: Маша подтверждает время. Deliverable: первая строка в tracker'е.
 - [ ] **CoS-8.** LC kickoff: scope-лист передан (юр-разблокировка ИП, 2 документа + консультация). W1. Deps: —. Deliverable: пометка в `/ops/status.md` или `/project-log.md`.
 - [ ] **CoS-9.** Weekly strategy review с Машей — пятница 15 мин, W1 и W2. Deps: M1. Deliverable: 2 записи в `/project-log.md`.
