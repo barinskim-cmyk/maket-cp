@@ -1,0 +1,367 @@
+// ═══════════════════════════════════════════════════════════════
+//  photo-versions-full.spec.ts.draft — Playwright skeleton
+//
+//  Статус: DRAFT. НЕ ЗАПУСКАТЬ В CI.
+//  Расширение `.draft` — защитный суффикс, чтобы Playwright-runner
+//  его не подхватывал. Для активации:
+//    1. Убедиться, что playwright.config.ts существует.
+//    2. Реализовать TODO-helpers (login, seed, share-link).
+//    3. Переименовать `.draft` → `.spec.ts` (переместить из pending/ в active/).
+//    4. Снять `test.fixme` после merge PA + DAD веток (compare view + DAD визуал).
+//    5. Подогнать селекторы под финальную DAD-вёрстку.
+//
+//  Source of truth:
+//    docs/agents/qa/test-plans/photo-versions-regression.md
+//    docs/agents/dev/photo_versions-migration-proposal.md
+//    docs/agents/dev/compare-view-integration-notes.md
+//    v2/supabase/030_photo_versions.sql
+//    v2/supabase/031_share_link_photo_versions_write.sql
+//
+//  Scenarios: PV-01..PV-10 — соответствуют табличному плану в .md.
+//
+//  Автор skeleton'а: QA lane, retry 2026-04-25.
+// ═══════════════════════════════════════════════════════════════
+
+import { test, expect, devices, type Page, type BrowserContext } from '@playwright/test';
+
+// ───────────────────────────────────────────────────────────────
+//  Конфигурация и фикстуры
+// ───────────────────────────────────────────────────────────────
+
+// TODO(qa): указать реальный URL staging / feature-flagged prod.
+const BASE_URL = process.env.MAKET_BASE_URL || 'http://localhost:5173';
+
+// TODO(qa): переменные окружения с тестовыми кредами (см. tests/e2e/README.md).
+const QA_OWNER_EMAIL        = process.env.QA_OWNER_EMAIL        || 'qa-owner@maket.test';
+const QA_OWNER_PWD          = process.env.QA_OWNER_PWD          || '';
+const QA_MEMBER_EMAIL       = process.env.QA_MEMBER_EMAIL       || 'qa-member@maket.test';
+const QA_MEMBER_PWD         = process.env.QA_MEMBER_PWD         || '';
+const QA_OTHER_OWNER_EMAIL  = process.env.QA_OTHER_OWNER_EMAIL  || 'qa-otherproject-owner@maket.test';
+const QA_OTHER_OWNER_PWD    = process.env.QA_OTHER_OWNER_PWD    || '';
+
+const SUPABASE_URL              = process.env.SUPABASE_URL              || '';
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+
+// TODO(qa): seed SQL. Helpers/seedPhotoVersions.ts наливает fixture
+// «photo-versions-baseline»:
+//   - проект A с owner=qa-owner, member=qa-member, активная share-link
+//   - 3 photo, у каждого 2 версии stage='color_correction' (v1 selected=true, v2 false)
+//   - параллельный проект B (owner=qa-otherproject-owner) для PV-04
+const FIXTURE_SEED_SQL = 'tests/e2e/fixtures/seed-photo-versions.sql';
+
+// Тестовые UUIDs / имена — заполняются seed'ом.
+let TEST_PROJECT_A_ID = '';
+let TEST_PROJECT_B_ID = '';
+let TEST_PHOTO_NAME   = 'IMG_0042.CR3';
+let TEST_SHARE_LINK_ACTIVE   = '';
+let TEST_SHARE_LINK_INACTIVE = '';
+
+// Селекторы compare-view — финализирует DAD. До этого — placeholder data-attrs,
+// PA согласовал чтобы wire-up в `previews.js` использовал именно их.
+const SEL = {
+  lightboxCompareBtn:  '[data-testid="lightbox-compare-btn"]',
+  comparePaneA:        '[data-compare="pane-a"]',
+  comparePaneB:        '[data-compare="pane-b"]',
+  compareSelectBtnA:   '[data-compare="select-button-a"]',
+  compareSelectBtnB:   '[data-compare="select-button-b"]',
+  compareDropdownA:    '[data-compare="dropdown-a"]',
+  compareDropdownB:    '[data-compare="dropdown-b"]',
+  versionSelectV1:     '[data-testid="photo-version-select-v1"]',
+  versionSelectV2:     '[data-testid="photo-version-select-v2"]',
+};
+
+// ───────────────────────────────────────────────────────────────
+//  TODO-helpers (вынести в tests/e2e/helpers/ когда активируется)
+// ───────────────────────────────────────────────────────────────
+
+async function loginAs(page: Page, email: string, pwd: string): Promise<void> {
+  // TODO(qa): реальная логика — заполнить login form, дождаться navigation.
+  void page; void email; void pwd;
+  throw new Error('NOT_IMPLEMENTED: loginAs');
+}
+
+async function seedPhotoVersionsBaseline(): Promise<void> {
+  // TODO(qa): через service-role pg-client прогнать FIXTURE_SEED_SQL,
+  // заполнить TEST_PROJECT_A_ID / TEST_PROJECT_B_ID / share-link UUIDs.
+  throw new Error('NOT_IMPLEMENTED: seedPhotoVersionsBaseline');
+}
+
+async function cleanupTestProjects(): Promise<void> {
+  // TODO(qa): DELETE FROM projects WHERE id IN (...); cascade убирает photo_versions.
+  throw new Error('NOT_IMPLEMENTED: cleanupTestProjects');
+}
+
+async function openPhoto(page: Page, photoName: string): Promise<void> {
+  // TODO(qa): кликнуть photo по data-testid="photo-tile-<name>", дождаться lightbox.
+  void page; void photoName;
+  throw new Error('NOT_IMPLEMENTED: openPhoto');
+}
+
+async function enableCompareViewFlag(page: Page): Promise<void> {
+  await page.evaluate(() => localStorage.setItem('DEBUG_COMPARE_VIEW', '1'));
+  await page.reload();
+}
+
+async function disableCompareViewFlag(page: Page): Promise<void> {
+  await page.evaluate(() => localStorage.removeItem('DEBUG_COMPARE_VIEW'));
+  await page.reload();
+}
+
+async function execServiceRoleSql<T = unknown>(sql: string): Promise<T> {
+  // TODO(qa): pg-client через SUPABASE_SERVICE_ROLE_KEY.
+  void sql;
+  throw new Error('NOT_IMPLEMENTED: execServiceRoleSql');
+}
+
+// ───────────────────────────────────────────────────────────────
+//  Setup / teardown
+// ───────────────────────────────────────────────────────────────
+
+test.beforeEach(async () => {
+  // TODO: seed fixture перед каждым тестом, чтобы тесты были независимы.
+  // await seedPhotoVersionsBaseline();
+});
+
+test.afterEach(async () => {
+  // TODO: cleanup тестовых projects (cascade убирает photo_versions).
+  // await cleanupTestProjects();
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  Regression — photo_versions (миграции 030 + 031)
+// ═══════════════════════════════════════════════════════════════
+
+test.describe('photo_versions — regression', () => {
+
+  test('PV-01: Select toggle (owner)', async ({ page }) => {
+    // План: docs/agents/qa/test-plans/photo-versions-regression.md → PV-01.
+    //
+    // Steps:
+    //   1. loginAs(page, QA_OWNER_EMAIL, QA_OWNER_PWD)
+    //   2. openProject + openPhoto(page, TEST_PHOTO_NAME)
+    //   3. const [resp] = await Promise.all([
+    //        page.waitForResponse(r => r.url().includes('/photo_versions') && r.request().method() === 'PATCH'),
+    //        page.click(SEL.versionSelectV2),
+    //      ]);
+    //   4. expect(resp.status()).toBe(204);
+    //   5. const rows = await execServiceRoleSql(`SELECT id, version_num, selected
+    //         FROM photo_versions
+    //        WHERE project_id='${TEST_PROJECT_A_ID}' AND photo_name='${TEST_PHOTO_NAME}'
+    //          AND stage='color_correction' ORDER BY version_num;`);
+    //   6. expect rows: v1.selected=false, v2.selected=true. Ровно одна selected=true.
+    //
+    // TODO: QA implements (Wave 1).
+    test.fixme(true, 'Not yet implemented — Wave 1');
+    void page;
+  });
+
+  test('PV-02: Share-link guest UPDATE (post-031 fix)', async ({ browser }) => {
+    // План: PV-02. Regression-якорь для migration 031 (2026-04-24).
+    // Если упал — немедленно CoS по T-01.
+    //
+    // Steps:
+    //   1. const anonCtx = await browser.newContext();
+    //   2. const anonPage = await anonCtx.newPage();
+    //   3. await anonPage.goto(TEST_SHARE_LINK_ACTIVE);
+    //   4. await openPhoto(anonPage, TEST_PHOTO_NAME);
+    //   5. const [resp] = await Promise.all([
+    //        anonPage.waitForResponse(r => r.url().includes('/photo_versions') && r.request().method() === 'PATCH'),
+    //        anonPage.click(SEL.versionSelectV2),
+    //      ]);
+    //   6. expect(resp.ok()).toBeTruthy(); // до 031 было 403
+    //   7. Проверить service-role: v2.selected=true, v1.selected=false.
+    //
+    // Дополнительно — попытка с TEST_SHARE_LINK_INACTIVE:
+    //   8. anonPage.goto(TEST_SHARE_LINK_INACTIVE) → UPDATE отвергается
+    //      (get_shared_project_ids фильтрует по is_active=true AND expires_at > now()).
+    //
+    // TODO: QA implements (Wave 1, priority critical).
+    test.fixme(true, 'Not yet implemented — Wave 1 (regression-якорь 031)');
+    void browser;
+  });
+
+  test('PV-03: Unique constraint (project_id, photo_name, stage, version_num)', async () => {
+    // План: PV-03.
+    //
+    // Steps:
+    //   1. Service-role INSERT с тем же ключом и другим preview_path:
+    //        INSERT INTO photo_versions (project_id, photo_name, stage, version_num,
+    //                                    preview_path, cos_path, selected)
+    //        VALUES ('<A>','<photo>','color_correction',1,'dup/preview','dup/cos',false);
+    //      Ожидание: ошибка 23505, имя constraint:
+    //        photo_versions_project_id_photo_name_stage_version_num_key
+    //   2. Через supabase-js upsert с onConflict='project_id,photo_name,stage,version_num'
+    //      — success, существующая строка обновлена. count(*) по ключам = 1.
+    //
+    // TODO: QA implements (Wave 1, через service-role pg-client).
+    test.fixme(true, 'Not yet implemented — Wave 1');
+  });
+
+  test('PV-04: RLS boundary — чужой проект', async ({ browser }) => {
+    // План: PV-04.
+    //
+    // Steps:
+    //   1. anonCtx подключается к share-link проекта A.
+    //   2. В devtools: const r = await supa.from('photo_versions')
+    //                                      .select('*').eq('project_id', TEST_PROJECT_B_ID);
+    //      expect(r.data).toEqual([]); // RLS фильтрует
+    //   3. const u = await supa.from('photo_versions')
+    //                          .update({ selected: true })
+    //                          .eq('id', '<v-from-B>');
+    //      expect(u.data ?? []).toEqual([]); // 0 affected
+    //   4. Service-role: состояние photo_versions проекта B без изменений.
+    //
+    // TODO: QA implements (Wave 1).
+    test.fixme(true, 'Not yet implemented — Wave 1');
+    void browser;
+  });
+
+  test('PV-05: Cascade delete при удалении проекта', async () => {
+    // План: PV-05.
+    //
+    // Steps:
+    //   1. Service-role: count(*) photo_versions WHERE project_id=A → 15 (5 photo × 3 версии).
+    //   2. DELETE FROM projects WHERE id='<A>';
+    //   3. count(*) → 0 (ON DELETE CASCADE).
+    //   4. Storage: count объектов в postprod/<A>/% — фиксируем как known gap
+    //      (cleanup отдельным storage-job, OQ-QA-05).
+    //
+    // TODO: QA implements (Wave 1).
+    test.fixme(true, 'Not yet implemented — Wave 1');
+  });
+
+  test('PV-06: Realtime subscribe на UPDATE', async ({ browser }) => {
+    // План: PV-06.
+    //
+    // Steps:
+    //   1. ctxA: loginAs(QA_OWNER), openPhoto.
+    //   2. ctxB: loginAs(QA_MEMBER), openPhoto, тот же project A.
+    //   3. ctxB подписывается: ожидаем `realtime.channel('photo_versions_<A>')`
+    //      (auto при openPhoto через previews.js).
+    //   4. На ctxA: click SEL.versionSelectV2.
+    //   5. На ctxB: ждём `page.waitForFunction()` пока UI не покажет v2 selected.
+    //   6. Замер latency → expect < 3000ms.
+    //
+    // TODO: QA implements (Wave 1, multi-context).
+    test.fixme(true, 'Not yet implemented — Wave 1');
+    void browser;
+  });
+
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  Compare view (зависит от merge PA + DAD)
+// ═══════════════════════════════════════════════════════════════
+
+test.describe('compare view — feature flag + UX', () => {
+
+  test('PV-07: Compare view toggle через feature flag', async ({ page }) => {
+    // План: PV-07.
+    //
+    // Steps:
+    //   1. loginAs(page, QA_OWNER), openPhoto.
+    //   2. expect(page.locator(SEL.lightboxCompareBtn)).toHaveCount(0); // флаг off
+    //   3. await enableCompareViewFlag(page);
+    //   4. await openPhoto(page, TEST_PHOTO_NAME);
+    //      expect(page.locator(SEL.lightboxCompareBtn)).toBeVisible();
+    //   5. await disableCompareViewFlag(page);
+    //   6. await openPhoto(page, TEST_PHOTO_NAME);
+    //      expect(page.locator(SEL.lightboxCompareBtn)).toHaveCount(0);
+    //   7. expect(consoleErrors).toEqual([]); // hook'ом из beforeEach.
+    //
+    // TODO: QA implements (Wave 2, после merge PA-ветки compare view).
+    test.fixme(true, 'Not yet implemented — Wave 2 (после merge compare view)');
+    void page;
+  });
+
+  test('PV-08: Compare select — UPDATE + распространение в галерею', async ({ page }) => {
+    // План: PV-08.
+    //
+    // Steps:
+    //   1. loginAs(page, QA_OWNER); enableCompareViewFlag(page).
+    //   2. await page.goto(`${BASE_URL}/compare-view.html?project_id=${TEST_PROJECT_A_ID}&photo_name=${TEST_PHOTO_NAME}`);
+    //   3. expect(SEL.comparePaneA + ' .selected-badge').toBeVisible();
+    //   4. await page.locator(SEL.compareDropdownB).selectOption({ label: 'v2 — color_correction' });
+    //   5. const [resp] = await Promise.all([
+    //        page.waitForResponse(r => r.url().includes('/photo_versions') && r.request().method() === 'PATCH'),
+    //        page.click(SEL.compareSelectBtnB),
+    //      ]);
+    //   6. expect(resp.ok()).toBeTruthy();
+    //   7. await page.goBack(); // или закрыть compare-tab
+    //      expect preview-panel показывает v2 selected без F5.
+    //   8. Service-role SQL: v2.selected=true, v1.selected=false.
+    //
+    // TODO: QA implements (Wave 2).
+    test.fixme(true, 'Not yet implemented — Wave 2');
+    void page;
+  });
+
+  test('PV-09: Mobile — compare-view не вшит, lightbox жив', async ({ browser }) => {
+    // План: PV-09 (smoke).
+    //
+    // Steps:
+    //   1. const ctx = await browser.newContext({ ...devices['iPhone 13'] });
+    //   2. const page = await ctx.newPage();
+    //   3. loginAs, openPhoto. Mobile lightbox _pvLbOpenMobile — без compare-кнопки.
+    //   4. enableCompareViewFlag(page); reload; openPhoto. Кнопки всё равно нет
+    //      (PA сознательно не вшил в _pvLbOpenMobile).
+    //   5. Direct goto compare-view.html на mobile viewport.
+    //      Скриншот, проверка отсутствия overflow-x:
+    //        const overflowX = await page.evaluate(
+    //          () => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    //        expect(overflowX).toBeLessThanOrEqual(1);
+    //
+    // TODO: QA implements (Wave 3, smoke до 7 мая).
+    test.fixme(true, 'Not yet implemented — Wave 3 (mobile smoke до 7 мая)');
+    void browser;
+    void devices;
+  });
+
+  test('PV-10: Feature flag OFF — full fallback', async ({ page, browser }) => {
+    // План: PV-10.
+    //
+    // Steps:
+    //   1. Чистый localStorage (флаг off, дефолт).
+    //   2. loginAs(page, QA_OWNER). Открыть проект, photo, panel ЦК.
+    //   3. Выбрать ЦК-версию через существующий UI (panel ЦК / Rate Setter).
+    //      expect: photo_versions UPDATE прошёл штатно.
+    //   4. anonCtx через share-link: выбор кадра тоже работает.
+    //   5. await page.goto(`${BASE_URL}/compare-view.html?project_id=...&photo_name=...`);
+    //      expect(page.locator('[data-compare="not-enabled"]')).toBeVisible();
+    //   6. Console errors через page.on('pageerror') — collected = []; expect 0.
+    //      Любая JS-ошибка = блок релиза 7 мая.
+    //
+    // TODO: QA implements (Wave 2, перед 7 мая).
+    test.fixme(true, 'Not yet implemented — Wave 2 (страховка перед 7 мая)');
+    void page;
+    void browser;
+  });
+
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  Соответствие сценариев плану
+//
+//  PV-01 select toggle (owner)                                — describe regression
+//  PV-02 share-link guest UPDATE (post-031 fix)               — describe regression
+//  PV-03 unique constraint                                    — describe regression
+//  PV-04 RLS boundary (чужой проект)                          — describe regression
+//  PV-05 cascade delete                                       — describe regression
+//  PV-06 realtime subscribe                                   — describe regression
+//  PV-07 compare view toggle через feature flag               — describe compare view
+//  PV-08 compare select (UPDATE + распространение)            — describe compare view
+//  PV-09 mobile (compare-view не вшит, lightbox жив)          — describe compare view
+//  PV-10 feature flag OFF (full fallback)                     — describe compare view
+//
+//  Покрытие из брифа: select toggle, share-link guest UPDATE,
+//  unique constraint, RLS boundary, cascade delete, realtime,
+//  compare toggle, compare select, mobile, feature-flag-off.
+// ═══════════════════════════════════════════════════════════════
+
+// expect используется в комментариях steps, импорт оставлен сознательно для
+// активации после снятия test.fixme.
+void expect;
+
+// Type-only references (BrowserContext) — оставлены в импортах для будущей
+// типизации helpers'ов.
+type _UnusedBrowserContext = BrowserContext;
