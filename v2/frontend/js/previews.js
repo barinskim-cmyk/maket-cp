@@ -2033,6 +2033,26 @@ function _pvLbOpenDesktop() {
     }
   } catch (e) { /* не блокируем лайтбокс из-за compare-view */ }
 
+  /* Phase 3.4: кнопка «Путь фото» — открывает per-photo digital twin modal.
+     Видна всегда (когда есть имя фото) — не зависит от feature-flag'ов. */
+  try {
+    if (pv && pv.name && typeof shShowPhotoHistory === 'function') {
+      var histBtn = document.createElement('button');
+      histBtn.className = 'cp-fullscreen-close';
+      /* Сдвигаем влево если уже есть «Сравнить версии» (right:72px),
+         иначе ставим на её место. */
+      var hasCmp = !!(typeof _compareViewEnabled === 'function' && _compareViewEnabled());
+      histBtn.style.cssText = 'top:16px;right:' + (hasCmp ? '210px' : '72px') +
+        ';width:auto;padding:0 12px;font-size:13px;';
+      histBtn.textContent = 'Путь фото';
+      histBtn.onclick = function(ev) {
+        ev.stopPropagation();
+        shShowPhotoHistory(pv.name);
+      };
+      overlay.appendChild(histBtn);
+    }
+  } catch (e) { /* не блокируем лайтбокс из-за per-photo history */ }
+
   document.body.appendChild(overlay);
 
   /* Всё что зависит от getElementById или getBoundingClientRect —

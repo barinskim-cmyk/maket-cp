@@ -1254,6 +1254,143 @@ function shShowDetailedPipeline() {
 }
 
 /**
+ * Phase 3.4: per-photo digital twin.
+ * Открыть модалку с историей конкретного фото — список checkpoints,
+ * в которых это фото фигурировало (cp.photos.includes(name)).
+ * Тот же timeline-формат что и shShowDetailedPipeline, но фильтрованный.
+ *
+ * @param {string} photoName — имя файла, например 'prv_042.jpg'
+ */
+function shShowPhotoHistory(photoName) {
+  if (!photoName) return;
+  var proj = getActiveProject();
+  if (!proj) return;
+
+  var allCheckpoints = proj._checkpoints || [];
+
+  /* Фильтр: только те checkpoints, где фото в photos[] */
+  var related = [];
+  for (var i = 0; i < allCheckpoints.length; i++) {
+    var cp = allCheckpoints[i];
+    var photos = cp.photos || [];
+    for (var j = 0; j < photos.length; j++) {
+      if (photos[j] === photoName) { related.push(cp); break; }
+    }
+  }
+
+  /* Sort по ts asc */
+  related.sort(function(a, b) {
+    var ta = new Date(a.ts || a.date || 0).getTime();
+    var tb = new Date(b.ts || b.date || 0).getTime();
+    return ta - tb;
+  });
+
+  var html = '<div class="sh-photo-history">';
+  html += '<h3 style="margin:0 0 4px 0;font-size:15px">Путь фото</h3>';
+  html += '<div style="font-size:12px;color:#888;margin-bottom:14px;font-family:monospace;word-break:break-all">' + esc(photoName) + '</div>';
+
+  if (related.length === 0) {
+    html += '<div style="color:#888;font-size:13px;padding:12px 0">';
+    html += 'Это фото пока не зафиксировано ни в одной контрольной точке.';
+    html += '</div>';
+  } else {
+    for (var ri = 0; ri < related.length; ri++) {
+      var cp2 = related[ri];
+      var icon = _shCpTriggerIcon(cp2.trigger);
+      var label = _shCpTriggerLabel(cp2.trigger);
+      var dateStr = _shCpFormatDate(cp2.ts || cp2.date);
+      var photoCount = (cp2.photos && cp2.photos.length) || cp2.count || 0;
+      var approver = cp2.approved_by_name || cp2.by_name || cp2.approver || '';
+      var note = cp2.note || cp2.notes || '';
+
+      var sFrom = (cp2.stage_from === undefined) ? cp2._stage_from : cp2.stage_from;
+      var sTo   = (cp2.stage_to   === undefined) ? cp2._stage_to   : cp2.stage_to;
+      if (sFrom === undefined) sFrom = null;
+      if (sTo   === undefined) sTo   = null;
+
+      var stagePart = '';
+      if (sFrom !== null && sTo !== null) {
+        if (sFrom === sTo) {
+          stagePart = '<span style="color:#888">в </span>' + esc(_shCpStageName(sTo));
+        } else {
+          stagePart = esc(_shCpStageName(sFrom)) + ' <span style="color:#aaa">→</span> ' + esc(_shCpStageName(sTo));
+        }
+      } else if (sTo !== null) {
+        stagePart = '<span style="color:#aaa">→</span> ' + esc(_shCpStageName(sTo));
+      } else if (sFrom !== null) {
+        stagePart = esc(_shCpStageName(sFrom)) + ' <span style="color:#aaa">→</span>';
+      }
+
+      html += '<div style="display:flex;gap:10px;position:relative;min-height:44px">';
+
+      html += '<div style="display:flex;flex-direction:column;align-items:center;width:24px;flex-shrink:0">';
+      if (ri > 0) {
+        html += '<div style="width:2px;height:8px;background:#e0e0e0"></div>';
+      } else {
+        html += '<div style="height:8px"></div>';
+      }
+      html += '<div style="width:22px;height:22px;border-radius:50%;background:#fff;border:1.5px solid #ccc;display:flex;align-items:center;justify-content:center;font-size:12px;line-height:1;flex-shrink:0">';
+      html += icon;
+      html += '</div>';
+      if (ri < related.length - 1) {
+        html += '<div style="width:2px;flex:1;background:#e0e0e0"></div>';
+      }
+      html += '</div>';
+
+      html += '<div style="flex:1;padding-bottom:10px">';
+
+      html += '<div style="font-size:13px;font-weight:500;color:#333;line-height:1.35">';
+      html += esc(label);
+      if (stagePart) html += ' <span style="color:#aaa">·</span> ' + stagePart;
+      html += '</div>';
+
+      html += '<div style="font-size:11px;color:#888;margin-top:3px">';
+      html += esc(dateStr);
+      if (approver) html += ' <span style="color:#bbb">·</span> ' + esc(approver);
+      if (photoCount) html += ' <span style="color:#bbb">·</span> группа ' + photoCount + ' фото';
+      html += '</div>';
+
+      if (note) {
+        html += '<div style="font-size:11px;color:#666;margin-top:3px;font-style:italic">';
+        html += '«' + esc(note) + '»';
+        html += '</div>';
+      }
+
+      html += '</div>'; /* /flex:1 */
+      html += '</div>'; /* /row */
+    }
+
+    html += '<div style="margin-top:10px;padding-top:8px;border-top:1px solid #eee;font-size:11px;color:#888">';
+    html += related.length + ' контрольных точек';
+    html += '</div>';
+  }
+
+  html += '</div>';
+
+  /* Динамическая модалка (свой ID, отдельно от группового детального пайплайна) */
+  var overlay = document.getElementById('sh-photo-history-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'sh-photo-history-overlay';
+    overlay.className = 'modal-overlay';
+    overlay.style.zIndex = '10050'; /* выше lightbox'а */
+    overlay.innerHTML = '<div class="modal" style="max-width:480px;padding:22px;max-height:80vh;overflow-y:auto;position:relative">' +
+      '<button id="sh-photo-history-close" style="position:absolute;top:8px;right:8px;background:transparent;border:none;font-size:22px;line-height:1;cursor:pointer;color:#888;padding:4px 10px">&times;</button>' +
+      '<div class="sh-photo-history-body"></div>' +
+      '</div>';
+    overlay.addEventListener('click', function(e) {
+      if (e.target === overlay) overlay.classList.remove('open');
+    });
+    document.body.appendChild(overlay);
+    document.getElementById('sh-photo-history-close').addEventListener('click', function() {
+      overlay.classList.remove('open');
+    });
+  }
+  overlay.querySelector('.sh-photo-history-body').innerHTML = html;
+  overlay.classList.add('open');
+}
+
+/**
  * Рендерить ячейку ветки комментирования для данного этапа пайплайна.
  * Встраивается прямо внутрь pipeline-step для идеальной синхронизации высот.
  *
