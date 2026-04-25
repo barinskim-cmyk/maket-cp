@@ -752,6 +752,7 @@ function shSelectedCount(proj) {
  *             clientStageIndex: number, passedPreselect: number }}
  */
 function shCumulativeMetrics(proj, photoCounts) {
+  if (!photoCounts) photoCounts = shPhotosPerStage(proj);
   var potential = proj.previews ? proj.previews.length : 0;
   var cumulative = [];
   /* Для каждого этапа i: прошли = сумма фото на всех этапах ПОСЛЕ i */

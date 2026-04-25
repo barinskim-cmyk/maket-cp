@@ -3075,8 +3075,11 @@ function _sbLoadAndAttachVersions(cloudId, proj, pvByName, done) {
   if (!sbClient) { done(); return; }
 
   sbClient.from('photo_versions')
-    .select('photo_name, stage, preview_path')
+    .select('photo_name, stage, preview_path, version_num, selected, cos_path, retouch_path, created_at, created_by')
     .eq('project_id', cloudId)
+    .order('photo_name', { ascending: true })
+    .order('stage', { ascending: true })
+    .order('version_num', { ascending: true })
     .then(function(res) {
       if (res.error || !res.data || res.data.length === 0) {
         done();
@@ -3086,19 +3089,69 @@ function _sbLoadAndAttachVersions(cloudId, proj, pvByName, done) {
       var rows = res.data;
       console.log('sbVersions: загружено ' + rows.length + ' версий');
 
+      /* Группируем по photo_name + stage. По одному фото на одной стадии может
+         быть несколько версий (compare-view сценарий: v1, v2, v3 для color). */
+      var groups = {};
       for (var i = 0; i < rows.length; i++) {
         var r = rows[i];
-        var pv = pvByName[r.photo_name];
-        if (!pv) continue;
-        if (!pv.versions) pv.versions = {};
-        /* Не перезаписывать если уже есть (из IndexedDB) */
-        if (!pv.versions[r.stage]) {
-          pv.versions[r.stage] = {
-            thumb: r.preview_path || '',
-            preview: r.preview_path || ''
-          };
-        }
+        var key = r.photo_name + '\x00' + r.stage;
+        if (!groups[key]) groups[key] = { name: r.photo_name, stage: r.stage, rows: [] };
+        groups[key].rows.push(r);
       }
+
+      Object.keys(groups).forEach(function(key) {
+        var g = groups[key];
+        var pv = pvByName[g.name];
+        if (!pv) return;
+        if (!pv.versions) pv.versions = {};
+
+        /* variants[] — все версии этого фото на этой стадии (для compare-view,
+           digital twin, истории). Сохраняем порядок загрузки (по version_num). */
+        var variants = g.rows.map(function(r) {
+          return {
+            version_num: r.version_num,
+            thumb: r.preview_path || '',
+            preview: r.preview_path || '',
+            path: r.preview_path || '',
+            selected: !!r.selected,
+            cos_path: r.cos_path || null,
+            retouch_path: r.retouch_path || null,
+            created_at: r.created_at || null,
+            created_by: r.created_by || null
+          };
+        });
+
+        /* Primary version: 1) selected, 2) последняя по version_num, 3) первая. */
+        var primary = null;
+        for (var k = 0; k < variants.length; k++) {
+          if (variants[k].selected) { primary = variants[k]; break; }
+        }
+        if (!primary) primary = variants[variants.length - 1] || variants[0];
+
+        /* Адаптер для legacy consumers (pvHasVersion / pvGetThumb / etc.):
+           pv.versions[stage] остаётся одиночным объектом — primary версия.
+           Полный список доступен через pv.versions[stage].variants[]. */
+        if (!pv.versions[g.stage]) {
+          pv.versions[g.stage] = {
+            thumb: primary.thumb,
+            preview: primary.preview,
+            path: primary.path,
+            version_num: primary.version_num,
+            selected: primary.selected,
+            cos_path: primary.cos_path,
+            retouch_path: primary.retouch_path,
+            created_at: primary.created_at,
+            created_by: primary.created_by,
+            variants: variants
+          };
+        } else {
+          /* Уже было заполнено из IndexedDB — добавим variants для compare-view */
+          pv.versions[g.stage].variants = variants;
+          if (!pv.versions[g.stage].version_num && primary.version_num) {
+            pv.versions[g.stage].version_num = primary.version_num;
+          }
+        }
+      });
 
       done();
     })['catch'](function(err) {
