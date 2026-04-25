@@ -141,3 +141,30 @@ team-used кейс, client-not-done кейс — см. секцию Tests ниж
   3 без фильтрации по «selected». Требует отдельной задачи для частичного
   advance.
 - `pipeline_backlog.md` — концепция «потенциал vs масштаб».
+
+---
+
+## v3 fix — `shSelectedCount` теперь считает все контейнеры
+
+**Дата:** 2026-04-25
+**Триггер:** Маша после v2 заметила что счётчик отбора занижен — pipeline показывал 134 (только из карточек), но в проекте есть ещё доп.контент (контейнеры + свободные фото).
+
+**Что изменено:**
+`v2/frontend/js/shootings.js:702` — `shSelectedCount(proj)` теперь суммирует unique имена файлов из ТРЁХ источников (как `acGetAllContent()` в `previews.js:3473`):
+1. `proj.cards[].slots[].file` — фото в карточках товара
+2. `proj.ocContainers[].items[].name` — контейнеры доп.контента
+3. `proj.otherContent[].name` — свободные фото доп.контента
+
+Дедупликация по имени файла через `seen[name]`.
+
+**Verified node-харнесом:**
+- cards only (2 unique из 3 records): 2 ✓
+- containers only (2): 2 ✓
+- otherContent only (2): 2 ✓
+- mix all 3 with overlap (a/b в карточках, b/c в контейнерах, c/d в otherContent): 4 (a,b,c,d) ✓
+- null/empty: 0 ✓
+
+**Что Маше проверить:**
+1. На странице «Отбор» счётчик «N фото» должен совпадать с pipeline «Отбор клиента: N/превью».
+2. Проект только с карточками — без regression.
+3. Проект с контейнерами доп.контента — pipeline теперь учитывает их.

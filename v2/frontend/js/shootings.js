@@ -700,16 +700,37 @@ function shPhotosPerStage(proj) {
  * @returns {number}
  */
 function shSelectedCount(proj) {
-  if (!proj || !proj.cards) return 0;
+  if (!proj) return 0;
   var seen = {};
   var n = 0;
-  for (var c = 0; c < proj.cards.length; c++) {
-    var slots = (proj.cards[c] && proj.cards[c].slots) || [];
+
+  // 1. Фото в карточках товара
+  var cards = proj.cards || [];
+  for (var c = 0; c < cards.length; c++) {
+    var slots = (cards[c] && cards[c].slots) || [];
     for (var s = 0; s < slots.length; s++) {
       var f = slots[s] && slots[s].file;
       if (f && !seen[f]) { seen[f] = true; n++; }
     }
   }
+
+  // 2. Контейнеры доп.контента
+  var ocCnt = proj.ocContainers || [];
+  for (var ci = 0; ci < ocCnt.length; ci++) {
+    var items = (ocCnt[ci] && ocCnt[ci].items) || [];
+    for (var cj = 0; cj < items.length; cj++) {
+      var name = items[cj] && items[cj].name;
+      if (name && !seen[name]) { seen[name] = true; n++; }
+    }
+  }
+
+  // 3. Свободные фото в доп.контенте
+  var oc = proj.otherContent || [];
+  for (var i = 0; i < oc.length; i++) {
+    var nm = oc[i] && oc[i].name;
+    if (nm && !seen[nm]) { seen[nm] = true; n++; }
+  }
+
   return n;
 }
 
