@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Compare View — Mockup (DAD retry)</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Inter", "Helvetica Neue", Arial, sans-serif;
+    background: #0F0F10;
+    color: #F3F3F3;
+    font-size: 14px;
+    line-height: 1.4;
+    padding: 24px;
+  }
+  .section-label {
+    max-width: 1280px;
+    margin: 0 auto 12px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #6E6E72;
+  }
+
+  /* === Shell === */
+  .compare-shell {
+    max-width: 1280px;
+    margin: 0 auto 32px;
+    background: #0F0F10;
+    border: 1px solid #2A2A2D;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .compare-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    background: #1F1F21;
+    border-bottom: 1px solid #2A2A2D;
+  }
+  .iconbtn {
+    background: transparent;
+    border: 1px solid #2A2A2D;
+    color: #F3F3F3;
+    padding: 6px 12px;
+    font: inherit;
+    cursor: pointer;
+    border-radius: 4px;
+  }
+  .iconbtn:hover { border-color: #6E6E72; }
+  .compare-title {
+    font-weight: 500;
+    font-size: 14px;
+    color: #F3F3F3;
+  }
+  .compare-title small {
+    color: #9B9B9E;
+    margin-left: 6px;
+  }
+
+  /* === Sides === */
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    padding: 24px;
+    background: #0F0F10;
+  }
+  .compare-side {
+    background: #1A1A1A;
+    border: 1px solid #2A2A2D;
+    border-radius: 6px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .compare-side.is-selected {
+    border-color: #FFFFFF;
+    border-width: 2px;
+    padding: 15px;
+  }
+  .side-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .stage-badge {
+    background: #F3F3F3;
+    color: #0F0F10;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    padding: 3px 8px;
+    border-radius: 3px;
+  }
+  .meta-text {
+    font-size: 12px;
+    color: #9B9B9E;
+  }
+  .photo-wrap {
+    background: #1A1A1A;
+    aspect-ratio: 4 / 5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6E6E72;
+    font-size: 12px;
+    overflow: hidden;
+    border: 1px solid #2A2A2D;
+  }
+  .photo-a {
+    background:
+      repeating-linear-gradient(45deg, #2A2A2D 0 8px, #1F1F21 8px 16px);
+  }
+  .photo-b {
+    background:
+      repeating-linear-gradient(135deg, #2A2A2D 0 8px, #141416 8px 16px);
+  }
+  .photo-label {
+    background: rgba(15,15,16,0.85);
+    padding: 4px 8px;
+    border: 1px solid #2A2A2D;
+    border-radius: 3px;
+    color: #9B9B9E;
+  }
+
+  /* === Side controls === */
+  .side-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .version-select {
+    flex: 1;
+    border: 1px solid #2A2A2D;
+    background: #141416;
+    color: #F3F3F3;
+    padding: 8px 28px 8px 10px;
+    font: inherit;
+    cursor: pointer;
+    appearance: none;
+    border-radius: 4px;
+    background-image: linear-gradient(45deg, transparent 50%, #F3F3F3 50%),
+                      linear-gradient(135deg, #F3F3F3 50%, transparent 50%);
+    background-position: calc(100% - 14px) center, calc(100% - 9px) center;
+    background-size: 5px 5px;
+    background-repeat: no-repeat;
+  }
+  .version-select:focus {
+    outline: 2px solid #6E6E72;
+    outline-offset: 1px;
+  }
+
+  .selected-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+    padding: 8px 14px;
+    border: 1px solid #2A2A2D;
+    background: transparent;
+    color: #F3F3F3;
+    border-radius: 4px;
+    font: inherit;
+  }
+  .selected-toggle.is-on {
+    background: #FFFFFF;
+    color: #0F0F10;
+    border-color: #FFFFFF;
+    cursor: default;
+  }
+  .toggle-dot {
+    width: 14px;
+    height: 14px;
+    border: 2px solid #6E6E72;
+    border-radius: 50%;
+    background: transparent;
+    display: inline-block;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .selected-toggle.is-on .toggle-dot {
+    background: #0F0F10;
+    border-color: #0F0F10;
+  }
+  .selected-toggle.is-on .toggle-dot::after {
+    content: "";
+    position: absolute;
+    inset: 3px;
+    background: #FFFFFF;
+    border-radius: 50%;
+  }
+
+  /* === Bottom bar / comment === */
+  .compare-bottombar {
+    display: flex;
+    gap: 12px;
+    padding: 16px 24px;
+    border-top: 1px solid #2A2A2D;
+    background: #1F1F21;
+    align-items: center;
+  }
+  .comment-input {
+    flex: 1;
+    border: 1px solid #2A2A2D;
+    padding: 10px 12px;
+    font: inherit;
+    color: #F3F3F3;
+    background: #141416;
+    border-radius: 4px;
+  }
+  .comment-input::placeholder { color: #6E6E72; }
+  .comment-input:focus {
+    outline: 2px solid #6E6E72;
+    outline-offset: -2px;
+  }
+  .save-btn {
+    background: #FFFFFF;
+    color: #0F0F10;
+    border: none;
+    padding: 10px 18px;
+    font: inherit;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: 4px;
+  }
+  .save-btn:hover { background: #E5E5E5; }
+  .hint {
+    font-size: 11px;
+    color: #6E6E72;
+    padding: 0 24px 14px;
+  }
+
+  /* === Mobile preview === */
+  .mobile-preview {
+    margin: 0 auto 32px;
+    max-width: 360px;
+    background: #0F0F10;
+    border: 1px solid #2A2A2D;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .mobile-preview .compare-grid {
+    grid-template-columns: 1fr;
+    padding: 16px;
+    gap: 0;
+  }
+  .swipe-dots {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    padding: 12px 0 4px;
+    background: #0F0F10;
+  }
+  .swipe-dots span {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #2A2A2D;
+    display: inline-block;
+  }
+  .swipe-dots span.active { background: #F3F3F3; }
+</style>
+</head>
+<body>
+
+  <div class="section-label">Desktop · slot A selected</div>
+
+  <div class="compare-shell">
+    <div class="compare-topbar">
+      <button class="iconbtn">Назад</button>
+      <div class="compare-title">Сравнение версий <small>— EKONIKA / SS26 / IMG_0421.jpg</small></div>
+      <button class="iconbtn">Закрыть</button>
+    </div>
+
+    <div class="compare-grid">
+      <!-- Slot A (selected) -->
+      <div class="compare-side is-selected" aria-label="Версия A">
+        <div class="side-meta">
+          <span class="stage-badge">RETOUCH · v3</span>
+          <span class="meta-text">24.04.2026, 15:22 · anna@studio.com</span>
+        </div>
+        <div class="photo-wrap photo-a"><span class="photo-label">фото A</span></div>
+        <div class="side-controls">
+          <select class="version-select" aria-label="Какую версию показать">
+            <option>RETOUCH #3 — 24.04.2026 (показана сейчас)</option>
+            <option>RETOUCH #2 — 22.04.2026</option>
+            <option>RETOUCH #1 — 20.04.2026</option>
+            <option>CC #1 — 18.04.2026</option>
+          </select>
+          <button class="selected-toggle is-on">
+            <span class="toggle-dot"></span>
+            <span>Выбрана</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Slot B -->
+      <div class="compare-side" aria-label="Версия B">
+        <div class="side-meta">
+          <span class="stage-badge">GRADING · v1</span>
+          <span class="meta-text">25.04.2026, 11:08 · masha@maket.cp</span>
+        </div>
+        <div class="photo-wrap photo-b"><span class="photo-label">фото B</span></div>
+        <div class="side-controls">
+          <select class="version-select" aria-label="Какую версию показать">
+            <option>GRADING #1 — 25.04.2026 (показана сейчас)</option>
+            <option>RETOUCH #3 — 24.04.2026</option>
+            <option>RETOUCH #2 — 22.04.2026</option>
+          </select>
+          <button class="selected-toggle">
+            <span class="toggle-dot"></span>
+            <span>Выбрать эту версию</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="compare-bottombar">
+      <input class="comment-input" type="text"
+             placeholder="Напишите комментарий — он относится ко всему фото, а не к отдельной версии.">
+      <button class="save-btn">Сохранить</button>
+    </div>
+    <div class="hint">Cmd/Ctrl + Enter — сохранить · Esc — закрыть · ← / → — переключить слот</div>
+  </div>
+
+  <div class="section-label">Mobile · slot A в фокусе</div>
+
+  <div class="mobile-preview">
+    <div class="compare-topbar">
+      <button class="iconbtn">Назад</button>
+      <div class="compare-title"><small>IMG_0421.jpg</small></div>
+      <button class="iconbtn">Закрыть</button>
+    </div>
+    <div class="compare-grid">
+      <div class="compare-side is-selected">
+        <div class="side-meta">
+          <span class="stage-badge">RETOUCH · v3</span>
+          <span class="meta-text">24.04, 15:22 · anna@studio.com</span>
+        </div>
+        <div class="photo-wrap photo-a"><span class="photo-label">фото A</span></div>
+        <div class="side-controls">
+          <select class="version-select">
+            <option>RETOUCH #3 — 24.04 (показана сейчас)</option>
+            <option>RETOUCH #2 — 22.04</option>
+          </select>
+          <button class="selected-toggle is-on">
+            <span class="toggle-dot"></span>
+            <span>Выбрана</span>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="swipe-dots">
+      <span class="active" aria-label="A"></span>
+      <span aria-label="B"></span>
+    </div>
+    <div class="compare-bottombar">
+      <input class="comment-input" type="text" placeholder="Комментарий к фото">
+    </div>
+    <div class="compare-bottombar" style="border-top:none; padding-top:0;">
+      <button class="save-btn" style="flex:1;">Сохранить</button>
+    </div>
+  </div>
+
+</body>
+</html>
