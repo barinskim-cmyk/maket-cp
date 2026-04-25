@@ -50,8 +50,12 @@ source: live-test
 ## Timeline
 - 2026-04-25 01:55 — reported by Masha
 - 2026-04-25 12:30 — in-progress by PA (Claude)
-- 2026-04-25 13:10 — fixed, commit `531b8eb` —
+- 2026-04-25 13:10 — fixed (v1), commit `531b8eb` —
   `fix(pipeline): post-selection stages count from selected, not preview`
+- 2026-04-25 13:40 — reopened by Masha: «Отбор клиента» всё ещё показывает
+  `453/453` (cum == passedTeam после массового advance, числитель не менялся).
+- 2026-04-25 13:55 — fixed (v2), commit `<filled-after-push-2>` —
+  `fix(pipeline): client done shows selectedCount/passedTeam, not cum/passedPreselect`
 
 ## Resolution
 **Root cause.** `shCumulativeMetrics()` (в `v2/frontend/js/shootings.js`)
@@ -88,9 +92,25 @@ source: live-test
    к `metrics.scale`, если `cnt > scale` (защита от данных, где
    все фото механически переехали вперёд без партиальной фильтрации).
 
+**Follow-up fix v2 (commit `<v2>`):** v1 поменял знаменатель и активные
+счётчики, но числитель для done-стадии «Отбор клиента» оставался `cum =
+cumulative[2] = passedTeam`, что после массового advance всех фото равно
+`passedPreselect` — и снова получалось `453/453`. v2 переопределяет
+числитель и знаменатель именно для стадии client done:
+
+- numerator = `selectedCount` (фото в карточках) если `clientStageDone`
+  и `selectedCount > 0`; иначе fallback на `cum`
+- denominator = `passedTeam` (фото, прошедшие team selection); если team
+  не использовался, `passedTeam == passedPreselect`, и формула даёт
+  `selectedCount/passedPreselect` = `134/453` по концепции Маши.
+
+Также `shCumulativeMetrics()` теперь экспортирует `passedTeam`,
+`passedClient`, `teamStageIndex` для удобства.
+
 **Регрессия покрыта тестом:** TODO — добавить unit-тест на
 `shCumulativeMetrics()` (test pending). Сделана ручная проверка в Node
-через изолированный harness (6 сценариев, см. секцию Tests ниже).
+через изолированный harness (3 сценария после v2: Маша's кейс,
+team-used кейс, client-not-done кейс — см. секцию Tests ниже).
 
 **Что ещё потенциально затронуто.** Логика `shClientApprove()`
 по-прежнему перемещает ВСЕ фото на стадию 3 — это требует отдельного
@@ -99,13 +119,22 @@ source: live-test
 показывать инфлированное число.
 
 ### Tests (manual harness)
-1. До отбора, все на стадии 0 → `scale=0`, `potential=5`, ничего не врёт.
+**v1 (метрика scale):**
+1. До отбора, все на стадии 0 → `scale=0`, `potential=5`.
 2. До отбора, преотбор пройден → `scale=passedPreselect=5` (legacy).
-3. **Пост-отбор, все 5 advanced на стадию 3, 3 в карточках →
-   `scale=3` (selectedCount), `clientStageDone=true`. ✓**
-4. Пост-отбор, partial advance → `scale=3`, идентичный результат.
-5. Пост-отбор, 0 selected → fallback на `passedClient=3`.
-6. Пустой проект → `scale=0`, потенциал 0.
+3. Пост-отбор, все 5 advanced на стадию 3, 3 в карточках →
+   `scale=3` (selectedCount), `clientStageDone=true`. ✓
+4. Пост-отбор, partial advance → `scale=3`.
+5. Пост-отбор, 0 selected → fallback на `passedClient`.
+6. Пустой проект → `scale=0`.
+
+**v2 (per-stage display, точные числа):**
+- Сценарий Маши (453 превью, все advanced, 134 в карточках):
+  Преотбор `453/453` ✓; Отбор команды `453/453` ✓ (team не использован);
+  **Отбор клиента `134/453` ✓** (было `453/453`).
+- Team используется (453 → 200 после team → 134 selected):
+  Отбор команды `200/453` ✓; **Отбор клиента `134/200` ✓**.
+- Client не done: Отбор команды `200/453` ✓; Отбор клиента активен.
 
 ## Related
 - Связано с `shClientApprove()` — массовое перемещение всех фото на стадию

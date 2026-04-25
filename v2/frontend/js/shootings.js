@@ -742,9 +742,12 @@ function shCumulativeMetrics(proj, photoCounts) {
     cumulative.push(passed);
   }
   /* CLIENT_STAGE_INDEX совпадает с индексом 'client' в PIPELINE_STAGES
-     (см. state.js — preselect=0, selection=1, client=2). */
+     (см. state.js — preselect=0, selection=1, client=2).
+     TEAM_STAGE_INDEX = индекс «Отбор команды» (этап перед клиентским). */
   var CLIENT_STAGE_INDEX = 2;
+  var TEAM_STAGE_INDEX = 1;
   var passedPreselect = cumulative[0] || 0;
+  var passedTeam = cumulative[TEAM_STAGE_INDEX] || 0;
   var passedClient = cumulative[CLIENT_STAGE_INDEX] || 0;
   /* Этап «Отбор клиента» считается завершённым если:
      1. зафиксировано client_approved в _stageHistory, или
@@ -770,7 +773,10 @@ function shCumulativeMetrics(proj, photoCounts) {
     selectedCount: selectedCount,
     clientStageDone: clientStageDone,
     clientStageIndex: CLIENT_STAGE_INDEX,
-    passedPreselect: passedPreselect
+    teamStageIndex: TEAM_STAGE_INDEX,
+    passedPreselect: passedPreselect,
+    passedTeam: passedTeam,
+    passedClient: passedClient
   };
 }
 
@@ -889,39 +895,51 @@ function renderPipeline() {
     html += '<div class="step-dot">' + (cls === 'done' ? '&#10003;' : (i + 1)) + '</div>';
     html += '<div class="step-info">';
     html += '<div class="step-name">' + esc(s.name);
-    /* Счётчик: cumulative N/M для done, "N на этапе" для active.
-       Знаменатель зависит от позиции этапа относительно «Отбор клиента»:
-       — этап 0 (преотбор): из общего числа превью (потенциал)
-       — этапы 1..clientStageIndex (отбор команды, отбор клиента): из passed_preselect
-         (фото, прошедших преотбор) — legacy-совместимо
-       — этапы > clientStageIndex (ЦК и далее): из metrics.scale, который после
-         завершения «Отбор клиента» равен selectedCount (фото в слотах карточек). */
+    /* Счётчик: для done — N/M, для active — "N на этапе".
+       Числитель/знаменатель зависят от позиции этапа:
+       — этап 0 (преотбор) done: passedPreselect/potential
+       — этап team (1) done: passedTeam/passedPreselect (cum/passedPreselect, как было)
+       — этап client (2) done: selectedCount/passedTeam — фактически отобранные
+         клиентом из того, что показала команда (если команда не использовалась,
+         passedTeam == passedPreselect, и формула даёт 134/453 по концепции Маши).
+       — этапы > client (3+) done: cum/scale, scale = selectedCount после client. */
     if (totalPhotos > 0) {
       var cum = ss.cum;
+      var num = cum;
       var denom = 0;
       if (i === 0) {
         denom = metrics.potential;
-      } else if (i <= metrics.clientStageIndex) {
+      } else if (i === metrics.teamStageIndex) {
         denom = metrics.passedPreselect || metrics.potential;
+      } else if (i === metrics.clientStageIndex) {
+        /* Знаменатель: то, что прошло team (вход в стадию client).
+           Если team пустой — passedTeam == passedPreselect, отображаем
+           selectedCount/passedPreselect, что и хочет Маша. */
+        denom = metrics.passedTeam || metrics.passedPreselect || metrics.potential;
+        /* Числитель: если этап завершён — реально отобранные (selectedCount),
+           а не cumulative (последний почти всегда == passedTeam, потому что
+           shClientApprove массово advance'ит все фото). */
+        if (cls === 'done' && metrics.clientStageDone && metrics.selectedCount > 0) {
+          num = metrics.selectedCount;
+        }
       } else {
-        /* После «Отбор клиента»: знаменатель = scale (selectedCount если client done).
-           Если клиент ещё не подтвердил — fallback на passedPreselect. */
+        /* После «Отбор клиента»: знаменатель = scale (selectedCount если client done). */
         denom = metrics.clientStageDone
           ? (metrics.scale || metrics.passedPreselect || metrics.potential)
           : (metrics.passedPreselect || metrics.potential);
       }
       if (i === 0) {
         if (cls === 'done') {
-          if (denom > 0) html += '<span class="step-photo-count">' + cum + '/' + denom + '</span>';
+          if (denom > 0) html += '<span class="step-photo-count">' + num + '/' + denom + '</span>';
         } else if (cnt > 0) {
           html += '<span class="step-photo-count">' + cnt + ' фото</span>';
         }
       } else {
         if (cls === 'done') {
           if (denom > 0) {
-            html += '<span class="step-photo-count">' + cum + '/' + denom + '</span>';
-          } else if (cum > 0) {
-            html += '<span class="step-photo-count">' + cum + ' фото</span>';
+            html += '<span class="step-photo-count">' + num + '/' + denom + '</span>';
+          } else if (num > 0) {
+            html += '<span class="step-photo-count">' + num + ' фото</span>';
           }
         } else if (cls === 'active') {
           /* "N на этапе": после клиентского отбора показываем известную нижнюю
