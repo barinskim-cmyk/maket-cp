@@ -802,6 +802,14 @@ function sbDownloadProject(cloudId, callback) {
       channels: (typeof remote.channels === 'string') ? JSON.parse(remote.channels || '[]') : (remote.channels || []),
       _ocNames: (typeof remote.other_content === 'string') ? JSON.parse(remote.other_content || '[]') : (remote.other_content || []),
       _ocContainersRaw: (typeof remote.oc_containers === 'string') ? JSON.parse(remote.oc_containers || '[]') : (remote.oc_containers || []),
+      _checkpoints: (function() {
+        var cpk = remote.checkpoints;
+        if (!cpk) return [];
+        if (typeof cpk === 'string') {
+          try { return JSON.parse(cpk) || []; } catch(e) { return []; }
+        }
+        return Array.isArray(cpk) ? cpk : [];
+      })(),
       cards: [],
       previews: [],
       otherContent: [],
@@ -2426,7 +2434,10 @@ function sbPullProject(callback) {
       if (typeof _remoteCpk === 'string') {
         try { _remoteCpk = JSON.parse(_remoteCpk); } catch(e) { _remoteCpk = []; }
       }
-      if (_remoteCpk.length > 0) proj._checkpoints = _remoteCpk;
+      /* Phase 3: всегда синкаем checkpoints (даже пустой массив).
+         Раньше присваивали только при length > 0 — это блокировало проекты,
+         где cloud-checkpoints ещё не были выгружены в proj-object. */
+      proj._checkpoints = Array.isArray(_remoteCpk) ? _remoteCpk : [];
 
       /* Fingerprint ПОСЛЕ — сравниваем */
       var _fpAfter = _sbProjectFingerprint(proj);
@@ -2641,7 +2652,8 @@ function sbPullProject(callback) {
         if (typeof _remoteCpk2 === 'string') {
           try { _remoteCpk2 = JSON.parse(_remoteCpk2); } catch(e) { _remoteCpk2 = []; }
         }
-        if (_remoteCpk2.length > 0) proj._checkpoints = _remoteCpk2;
+        /* Phase 3: всегда синкаем checkpoints (даже пустой массив) — см. комментарий выше. */
+        proj._checkpoints = Array.isArray(_remoteCpk2) ? _remoteCpk2 : [];
 
         /* Fingerprint ПОСЛЕ — сравниваем */
         var _fpAfter2 = _sbProjectFingerprint(proj);

@@ -1111,87 +1111,30 @@ function shShowJumpMenu(currentIdx, btn) {
 
 /**
  * Показать детальный пайплайн во всплывающем окне.
- * Отображает путь групп фото по этапам: сколько фото на каждом, куда идут.
- * Пройденные этапы — бледные, активные — яркие.
+ * Phase 3: digital twin — хронологический timeline групповых движений.
+ * Источник: proj._checkpoints (jsonb-массив batch-событий).
+ * Каждая строка = одно перемещение группы фото между этапами.
  */
 function shShowDetailedPipeline() {
   var proj = getActiveProject();
   if (!proj) return;
 
   shEnsurePhotoStages(proj);
-  var batches = proj._stageBatches || [];
+  var checkpoints = (proj._checkpoints || []).slice();
   var totalPhotos = proj.previews ? proj.previews.length : 0;
 
-  /* ---------- Таблица триггер → человекочитаемое название ---------- */
-  var triggerLabels = {
-    'manual': 'Переход вручную',
-    'manual_advance': 'Переход этапа',
-    'send_client_link': 'Отправлено клиенту',
-    'client_approved': 'Клиент согласовал',
-    'client_extra_request': 'Клиент запросил ещё',
-    'preview_loaded': 'Превью загружены',
-    'selection_done': 'Отбор завершён',
-    'cc_loaded': 'ЦК загружена',
-    'cc_confirmed': 'ЦК подтверждена',
-    'retouch_comments': 'Комментарии отправлены',
-    'retouch_loaded': 'Ретушь загружена',
-    'retouch_approved': 'Ретушь согласована',
-    'retouch_returned': 'Ретушь возвращена',
-    'adaptation_done': 'Финал'
-  };
+  /* Sort по ts (хронологически, ascending) */
+  checkpoints.sort(function(a, b) {
+    var ta = new Date(a.ts || a.date || 0).getTime();
+    var tb = new Date(b.ts || b.date || 0).getTime();
+    return ta - tb;
+  });
 
   var html = '<div class="sh-detail-pipeline">';
   html += '<h3 style="margin:0 0 16px 0;font-size:16px">Маршруты фотографий</h3>';
 
-  /* Если реальных батчей нет — синтезируем линейный таймлайн из _stageHistory
-     (для проектов, созданных до появления batch-трекинга). */
-  var synthesized = false;
-  if (batches.length === 0 && proj._stageHistory) {
-    var histKeys = [];
-    for (var _hk in proj._stageHistory) {
-      if (proj._stageHistory.hasOwnProperty(_hk) && /^\d+$/.test(_hk)) {
-        histKeys.push(parseInt(_hk, 10));
-      }
-    }
-    histKeys.sort(function(a, b) { return a - b; });
-    if (histKeys.length >= 1) {
-      var synthBatches = [];
-      var _prevId = null;
-      for (var _hi = 0; _hi < histKeys.length; _hi++) {
-        var _toH = histKeys[_hi];
-        var _fromH = (_hi === 0) ? Math.max(0, _toH - 1) : histKeys[_hi - 1];
-        if (_toH === _fromH) continue;
-        var _timeStr = proj._stageHistory[_toH] || '';
-        var _synthId = 'synth_' + _toH + '_' + _hi;
-        synthBatches.push({
-          id: _synthId,
-          photos: [],
-          fromStage: _fromH,
-          toStage: _toH,
-          date: new Date().toISOString(),
-          _dateDisplay: _timeStr,
-          trigger: 'manual',
-          count: totalPhotos,
-          parentBatchIds: _prevId ? [_prevId] : [],
-          _synthesized: true
-        });
-        _prevId = _synthId;
-      }
-      if (synthBatches.length > 0) {
-        batches = synthBatches;
-        synthesized = true;
-      }
-    }
-  }
-
-  if (synthesized) {
-    html += '<div style="font-size:11px;color:#8a6d00;background:#fff8dc;padding:6px 8px;border-radius:4px;margin-bottom:12px;line-height:1.4">';
-    html += 'Маршруты реконструированы по истории этапов. Подробности ветвлений появятся при следующих переходах.';
-    html += '</div>';
-  }
-
-  if (batches.length === 0) {
-    /* Нет ни батчей, ни истории — показать текущее распределение */
+  if (checkpoints.length === 0) {
+    /* Нет чекпоинтов — показать текущее распределение */
     var photoCounts = shPhotosPerStage(proj);
     html += '<div style="color:#888;font-size:13px;margin-bottom:12px">';
     html += 'Пока нет записанных перемещений. Текущее распределение:';
@@ -1207,93 +1150,78 @@ function shShowDetailedPipeline() {
     html += '<div style="margin-top:12px;font-size:11px;color:#bbb">';
     html += 'Маршруты начнут записываться при переходах между этапами.</div>';
   } else {
-    /* ---------- Дерево маршрутов ---------- */
-    /* Индекс batch по ID для быстрого поиска */
-    var batchById = {};
-    for (var bi = 0; bi < batches.length; bi++) {
-      batchById[batches[bi].id] = batches[bi];
-    }
+    /* ---------- Timeline групповых движений ---------- */
+    for (var ri = 0; ri < checkpoints.length; ri++) {
+      var cp = checkpoints[ri];
+      var icon = _shCpTriggerIcon(cp.trigger);
+      var label = _shCpTriggerLabel(cp.trigger);
+      var dateStr = _shCpFormatDate(cp.ts || cp.date);
+      var photoCount = (cp.photos && cp.photos.length) || cp.count || 0;
+      var approver = cp.approved_by_name || cp.by_name || cp.approver || '';
+      var note = cp.note || cp.notes || '';
 
-    /* Найти сколько потомков у каждого batch (для определения точек ветвления) */
-    var childCount = {};
-    for (var ci = 0; ci < batches.length; ci++) {
-      var pids = batches[ci].parentBatchIds || [];
-      for (var pi = 0; pi < pids.length; pi++) {
-        childCount[pids[pi]] = (childCount[pids[pi]] || 0) + 1;
+      /* stage_from / stage_to (могут быть null) */
+      var sFrom = (cp.stage_from === undefined) ? cp._stage_from : cp.stage_from;
+      var sTo   = (cp.stage_to   === undefined) ? cp._stage_to   : cp.stage_to;
+      if (sFrom === undefined) sFrom = null;
+      if (sTo   === undefined) sTo   = null;
+
+      var stagePart = '';
+      if (sFrom !== null && sTo !== null) {
+        if (sFrom === sTo) {
+          stagePart = '<span style="color:#888">в </span>' + esc(_shCpStageName(sTo));
+        } else {
+          stagePart = esc(_shCpStageName(sFrom)) + ' <span style="color:#aaa">→</span> ' + esc(_shCpStageName(sTo));
+        }
+      } else if (sTo !== null) {
+        stagePart = '<span style="color:#aaa">→</span> ' + esc(_shCpStageName(sTo));
+      } else if (sFrom !== null) {
+        stagePart = esc(_shCpStageName(sFrom)) + ' <span style="color:#aaa">→</span>';
       }
-    }
 
-    /* Рисуем хронологически (batches уже в порядке создания) */
-    for (var ri = 0; ri < batches.length; ri++) {
-      var b = batches[ri];
-      var fromName = PIPELINE_STAGES[b.fromStage] ? PIPELINE_STAGES[b.fromStage].name : ('Этап ' + b.fromStage);
-      var toName = PIPELINE_STAGES[b.toStage] ? PIPELINE_STAGES[b.toStage].name : ('Этап ' + b.toStage);
-      var label = triggerLabels[b.trigger] || b.trigger;
-      var dateStr;
-      if (b._dateDisplay) {
-        dateStr = b._dateDisplay;
-      } else {
-        var d = new Date(b.date);
-        dateStr = d.toLocaleDateString('ru-RU') + ' ' + d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-      }
-      var photoCount = b.count || (b.photos ? b.photos.length : 0);
-
-      /* Определить тип узла: обычный, ветвление, слияние */
-      var parents = b.parentBatchIds || [];
-      var isMerge = parents.length > 1;
-      var isBranch = false;
-      for (var pp = 0; pp < parents.length; pp++) {
-        if ((childCount[parents[pp]] || 0) > 1) { isBranch = true; break; }
-      }
-      var isSkip = (b.toStage - b.fromStage) > 1;
-
-      /* Цвет линии: обычный серый, ветвление — тёмный, слияние — тёмный */
-      var lineColor = (isMerge || isBranch) ? '#333' : '#ccc';
-      var dotBorder = (isMerge || isBranch) ? '2px solid #333' : '2px solid #ccc';
-      var dotBg = isMerge ? '#333' : '#fff';
-      var dotColor = isMerge ? '#fff' : '#333';
+      var isSkip = (sFrom !== null && sTo !== null && (sTo - sFrom) > 1);
 
       html += '<div style="display:flex;gap:10px;position:relative;min-height:44px">';
 
-      /* Вертикальная линия + точка */
-      html += '<div style="display:flex;flex-direction:column;align-items:center;width:20px;flex-shrink:0">';
+      /* Левая колонка: иконка-триггер */
+      html += '<div style="display:flex;flex-direction:column;align-items:center;width:24px;flex-shrink:0">';
       if (ri > 0) {
-        html += '<div style="width:2px;height:8px;background:' + lineColor + '"></div>';
+        html += '<div style="width:2px;height:8px;background:#e0e0e0"></div>';
       } else {
         html += '<div style="height:8px"></div>';
       }
-      /* Точка — кружок или ромб для ветвления */
-      if (isMerge) {
-        html += '<div style="width:12px;height:12px;border-radius:50%;background:' + dotBg + ';border:' + dotBorder + ';flex-shrink:0"></div>';
-      } else if (isBranch) {
-        html += '<div style="width:10px;height:10px;transform:rotate(45deg);background:#fff;border:' + dotBorder + ';flex-shrink:0"></div>';
-      } else {
-        html += '<div style="width:10px;height:10px;border-radius:50%;background:' + dotBg + ';border:' + dotBorder + ';flex-shrink:0"></div>';
-      }
-      if (ri < batches.length - 1) {
+      html += '<div style="width:22px;height:22px;border-radius:50%;background:#fff;border:1.5px solid #ccc;display:flex;align-items:center;justify-content:center;font-size:12px;line-height:1;flex-shrink:0">';
+      html += icon;
+      html += '</div>';
+      if (ri < checkpoints.length - 1) {
         html += '<div style="width:2px;flex:1;background:#e0e0e0"></div>';
       }
       html += '</div>';
 
-      /* Содержимое */
-      html += '<div style="flex:1;padding-bottom:8px">';
+      /* Правая колонка: содержимое */
+      html += '<div style="flex:1;padding-bottom:10px">';
 
-      /* Заголовок: N фото: From -> To */
-      html += '<div style="font-size:13px;font-weight:500;color:#333">';
-      html += photoCount + ' фото: ';
-      html += esc(fromName) + ' &rarr; ' + esc(toName);
+      /* Заголовок строки: N фото · From → To */
+      html += '<div style="font-size:13px;font-weight:500;color:#333;line-height:1.35">';
+      html += '<strong>' + photoCount + ' фото</strong>';
+      if (stagePart) {
+        html += ' <span style="color:#aaa">·</span> ' + stagePart;
+      }
       if (isSkip) html += ' <span style="font-size:11px;color:#c62828">(пропуск)</span>';
       html += '</div>';
 
-      /* Подробности: триггер, дата */
-      html += '<div style="font-size:11px;color:#888;margin-top:2px">';
-      html += esc(label) + ' &middot; ' + dateStr;
+      /* Подзаголовок: Триггер · DD.MM HH:MM · approver */
+      html += '<div style="font-size:11px;color:#888;margin-top:3px">';
+      html += esc(label) + ' <span style="color:#bbb">·</span> ' + esc(dateStr);
+      if (approver) {
+        html += ' <span style="color:#bbb">·</span> ' + esc(approver);
+      }
       html += '</div>';
 
-      /* Индикаторы ветвления/слияния */
-      if (isMerge) {
-        html += '<div style="font-size:11px;color:#555;margin-top:2px">';
-        html += 'Слияние ' + parents.length + ' потоков';
+      /* Note (если есть) */
+      if (note) {
+        html += '<div style="font-size:11px;color:#666;margin-top:3px;font-style:italic">';
+        html += '«' + esc(note) + '»';
         html += '</div>';
       }
 
@@ -1305,7 +1233,7 @@ function shShowDetailedPipeline() {
   /* Итого */
   html += '<div style="margin-top:12px;padding-top:8px;border-top:1px solid #eee;font-size:12px;color:#888">';
   html += 'Всего: ' + totalPhotos + ' фото';
-  if (batches.length > 0) html += ' &middot; ' + batches.length + ' перемещений';
+  if (checkpoints.length > 0) html += ' &middot; ' + checkpoints.length + ' контрольных точек';
   html += '</div>';
   html += '</div>';
 
@@ -1391,6 +1319,98 @@ function _shRenderBranchCell(i, stage, branchStart, branchEnd, cmtCount, annotCo
 }
 
 /**
+ * Phase 3: единый форматтер дат для checkpoints.
+ * Принимает ISO-строку или Date, возвращает "DD.MM HH:MM" (например "10.04 11:00").
+ * Если значение отсутствует/невалидно — возвращает '—'.
+ * @param {string|Date|null} v
+ * @returns {string}
+ */
+function _shCpFormatDate(v) {
+  if (!v) return '—';
+  var d = (v instanceof Date) ? v : new Date(v);
+  if (isNaN(d.getTime())) return '—';
+  var pad = function(n) { return n < 10 ? '0' + n : '' + n; };
+  return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + ' ' +
+         pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+
+/**
+ * Phase 3: human-readable label для trigger.
+ * @param {string} trigger
+ * @returns {string}
+ */
+function _shCpTriggerLabel(trigger) {
+  var map = {
+    'preview_loaded':            'Превью загружены',
+    'selection_done':            'Отбор команды',
+    'team_selection_done':       'Команда отдала клиенту',
+    'client_review_v1':          'Клиент открыл',
+    'client_review':             'Клиент открыл',
+    'client_received':           'Клиент открыл',
+    'client_save':               'Клиент сохранил',
+    'client_saved':              'Клиент сохранил',
+    'client_approved':           'Клиент согласовал',
+    'client_returned':           'Клиент вернул',
+    'client_replacement_request':'Клиент: нужны другие',
+    'replacement_pulled':        'Замены подобраны',
+    'photo_killed':              'Фото удалено из отбора',
+    'cc_loaded':                 'ЦК загружена',
+    'cc_confirmed':              'ЦК подтверждена',
+    'manual_skip_cc':            'Пропуск ЦК (вручную)',
+    'retouch_comments':          'Комментарии отправлены',
+    'retouch_loaded':            'Ретушь загружена',
+    'retouch_approved':          'Ретушь согласована',
+    'retouch_returned':          'Ретушь возвращена',
+    'manual':                    'Ручная фиксация',
+    'adaptation_done':           'Финал'
+  };
+  return map[trigger] || trigger;
+}
+
+/**
+ * Phase 3: emoji-иконка для trigger (для timeline-рендера групповых движений).
+ * @param {string} trigger
+ * @returns {string}
+ */
+function _shCpTriggerIcon(trigger) {
+  var map = {
+    'preview_loaded':            '📥',
+    'selection_done':            '✋',
+    'team_selection_done':       '✋',
+    'client_review_v1':          '👁',
+    'client_review':             '👁',
+    'client_received':           '👁',
+    'client_save':               '✓',
+    'client_saved':              '✓',
+    'client_approved':           '✓',
+    'client_returned':           '↩️',
+    'client_replacement_request':'🔄',
+    'replacement_pulled':        '🔄',
+    'cc_loaded':                 '🎨',
+    'cc_confirmed':              '🎨',
+    'manual_skip_cc':            '⚡',
+    'retouch_comments':          '💬',
+    'retouch_loaded':            '✏️',
+    'retouch_approved':          '✓',
+    'retouch_returned':          '↩️',
+    'manual':                    '·',
+    'adaptation_done':           '🏁'
+  };
+  return map[trigger] || '·';
+}
+
+/**
+ * Phase 3: имя этапа по индексу (с fallback'ом).
+ * @param {number|null|undefined} idx
+ * @returns {string}
+ */
+function _shCpStageName(idx) {
+  if (idx === null || idx === undefined) return '';
+  if (PIPELINE_STAGES[idx]) return PIPELINE_STAGES[idx].name;
+  return 'Этап ' + idx;
+}
+
+/**
  * Отрисовать таймлайн контрольных точек для пайплайна.
  * @param {Object} proj — проект
  * @returns {string} HTML
@@ -1435,8 +1455,8 @@ function _shRenderTimeline(proj) {
 
   for (var i = 0; i < checkpoints.length; i++) {
     var cp = checkpoints[i];
-    var d = new Date(cp.date);
-    var dateStr = d.toLocaleDateString('ru-RU') + ' ' + d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    /* Phase 3: jsonb-поле = `ts`, legacy local-only = `date`. Поддерживаем оба. */
+    var dateStr = _shCpFormatDate(cp.ts || cp.date);
     var label = triggerLabelsMap[cp.trigger] || cp.trigger;
     var bgColor = stageColors[cp.stage] || '#f5f5f5';
     var photoCount = cp.photos ? cp.photos.length : 0;
@@ -1453,7 +1473,9 @@ function _shRenderTimeline(proj) {
     if (cp.added && cp.added.length > 0) infoParts.push('+' + cp.added.length + ' добавлено');
     if (cp.removed && cp.removed.length > 0) infoParts.push('-' + cp.removed.length + ' убрано');
     if (cp.iteration > 0) infoParts.push('итерация ' + cp.iteration);
-    if (cp.note) infoParts.push(cp.note);
+    /* `note` (singular) — jsonb cloud-формат; `notes` — legacy local. */
+    var cpNote = cp.note || cp.notes;
+    if (cpNote) infoParts.push(cpNote);
 
     if (infoParts.length > 0) {
       html += '<div class="pipeline-cp-info">' + esc(infoParts.join(' / ')) + '</div>';
