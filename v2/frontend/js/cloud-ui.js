@@ -614,6 +614,13 @@ function authCheckOnLoad() {
   if (shareToken) {
     window._isShareLink = true;  /* флаг: не грузить все проекты */
     window._shareToken = shareToken; /* сохраняем для записи клиента */
+    /* Permission-hardening: пометить body, чтобы CSS скрыл админ-панели
+       (Артикулы и др.) у гостя, пришедшего по share-ссылке.
+       См. css/style.css — правило body.is-share-link #nav-articles, #page-articles. */
+    if (document.body) document.body.classList.add('is-share-link');
+    /* Перевызвать видимость вкладок: на момент DOMContentLoaded флаг ещё не был
+       установлен, и кнопка #nav-articles могла остаться видимой. */
+    if (typeof navUpdateTabVisibility === 'function') navUpdateTabVisibility();
     authUnlock();
     /* Скрыть пайплайн и показать лоадер пока проект грузится */
     _showShareLoader();
