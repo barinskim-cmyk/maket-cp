@@ -50,7 +50,7 @@ source: live-test
 ## Timeline
 - 2026-04-25 01:55 — reported by Masha
 - 2026-04-25 12:30 — in-progress by PA (Claude)
-- 2026-04-25 13:10 — fixed, commit `<filled-after-push>` —
+- 2026-04-25 13:10 — fixed, commit `531b8eb` —
   `fix(pipeline): post-selection stages count from selected, not preview`
 
 ## Resolution
