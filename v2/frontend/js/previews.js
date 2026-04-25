@@ -4175,27 +4175,72 @@ function acViewFrom(name, e) {
 }
 
 /**
- * Кнопка «Посмотреть все опции» — открывает лайтбокс со ВСЕМИ превью проекта
- * (не только отбор, а полный пул). С фильтром по рейтингу если задан.
+ * Кнопка «Посмотреть все опции» — открывает лайтбокс с фото из ОТБОРА
+ * (карточки + контейнеры + свободные доп.контент), у которых есть
+ * хотя бы 2 ЦК-версии (compare-eligible). Это и есть «опции» —
+ * фото для которых имеет смысл выбрать вариант.
+ *
+ * Phase 3.5 (2026-04-25): источник данных переключён с proj.previews
+ * на pvGetSelectionSet() + filter по multi-version. Counter теперь "1 / N"
+ * где N = compare-eligible photos, не all previews.
+ *
+ * Если нет ни одного фото с ≥2 версиями — fallback на старое поведение
+ * (все selected, чтобы кнопка не была мертвой).
  */
 function acViewAll() {
   var proj = getActiveProject();
   if (!proj || !proj.previews || !proj.previews.length) return;
 
-  var all = proj.previews;
+  /* Selection set — только отбор (карточки + контейнеры + свободные) */
+  var selSet = (typeof pvGetSelectionSet === 'function') ? pvGetSelectionSet() : {};
+
   /* Применить рейтинговый фильтр если есть */
   var minR = _acRatingFilter || 0;
+
+  /* Шаг 1: список selected превью с применённым рейтинговым фильтром */
+  var selectedPreviews = [];
+  for (var i = 0; i < proj.previews.length; i++) {
+    var pv = proj.previews[i];
+    if (!selSet[pv.name]) continue;
+    if (minR > 0 && (pv.rating || 0) < minR) continue;
+    selectedPreviews.push(pv);
+  }
+
+  /* Шаг 2: фильтр compare-eligible — те у кого ≥2 версий на color stage.
+     pv.versions.color может быть массивом (новый формат после Phase 1.2)
+     или объектом (legacy). Считаем variants. */
+  function variantCount(pv) {
+    if (!pv || !pv.versions) return 0;
+    var v = pv.versions['color'] || pv.versions.color;
+    if (!v) return 0;
+    if (Array.isArray(v)) return v.length;
+    /* legacy: object — может иметь variants[] */
+    if (Array.isArray(v.variants)) return v.variants.length;
+    return v.thumb || v.preview ? 1 : 0;
+  }
+
+  var multiVersionPreviews = [];
+  for (var k = 0; k < selectedPreviews.length; k++) {
+    if (variantCount(selectedPreviews[k]) >= 2) {
+      multiVersionPreviews.push(selectedPreviews[k]);
+    }
+  }
+
+  /* Если есть compare-eligible — берём только их. Иначе fallback на selected
+     (чтобы кнопка не висела мёртвой если ЦК ещё не загружали). */
+  var pickList = multiVersionPreviews.length > 0 ? multiVersionPreviews : selectedPreviews;
+
   var lbList = [];
-  for (var i = 0; i < all.length; i++) {
-    if (minR > 0 && (all[i].rating || 0) < minR) continue;
+  for (var j = 0; j < pickList.length; j++) {
+    var p = pickList[j];
     lbList.push({
-      name: all[i].name,
-      thumb: all[i].thumb || '',
-      preview: all[i].preview || '',
-      path: all[i].path || '',
-      orient: all[i].orient || 'v',
-      width: all[i].width || 0,
-      height: all[i].height || 0
+      name: p.name,
+      thumb: p.thumb || '',
+      preview: p.preview || '',
+      path: p.path || '',
+      orient: p.orient || 'v',
+      width: p.width || 0,
+      height: p.height || 0
     });
   }
   if (!lbList.length) return;
