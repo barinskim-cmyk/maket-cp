@@ -637,7 +637,10 @@ function sbUploadPreviews(projectId, previews, callback) {
                 preview_path: hasPreview ? previewUrl : null,
                 rating: pv.rating || 0,
                 orient: pv.orient || 'v',
-                position: item.position
+                position: item.position,
+                /* Per-photo pipeline stage (0=preselect..7=adaptation). Persists
+                   so seed/distribution survives reloads + cross-device sync. */
+                stage: (typeof pv._stage === 'number') ? pv._stage : 0
               });
             }
 
@@ -755,7 +758,11 @@ function sbDownloadPreviews(projectId, callback) {
           rating: r.rating || 0,
           orient: r.orient || 'v',
           path: '',
-          folders: []
+          folders: [],
+          /* Per-photo pipeline stage from previews.stage column.
+             shEnsurePhotoStages() respects it because it only fills
+             undefined _stage; an explicit number wins. */
+          _stage: (typeof r.stage === 'number') ? r.stage : 0
         });
       }
       callback(null, previews);
