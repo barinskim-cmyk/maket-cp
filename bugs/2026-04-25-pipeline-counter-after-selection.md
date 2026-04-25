@@ -54,7 +54,7 @@ source: live-test
   `fix(pipeline): post-selection stages count from selected, not preview`
 - 2026-04-25 13:40 — reopened by Masha: «Отбор клиента» всё ещё показывает
   `453/453` (cum == passedTeam после массового advance, числитель не менялся).
-- 2026-04-25 13:55 — fixed (v2), commit `<filled-after-push-2>` —
+- 2026-04-25 13:55 — fixed (v2), commit `269cf11` —
   `fix(pipeline): client done shows selectedCount/passedTeam, not cum/passedPreselect`
 
 ## Resolution
@@ -92,7 +92,7 @@ source: live-test
    к `metrics.scale`, если `cnt > scale` (защита от данных, где
    все фото механически переехали вперёд без партиальной фильтрации).
 
-**Follow-up fix v2 (commit `<v2>`):** v1 поменял знаменатель и активные
+**Follow-up fix v2 (commit `269cf11`):** v1 поменял знаменатель и активные
 счётчики, но числитель для done-стадии «Отбор клиента» оставался `cum =
 cumulative[2] = passedTeam`, что после массового advance всех фото равно
 `passedPreselect` — и снова получалось `453/453`. v2 переопределяет
