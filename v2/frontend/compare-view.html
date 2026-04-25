@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Compare view — Maket CP</title>
+<!--
+  Compare view: side-by-side просмотр 2 версий фото.
+
+  MVP / stand-alone страница. Используется для тестирования/разработки
+  до интеграции в основной UI galery/лайтбокса.
+
+  Включение:
+      localStorage.setItem('DEBUG_COMPARE_VIEW', '1')
+  Без флага страница показывает заглушку «в разработке».
+
+  Query params:
+      ?project_id=<uuid>&photo_name=<IMG_0001.CR3>
+      (photo_id поддержан как алиас для photo_name — см. compare-view.js)
+
+  Визуальный дизайн — минимальный stub. Финальный UX/layout делает DAD:
+  см. docs/agents/design/compare-view/.
+-->
+<style>
+  /* Плоский CSS без переменных (как в основном проекте). */
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #111;
+    color: #ddd;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    height: 100%;
+  }
+  body { display: flex; flex-direction: column; }
+
+  /* Шапка */
+  .cv-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background: #1a1a1a;
+    border-bottom: 1px solid #2a2a2a;
+    flex-shrink: 0;
+  }
+  .cv-title { font-size: 14px; color: #999; }
+  .cv-title strong { color: #eee; }
+  .cv-back-btn {
+    background: #2a2a2a;
+    color: #ddd;
+    border: 1px solid #3a3a3a;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .cv-back-btn:hover { background: #333; }
+
+  /* Сетка двух слотов */
+  .cv-grid {
+    flex: 1;
+    display: flex;
+    gap: 1px;
+    background: #000;
+    min-height: 0;
+  }
+  .cv-slot {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #141414;
+    min-width: 0;
+  }
+  .cv-slot-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: #1a1a1a;
+    border-bottom: 1px solid #2a2a2a;
+  }
+  .cv-slot-label {
+    font-size: 12px;
+    color: #888;
+    min-width: 16px;
+    font-weight: bold;
+  }
+  .cv-dropdown {
+    flex: 1;
+    background: #2a2a2a;
+    color: #ddd;
+    border: 1px solid #3a3a3a;
+    padding: 5px 8px;
+    border-radius: 3px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .cv-select-btn {
+    background: #2d5a3d;
+    color: #dfefd7;
+    border: 1px solid #3d6a4d;
+    padding: 5px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  .cv-select-btn:hover { background: #3d6a4d; }
+  .cv-select-btn.cv-selected {
+    background: #4a7a5a;
+    border-color: #5a8a6a;
+    cursor: default;
+  }
+  .cv-select-btn[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* Изображение */
+  .cv-img-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    min-height: 0;
+    position: relative;
+    background: #0a0a0a;
+  }
+  .cv-img-wrap img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+  .cv-slot-meta {
+    padding: 6px 12px;
+    font-size: 11px;
+    color: #777;
+    background: #1a1a1a;
+    border-top: 1px solid #2a2a2a;
+    font-family: Menlo, Monaco, monospace;
+  }
+  .cv-empty-msg {
+    color: #555;
+    font-size: 13px;
+    padding: 20px;
+    text-align: center;
+  }
+
+  /* Заглушка feature-flag */
+  .cv-flag-gate {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 12px;
+    padding: 40px;
+    text-align: center;
+  }
+  .cv-flag-gate h2 { color: #888; font-weight: normal; margin: 0; }
+  .cv-flag-gate p { color: #666; margin: 0; font-size: 13px; max-width: 440px; line-height: 1.5; }
+  .cv-flag-gate code {
+    background: #222;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 12px;
+    color: #bbb;
+  }
+
+  .cv-loading, .cv-error {
+    padding: 40px;
+    text-align: center;
+    color: #777;
+  }
+  .cv-error { color: #c87070; }
+</style>
+</head>
+<body>
+
+<div class="cv-header">
+  <div class="cv-title">
+    Compare view <span id="cv-photo-name"></span>
+  </div>
+  <button class="cv-back-btn" onclick="cvGoBack()">Назад</button>
+</div>
+
+<!-- Основное содержимое — наполняется JS -->
+<div id="cv-root" class="cv-grid">
+  <div class="cv-loading">Загрузка…</div>
+</div>
+
+<!--
+  Зависимости:
+  1. Supabase SDK (для sbClient).
+  2. supabase.js — даёт sbInit(), sbGetPhotoVersions(), sbSelectPhotoVersion(), _compareViewEnabled().
+  3. compare-view.js — логика страницы.
+
+  NB: supabase.js подтягивает sbClient из localStorage-конфига (SB_CONFIG_KEY)
+  или из дефолтных констант SB_URL / SB_ANON. Если пользователь залогинен
+  в основном приложении в этом же браузере — сессия подхватится автоматически.
+-->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/supabase.js?v=2"></script>
+<script src="js/compare-view.js"></script>
+
+</body>
+</html>

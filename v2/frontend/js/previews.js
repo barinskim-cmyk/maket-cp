@@ -2009,6 +2009,30 @@ function _pvLbOpenDesktop() {
   overlay.appendChild(nameEl);
   overlay.appendChild(prevBtn);
   overlay.appendChild(nextBtn);
+
+  /* Compare view: кнопка «Сравнить версии» — только при DEBUG_COMPARE_VIEW=1.
+     MVP wire-up: открывает stand-alone страницу в новой вкладке.
+     См. docs/agents/dev/compare-view-integration-notes.md. */
+  try {
+    if (typeof _compareViewEnabled === 'function' && _compareViewEnabled()) {
+      var proj = (typeof App !== 'undefined' && App && App.currentProject) ? App.currentProject : null;
+      var projCloudId = proj && proj._cloudId ? proj._cloudId : '';
+      if (projCloudId && pv && pv.name) {
+        var cmpBtn = document.createElement('button');
+        cmpBtn.className = 'cp-fullscreen-close'; /* заимствуем стиль close-кнопки */
+        cmpBtn.style.cssText = 'top:16px;right:72px;width:auto;padding:0 12px;font-size:13px;';
+        cmpBtn.textContent = 'Сравнить версии';
+        cmpBtn.onclick = function(ev) {
+          ev.stopPropagation();
+          var u = 'compare-view.html?project_id=' + encodeURIComponent(projCloudId) +
+                  '&photo_name=' + encodeURIComponent(pv.name);
+          window.open(u, '_blank');
+        };
+        overlay.appendChild(cmpBtn);
+      }
+    }
+  } catch (e) { /* не блокируем лайтбокс из-за compare-view */ }
+
   document.body.appendChild(overlay);
 
   /* Всё что зависит от getElementById или getBoundingClientRect —

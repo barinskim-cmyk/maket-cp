@@ -3280,6 +3280,85 @@ function sbSelectPhotoVersion(versionId, projectId, photoName, stage, callback) 
     });
 }
 
+/* ══════════════════════════════════════════════
+   Compare View — инфраструктура (MVP)
+   ══════════════════════════════════════════════
+
+   Compare view позволяет смотреть 2+ версии фото одновременно
+   (side-by-side) и выбирать победителя.
+
+   Feature-flag защищает новое поведение. Включается через:
+       localStorage.setItem('DEBUG_COMPARE_VIEW', '1')
+   Выключается:
+       localStorage.removeItem('DEBUG_COMPARE_VIEW')
+
+   См. docs/agents/dev/compare-view-integration-notes.md
+*/
+
+/**
+ * Проверить, включён ли compare view (MVP фича-флаг).
+ * По умолчанию выключен — кнопка «Сравнить версии» не показывается.
+ * @returns {boolean}
+ */
+function _compareViewEnabled() {
+  try {
+    if (typeof localStorage === 'undefined') return false;
+    var v = localStorage.getItem('DEBUG_COMPARE_VIEW');
+    return v === '1' || v === 'true' || v === 'on';
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Compare view: загрузить все версии фото по photo_name в рамках проекта.
+ *
+ * NB: в текущей схеме photo_versions идентификатор фото — пара
+ *     (project_id, photo_name), колонки photo_id нет
+ *     (см. migrations/001_photo_versions.sql и v2/supabase/030_photo_versions.sql).
+ *     Сигнатура (projectId, photoName) отражает реальный ключ;
+ *     если в будущем будет отдельная photos-таблица с photo_id —
+ *     функция станет тонкой оболочкой.
+ *
+ * Возвращает Promise, чтобы compare-view.js мог использовать await.
+ * Ошибки логируются в консоль и возвращается пустой массив
+ * (UI показывает «нет версий» — не падает).
+ *
+ * @param {string} projectId - UUID проекта
+ * @param {string} photoName - имя файла (IMG_0001.CR3)
+ * @returns {Promise<Array>} список версий (stage ASC, version_num DESC)
+ */
+function sbGetPhotoVersions(projectId, photoName) {
+  if (!sbClient) {
+    console.warn('[compare-view] supabase client not initialised');
+    return Promise.resolve([]);
+  }
+  if (!projectId || !photoName) {
+    console.warn('[compare-view] missing projectId/photoName', projectId, photoName);
+    return Promise.resolve([]);
+  }
+
+  /* select всех полей: id, photo_name, stage, version_num, preview_path, cos_path,
+     selected, created_at, created_by, metadata. Последние три есть в миграции 030
+     и могут быть NULL/пустыми для исторических записей. */
+  return sbClient.from('photo_versions')
+    .select('id, project_id, photo_name, stage, version_num, selected, preview_path, cos_path, created_at, created_by, metadata')
+    .eq('project_id', projectId)
+    .eq('photo_name', photoName)
+    .order('stage', { ascending: true })
+    .order('version_num', { ascending: false })
+    .then(function(res) {
+      if (res && res.error) {
+        console.warn('[compare-view] fetch versions failed', res.error);
+        return [];
+      }
+      return (res && res.data) || [];
+    })['catch'](function(err) {
+      console.warn('[compare-view] fetch versions exception', err);
+      return [];
+    });
+}
+
 /**
  * Удалить версию фото (и файлы из Storage).
  *
