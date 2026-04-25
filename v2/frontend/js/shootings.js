@@ -1594,7 +1594,14 @@ function _shRenderTimeline(proj) {
     var cp = checkpoints[i];
     /* Phase 3: jsonb-поле = `ts`, legacy local-only = `date`. Поддерживаем оба. */
     var dateStr = _shCpFormatDate(cp.ts || cp.date);
-    var label = triggerLabelsMap[cp.trigger] || cp.trigger;
+    /* Phase 3: единый источник лейблов — _shCpTriggerLabel (покрывает все
+       cloud-триггеры: team_selection_done, client_review_v1, client_save,
+       client_replacement_request, replacement_pulled, manual_skip_cc и т.д.).
+       Local triggerLabelsMap оставлен как fallback для legacy-вариантов. */
+    var label = _shCpTriggerLabel(cp.trigger);
+    if (label === cp.trigger && triggerLabelsMap[cp.trigger]) {
+      label = triggerLabelsMap[cp.trigger];
+    }
     var bgColor = stageColors[cp.stage] || '#f5f5f5';
     var photoCount = cp.photos ? cp.photos.length : 0;
 
