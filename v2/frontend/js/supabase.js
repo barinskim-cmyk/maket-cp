@@ -3090,12 +3090,18 @@ function _sbLoadAndAttachVersions(cloudId, proj, pvByName, done) {
       console.log('sbVersions: загружено ' + rows.length + ' версий');
 
       /* Группируем по photo_name + stage. По одному фото на одной стадии может
-         быть несколько версий (compare-view сценарий: v1, v2, v3 для color). */
+         быть несколько версий (compare-view сценарий: v1, v2, v3 для color).
+         Mapping: photo_versions.stage = 'color_correction' (DB canonical) →
+         pv.versions.color (frontend pipeline). Retouch/grading проходят как есть. */
+      var STAGE_MAP = { 'color_correction': 'color' };
+      var mapStage = function(s) { return STAGE_MAP[s] || s; };
+
       var groups = {};
       for (var i = 0; i < rows.length; i++) {
         var r = rows[i];
-        var key = r.photo_name + '\x00' + r.stage;
-        if (!groups[key]) groups[key] = { name: r.photo_name, stage: r.stage, rows: [] };
+        var stageKey = mapStage(r.stage);
+        var key = r.photo_name + '\x00' + stageKey;
+        if (!groups[key]) groups[key] = { name: r.photo_name, stage: stageKey, rows: [] };
         groups[key].rows.push(r);
       }
 
