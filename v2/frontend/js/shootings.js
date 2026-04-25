@@ -692,16 +692,43 @@ function shPhotosPerStage(proj) {
 }
 
 /**
+ * Кол-во уникальных фото, помещённых в слоты карточек.
+ * Используется как «selected count» — фактическое число фото,
+ * с которыми команда/клиент работают после отбора клиента.
+ *
+ * @param {Object} proj
+ * @returns {number}
+ */
+function shSelectedCount(proj) {
+  if (!proj || !proj.cards) return 0;
+  var seen = {};
+  var n = 0;
+  for (var c = 0; c < proj.cards.length; c++) {
+    var slots = (proj.cards[c] && proj.cards[c].slots) || [];
+    for (var s = 0; s < slots.length; s++) {
+      var f = slots[s] && slots[s].file;
+      if (f && !seen[f]) { seen[f] = true; n++; }
+    }
+  }
+  return n;
+}
+
+/**
  * Cumulative: сколько фото УЖЕ ПРОШЛИ каждый этап (находятся дальше).
  * cumulative[i] = кол-во фото с _stage > i (завершили этап i).
  *
  * Метрика «потенциал vs масштаб»:
  * - Потенциал = все превью (proj.previews.length)
- * - Масштаб (отбор) = фото с _stage >= 1 (прошли преотбор, вошли в отбор)
+ * - Масштаб (scale) = текущий объём работы:
+ *     • до завершения «Отбор клиента» — фото с _stage >= 1 (прошли преотбор)
+ *     • после завершения «Отбор клиента» — selectedCount (фото в слотах карточек)
+ *       fallback: cumulative[CLIENT_STAGE_INDEX] если карточки ещё не заполнены.
  *
  * @param {Object} proj
  * @param {number[]} photoCounts — результат shPhotosPerStage()
- * @returns {{ cumulative: number[], scale: number, potential: number }}
+ * @returns {{ cumulative: number[], scale: number, potential: number,
+ *             selectedCount: number, clientStageDone: boolean,
+ *             clientStageIndex: number, passedPreselect: number }}
  */
 function shCumulativeMetrics(proj, photoCounts) {
   var potential = proj.previews ? proj.previews.length : 0;
@@ -714,10 +741,37 @@ function shCumulativeMetrics(proj, photoCounts) {
     }
     cumulative.push(passed);
   }
-  /* Масштаб = фото, которые прошли преотбор (этап 0) = cumulative[0].
-     Для проектов где все на этапе 0 — масштаб = 0 (отбор ещё не сформирован). */
-  var scale = cumulative[0] || 0;
-  return { cumulative: cumulative, scale: scale, potential: potential };
+  /* CLIENT_STAGE_INDEX совпадает с индексом 'client' в PIPELINE_STAGES
+     (см. state.js — preselect=0, selection=1, client=2). */
+  var CLIENT_STAGE_INDEX = 2;
+  var passedPreselect = cumulative[0] || 0;
+  var passedClient = cumulative[CLIENT_STAGE_INDEX] || 0;
+  /* Этап «Отбор клиента» считается завершённым если:
+     1. зафиксировано client_approved в _stageHistory, или
+     2. на самом этапе client уже нет фото, а дальше есть (т.е. он уже опустел). */
+  var clientStageDone = !!(proj && proj._stageHistory && proj._stageHistory['client_approved']);
+  if (!clientStageDone && photoCounts[CLIENT_STAGE_INDEX] === 0 && passedClient > 0) {
+    clientStageDone = true;
+  }
+  var selectedCount = shSelectedCount(proj);
+  /* Масштаб (новое определение):
+     — до отбора клиента: passed_preselect (legacy-совместимое)
+     — после отбора клиента: selectedCount (фото в карточках), fallback на passedClient. */
+  var scale;
+  if (clientStageDone) {
+    scale = selectedCount > 0 ? selectedCount : (passedClient || passedPreselect);
+  } else {
+    scale = passedPreselect;
+  }
+  return {
+    cumulative: cumulative,
+    scale: scale,
+    potential: potential,
+    selectedCount: selectedCount,
+    clientStageDone: clientStageDone,
+    clientStageIndex: CLIENT_STAGE_INDEX,
+    passedPreselect: passedPreselect
+  };
 }
 
 /**
@@ -835,23 +889,54 @@ function renderPipeline() {
     html += '<div class="step-dot">' + (cls === 'done' ? '&#10003;' : (i + 1)) + '</div>';
     html += '<div class="step-info">';
     html += '<div class="step-name">' + esc(s.name);
-    /* Счётчик: cumulative N/M для done, "N на этапе" для active */
+    /* Счётчик: cumulative N/M для done, "N на этапе" для active.
+       Знаменатель зависит от позиции этапа относительно «Отбор клиента»:
+       — этап 0 (преотбор): из общего числа превью (потенциал)
+       — этапы 1..clientStageIndex (отбор команды, отбор клиента): из passed_preselect
+         (фото, прошедших преотбор) — legacy-совместимо
+       — этапы > clientStageIndex (ЦК и далее): из metrics.scale, который после
+         завершения «Отбор клиента» равен selectedCount (фото в слотах карточек). */
     if (totalPhotos > 0) {
       var cum = ss.cum;
-      if (i === 0 && metrics.potential > 0) {
+      var denom = 0;
+      if (i === 0) {
+        denom = metrics.potential;
+      } else if (i <= metrics.clientStageIndex) {
+        denom = metrics.passedPreselect || metrics.potential;
+      } else {
+        /* После «Отбор клиента»: знаменатель = scale (selectedCount если client done).
+           Если клиент ещё не подтвердил — fallback на passedPreselect. */
+        denom = metrics.clientStageDone
+          ? (metrics.scale || metrics.passedPreselect || metrics.potential)
+          : (metrics.passedPreselect || metrics.potential);
+      }
+      if (i === 0) {
         if (cls === 'done') {
-          html += '<span class="step-photo-count">' + cum + '/' + metrics.potential + '</span>';
+          if (denom > 0) html += '<span class="step-photo-count">' + cum + '/' + denom + '</span>';
         } else if (cnt > 0) {
           html += '<span class="step-photo-count">' + cnt + ' фото</span>';
         }
-      } else if (i > 0 && metrics.scale > 0) {
+      } else {
         if (cls === 'done') {
-          html += '<span class="step-photo-count">' + cum + '/' + metrics.scale + '</span>';
+          if (denom > 0) {
+            html += '<span class="step-photo-count">' + cum + '/' + denom + '</span>';
+          } else if (cum > 0) {
+            html += '<span class="step-photo-count">' + cum + ' фото</span>';
+          }
         } else if (cls === 'active') {
-          html += '<span class="step-photo-count">' + cnt + ' на этапе</span>';
+          /* "N на этапе": после клиентского отбора показываем известную нижнюю
+             границу (scale) если фактический cnt больше — это защищает от
+             ситуации, когда все фото были автоматически перемещены вперёд
+             без партиальной фильтрации. */
+          var displayCnt = cnt;
+          if (i > metrics.clientStageIndex && metrics.clientStageDone &&
+              metrics.scale > 0 && cnt > metrics.scale) {
+            displayCnt = metrics.scale;
+          }
+          html += '<span class="step-photo-count">' + displayCnt + ' на этапе</span>';
+        } else if (cnt > 0) {
+          html += '<span class="step-photo-count">' + cnt + ' фото</span>';
         }
-      } else if (cnt > 0) {
-        html += '<span class="step-photo-count">' + cnt + ' фото</span>';
       }
     }
     html += '</div>';
