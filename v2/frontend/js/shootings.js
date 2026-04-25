@@ -1122,6 +1122,9 @@ function shShowDetailedPipeline() {
   shEnsurePhotoStages(proj);
   var checkpoints = (proj._checkpoints || []).slice();
   var totalPhotos = proj.previews ? proj.previews.length : 0;
+  var allPreviews = (proj.previews || []).map(function(p) {
+    return typeof p === 'string' ? p : (p.name || p.file || '');
+  }).filter(function(s) { return !!s; });
 
   /* Sort по ts (хронологически, ascending) */
   checkpoints.sort(function(a, b) {
@@ -1130,127 +1133,342 @@ function shShowDetailedPipeline() {
     return ta - tb;
   });
 
-  var html = '<div class="sh-detail-pipeline">';
-  html += '<h3 style="margin:0 0 16px 0;font-size:16px">Маршруты фотографий</h3>';
+  /* Построить дерево узлов */
+  var tree = _shCpBuildTree(checkpoints, totalPhotos, allPreviews);
+
+  /* Геометрия */
+  var nodeWidth = 200;
+  var nodeHeight = 38;
+  var levelWidth = 240;
+  var rowHeight = 70;
+  var pad = 40;
+
+  /* Layout */
+  var leafCount = Math.max(1, _shCpCountLeaves(tree));
+  var maxDepth = _shCpMaxDepth(tree);
+  var canvasW = (maxDepth + 1) * levelWidth + nodeWidth + pad * 2;
+  var canvasH = leafCount * rowHeight + pad * 2;
+  _shCpLayoutTree(tree, pad, canvasH / 2, levelWidth, rowHeight);
+
+  /* Render SVG */
+  var svgContent = _shCpRenderTreeSVG(tree, canvasW, canvasH, nodeWidth, nodeHeight);
+
+  /* HTML */
+  var html = '';
+  html += '<div class="sh-tree-modal-inner">';
+  html += '<div class="sh-tree-modal-header">';
+  html += '<div class="sh-tree-modal-title">Маршруты фотографий</div>';
+  html += '<button type="button" class="sh-tree-modal-close" aria-label="Закрыть">&times;</button>';
+  html += '</div>';
 
   if (checkpoints.length === 0) {
-    /* Нет чекпоинтов — показать текущее распределение */
-    var photoCounts = shPhotosPerStage(proj);
-    html += '<div style="color:#888;font-size:13px;margin-bottom:12px">';
-    html += 'Пока нет записанных перемещений. Текущее распределение:';
+    html += '<div class="sh-tree-modal-empty">';
+    html += 'Пока нет записанных перемещений. ';
+    html += 'Маршруты появятся, когда фото начнут двигаться по этапам.';
     html += '</div>';
-    for (var i = 0; i < PIPELINE_STAGES.length; i++) {
-      if (photoCounts[i] === 0) continue;
-      html += '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px">';
-      html += '<span style="color:#aaa;width:16px;text-align:right">' + (i + 1) + '</span>';
-      html += '<span>' + esc(PIPELINE_STAGES[i].name) + '</span>';
-      html += '<span style="color:#888;font-size:12px">' + photoCounts[i] + ' фото</span>';
-      html += '</div>';
-    }
-    html += '<div style="margin-top:12px;font-size:11px;color:#bbb">';
-    html += 'Маршруты начнут записываться при переходах между этапами.</div>';
   } else {
-    /* ---------- Timeline групповых движений ---------- */
-    for (var ri = 0; ri < checkpoints.length; ri++) {
-      var cp = checkpoints[ri];
-      var icon = _shCpTriggerIcon(cp.trigger);
-      var label = _shCpTriggerLabel(cp.trigger);
-      var dateStr = _shCpFormatDate(cp.ts || cp.date);
-      var photoCount = (cp.photos && cp.photos.length) || cp.count || 0;
-      var approver = cp.approved_by_name || cp.by_name || cp.approver || '';
-      var note = cp.note || cp.notes || '';
-
-      /* stage_from / stage_to (могут быть null) */
-      var sFrom = (cp.stage_from === undefined) ? cp._stage_from : cp.stage_from;
-      var sTo   = (cp.stage_to   === undefined) ? cp._stage_to   : cp.stage_to;
-      if (sFrom === undefined) sFrom = null;
-      if (sTo   === undefined) sTo   = null;
-
-      var stagePart = '';
-      if (sFrom !== null && sTo !== null) {
-        if (sFrom === sTo) {
-          stagePart = '<span style="color:#888">в </span>' + esc(_shCpStageName(sTo));
-        } else {
-          stagePart = esc(_shCpStageName(sFrom)) + ' <span style="color:#aaa">→</span> ' + esc(_shCpStageName(sTo));
-        }
-      } else if (sTo !== null) {
-        stagePart = '<span style="color:#aaa">→</span> ' + esc(_shCpStageName(sTo));
-      } else if (sFrom !== null) {
-        stagePart = esc(_shCpStageName(sFrom)) + ' <span style="color:#aaa">→</span>';
-      }
-
-      var isSkip = (sFrom !== null && sTo !== null && (sTo - sFrom) > 1);
-
-      html += '<div style="display:flex;gap:10px;position:relative;min-height:44px">';
-
-      /* Левая колонка: иконка-триггер */
-      html += '<div style="display:flex;flex-direction:column;align-items:center;width:24px;flex-shrink:0">';
-      if (ri > 0) {
-        html += '<div style="width:2px;height:8px;background:#e0e0e0"></div>';
-      } else {
-        html += '<div style="height:8px"></div>';
-      }
-      html += '<div style="width:22px;height:22px;border-radius:50%;background:#fff;border:1.5px solid #ccc;display:flex;align-items:center;justify-content:center;font-size:12px;line-height:1;flex-shrink:0">';
-      html += icon;
-      html += '</div>';
-      if (ri < checkpoints.length - 1) {
-        html += '<div style="width:2px;flex:1;background:#e0e0e0"></div>';
-      }
-      html += '</div>';
-
-      /* Правая колонка: содержимое */
-      html += '<div style="flex:1;padding-bottom:10px">';
-
-      /* Заголовок строки: N фото · From → To */
-      html += '<div style="font-size:13px;font-weight:500;color:#333;line-height:1.35">';
-      html += '<strong>' + photoCount + ' фото</strong>';
-      if (stagePart) {
-        html += ' <span style="color:#aaa">·</span> ' + stagePart;
-      }
-      if (isSkip) html += ' <span style="font-size:11px;color:#c62828">(пропуск)</span>';
-      html += '</div>';
-
-      /* Подзаголовок: Триггер · DD.MM HH:MM · approver */
-      html += '<div style="font-size:11px;color:#888;margin-top:3px">';
-      html += esc(label) + ' <span style="color:#bbb">·</span> ' + esc(dateStr);
-      if (approver) {
-        html += ' <span style="color:#bbb">·</span> ' + esc(approver);
-      }
-      html += '</div>';
-
-      /* Note (если есть) */
-      if (note) {
-        html += '<div style="font-size:11px;color:#666;margin-top:3px;font-style:italic">';
-        html += '«' + esc(note) + '»';
-        html += '</div>';
-      }
-
-      html += '</div>'; /* /flex:1 */
-      html += '</div>'; /* /row */
-    }
+    html += '<div class="sh-tree-modal-canvas">' + svgContent + '</div>';
   }
 
-  /* Итого */
-  html += '<div style="margin-top:12px;padding-top:8px;border-top:1px solid #eee;font-size:12px;color:#888">';
+  html += '<div class="sh-tree-modal-footer">';
   html += 'Всего: ' + totalPhotos + ' фото';
-  if (checkpoints.length > 0) html += ' &middot; ' + checkpoints.length + ' контрольных точек';
+  if (checkpoints.length > 0) html += ' · ' + checkpoints.length + ' контрольных точек';
   html += '</div>';
   html += '</div>';
 
-  /* Динамическая модалка */
+  /* Overlay (полноэкранная модалка) */
   var overlay = document.getElementById('sh-detail-overlay');
   if (!overlay) {
     overlay = document.createElement('div');
     overlay.id = 'sh-detail-overlay';
-    overlay.className = 'modal-overlay';
-    overlay.innerHTML = '<div class="modal" style="max-width:520px;padding:24px;max-height:80vh;overflow-y:auto"></div>';
-    overlay.addEventListener('click', function(e) {
-      if (e.target === overlay) overlay.classList.remove('open');
-    });
+    overlay.className = 'sh-tree-overlay';
     document.body.appendChild(overlay);
   }
-  overlay.querySelector('.modal').innerHTML = html;
+  overlay.className = 'sh-tree-overlay';
+  overlay.innerHTML = '<div class="sh-tree-modal">' + html + '</div>';
   overlay.classList.add('open');
+
+  /* Обработчики */
+  var closeFn = function() { overlay.classList.remove('open'); };
+  overlay.onclick = function(e) { if (e.target === overlay) closeFn(); };
+  var btn = overlay.querySelector('.sh-tree-modal-close');
+  if (btn) btn.onclick = closeFn;
+
+  /* Inject стили один раз */
+  if (!document.getElementById('sh-tree-styles')) {
+    var st = document.createElement('style');
+    st.id = 'sh-tree-styles';
+    st.textContent = ''
+      + '.sh-tree-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.55);'
+      +   'z-index:10040;display:none;align-items:center;justify-content:center;padding:2.5vh 2.5vw}'
+      + '.sh-tree-overlay.open{display:flex}'
+      + '.sh-tree-modal{background:#fff;border-radius:14px;width:95vw;height:95vh;'
+      +   'display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.3)}'
+      + '.sh-tree-modal-inner{display:flex;flex-direction:column;height:100%;width:100%}'
+      + '.sh-tree-modal-header{display:flex;align-items:center;justify-content:space-between;'
+      +   'padding:18px 24px;border-bottom:1px solid #eee;flex-shrink:0}'
+      + '.sh-tree-modal-title{font-size:16px;font-weight:600;color:#222}'
+      + '.sh-tree-modal-close{background:transparent;border:none;font-size:28px;line-height:1;'
+      +   'cursor:pointer;color:#888;padding:0 8px}'
+      + '.sh-tree-modal-close:hover{color:#333}'
+      + '.sh-tree-modal-canvas{flex:1;overflow:auto;padding:24px;background:#fafafa}'
+      + '.sh-tree-modal-empty{flex:1;display:flex;align-items:center;justify-content:center;'
+      +   'color:#888;font-size:14px;text-align:center;padding:40px}'
+      + '.sh-tree-modal-footer{padding:12px 24px;border-top:1px solid #eee;font-size:12px;'
+      +   'color:#888;flex-shrink:0;text-align:right}';
+    document.head.appendChild(st);
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   Tree builder + layout + SVG render для Маршруты фотографий
+   ────────────────────────────────────────────────────────────────── */
+
+/**
+ * Построить дерево узлов из списка checkpoints.
+ * Каждый checkpoint становится узлом; родитель — предыдущий state с максимальным
+ * пересечением фото (либо root, если ни одно совпадение не найдено).
+ *
+ * Возвращает root-узел: { label, count, total, stage, children:[], kind:'root' }.
+ * Дочерние узлы добавляют поля: stageFrom, stageTo, isLoop, trigger, date, note, kind.
+ */
+function _shCpBuildTree(checkpoints, totalPhotos, allPreviews) {
+  var root = {
+    label: 'Превью',
+    count: totalPhotos,
+    total: totalPhotos,
+    stage: 0,
+    photos: (allPreviews || []).slice(),
+    children: [],
+    kind: 'root',
+    parent: null,
+    isLoop: false,
+    date: null,
+    trigger: 'preview_loaded'
+  };
+
+  if (!checkpoints || checkpoints.length === 0) return root;
+
+  /* Все известные state-узлы (донорские состояния, к которым может прицепиться child). */
+  var states = [root];
+  var skipFirst = false;
+
+  /* Если первый checkpoint = preview_loaded — обновим root и пропустим. */
+  if (checkpoints[0] && checkpoints[0].trigger === 'preview_loaded') {
+    var first = checkpoints[0];
+    root.date = first.ts || first.date || null;
+    if (first.photos && first.photos.length > 0) {
+      root.photos = first.photos.slice();
+      if (!root.count) root.count = first.photos.length;
+      if (!root.total) root.total = first.photos.length;
+    }
+    skipFirst = true;
+  }
+
+  for (var i = (skipFirst ? 1 : 0); i < checkpoints.length; i++) {
+    var cp = checkpoints[i];
+    var cpPhotos = cp.photos || [];
+    var sFrom = (cp.stage_from === undefined) ? cp._stage_from : cp.stage_from;
+    var sTo = (cp.stage_to === undefined) ? cp._stage_to : cp.stage_to;
+    if (sFrom === undefined) sFrom = null;
+    if (sTo === undefined) sTo = null;
+    if (sTo === null && sFrom !== null) sTo = sFrom;
+
+    /* Найти лучшего родителя по пересечению фото. */
+    var bestParent = root;
+    var bestScore = -1;
+    for (var j = 0; j < states.length; j++) {
+      var st = states[j];
+      var score = 0;
+      var stPhotos = st.photos || [];
+      if (cpPhotos.length > 0 && stPhotos.length > 0) {
+        var setSt = {};
+        for (var k = 0; k < stPhotos.length; k++) setSt[stPhotos[k]] = 1;
+        for (var k2 = 0; k2 < cpPhotos.length; k2++) {
+          if (setSt[cpPhotos[k2]]) score++;
+        }
+      }
+      /* Бонус: parent на этапе sFrom. */
+      if (sFrom !== null && st.stage === sFrom) score += 0.5;
+      /* Анти-бонус: одинаковый kind=loop не цепляем к loop'у обратно. */
+      if (st.kind === 'kill') score -= 100;
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestParent = st;
+      }
+    }
+
+    var isLoop = (sFrom !== null && sTo !== null && sTo < sFrom);
+    var isKill = (cp.trigger === 'photo_killed' || cp.trigger === 'client_returned');
+
+    var stageName = _shCpStageName(sTo !== null ? sTo : sFrom);
+    var triggerLabel = (typeof _shCpTriggerLabel === 'function') ? _shCpTriggerLabel(cp.trigger) : cp.trigger;
+
+    /* Если переход внутри одного этапа (sFrom===sTo) — показываем имя этапа,
+       но если есть осмысленный triggerLabel и они разные — отдаём предпочтение
+       короткому stage-имени для основного label, а triggerLabel идёт ниже. */
+    var nodeLabel = stageName || triggerLabel || cp.trigger || '?';
+
+    var child = {
+      label: nodeLabel,
+      count: (cpPhotos.length || cp.count || 0),
+      total: bestParent.count || totalPhotos,
+      stage: (sTo !== null ? sTo : sFrom),
+      stageFrom: sFrom,
+      stageTo: sTo,
+      photos: cpPhotos.slice(),
+      children: [],
+      kind: isKill ? 'kill' : (isLoop ? 'loop' : 'normal'),
+      parent: bestParent,
+      isLoop: isLoop,
+      trigger: cp.trigger,
+      triggerLabel: triggerLabel,
+      date: cp.ts || cp.date || null,
+      note: cp.note || cp.notes || ''
+    };
+
+    bestParent.children.push(child);
+    states.push(child);
+  }
+
+  return root;
+}
+
+/** Кол-во листьев в поддереве. */
+function _shCpCountLeaves(node) {
+  if (!node.children || node.children.length === 0) return 1;
+  var s = 0;
+  for (var i = 0; i < node.children.length; i++) s += _shCpCountLeaves(node.children[i]);
+  return s;
+}
+
+/** Глубина поддерева (root → 0). */
+function _shCpMaxDepth(node) {
+  if (!node.children || node.children.length === 0) return 0;
+  var m = 0;
+  for (var i = 0; i < node.children.length; i++) {
+    var d = _shCpMaxDepth(node.children[i]);
+    if (d > m) m = d;
+  }
+  return 1 + m;
+}
+
+/** Уложить дерево горизонтально (left → right). Заполняет node.x, node.y. */
+function _shCpLayoutTree(node, x, yMid, levelWidth, rowHeight) {
+  node.x = x;
+  node.y = yMid;
+  if (!node.children || node.children.length === 0) return;
+  var totalH = _shCpCountLeaves(node) * rowHeight;
+  var startY = yMid - totalH / 2;
+  for (var i = 0; i < node.children.length; i++) {
+    var c = node.children[i];
+    var ch = _shCpCountLeaves(c) * rowHeight;
+    _shCpLayoutTree(c, x + levelWidth, startY + ch / 2, levelWidth, rowHeight);
+    startY += ch;
+  }
+}
+
+/** Плоский обход дерева (для итерации). */
+function _shCpFlattenTree(node, out) {
+  out.push(node);
+  if (node.children) {
+    for (var i = 0; i < node.children.length; i++) _shCpFlattenTree(node.children[i], out);
+  }
+}
+
+/** Отрендерить дерево как SVG-строку. */
+function _shCpRenderTreeSVG(root, w, h, nodeW, nodeH) {
+  var nodes = [];
+  _shCpFlattenTree(root, nodes);
+
+  /* Реальные границы — могут оказаться больше w/h из-за длинных текстов. */
+  var maxX = w, maxY = h;
+  for (var i = 0; i < nodes.length; i++) {
+    if (nodes[i].x + nodeW > maxX) maxX = nodes[i].x + nodeW;
+    if (nodes[i].y + nodeH > maxY) maxY = nodes[i].y + nodeH;
+  }
+  maxX += 30;
+  maxY += 30;
+
+  var svg = '<svg width="' + maxX + '" height="' + maxY + '" '
+          + 'viewBox="0 0 ' + maxX + ' ' + maxY + '" '
+          + 'xmlns="http://www.w3.org/2000/svg" style="display:block">';
+
+  /* Edges (под узлами) */
+  for (var i = 0; i < nodes.length; i++) {
+    var n = nodes[i];
+    if (!n.parent) continue;
+    var p = n.parent;
+    var x1 = p.x + nodeW;
+    var y1 = p.y;
+    var x2 = n.x;
+    var y2 = n.y;
+    var midX = (x1 + x2) / 2;
+    var d = 'M' + x1 + ',' + y1
+          + ' C' + midX + ',' + y1 + ' ' + midX + ',' + y2 + ' ' + x2 + ',' + y2;
+    var dashed = n.isLoop ? ' stroke-dasharray="5,4"' : '';
+    var color = n.isLoop ? '#b88' : '#bbb';
+    svg += '<path d="' + d + '" stroke="' + color + '" stroke-width="1.5" fill="none"' + dashed + '/>';
+  }
+
+  /* Nodes */
+  for (var i2 = 0; i2 < nodes.length; i2++) {
+    var n2 = nodes[i2];
+    var isRoot = (n2.kind === 'root');
+    var isKill = (n2.kind === 'kill');
+    var bg = isRoot ? '#2c2c2c' : '#fff';
+    var stroke = isRoot ? '#2c2c2c' : (isKill ? '#c62828' : '#dcdcdc');
+    var textColor = isRoot ? '#fff' : (isKill ? '#c62828' : '#2a2a2a');
+
+    var rectX = n2.x;
+    var rectY = n2.y - nodeH / 2;
+
+    svg += '<g>';
+    svg += '<rect x="' + rectX + '" y="' + rectY + '" '
+        + 'width="' + nodeW + '" height="' + nodeH + '" '
+        + 'rx="19" ry="19" fill="' + bg + '" stroke="' + stroke + '" stroke-width="1.2"/>';
+
+    /* Текст узла: "Имя этапа N/M"  (или "Имя N" для root) */
+    var countText;
+    if (isRoot) {
+      countText = ' ' + (n2.count || 0);
+    } else if (n2.total && n2.total !== n2.count) {
+      countText = ' ' + n2.count + '/' + n2.total;
+    } else {
+      countText = ' ' + n2.count;
+    }
+    var label = (n2.label || '') + countText;
+
+    svg += '<text x="' + (rectX + nodeW / 2) + '" y="' + (n2.y + 4) + '" '
+        + 'font-size="12.5" font-family="-apple-system,Segoe UI,sans-serif" '
+        + 'fill="' + textColor + '" text-anchor="middle">'
+        + _shCpEscapeSVG(label) + '</text>';
+    svg += '</g>';
+
+    /* Подпись даты под листовыми узлами */
+    var isLeaf = (!n2.children || n2.children.length === 0);
+    if (isLeaf && n2.date && !isRoot) {
+      var dt = _shCpFormatDate(n2.date);
+      svg += '<text x="' + (rectX + nodeW / 2) + '" y="' + (n2.y + nodeH / 2 + 14) + '" '
+          + 'font-size="10" font-family="-apple-system,Segoe UI,sans-serif" '
+          + 'fill="#999" text-anchor="middle">' + _shCpEscapeSVG('Сдано ' + dt) + '</text>';
+    }
+  }
+
+  svg += '</svg>';
+  return svg;
+}
+
+/** Защита от XML-метасимволов в SVG-тексте. */
+function _shCpEscapeSVG(s) {
+  if (s === null || s === undefined) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 /**
@@ -1505,35 +1723,14 @@ function _shCpTriggerLabel(trigger) {
 }
 
 /**
- * Phase 3: emoji-иконка для trigger (для timeline-рендера групповых движений).
+ * Phase 3: маркер для trigger (текстовый, без эмодзи).
+ * Сохраняем функцию для обратной совместимости с shShowPhotoHistory,
+ * но возвращаем нейтральную точку — никаких смайликов.
  * @param {string} trigger
  * @returns {string}
  */
 function _shCpTriggerIcon(trigger) {
-  var map = {
-    'preview_loaded':            '📥',
-    'selection_done':            '✋',
-    'team_selection_done':       '✋',
-    'client_review_v1':          '👁',
-    'client_review':             '👁',
-    'client_received':           '👁',
-    'client_save':               '✓',
-    'client_saved':              '✓',
-    'client_approved':           '✓',
-    'client_returned':           '↩️',
-    'client_replacement_request':'🔄',
-    'replacement_pulled':        '🔄',
-    'cc_loaded':                 '🎨',
-    'cc_confirmed':              '🎨',
-    'manual_skip_cc':            '⚡',
-    'retouch_comments':          '💬',
-    'retouch_loaded':            '✏️',
-    'retouch_approved':          '✓',
-    'retouch_returned':          '↩️',
-    'manual':                    '·',
-    'adaptation_done':           '🏁'
-  };
-  return map[trigger] || '·';
+  return '·';
 }
 
 /**
