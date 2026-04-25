@@ -3075,7 +3075,7 @@ function _sbLoadAndAttachVersions(cloudId, proj, pvByName, done) {
   if (!sbClient) { done(); return; }
 
   sbClient.from('photo_versions')
-    .select('photo_name, stage, preview_path, version_num, selected, cos_path, retouch_path, created_at, created_by')
+    .select('photo_name, stage, preview_path, version_num, selected, cos_path, created_at')
     .eq('project_id', cloudId)
     .order('photo_name', { ascending: true })
     .order('stage', { ascending: true })
@@ -3121,9 +3121,7 @@ function _sbLoadAndAttachVersions(cloudId, proj, pvByName, done) {
             path: r.preview_path || '',
             selected: !!r.selected,
             cos_path: r.cos_path || null,
-            retouch_path: r.retouch_path || null,
-            created_at: r.created_at || null,
-            created_by: r.created_by || null
+            created_at: r.created_at || null
           };
         });
 
@@ -3145,9 +3143,7 @@ function _sbLoadAndAttachVersions(cloudId, proj, pvByName, done) {
             version_num: primary.version_num,
             selected: primary.selected,
             cos_path: primary.cos_path,
-            retouch_path: primary.retouch_path,
             created_at: primary.created_at,
-            created_by: primary.created_by,
             variants: variants
           };
         } else {
