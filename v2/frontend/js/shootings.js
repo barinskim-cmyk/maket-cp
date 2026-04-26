@@ -1322,11 +1322,11 @@ function _shCpEventName(cp) {
 
 /** Уложить узлы по координатам. */
 function _shCpLayoutEventGraph(nodes) {
-  var TOP = 50;
-  var ROW = 85;
-  var X_MAIN = 280;
-  var X_LEFT = 170;
-  var X_RIGHT = 660;
+  var TOP = 35;
+  var ROW = 55;
+  var X_MAIN = 200;
+  var X_LEFT = 110;
+  var X_RIGHT = 480;
 
   for (var i = 0; i < nodes.length; i++) {
     var n = nodes[i];
@@ -1337,17 +1337,17 @@ function _shCpLayoutEventGraph(nodes) {
 
     /* Радиус ∝ sqrt(count). */
     if (n.count > 0) {
-      n.r = Math.max(4, Math.min(12, 3 + Math.sqrt(n.count) * 0.9));
+      n.r = Math.max(3, Math.min(8, 2 + Math.sqrt(n.count) * 0.6));
     } else {
-      n.r = 4;
+      n.r = 3;
     }
-    if (n.isFirst) n.r = Math.max(n.r, 10);
-    if (n.isActive && n.isLast) n.r = Math.max(n.r, 8);
+    if (n.isFirst) n.r = Math.max(n.r, 7);
+    if (n.isActive && n.isLast) n.r = Math.max(n.r, 6);
   }
 
   return {
-    w: 1000,
-    h: TOP + nodes.length * ROW + 50,
+    w: 700,
+    h: TOP + nodes.length * ROW + 40,
     xMain: X_MAIN,
     xLeft: X_LEFT,
     xRight: X_RIGHT,
@@ -1364,21 +1364,21 @@ function _shCpRenderEventGraphSVG(nodes, dim) {
   var spineTop = mainNodes.length > 0 ? mainNodes[0].y : dim.top;
   var spineBottom = mainNodes.length > 0 ? mainNodes[mainNodes.length - 1].y : dim.top;
 
-  var svg = '<svg viewBox="0 0 ' + w + ' ' + h + '" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;height:auto">';
+  var svg = '<svg viewBox="0 0 ' + w + ' ' + h + '" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMin meet" style="display:block;width:100%;max-width:700px;height:auto;margin:0 auto">';
   svg += '<style>'
-    + '.dot{fill:#fff;stroke:#2c2c2c;stroke-width:1.6}'
+    + '.dot{fill:#fff;stroke:#2c2c2c;stroke-width:1.2}'
     + '.dot-active{fill:#2c2c2c;stroke:#2c2c2c}'
-    + '.dot-light{fill:#fff;stroke:#aaa;stroke-width:1.4}'
-    + '.line{fill:none;stroke:#555;stroke-width:1.4}'
-    + '.line-iter{fill:none;stroke:#bbb;stroke-width:1.2}'
-    + '.cp-name{font:600 11px system-ui,-apple-system,sans-serif;fill:#2c2c2c}'
-    + '.cp-name-light{font:500 11px system-ui,-apple-system,sans-serif;fill:#888}'
-    + '.cp-num{font:700 12px system-ui,-apple-system,sans-serif;fill:#2c2c2c}'
-    + '.cp-num-light{font:600 11px system-ui,-apple-system,sans-serif;fill:#888}'
-    + '.cp-desc{font:10px system-ui,-apple-system,sans-serif;fill:#555}'
-    + '.cp-desc-light{font:10px system-ui,-apple-system,sans-serif;fill:#999}'
-    + '.cp-meta{font:9px system-ui,-apple-system,sans-serif;fill:#888}'
-    + '.cp-compo{font:9px system-ui,-apple-system,sans-serif;fill:#888}'
+    + '.dot-light{fill:#fff;stroke:#aaa;stroke-width:1.0}'
+    + '.line{fill:none;stroke:#555;stroke-width:1.0}'
+    + '.line-iter{fill:none;stroke:#bbb;stroke-width:0.9}'
+    + '.cp-name{font:600 8px system-ui,-apple-system,sans-serif;fill:#2c2c2c}'
+    + '.cp-name-light{font:500 8px system-ui,-apple-system,sans-serif;fill:#888}'
+    + '.cp-num{font:700 9px system-ui,-apple-system,sans-serif;fill:#2c2c2c}'
+    + '.cp-num-light{font:600 8px system-ui,-apple-system,sans-serif;fill:#888}'
+    + '.cp-desc{font:7.5px system-ui,-apple-system,sans-serif;fill:#555}'
+    + '.cp-desc-light{font:7.5px system-ui,-apple-system,sans-serif;fill:#999}'
+    + '.cp-meta{font:7px system-ui,-apple-system,sans-serif;fill:#888}'
+    + '.cp-compo{font:7px system-ui,-apple-system,sans-serif;fill:#888}'
     + '</style>';
 
   /* Главная вертикальная ось. */
@@ -1417,14 +1417,14 @@ function _shCpRenderEventGraphSVG(nodes, dim) {
   }
 
   /* Легенда внизу. */
-  var legendY = h - 30;
-  svg += '<g transform="translate(40,' + legendY + ')">'
-       + '<circle class="dot-active" cx="6" cy="0" r="8"/>'
-       + '<text class="cp-meta" x="22" y="4">старт / финал · размер кружка ∝ количеству фото</text>'
-       + '<circle class="dot" cx="380" cy="0" r="6"/>'
-       + '<text class="cp-meta" x="396" y="4">главный поток</text>'
-       + '<circle class="dot-light" cx="540" cy="0" r="6"/>'
-       + '<text class="cp-meta" x="556" y="4">боковая ветка</text>'
+  var legendY = h - 18;
+  svg += '<g transform="translate(20,' + legendY + ')">'
+       + '<circle class="dot-active" cx="4" cy="0" r="5"/>'
+       + '<text class="cp-meta" x="14" y="3">старт / финал · кружок ∝ количеству фото</text>'
+       + '<circle class="dot" cx="260" cy="0" r="4"/>'
+       + '<text class="cp-meta" x="270" y="3">главный поток</text>'
+       + '<circle class="dot-light" cx="370" cy="0" r="4"/>'
+       + '<text class="cp-meta" x="380" y="3">боковая ветка</text>'
        + '</g>';
 
   svg += '</svg>';
@@ -1434,7 +1434,7 @@ function _shCpRenderEventGraphSVG(nodes, dim) {
 /** Цепочка боковых узлов: первый соединён со spine горизонтально, последующие — вертикально между собой. */
 function _shCpRenderSideChain(arr, xMain, xSide) {
   if (!arr || arr.length === 0) return '';
-  var ROW_THRESH = 220; /* в пределах ~1.5 ROW считаем chain'ом. */
+  var ROW_THRESH = 90; /* в пределах ~1.5 ROW (ROW=55) считаем chain'ом. */
   var html = '';
   var prev = null;
   for (var i = 0; i < arr.length; i++) {
@@ -1465,28 +1465,28 @@ function _shCpRenderNodeText(n) {
   /* Положение текста: справа на main и side-right, слева (anchor=end) на side-left. */
   var tx, anchor, nameClass, numClass, descClass;
   if (n.lane === 'side-left') {
-    tx = n.x - n.r - 12;
+    tx = n.x - n.r - 8;
     anchor = 'end';
     nameClass = 'cp-name-light';
     numClass = 'cp-num-light';
     descClass = 'cp-desc-light';
   } else if (n.lane === 'side-right') {
-    tx = n.x + n.r + 12;
+    tx = n.x + n.r + 8;
     anchor = 'start';
     nameClass = 'cp-name-light';
     numClass = 'cp-num-light';
     descClass = 'cp-desc-light';
   } else {
-    tx = n.x + n.r + 14;
+    tx = n.x + n.r + 10;
     anchor = 'start';
     nameClass = 'cp-name';
     numClass = 'cp-num';
     descClass = 'cp-desc';
   }
 
-  var nameY = n.y - 10;
-  var numY = n.y + 3;
-  var descY = n.y + 16;
+  var nameY = n.y - 7;
+  var numY = n.y + 2;
+  var descY = n.y + 11;
 
   s += '<text class="' + nameClass + '" x="' + tx + '" y="' + nameY +
        '" text-anchor="' + anchor + '">' + _shCpEscapeSVG(_shCpTrunc(n.name, 20)) + '</text>';
@@ -1501,9 +1501,9 @@ function _shCpRenderNodeText(n) {
     for (var li = 0; li < lines.length; li++) {
       s += '<text class="' + descClass + '" x="' + tx + '" y="' + nextY +
            '" text-anchor="' + anchor + '">' + _shCpEscapeSVG(lines[li]) + '</text>';
-      nextY += 11;
+      nextY += 8;
     }
-    nextY += 2;
+    nextY += 1;
   }
 
   var meta = _shCpTrunc((n.author || '—') + ' · ' + (n.date || '—'), 35);
