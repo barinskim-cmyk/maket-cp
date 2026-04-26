@@ -1322,11 +1322,11 @@ function _shCpEventName(cp) {
 
 /** Уложить узлы по координатам. */
 function _shCpLayoutEventGraph(nodes) {
-  var TOP = 70;
-  var ROW = 115;
-  var X_MAIN = 300;
-  var X_LEFT = 180;
-  var X_RIGHT = 700;
+  var TOP = 50;
+  var ROW = 85;
+  var X_MAIN = 280;
+  var X_LEFT = 170;
+  var X_RIGHT = 660;
 
   for (var i = 0; i < nodes.length; i++) {
     var n = nodes[i];
@@ -1337,17 +1337,17 @@ function _shCpLayoutEventGraph(nodes) {
 
     /* Радиус ∝ sqrt(count). */
     if (n.count > 0) {
-      n.r = Math.max(5, Math.min(16, 4 + Math.sqrt(n.count) * 1.2));
+      n.r = Math.max(4, Math.min(12, 3 + Math.sqrt(n.count) * 0.9));
     } else {
-      n.r = 5;
+      n.r = 4;
     }
-    if (n.isFirst) n.r = Math.max(n.r, 14);
-    if (n.isActive && n.isLast) n.r = Math.max(n.r, 11);
+    if (n.isFirst) n.r = Math.max(n.r, 10);
+    if (n.isActive && n.isLast) n.r = Math.max(n.r, 8);
   }
 
   return {
-    w: 1080,
-    h: TOP + nodes.length * ROW + 60,
+    w: 1000,
+    h: TOP + nodes.length * ROW + 50,
     xMain: X_MAIN,
     xLeft: X_LEFT,
     xRight: X_RIGHT,
@@ -1371,14 +1371,14 @@ function _shCpRenderEventGraphSVG(nodes, dim) {
     + '.dot-light{fill:#fff;stroke:#aaa;stroke-width:1.4}'
     + '.line{fill:none;stroke:#555;stroke-width:1.4}'
     + '.line-iter{fill:none;stroke:#bbb;stroke-width:1.2}'
-    + '.cp-name{font:600 13px system-ui,-apple-system,sans-serif;fill:#2c2c2c}'
-    + '.cp-name-light{font:500 12px system-ui,-apple-system,sans-serif;fill:#888}'
-    + '.cp-num{font:700 14px system-ui,-apple-system,sans-serif;fill:#2c2c2c}'
-    + '.cp-num-light{font:600 12px system-ui,-apple-system,sans-serif;fill:#888}'
-    + '.cp-desc{font:11px system-ui,-apple-system,sans-serif;fill:#555}'
-    + '.cp-desc-light{font:11px system-ui,-apple-system,sans-serif;fill:#999}'
-    + '.cp-meta{font:10px system-ui,-apple-system,sans-serif;fill:#888}'
-    + '.cp-compo{font:10px system-ui,-apple-system,sans-serif;fill:#888}'
+    + '.cp-name{font:600 11px system-ui,-apple-system,sans-serif;fill:#2c2c2c}'
+    + '.cp-name-light{font:500 11px system-ui,-apple-system,sans-serif;fill:#888}'
+    + '.cp-num{font:700 12px system-ui,-apple-system,sans-serif;fill:#2c2c2c}'
+    + '.cp-num-light{font:600 11px system-ui,-apple-system,sans-serif;fill:#888}'
+    + '.cp-desc{font:10px system-ui,-apple-system,sans-serif;fill:#555}'
+    + '.cp-desc-light{font:10px system-ui,-apple-system,sans-serif;fill:#999}'
+    + '.cp-meta{font:9px system-ui,-apple-system,sans-serif;fill:#888}'
+    + '.cp-compo{font:9px system-ui,-apple-system,sans-serif;fill:#888}'
     + '</style>';
 
   /* Главная вертикальная ось. */
@@ -1484,12 +1484,12 @@ function _shCpRenderNodeText(n) {
     descClass = 'cp-desc';
   }
 
-  var nameY = n.y - 12;
-  var numY = n.y + 4;
-  var descY = n.y + 20;
+  var nameY = n.y - 10;
+  var numY = n.y + 3;
+  var descY = n.y + 16;
 
   s += '<text class="' + nameClass + '" x="' + tx + '" y="' + nameY +
-       '" text-anchor="' + anchor + '">' + _shCpEscapeSVG(_shCpTrunc(n.name, 24)) + '</text>';
+       '" text-anchor="' + anchor + '">' + _shCpEscapeSVG(_shCpTrunc(n.name, 20)) + '</text>';
 
   var countLabel = n.count > 0 ? (n.count + ' фото') : '—';
   s += '<text class="' + numClass + '" x="' + tx + '" y="' + numY +
@@ -1497,16 +1497,16 @@ function _shCpRenderNodeText(n) {
 
   var nextY = descY;
   if (n.description) {
-    var lines = _shCpWrapDesc(n.description, 40);
+    var lines = _shCpWrapDesc(n.description, 35);
     for (var li = 0; li < lines.length; li++) {
       s += '<text class="' + descClass + '" x="' + tx + '" y="' + nextY +
            '" text-anchor="' + anchor + '">' + _shCpEscapeSVG(lines[li]) + '</text>';
-      nextY += 13;
+      nextY += 11;
     }
     nextY += 2;
   }
 
-  var meta = _shCpTrunc((n.author || '—') + ' · ' + (n.date || '—'), 40);
+  var meta = _shCpTrunc((n.author || '—') + ' · ' + (n.date || '—'), 35);
   s += '<text class="cp-meta" x="' + tx + '" y="' + nextY +
        '" text-anchor="' + anchor + '">' + _shCpEscapeSVG(meta) + '</text>';
 
