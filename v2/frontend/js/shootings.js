@@ -1125,7 +1125,7 @@ function renderPipeline() {
      как DOM отрендерится. Сначала помещаем placeholder с метаданными в data-*. ── */
   if (pl5_sideBranches.length > 0) {
     var sbDataJson = '';
-    try { sbDataJson = JSON.stringify(pl5_sideBranches).replace(/"/g, '&quot;'); }
+    try { sbDataJson = encodeURIComponent(JSON.stringify(pl5_sideBranches)); }
     catch (e) { sbDataJson = ''; }
     html = html.replace(
       '<div class="pipeline-steps">',
@@ -1185,7 +1185,7 @@ function _shLayoutSideBranches(container) {
   var raw = overlay.getAttribute('data-side-branches');
   if (!raw) return;
   var data;
-  try { data = JSON.parse(raw); } catch (e) { return; }
+  try { data = JSON.parse(decodeURIComponent(raw)); } catch (e) { return; }
   if (!data || data.length === 0) return;
 
   /* Координаты по контейнеру pipeline-steps. */
