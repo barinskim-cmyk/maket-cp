@@ -1111,9 +1111,9 @@ function shShowJumpMenu(currentIdx, btn) {
 
 /**
  * Показать детальный пайплайн во всплывающем окне.
- * Phase 3: digital twin — хронологический timeline групповых движений.
- * Источник: proj._checkpoints (jsonb-массив batch-событий).
- * Каждая строка = одно перемещение группы фото между этапами.
+ * Phase 4: граф событий — каждый checkpoint = узел.
+ * Главная вертикальная ось — основной поток фото; боковые ветки —
+ * итерации, срочные, замены. Только orthogonal-линии, без стрелок.
  */
 function shShowDetailedPipeline() {
   var proj = getActiveProject();
@@ -1122,9 +1122,6 @@ function shShowDetailedPipeline() {
   shEnsurePhotoStages(proj);
   var checkpoints = (proj._checkpoints || []).slice();
   var totalPhotos = proj.previews ? proj.previews.length : 0;
-  var allPreviews = (proj.previews || []).map(function(p) {
-    return typeof p === 'string' ? p : (p.name || p.file || '');
-  }).filter(function(s) { return !!s; });
 
   /* Sort по ts (хронологически, ascending) */
   checkpoints.sort(function(a, b) {
@@ -1133,38 +1130,25 @@ function shShowDetailedPipeline() {
     return ta - tb;
   });
 
-  /* Построить дерево узлов */
-  var tree = _shCpBuildTree(checkpoints, totalPhotos, allPreviews);
-
-  /* Геометрия */
-  var nodeWidth = 200;
-  var nodeHeight = 38;
-  var levelWidth = 240;
-  var rowHeight = 70;
-  var pad = 40;
-
-  /* Layout */
-  var leafCount = Math.max(1, _shCpCountLeaves(tree));
-  var maxDepth = _shCpMaxDepth(tree);
-  var canvasW = (maxDepth + 1) * levelWidth + nodeWidth + pad * 2;
-  var canvasH = leafCount * rowHeight + pad * 2;
-  _shCpLayoutTree(tree, pad, canvasH / 2, levelWidth, rowHeight);
-
-  /* Render SVG */
-  var svgContent = _shCpRenderTreeSVG(tree, canvasW, canvasH, nodeWidth, nodeHeight);
+  var svgContent = '';
+  if (checkpoints.length > 0) {
+    var nodes = _shCpBuildEventNodes(checkpoints, totalPhotos);
+    var dim = _shCpLayoutEventGraph(nodes);
+    svgContent = _shCpRenderEventGraphSVG(nodes, dim);
+  }
 
   /* HTML */
   var html = '';
   html += '<div class="sh-tree-modal-inner">';
   html += '<div class="sh-tree-modal-header">';
-  html += '<div class="sh-tree-modal-title">Маршруты фотографий</div>';
+  html += '<div class="sh-tree-modal-title">Поток фотографий — детальный пайплайн</div>';
   html += '<button type="button" class="sh-tree-modal-close" aria-label="Закрыть">&times;</button>';
   html += '</div>';
 
   if (checkpoints.length === 0) {
     html += '<div class="sh-tree-modal-empty">';
     html += 'Пока нет записанных перемещений. ';
-    html += 'Маршруты появятся, когда фото начнут двигаться по этапам.';
+    html += 'События появятся, когда фото начнут двигаться по этапам.';
     html += '</div>';
   } else {
     html += '<div class="sh-tree-modal-canvas">' + svgContent + '</div>';
@@ -1172,7 +1156,7 @@ function shShowDetailedPipeline() {
 
   html += '<div class="sh-tree-modal-footer">';
   html += 'Всего: ' + totalPhotos + ' фото';
-  if (checkpoints.length > 0) html += ' · ' + checkpoints.length + ' контрольных точек';
+  if (checkpoints.length > 0) html += ' · ' + checkpoints.length + ' событий';
   html += '</div>';
   html += '</div>';
 
@@ -1211,7 +1195,7 @@ function shShowDetailedPipeline() {
       + '.sh-tree-modal-close{background:transparent;border:none;font-size:28px;line-height:1;'
       +   'cursor:pointer;color:#888;padding:0 8px}'
       + '.sh-tree-modal-close:hover{color:#333}'
-      + '.sh-tree-modal-canvas{flex:1;overflow:auto;padding:24px;background:#fafafa}'
+      + '.sh-tree-modal-canvas{flex:1;overflow:auto;padding:24px;background:#fff}'
       + '.sh-tree-modal-empty{flex:1;display:flex;align-items:center;justify-content:center;'
       +   'color:#888;font-size:14px;text-align:center;padding:40px}'
       + '.sh-tree-modal-footer{padding:12px 24px;border-top:1px solid #eee;font-size:12px;'
@@ -1221,243 +1205,338 @@ function shShowDetailedPipeline() {
 }
 
 /* ──────────────────────────────────────────────────────────────────
-   Tree builder + layout + SVG render для Маршруты фотографий
+   Phase 4: event graph — построение узлов из checkpoints,
+   назначение lane (main / side-left / side-right), и SVG render.
+   Принципы (утв. с Машей):
+   – узел = одно событие (checkpoint)
+   – вертикальная главная ось, боковые ветки orthogonal
+   – без стрелок, без эмодзи, без косых линий
+   – размер кружка ∝ sqrt(count)
    ────────────────────────────────────────────────────────────────── */
 
-/**
- * Построить дерево узлов из списка checkpoints.
- * Каждый checkpoint становится узлом; родитель — предыдущий state с максимальным
- * пересечением фото (либо root, если ни одно совпадение не найдено).
- *
- * Возвращает root-узел: { label, count, total, stage, children:[], kind:'root' }.
- * Дочерние узлы добавляют поля: stageFrom, stageTo, isLoop, trigger, date, note, kind.
- */
-function _shCpBuildTree(checkpoints, totalPhotos, allPreviews) {
-  var root = {
-    label: 'Превью',
-    count: totalPhotos,
-    total: totalPhotos,
-    stage: 0,
-    photos: (allPreviews || []).slice(),
-    children: [],
-    kind: 'root',
-    parent: null,
-    isLoop: false,
-    date: null,
-    trigger: 'preview_loaded'
-  };
-
-  if (!checkpoints || checkpoints.length === 0) return root;
-
-  /* Все известные state-узлы (донорские состояния, к которым может прицепиться child). */
-  var states = [root];
-  var skipFirst = false;
-
-  /* Если первый checkpoint = preview_loaded — обновим root и пропустим. */
-  if (checkpoints[0] && checkpoints[0].trigger === 'preview_loaded') {
-    var first = checkpoints[0];
-    root.date = first.ts || first.date || null;
-    if (first.photos && first.photos.length > 0) {
-      root.photos = first.photos.slice();
-      if (!root.count) root.count = first.photos.length;
-      if (!root.total) root.total = first.photos.length;
-    }
-    skipFirst = true;
-  }
-
-  for (var i = (skipFirst ? 1 : 0); i < checkpoints.length; i++) {
-    var cp = checkpoints[i];
-    var cpPhotos = cp.photos || [];
-    var sFrom = (cp.stage_from === undefined) ? cp._stage_from : cp.stage_from;
-    var sTo = (cp.stage_to === undefined) ? cp._stage_to : cp.stage_to;
-    if (sFrom === undefined) sFrom = null;
-    if (sTo === undefined) sTo = null;
-    if (sTo === null && sFrom !== null) sTo = sFrom;
-
-    /* Найти лучшего родителя по пересечению фото. */
-    var bestParent = root;
-    var bestScore = -1;
-    for (var j = 0; j < states.length; j++) {
-      var st = states[j];
-      var score = 0;
-      var stPhotos = st.photos || [];
-      if (cpPhotos.length > 0 && stPhotos.length > 0) {
-        var setSt = {};
-        for (var k = 0; k < stPhotos.length; k++) setSt[stPhotos[k]] = 1;
-        for (var k2 = 0; k2 < cpPhotos.length; k2++) {
-          if (setSt[cpPhotos[k2]]) score++;
-        }
-      }
-      /* Бонус: parent на этапе sFrom. */
-      if (sFrom !== null && st.stage === sFrom) score += 0.5;
-      /* Анти-бонус: одинаковый kind=loop не цепляем к loop'у обратно. */
-      if (st.kind === 'kill') score -= 100;
-
-      if (score > bestScore) {
-        bestScore = score;
-        bestParent = st;
-      }
-    }
-
-    var isLoop = (sFrom !== null && sTo !== null && sTo < sFrom);
-    var isKill = (cp.trigger === 'photo_killed' || cp.trigger === 'client_returned');
-
-    var stageName = _shCpStageName(sTo !== null ? sTo : sFrom);
-    var triggerLabel = (typeof _shCpTriggerLabel === 'function') ? _shCpTriggerLabel(cp.trigger) : cp.trigger;
-
-    /* Если переход внутри одного этапа (sFrom===sTo) — показываем имя этапа,
-       но если есть осмысленный triggerLabel и они разные — отдаём предпочтение
-       короткому stage-имени для основного label, а triggerLabel идёт ниже. */
-    var nodeLabel = stageName || triggerLabel || cp.trigger || '?';
-
-    var child = {
-      label: nodeLabel,
-      count: (cpPhotos.length || cp.count || 0),
-      total: bestParent.count || totalPhotos,
-      stage: (sTo !== null ? sTo : sFrom),
-      stageFrom: sFrom,
-      stageTo: sTo,
-      photos: cpPhotos.slice(),
-      children: [],
-      kind: isKill ? 'kill' : (isLoop ? 'loop' : 'normal'),
-      parent: bestParent,
-      isLoop: isLoop,
-      trigger: cp.trigger,
-      triggerLabel: triggerLabel,
-      date: cp.ts || cp.date || null,
-      note: cp.note || cp.notes || ''
-    };
-
-    bestParent.children.push(child);
-    states.push(child);
-  }
-
-  return root;
-}
-
-/** Кол-во листьев в поддереве. */
-function _shCpCountLeaves(node) {
-  if (!node.children || node.children.length === 0) return 1;
-  var s = 0;
-  for (var i = 0; i < node.children.length; i++) s += _shCpCountLeaves(node.children[i]);
-  return s;
-}
-
-/** Глубина поддерева (root → 0). */
-function _shCpMaxDepth(node) {
-  if (!node.children || node.children.length === 0) return 0;
-  var m = 0;
-  for (var i = 0; i < node.children.length; i++) {
-    var d = _shCpMaxDepth(node.children[i]);
-    if (d > m) m = d;
-  }
-  return 1 + m;
-}
-
-/** Уложить дерево горизонтально (left → right). Заполняет node.x, node.y. */
-function _shCpLayoutTree(node, x, yMid, levelWidth, rowHeight) {
-  node.x = x;
-  node.y = yMid;
-  if (!node.children || node.children.length === 0) return;
-  var totalH = _shCpCountLeaves(node) * rowHeight;
-  var startY = yMid - totalH / 2;
-  for (var i = 0; i < node.children.length; i++) {
-    var c = node.children[i];
-    var ch = _shCpCountLeaves(c) * rowHeight;
-    _shCpLayoutTree(c, x + levelWidth, startY + ch / 2, levelWidth, rowHeight);
-    startY += ch;
-  }
-}
-
-/** Плоский обход дерева (для итерации). */
-function _shCpFlattenTree(node, out) {
-  out.push(node);
-  if (node.children) {
-    for (var i = 0; i < node.children.length; i++) _shCpFlattenTree(node.children[i], out);
-  }
-}
-
-/** Отрендерить дерево как SVG-строку. */
-function _shCpRenderTreeSVG(root, w, h, nodeW, nodeH) {
+/** Собрать массив узлов из checkpoints. */
+function _shCpBuildEventNodes(checkpoints, totalPhotos) {
   var nodes = [];
-  _shCpFlattenTree(root, nodes);
 
-  /* Реальные границы — могут оказаться больше w/h из-за длинных текстов. */
-  var maxX = w, maxY = h;
-  for (var i = 0; i < nodes.length; i++) {
-    if (nodes[i].x + nodeW > maxX) maxX = nodes[i].x + nodeW;
-    if (nodes[i].y + nodeH > maxY) maxY = nodes[i].y + nodeH;
+  for (var i = 0; i < checkpoints.length; i++) {
+    var cp = checkpoints[i];
+    var photos = cp.photos || [];
+    var count = photos.length || 0;
+    var trigger = cp.trigger || '';
+    var isLast = (i === checkpoints.length - 1);
+
+    var lane = _shCpClassifyLane(trigger, i, isLast);
+
+    /* Найти лучшего родителя по пересечению фото (среди предыдущих cp). */
+    var bestParent = -1;
+    var bestScore = 0;
+    for (var j = i - 1; j >= 0; j--) {
+      var pp = checkpoints[j].photos || [];
+      if (pp.length === 0 || count === 0) continue;
+      var setP = {};
+      for (var k = 0; k < pp.length; k++) setP[pp[k]] = 1;
+      var ov = 0;
+      for (var k2 = 0; k2 < photos.length; k2++) if (setP[photos[k2]]) ov++;
+      if (ov > bestScore) { bestScore = ov; bestParent = j; }
+    }
+
+    /* Спец-правило: replacement_pulled → последний client_replacement_request, если есть. */
+    if (trigger === 'replacement_pulled') {
+      for (var p = i - 1; p >= 0; p--) {
+        if (checkpoints[p].trigger === 'client_replacement_request') { bestParent = p; break; }
+      }
+    }
+    /* Fallback: предыдущий cp. */
+    if (bestParent < 0 && i > 0) bestParent = i - 1;
+
+    nodes.push({
+      id: cp.id || ('cp' + i),
+      cpIndex: i,
+      name: _shCpEventName(cp),
+      count: count,
+      author: cp.approved_by_name || cp.author || '—',
+      date: _shCpFormatDate(cp.ts || cp.date),
+      description: cp.note || '',
+      lane: lane,
+      trigger: trigger,
+      parentIdx: bestParent,
+      isFirst: (i === 0),
+      isLast: isLast,
+      isActive: (i === 0) || (isLast && _shCpIsDeliveryTrigger(trigger))
+    });
   }
-  maxX += 30;
-  maxY += 30;
 
-  var svg = '<svg width="' + maxX + '" height="' + maxY + '" '
-          + 'viewBox="0 0 ' + maxX + ' ' + maxY + '" '
-          + 'xmlns="http://www.w3.org/2000/svg" style="display:block">';
+  return nodes;
+}
 
-  /* Edges (под узлами) */
+/** Классификация lane по триггеру. */
+function _shCpClassifyLane(trigger, idx, isLast) {
+  if (idx === 0) return 'main';
+  if (isLast && _shCpIsDeliveryTrigger(trigger)) return 'main';
+  /* Итерации / backflow → влево. */
+  if (trigger === 'client_returned' || trigger === 'photo_killed' ||
+      trigger === 'retouch_returned' || trigger === 'cc_returned') {
+    return 'side-left';
+  }
+  /* Срочные / замены / skip-CC → вправо. */
+  if (trigger === 'client_replacement_request' || trigger === 'replacement_pulled' ||
+      trigger === 'manual_skip_cc') {
+    return 'side-right';
+  }
+  return 'main';
+}
+
+function _shCpIsDeliveryTrigger(t) {
+  return t === 'adaptation_done' || t === 'retouch_approved' ||
+         t === 'client_approved' || t === 'retouch_loaded';
+}
+
+/** Человекочитаемое имя события для узла. */
+function _shCpEventName(cp) {
+  var labels = {
+    'preview_loaded':            'Превью загружены',
+    'selection_done':            'Преотбор команды',
+    'team_selection_done':       'Команда отдала клиенту',
+    'client_review_v1':          'Клиент открыл',
+    'client_review':             'Клиент открыл',
+    'client_received':           'Клиент получил',
+    'client_save':               'Клиент сохранил',
+    'client_saved':              'Клиент сохранил',
+    'client_approved':           'Клиент согласовал',
+    'client_returned':           'Клиент вернул',
+    'client_replacement_request':'Запрос замен',
+    'replacement_pulled':        'Подобраны замены',
+    'photo_killed':              'Фото удалены',
+    'cc_loaded':                 'Цветокоррекция',
+    'cc_confirmed':              'ЦК подтверждена',
+    'cc_returned':               'ЦК · возврат',
+    'manual_skip_cc':            'Минуют ЦК (срочно)',
+    'retouch_loaded':            'Ретушь загружена',
+    'retouch_approved':          'Ретушь согласована',
+    'retouch_returned':          'Ретушь возвращена',
+    'manual':                    'Ручная фиксация',
+    'adaptation_done':           'Сдано клиенту'
+  };
+  return labels[cp.trigger] || cp.trigger || 'Событие';
+}
+
+/** Уложить узлы по координатам. */
+function _shCpLayoutEventGraph(nodes) {
+  var TOP = 90;
+  var ROW = 140;
+  var X_MAIN = 320;
+  var X_LEFT = 120;
+  var X_RIGHT = 720;
+
   for (var i = 0; i < nodes.length; i++) {
     var n = nodes[i];
-    if (!n.parent) continue;
-    var p = n.parent;
-    var x1 = p.x + nodeW;
-    var y1 = p.y;
-    var x2 = n.x;
-    var y2 = n.y;
-    var midX = (x1 + x2) / 2;
-    var d = 'M' + x1 + ',' + y1
-          + ' C' + midX + ',' + y1 + ' ' + midX + ',' + y2 + ' ' + x2 + ',' + y2;
-    var dashed = n.isLoop ? ' stroke-dasharray="5,4"' : '';
-    var color = n.isLoop ? '#b88' : '#bbb';
-    svg += '<path d="' + d + '" stroke="' + color + '" stroke-width="1.5" fill="none"' + dashed + '/>';
-  }
+    n.y = TOP + i * ROW;
+    if (n.lane === 'main') n.x = X_MAIN;
+    else if (n.lane === 'side-left') n.x = X_LEFT;
+    else n.x = X_RIGHT;
 
-  /* Nodes */
-  for (var i2 = 0; i2 < nodes.length; i2++) {
-    var n2 = nodes[i2];
-    var isRoot = (n2.kind === 'root');
-    var isKill = (n2.kind === 'kill');
-    var bg = isRoot ? '#2c2c2c' : '#fff';
-    var stroke = isRoot ? '#2c2c2c' : (isKill ? '#c62828' : '#dcdcdc');
-    var textColor = isRoot ? '#fff' : (isKill ? '#c62828' : '#2a2a2a');
-
-    var rectX = n2.x;
-    var rectY = n2.y - nodeH / 2;
-
-    svg += '<g>';
-    svg += '<rect x="' + rectX + '" y="' + rectY + '" '
-        + 'width="' + nodeW + '" height="' + nodeH + '" '
-        + 'rx="19" ry="19" fill="' + bg + '" stroke="' + stroke + '" stroke-width="1.2"/>';
-
-    /* Текст узла: "Имя этапа N/M"  (или "Имя N" для root) */
-    var countText;
-    if (isRoot) {
-      countText = ' ' + (n2.count || 0);
-    } else if (n2.total && n2.total !== n2.count) {
-      countText = ' ' + n2.count + '/' + n2.total;
+    /* Радиус ∝ sqrt(count). */
+    if (n.count > 0) {
+      n.r = Math.max(7, Math.min(22, 6 + Math.sqrt(n.count) * 1.5));
     } else {
-      countText = ' ' + n2.count;
+      n.r = 7;
     }
-    var label = (n2.label || '') + countText;
+    if (n.isFirst) n.r = Math.max(n.r, 18);
+    if (n.isActive && n.isLast) n.r = Math.max(n.r, 14);
+  }
 
-    svg += '<text x="' + (rectX + nodeW / 2) + '" y="' + (n2.y + 4) + '" '
-        + 'font-size="12.5" font-family="-apple-system,Segoe UI,sans-serif" '
-        + 'fill="' + textColor + '" text-anchor="middle">'
-        + _shCpEscapeSVG(label) + '</text>';
-    svg += '</g>';
+  return {
+    w: 1100,
+    h: TOP + nodes.length * ROW + 80,
+    xMain: X_MAIN,
+    xLeft: X_LEFT,
+    xRight: X_RIGHT,
+    top: TOP
+  };
+}
 
-    /* Подпись даты под листовыми узлами */
-    var isLeaf = (!n2.children || n2.children.length === 0);
-    if (isLeaf && n2.date && !isRoot) {
-      var dt = _shCpFormatDate(n2.date);
-      svg += '<text x="' + (rectX + nodeW / 2) + '" y="' + (n2.y + nodeH / 2 + 14) + '" '
-          + 'font-size="10" font-family="-apple-system,Segoe UI,sans-serif" '
-          + 'fill="#999" text-anchor="middle">' + _shCpEscapeSVG('Сдано ' + dt) + '</text>';
+/** Отрендерить SVG графа событий. */
+function _shCpRenderEventGraphSVG(nodes, dim) {
+  var w = dim.w, h = dim.h;
+
+  var mainNodes = [];
+  for (var mi = 0; mi < nodes.length; mi++) if (nodes[mi].lane === 'main') mainNodes.push(nodes[mi]);
+  var spineTop = mainNodes.length > 0 ? mainNodes[0].y : dim.top;
+  var spineBottom = mainNodes.length > 0 ? mainNodes[mainNodes.length - 1].y : dim.top;
+
+  var svg = '<svg viewBox="0 0 ' + w + ' ' + h + '" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;height:auto">';
+  svg += '<style>'
+    + '.dot{fill:#fff;stroke:#2c2c2c;stroke-width:1.6}'
+    + '.dot-active{fill:#2c2c2c;stroke:#2c2c2c}'
+    + '.dot-light{fill:#fff;stroke:#aaa;stroke-width:1.4}'
+    + '.line{fill:none;stroke:#555;stroke-width:1.4}'
+    + '.line-iter{fill:none;stroke:#bbb;stroke-width:1.2}'
+    + '.cp-name{font:600 15px system-ui,-apple-system,sans-serif;fill:#2c2c2c}'
+    + '.cp-name-light{font:500 14px system-ui,-apple-system,sans-serif;fill:#888}'
+    + '.cp-num{font:700 16px system-ui,-apple-system,sans-serif;fill:#2c2c2c}'
+    + '.cp-num-light{font:600 14px system-ui,-apple-system,sans-serif;fill:#888}'
+    + '.cp-desc{font:12px system-ui,-apple-system,sans-serif;fill:#555}'
+    + '.cp-desc-light{font:12px system-ui,-apple-system,sans-serif;fill:#999}'
+    + '.cp-meta{font:11px system-ui,-apple-system,sans-serif;fill:#888}'
+    + '.cp-compo{font:11px system-ui,-apple-system,sans-serif;fill:#888}'
+    + '</style>';
+
+  /* Главная вертикальная ось. */
+  if (mainNodes.length > 1) {
+    svg += '<line class="line" x1="' + dim.xMain + '" y1="' + spineTop +
+           '" x2="' + dim.xMain + '" y2="' + spineBottom + '"/>';
+  }
+
+  /* Боковые ветки (orthogonal): группируем по lane, рисуем chains. */
+  var sideR = [];
+  var sideL = [];
+  for (var si = 0; si < nodes.length; si++) {
+    if (nodes[si].lane === 'side-right') sideR.push(nodes[si]);
+    else if (nodes[si].lane === 'side-left') sideL.push(nodes[si]);
+  }
+  sideR.sort(function(a, b) { return a.y - b.y; });
+  sideL.sort(function(a, b) { return a.y - b.y; });
+
+  svg += _shCpRenderSideChain(sideR, dim.xMain, dim.xRight);
+  svg += _shCpRenderSideChain(sideL, dim.xMain, dim.xLeft);
+
+  /* Composition labels на главной оси (между последовательными main-узлами при сужении потока). */
+  for (var ci = 0; ci < mainNodes.length - 1; ci++) {
+    var a = mainNodes[ci];
+    var b = mainNodes[ci + 1];
+    if (a.count > 0 && b.count > 0 && b.count < a.count) {
+      var midY = (a.y + b.y) / 2 + 4;
+      svg += '<text class="cp-compo" x="' + (dim.xMain - 12) + '" y="' + midY +
+             '" text-anchor="end">' + b.count + ' из ' + a.count + '</text>';
     }
   }
+
+  /* Узлы: круги + текст. */
+  for (var ni = 0; ni < nodes.length; ni++) {
+    svg += _shCpRenderNodeText(nodes[ni]);
+  }
+
+  /* Легенда внизу. */
+  var legendY = h - 30;
+  svg += '<g transform="translate(40,' + legendY + ')">'
+       + '<circle class="dot-active" cx="6" cy="0" r="8"/>'
+       + '<text class="cp-meta" x="22" y="4">старт / финал · размер кружка ∝ количеству фото</text>'
+       + '<circle class="dot" cx="380" cy="0" r="6"/>'
+       + '<text class="cp-meta" x="396" y="4">главный поток</text>'
+       + '<circle class="dot-light" cx="540" cy="0" r="6"/>'
+       + '<text class="cp-meta" x="556" y="4">боковая ветка</text>'
+       + '</g>';
 
   svg += '</svg>';
   return svg;
+}
+
+/** Цепочка боковых узлов: первый соединён со spine горизонтально, последующие — вертикально между собой. */
+function _shCpRenderSideChain(arr, xMain, xSide) {
+  if (!arr || arr.length === 0) return '';
+  var ROW_THRESH = 220; /* в пределах ~1.5 ROW считаем chain'ом. */
+  var html = '';
+  var prev = null;
+  for (var i = 0; i < arr.length; i++) {
+    var n = arr[i];
+    if (prev && Math.abs(n.y - prev.y) <= ROW_THRESH) {
+      /* Вертикаль от prev к n. */
+      html += '<polyline class="line-iter" points="' + xSide + ',' + prev.y + ' ' +
+              xSide + ',' + n.y + '"/>';
+    } else {
+      /* Горизонталь от spine к этому узлу. */
+      html += '<polyline class="line-iter" points="' + xMain + ',' + n.y + ' ' +
+              xSide + ',' + n.y + '"/>';
+    }
+    prev = n;
+  }
+  return html;
+}
+
+/** Кружок + текстовые поля одного узла. */
+function _shCpRenderNodeText(n) {
+  var dotClass;
+  if (n.lane === 'main') dotClass = n.isActive ? 'dot-active' : 'dot';
+  else dotClass = 'dot-light';
+
+  var s = '<circle class="' + dotClass + '" cx="' + n.x + '" cy="' + n.y +
+          '" r="' + n.r.toFixed(1) + '"/>';
+
+  /* Положение текста: справа на main и side-right, слева (anchor=end) на side-left. */
+  var tx, anchor, nameClass, numClass, descClass;
+  if (n.lane === 'side-left') {
+    tx = n.x - n.r - 14;
+    anchor = 'end';
+    nameClass = 'cp-name-light';
+    numClass = 'cp-num-light';
+    descClass = 'cp-desc-light';
+  } else if (n.lane === 'side-right') {
+    tx = n.x + n.r + 14;
+    anchor = 'start';
+    nameClass = 'cp-name-light';
+    numClass = 'cp-num-light';
+    descClass = 'cp-desc-light';
+  } else {
+    tx = n.x + n.r + 18;
+    anchor = 'start';
+    nameClass = 'cp-name';
+    numClass = 'cp-num';
+    descClass = 'cp-desc';
+  }
+
+  var nameY = n.y - 16;
+  var numY = n.y + 4;
+  var descY = n.y + 24;
+
+  s += '<text class="' + nameClass + '" x="' + tx + '" y="' + nameY +
+       '" text-anchor="' + anchor + '">' + _shCpEscapeSVG(n.name) + '</text>';
+
+  var countLabel = n.count > 0 ? (n.count + ' фото') : '—';
+  s += '<text class="' + numClass + '" x="' + tx + '" y="' + numY +
+       '" text-anchor="' + anchor + '">' + _shCpEscapeSVG(countLabel) + '</text>';
+
+  var nextY = descY;
+  if (n.description) {
+    var lines = _shCpWrapDesc(n.description, 52);
+    for (var li = 0; li < lines.length; li++) {
+      s += '<text class="' + descClass + '" x="' + tx + '" y="' + nextY +
+           '" text-anchor="' + anchor + '">' + _shCpEscapeSVG(lines[li]) + '</text>';
+      nextY += 16;
+    }
+    nextY += 2;
+  }
+
+  var meta = (n.author || '—') + ' · ' + (n.date || '—');
+  s += '<text class="cp-meta" x="' + tx + '" y="' + nextY +
+       '" text-anchor="' + anchor + '">' + _shCpEscapeSVG(meta) + '</text>';
+
+  return s;
+}
+
+/** Простой word-wrap: <=2 строки, по словам. */
+function _shCpWrapDesc(s, maxChars) {
+  if (!s) return [];
+  var clean = String(s).replace(/\s+/g, ' ').trim();
+  if (clean.length <= maxChars) return [clean];
+  var words = clean.split(' ');
+  var lines = [], cur = '';
+  for (var i = 0; i < words.length; i++) {
+    var w = words[i];
+    if ((cur + ' ' + w).trim().length > maxChars) {
+      if (cur) lines.push(cur);
+      cur = w;
+      if (lines.length >= 2) break;
+    } else {
+      cur = (cur ? cur + ' ' : '') + w;
+    }
+  }
+  if (cur && lines.length < 2) lines.push(cur);
+  if (lines.length === 2 && words.length > lines.join(' ').split(' ').length) {
+    var last = lines[1];
+    if (last.length > maxChars - 1) last = last.slice(0, maxChars - 1);
+    lines[1] = last + '…';
+  }
+  return lines;
 }
 
 /** Защита от XML-метасимволов в SVG-тексте. */
@@ -1470,7 +1549,6 @@ function _shCpEscapeSVG(s) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 }
-
 /**
  * Phase 3.4: per-photo digital twin.
  * Открыть модалку с историей конкретного фото — список checkpoints,
