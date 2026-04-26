@@ -2577,17 +2577,21 @@ body.mob-client-mode html {
   display: flex; gap: 4px; flex-shrink: 0; align-items: center;
 }
 
-/* Each clickable thumbnail (96px tall — bigger than matching's 68) */
+/* Each clickable thumbnail — FIXED 88×96 box (matches .ar-vfy-thumb-empty
+   width) so the reference column always starts at the same x-position
+   regardless of photo aspect ratio. Image inside is contained, not
+   filled, so portrait/landscape photos are letter-/pillar-boxed. */
 .ar-vfy-thumb {
   position: relative;
-  display: inline-block; padding: 0;
+  display: inline-block; padding: 0; box-sizing: border-box;
+  width: 88px; height: 96px;
   border: 1px solid #e0e0e0; border-radius: 4px;
   background: #f8f8f8; cursor: pointer; overflow: hidden;
   transition: border-color 0.12s;
   flex-shrink: 0;
 }
 .ar-vfy-thumb img {
-  display: block; height: 96px; width: auto; max-width: 120px;
+  display: block; width: 100%; height: 100%;
   object-fit: contain; background: #f8f8f8;
 }
 .ar-vfy-thumb:hover { border-color: #333; }
@@ -2619,7 +2623,10 @@ body.mob-client-mode html {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
   flex-shrink: 0;
 }
-.ar-vfy-thumb-ref img { height: 96px; max-width: 110px; }
+/* Reference thumb — FIXED 110×96 box. Same contain behavior as photos
+   so ref column width is constant regardless of artwork aspect ratio. */
+.ar-vfy-thumb-ref { width: 110px; height: 96px; }
+.ar-vfy-thumb-ref img { width: 100%; height: 100%; object-fit: contain; }
 .ar-vfy-refbox-empty {
   width: 110px; height: 96px;
 }
