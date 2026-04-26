@@ -1322,11 +1322,11 @@ function _shCpEventName(cp) {
 
 /** Уложить узлы по координатам. */
 function _shCpLayoutEventGraph(nodes) {
-  var TOP = 90;
-  var ROW = 140;
-  var X_MAIN = 320;
-  var X_LEFT = 120;
-  var X_RIGHT = 720;
+  var TOP = 70;
+  var ROW = 115;
+  var X_MAIN = 300;
+  var X_LEFT = 180;
+  var X_RIGHT = 700;
 
   for (var i = 0; i < nodes.length; i++) {
     var n = nodes[i];
@@ -1337,17 +1337,17 @@ function _shCpLayoutEventGraph(nodes) {
 
     /* Радиус ∝ sqrt(count). */
     if (n.count > 0) {
-      n.r = Math.max(7, Math.min(22, 6 + Math.sqrt(n.count) * 1.5));
+      n.r = Math.max(5, Math.min(16, 4 + Math.sqrt(n.count) * 1.2));
     } else {
-      n.r = 7;
+      n.r = 5;
     }
-    if (n.isFirst) n.r = Math.max(n.r, 18);
-    if (n.isActive && n.isLast) n.r = Math.max(n.r, 14);
+    if (n.isFirst) n.r = Math.max(n.r, 14);
+    if (n.isActive && n.isLast) n.r = Math.max(n.r, 11);
   }
 
   return {
-    w: 1100,
-    h: TOP + nodes.length * ROW + 80,
+    w: 1080,
+    h: TOP + nodes.length * ROW + 60,
     xMain: X_MAIN,
     xLeft: X_LEFT,
     xRight: X_RIGHT,
@@ -1371,14 +1371,14 @@ function _shCpRenderEventGraphSVG(nodes, dim) {
     + '.dot-light{fill:#fff;stroke:#aaa;stroke-width:1.4}'
     + '.line{fill:none;stroke:#555;stroke-width:1.4}'
     + '.line-iter{fill:none;stroke:#bbb;stroke-width:1.2}'
-    + '.cp-name{font:600 15px system-ui,-apple-system,sans-serif;fill:#2c2c2c}'
-    + '.cp-name-light{font:500 14px system-ui,-apple-system,sans-serif;fill:#888}'
-    + '.cp-num{font:700 16px system-ui,-apple-system,sans-serif;fill:#2c2c2c}'
-    + '.cp-num-light{font:600 14px system-ui,-apple-system,sans-serif;fill:#888}'
-    + '.cp-desc{font:12px system-ui,-apple-system,sans-serif;fill:#555}'
-    + '.cp-desc-light{font:12px system-ui,-apple-system,sans-serif;fill:#999}'
-    + '.cp-meta{font:11px system-ui,-apple-system,sans-serif;fill:#888}'
-    + '.cp-compo{font:11px system-ui,-apple-system,sans-serif;fill:#888}'
+    + '.cp-name{font:600 13px system-ui,-apple-system,sans-serif;fill:#2c2c2c}'
+    + '.cp-name-light{font:500 12px system-ui,-apple-system,sans-serif;fill:#888}'
+    + '.cp-num{font:700 14px system-ui,-apple-system,sans-serif;fill:#2c2c2c}'
+    + '.cp-num-light{font:600 12px system-ui,-apple-system,sans-serif;fill:#888}'
+    + '.cp-desc{font:11px system-ui,-apple-system,sans-serif;fill:#555}'
+    + '.cp-desc-light{font:11px system-ui,-apple-system,sans-serif;fill:#999}'
+    + '.cp-meta{font:10px system-ui,-apple-system,sans-serif;fill:#888}'
+    + '.cp-compo{font:10px system-ui,-apple-system,sans-serif;fill:#888}'
     + '</style>';
 
   /* Главная вертикальная ось. */
@@ -1465,31 +1465,31 @@ function _shCpRenderNodeText(n) {
   /* Положение текста: справа на main и side-right, слева (anchor=end) на side-left. */
   var tx, anchor, nameClass, numClass, descClass;
   if (n.lane === 'side-left') {
-    tx = n.x - n.r - 14;
+    tx = n.x - n.r - 12;
     anchor = 'end';
     nameClass = 'cp-name-light';
     numClass = 'cp-num-light';
     descClass = 'cp-desc-light';
   } else if (n.lane === 'side-right') {
-    tx = n.x + n.r + 14;
+    tx = n.x + n.r + 12;
     anchor = 'start';
     nameClass = 'cp-name-light';
     numClass = 'cp-num-light';
     descClass = 'cp-desc-light';
   } else {
-    tx = n.x + n.r + 18;
+    tx = n.x + n.r + 14;
     anchor = 'start';
     nameClass = 'cp-name';
     numClass = 'cp-num';
     descClass = 'cp-desc';
   }
 
-  var nameY = n.y - 16;
+  var nameY = n.y - 12;
   var numY = n.y + 4;
-  var descY = n.y + 24;
+  var descY = n.y + 20;
 
   s += '<text class="' + nameClass + '" x="' + tx + '" y="' + nameY +
-       '" text-anchor="' + anchor + '">' + _shCpEscapeSVG(n.name) + '</text>';
+       '" text-anchor="' + anchor + '">' + _shCpEscapeSVG(_shCpTrunc(n.name, 24)) + '</text>';
 
   var countLabel = n.count > 0 ? (n.count + ' фото') : '—';
   s += '<text class="' + numClass + '" x="' + tx + '" y="' + numY +
@@ -1497,41 +1497,50 @@ function _shCpRenderNodeText(n) {
 
   var nextY = descY;
   if (n.description) {
-    var lines = _shCpWrapDesc(n.description, 52);
+    var lines = _shCpWrapDesc(n.description, 40);
     for (var li = 0; li < lines.length; li++) {
       s += '<text class="' + descClass + '" x="' + tx + '" y="' + nextY +
            '" text-anchor="' + anchor + '">' + _shCpEscapeSVG(lines[li]) + '</text>';
-      nextY += 16;
+      nextY += 13;
     }
     nextY += 2;
   }
 
-  var meta = (n.author || '—') + ' · ' + (n.date || '—');
+  var meta = _shCpTrunc((n.author || '—') + ' · ' + (n.date || '—'), 40);
   s += '<text class="cp-meta" x="' + tx + '" y="' + nextY +
        '" text-anchor="' + anchor + '">' + _shCpEscapeSVG(meta) + '</text>';
 
   return s;
 }
 
-/** Простой word-wrap: <=2 строки, по словам. */
+/** Обрезка строки до maxChars с многоточием. */
+function _shCpTrunc(s, maxChars) {
+  if (!s) return '';
+  var str = String(s);
+  if (str.length <= maxChars) return str;
+  return str.slice(0, Math.max(1, maxChars - 1)) + '…';
+}
+
+/** Простой word-wrap: <=2 строки, по словам, итого не более ~2*maxChars. */
 function _shCpWrapDesc(s, maxChars) {
   if (!s) return [];
   var clean = String(s).replace(/\s+/g, ' ').trim();
   if (clean.length <= maxChars) return [clean];
   var words = clean.split(' ');
   var lines = [], cur = '';
+  var consumed = 0;
   for (var i = 0; i < words.length; i++) {
     var w = words[i];
     if ((cur + ' ' + w).trim().length > maxChars) {
-      if (cur) lines.push(cur);
+      if (cur) { lines.push(cur); consumed += cur.split(' ').length; }
       cur = w;
       if (lines.length >= 2) break;
     } else {
       cur = (cur ? cur + ' ' : '') + w;
     }
   }
-  if (cur && lines.length < 2) lines.push(cur);
-  if (lines.length === 2 && words.length > lines.join(' ').split(' ').length) {
+  if (cur && lines.length < 2) { lines.push(cur); consumed += cur.split(' ').length; }
+  if (lines.length === 2 && consumed < words.length) {
     var last = lines[1];
     if (last.length > maxChars - 1) last = last.slice(0, maxChars - 1);
     lines[1] = last + '…';
