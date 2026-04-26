@@ -875,8 +875,98 @@ function renderPipeline() {
     }
   }
 
+  /* ── Phase 5: ветка переименования (best-effort из _renameLog + articles) ── */
+  var _renBranchActive = false;
+  var _renBranchStart = -1;
+  var _renBranchEnd = -1;
+  var _renVerifiedCount = 0;
+  var _renTotalCount = 0;
+  var _renStartDate = null;
+  var _renEndDate = null;
+  if (proj.articles && proj.articles.length > 0) {
+    _renTotalCount = proj.articles.length;
+    for (var arI = 0; arI < proj.articles.length; arI++) {
+      if (proj.articles[arI].status === 'verified') _renVerifiedCount++;
+    }
+    if (_renVerifiedCount > 0) {
+      _renBranchActive = true;
+      /* Старт — стадия, на которой произошёл первый rename. Best-effort:
+         берём timestamp первой записи и сравниваем с _stageDates */
+      var firstRenameTs = null;
+      if (proj._renameLog && proj._renameLog.length > 0) {
+        firstRenameTs = new Date(proj._renameLog[0].renamed_at).getTime();
+        _renStartDate = proj._renameLog[0].renamed_at;
+        var lastRen = proj._renameLog[proj._renameLog.length - 1];
+        _renEndDate = lastRen.renamed_at;
+      }
+      _renBranchStart = stage; /* fallback — текущий active */
+      if (firstRenameTs && proj._stageDates) {
+        for (var sdi = PIPELINE_STAGES.length - 1; sdi >= 0; sdi--) {
+          var sdEntry = proj._stageDates[sdi];
+          if (sdEntry && sdEntry.firstEnter) {
+            var sdTs = new Date(sdEntry.firstEnter).getTime();
+            if (sdTs <= firstRenameTs) { _renBranchStart = sdi; break; }
+          }
+        }
+      }
+      /* Конец — если все артикулы verified */
+      if (_renVerifiedCount === _renTotalCount) {
+        _renBranchEnd = stage;
+      }
+    }
+  }
+
   /* ── Классификация этапов: done / active / future ── */
-  var hasBranch = _cmtBranchActive;
+  /* hasBranch теперь true если есть ЛЮБАЯ параллельная активность */
+  var hasBranch = _cmtBranchActive || _renBranchActive;
+
+  /* ── Phase 5: построение branch-list для inline badges и side-branch overlay ── */
+  /*
+     Каждая ветка либо inline (короткая, в одной стадии) — рендерится плашкой
+     внутри step-info родительской стадии — либо side-branch (multi-stage /
+     open), которая рисуется через SVG overlay поверх pipeline-steps.
+  */
+  var pl5_inlineByStage = {}; /* stageIdx -> [{type, label, count, dates}, ...] */
+  var pl5_sideBranches = [];  /* {type, label, startIdx, endIdx, count, dates, sideIdx} */
+  var pl5_sideIdxByStage = {};
+
+  function _pl5_pushBranch(b) {
+    /* Inline: завершена (endIdx >= 0) и началась/закончилась на одной стадии */
+    if (b.endIdx >= 0 && b.startIdx === b.endIdx) {
+      if (!pl5_inlineByStage[b.startIdx]) pl5_inlineByStage[b.startIdx] = [];
+      pl5_inlineByStage[b.startIdx].push(b);
+    } else {
+      /* Side: multi-stage или open */
+      var k = b.startIdx;
+      pl5_sideIdxByStage[k] = (pl5_sideIdxByStage[k] || 0) + 1;
+      b.sideIdx = pl5_sideIdxByStage[k];
+      pl5_sideBranches.push(b);
+    }
+  }
+
+  if (_cmtBranchActive) {
+    var cmtParts = [];
+    if (_cmtCount > 0) cmtParts.push(_cmtCount + ' комм.');
+    if (_annotCount > 0) cmtParts.push(_annotCount + ' аннот.');
+    _pl5_pushBranch({
+      type: 'comment',
+      label: 'Комментирование',
+      startIdx: _cmtBranchStart,
+      endIdx: _cmtBranchEnd,
+      count: cmtParts.join(', '),
+      dates: ''
+    });
+  }
+  if (_renBranchActive) {
+    _pl5_pushBranch({
+      type: 'rename',
+      label: 'Переименование',
+      startIdx: _renBranchStart,
+      endIdx: _renBranchEnd,
+      count: _renVerifiedCount + '/' + _renTotalCount + ' артикулов',
+      dates: ''
+    });
+  }
   var stageStates = []; /* массив {cls, cnt, cum} для каждого этапа */
   for (var i = 0; i < PIPELINE_STAGES.length; i++) {
     var cnt = photoCounts[i];
@@ -1011,17 +1101,38 @@ function renderPipeline() {
         html += '<button class="step-action" style="border-color:#333;color:#333;margin-left:6px" onclick="pvOnLoadVersionSelect({value:\'retouch\'})" title="Загрузить ретушь версию для отбора">Загрузить ретушь</button>';
       }
     }
-    html += '</div>'; /* /step-info */
-
-    /* ── Встроенная ветка (комментирование) ── */
-    if (hasBranch) {
-      var branchHtml = _shRenderBranchCell(i, stage, _cmtBranchStart, _cmtBranchEnd, _cmtCount, _annotCount);
-      if (branchHtml) html += branchHtml;
+    /* ── Phase 5: inline badges для коротких параллельных активностей,
+       которые целиком уложились в этой стадии. Рендерим внутри step-info
+       чтобы плашка была под именем стадии. ── */
+    var _inlineList = pl5_inlineByStage[i];
+    if (_inlineList && _inlineList.length > 0) {
+      for (var ibI = 0; ibI < _inlineList.length; ibI++) {
+        var ib = _inlineList[ibI];
+        var ibText = ib.label;
+        if (ib.count) ibText += ' · ' + ib.count;
+        if (ib.dates) ibText += ' · ' + ib.dates;
+        html += '<div class="pl-inline-badge">' + esc(ibText) + '</div>';
+      }
     }
 
+    html += '</div>'; /* /step-info */
     html += '</div>'; /* /pipeline-step */
   }
   html += '</div>'; /* /pipeline-steps */
+
+  /* ── Phase 5: SVG overlay для side-branches.
+     Координаты Y вычисляются в _shLayoutSideBranches() через rAF после того,
+     как DOM отрендерится. Сначала помещаем placeholder с метаданными в data-*. ── */
+  if (pl5_sideBranches.length > 0) {
+    var sbDataJson = '';
+    try { sbDataJson = JSON.stringify(pl5_sideBranches).replace(/"/g, '&quot;'); }
+    catch (e) { sbDataJson = ''; }
+    html = html.replace(
+      '<div class="pipeline-steps">',
+      '<div class="pipeline-steps">' +
+      '<svg class="pl-overlay-svg" data-side-branches="' + sbDataJson + '" preserveAspectRatio="none"></svg>'
+    );
+  }
 
   /* ── Строка масштаба + ссылка на детальный вид ── */
   if (totalPhotos > 0) {
@@ -1049,6 +1160,157 @@ function renderPipeline() {
   html += _shRenderTimeline(proj);
 
   container.innerHTML = html;
+
+  /* Phase 5: после рендера — позиционируем side-branch overlay по реальным
+     координатам step-dot'ов. Делаем через rAF чтобы layout уже стабилизировался. */
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(function() { _shLayoutSideBranches(container); });
+  } else {
+    setTimeout(function() { _shLayoutSideBranches(container); }, 0);
+  }
+}
+
+/**
+ * Phase 5: позиционирование side-branch SVG overlay.
+ * Измеряем фактические Y-координаты step-dot'ов и рисуем для каждой
+ * side-ветки: top-arm → top-dot → vertical → bottom-dot+bottom-arm (или
+ * dashed open-arm если ветка ещё активна).
+ * @param {HTMLElement} container
+ */
+function _shLayoutSideBranches(container) {
+  if (!container) return;
+  var stepsRoot = container.querySelector('.pipeline-steps');
+  var overlay = container.querySelector('.pl-overlay-svg');
+  if (!stepsRoot || !overlay) return;
+  var raw = overlay.getAttribute('data-side-branches');
+  if (!raw) return;
+  var data;
+  try { data = JSON.parse(raw); } catch (e) { return; }
+  if (!data || data.length === 0) return;
+
+  /* Координаты по контейнеру pipeline-steps. */
+  var rootRect = stepsRoot.getBoundingClientRect();
+  var rootW = rootRect.width || 320;
+  var rootH = rootRect.height || 0;
+
+  /* Map stageIdx -> y центра step-dot (относительно stepsRoot). */
+  var stepRows = stepsRoot.querySelectorAll('.pipeline-step');
+  /* Каждый step-dot — первый ребёнок step-row. Stage idx у нас НЕ совпадает
+     с порядком в DOM, потому что неактивные стадии скипаются. Поэтому
+     сопоставим через текст dot'а: cls === 'done' → '✓', иначе — (i+1). */
+  var dotYByLabel = {};
+  for (var ri = 0; ri < stepRows.length; ri++) {
+    var dot = stepRows[ri].querySelector('.step-dot');
+    if (!dot) continue;
+    var label = (dot.textContent || '').trim();
+    var dotRect = dot.getBoundingClientRect();
+    var cy = dotRect.top - rootRect.top + dotRect.height / 2;
+    dotYByLabel[label] = { y: cy, row: stepRows[ri] };
+  }
+  function _yForStageIdx(stageIdx) {
+    var lbl = '' + (stageIdx + 1);
+    if (dotYByLabel[lbl]) return dotYByLabel[lbl].y;
+    if (dotYByLabel['✓']) return dotYByLabel['✓'].y; /* fallback */
+    /* fallback: если этап скипнут (нет в DOM) — используем последний доступный */
+    var keys = Object.keys(dotYByLabel);
+    if (keys.length > 0) return dotYByLabel[keys[keys.length - 1]].y;
+    return 0;
+  }
+
+  /* Spine x (col container_padding + step-dot half = 13px от стейта pipeline-steps).
+     Side x — справа от step-info, фиксированно. */
+  var SPINE_X = 13;
+  var SIDE_X = Math.min(rootW - 60, 230); /* колонка side-узлов */
+  if (SIDE_X < 140) SIDE_X = 140;
+  var DOT_R = 14;
+
+  var svg = '';
+  svg += '<defs></defs>';
+
+  /* Для каждой side-ветки: */
+  for (var bi = 0; bi < data.length; bi++) {
+    var b = data[bi];
+    var topY = _yForStageIdx(b.startIdx);
+    /* Сдвиг top-arm чтобы он шёл из ПРОСВЕТА между dot startIdx и dot startIdx+1.
+       Если есть следующий стейт — берём середину; иначе берём чуть ниже dot. */
+    var nextY = _yForStageIdx(b.startIdx + 1);
+    if (nextY > topY) {
+      topY = topY + Math.min((nextY - topY) * 0.4, 28);
+    } else {
+      topY = topY + 28;
+    }
+    /* Если несколько веток на одной стадии — сдвигаем по вертикали */
+    var sideOffset = (b.sideIdx > 1) ? (b.sideIdx - 1) * 36 : 0;
+    topY += sideOffset;
+
+    var bottomY;
+    var isOpen = (typeof b.endIdx !== 'number') || b.endIdx < 0;
+    if (isOpen) {
+      /* Открытая ветка — пунктир вниз до текущего низа последнего active step,
+         либо +60px от topY если ниже нет. */
+      var lastY = topY + 70;
+      var allYs = Object.keys(dotYByLabel).map(function(k){ return dotYByLabel[k].y; });
+      var maxY = allYs.length ? Math.max.apply(null, allYs) : topY;
+      lastY = Math.max(lastY, maxY - 8);
+      bottomY = lastY;
+    } else {
+      var endY = _yForStageIdx(b.endIdx);
+      var afterEndY = _yForStageIdx(b.endIdx + 1);
+      if (afterEndY > endY) {
+        bottomY = endY + Math.min((afterEndY - endY) * 0.6, 36);
+      } else {
+        bottomY = endY + 32;
+      }
+    }
+    if (bottomY < topY + 36) bottomY = topY + 36;
+
+    /* Top arm: от spine к side-dot */
+    svg += '<line class="pl-arm" x1="' + SPINE_X + '" y1="' + topY +
+           '" x2="' + SIDE_X + '" y2="' + topY + '"/>';
+    /* Top dot */
+    svg += '<circle class="pl-side-dot" cx="' + SIDE_X + '" cy="' + topY +
+           '" r="' + DOT_R + '"/>';
+    /* Numbering: parent stage display number + .sideIdx */
+    var sideNum = (b.startIdx + 1) + '.' + b.sideIdx;
+    svg += '<text class="pl-side-num" x="' + SIDE_X + '" y="' + (topY + 3) +
+           '">' + sideNum + '</text>';
+    /* Label справа от top-dot */
+    svg += '<text class="pl-side-name" x="' + (SIDE_X + DOT_R + 8) +
+           '" y="' + (topY - 4) + '">' + _esc4svg(b.label) + '</text>';
+    if (b.count) {
+      svg += '<text class="pl-side-meta" x="' + (SIDE_X + DOT_R + 8) +
+             '" y="' + (topY + 11) + '">' + _esc4svg(b.count) + '</text>';
+    }
+
+    /* Vertical line вниз */
+    var vertCls = isOpen ? 'pl-arm-open' : 'pl-vert';
+    svg += '<line class="' + vertCls + '" x1="' + SIDE_X + '" y1="' + (topY + DOT_R) +
+           '" x2="' + SIDE_X + '" y2="' + (bottomY - (isOpen ? 0 : DOT_R)) + '"/>';
+
+    if (!isOpen) {
+      /* Bottom dot — заливка тёмная, обозначает завершение */
+      svg += '<circle class="pl-side-dot-active" cx="' + SIDE_X + '" cy="' + bottomY +
+             '" r="' + DOT_R + '"/>';
+      svg += '<text class="pl-side-num pl-side-num-active" x="' + SIDE_X + '" y="' +
+             (bottomY + 3) + '">' + sideNum + '</text>';
+      /* Bottom arm обратно к spine */
+      svg += '<line class="pl-arm" x1="' + SIDE_X + '" y1="' + bottomY +
+             '" x2="' + SPINE_X + '" y2="' + bottomY + '"/>';
+    }
+  }
+
+  /* Set viewBox = размер pipeline-steps */
+  overlay.setAttribute('viewBox', '0 0 ' + rootW + ' ' + rootH);
+  overlay.setAttribute('width', rootW);
+  overlay.setAttribute('height', rootH);
+  overlay.innerHTML = svg;
+}
+
+/** SVG-safe escape для текстов в overlay. */
+function _esc4svg(s) {
+  if (s == null) return '';
+  return ('' + s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                 .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 /**
