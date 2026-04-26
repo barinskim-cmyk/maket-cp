@@ -1324,9 +1324,9 @@ function _shCpEventName(cp) {
 function _shCpLayoutEventGraph(nodes) {
   var TOP = 35;
   var ROW = 55;
-  var X_MAIN = 200;
-  var X_LEFT = 110;
-  var X_RIGHT = 480;
+  var X_MAIN = 280;
+  var X_LEFT = 170;
+  var X_RIGHT = 540;
 
   for (var i = 0; i < nodes.length; i++) {
     var n = nodes[i];
@@ -1346,7 +1346,7 @@ function _shCpLayoutEventGraph(nodes) {
   }
 
   return {
-    w: 700,
+    w: 800,
     h: TOP + nodes.length * ROW + 40,
     xMain: X_MAIN,
     xLeft: X_LEFT,
