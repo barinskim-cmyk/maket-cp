@@ -2602,12 +2602,10 @@ body.mob-client-mode html {
 }
 
 /* Empty placeholder slot — keeps 3-thumb layout consistent across rows.
-   Same outer dimensions as a real thumb (~96px tall, ~88px wide),
-   dashed border, no fill/icon — purely structural. */
+   Pure structural spacer: same outer dimensions as a real thumb,
+   но без border/fill/icon чтобы не отвлекало визуально. */
 .ar-vfy-thumb-empty {
   width: 88px; height: 96px;
-  border: 1px dashed #d8d8d8; border-radius: 4px;
-  background: transparent;
   flex-shrink: 0;
 }
 
@@ -2624,8 +2622,6 @@ body.mob-client-mode html {
 .ar-vfy-thumb-ref img { height: 96px; max-width: 110px; }
 .ar-vfy-refbox-empty {
   width: 110px; height: 96px;
-  border: 1px dashed #d8d8d8; border-radius: 4px;
-  background: transparent;
 }
 .ar-vfy-reflabel {
   font-size: 10px; color: #999; text-transform: uppercase; letter-spacing: 0.4px;
