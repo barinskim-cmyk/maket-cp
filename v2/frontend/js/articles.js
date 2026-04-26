@@ -4650,51 +4650,110 @@ function arRenderVerification() {
   toolbarHtml += '<span id="ar-rename-status" style="font-size:12px;margin-left:8px"></span>'
     + '</div>';
 
+  /* Phase 6 row layout (matches matching-menu visual language):
+     [ photo1 photo2 photo3 ] → [ ref ] [ SKU + cat + badge ] [ confirm | reject ]
+     • до 3 фото из card.slots (фиксированная сетка — пустые placeholder'ы
+       для консистентного выравнивания во всех рядах)
+     • каждый thumb кликабелен → arPreviewCard(cardIdx) показывает все слоты крупно
+     • референс кликабелен → arShowRefImage(idx)
+     • верифицированные ряды получают .ar-vfy-verified (зелёная рамка) и
+       скрываются CSS-правилом если включён тогл "скрывать подтверждённые".
+     Кнопка "Не тот артикул" вызывает arUnmatch — пишет rejected-пару в
+     ai_match_decisions, чтобы AI-метчер впредь не предлагал эту пару. */
+  var PHOTO_CAP = 3;
   var html = toolbarHtml;
+  /* Построить карту превью один раз — для извлечения dataUrl/thumb если
+     слот указывает только имя файла. */
+  var pvByName = {};
+  if (proj.previews) {
+    for (var pvi = 0; pvi < proj.previews.length; pvi++) {
+      pvByName[proj.previews[pvi].name] = proj.previews[pvi];
+    }
+  }
+
   for (var m = 0; m < matchedItems.length; m++) {
     var idx = matchedItems[m];
     var art = proj.articles[idx];
     /* Multi-pass фильтр "скрывать подтверждённые": раньше здесь был
        `continue` для верифицированных, но полное переписывание innerHTML
        при переключении чекбокса приводило к blink + прыжку скролла.
-       Теперь рендерим все сопоставленные пары, а скрытие делается
-       CSS-правилом `#page-articles.ar-hide-verified .ar-verify-item.ar-verified`
+       Теперь рендерим все пары; скрытие — CSS-правилом
+       `#page-articles.ar-hide-verified .ar-vfy-row.ar-vfy-verified`
        (см. arToggleHideVerified). */
     var card = (proj.cards && proj.cards[art.cardIdx]) ? proj.cards[art.cardIdx] : null;
-    var cardThumb = '';
-    if (card && card.slots && card.slots[0]) {
-      cardThumb = card.slots[0].dataUrl || card.slots[0].thumbUrl || '';
+    var verified = (art.status === 'verified');
+    var rowCls = 'ar-vfy-row' + (verified ? ' ar-vfy-verified' : '');
+
+    html += '<div class="' + rowCls + '" data-idx="' + idx + '">';
+
+    /* Фото-сетка карточки (max 3, остаток — пустые placeholder'ы). */
+    html += '<div class="ar-vfy-photos">';
+    var slots = (card && card.slots) ? card.slots : [];
+    var shown = Math.min(slots.length, PHOTO_CAP);
+    for (var si = 0; si < shown; si++) {
+      var slot = slots[si];
+      var imgSrc = slot.dataUrl || slot.thumbUrl || '';
+      if (!imgSrc && slot.file && pvByName[slot.file]) {
+        var pv = pvByName[slot.file];
+        imgSrc = pv.thumb || pv.preview || '';
+      }
+      if (imgSrc) {
+        html += '<button class="ar-vfy-thumb" type="button" title="Увеличить" '
+             + 'onclick="event.stopPropagation();arPreviewCard(' + art.cardIdx + ')">'
+             + '<img src="' + imgSrc + '" alt="">'
+             + '<span class="ar-vfy-thumb-zoom">+</span>'
+             + '</button>';
+      } else {
+        html += '<div class="ar-vfy-thumb-empty"></div>';
+      }
     }
-
-    var verified = (art.status === 'verified') ? ' ar-verified' : '';
-    html += '<div class="ar-verify-item' + verified + '" data-idx="' + idx + '" onclick="arToggleVerify(' + idx + ')">';
-
-    /* Фото из карточки (слева) */
-    html += '<div class="ar-verify-card">';
-    if (cardThumb) {
-      html += '<img src="' + cardThumb + '" alt="card">';
+    /* Добор пустых до 3 слотов — для consistent выравнивания. */
+    for (var pad = shown; pad < PHOTO_CAP; pad++) {
+      html += '<div class="ar-vfy-thumb-empty"></div>';
     }
     html += '</div>';
 
-    /* Инфо (центр) */
-    html += '<div class="ar-verify-info">';
-    html += '<div class="ar-verify-sku">' + esc(art.sku) + '</div>';
-    if (art.category) html += '<div class="ar-verify-cat">' + esc(art.category) + '</div>';
-    html += '<div class="ar-verify-status">' + (art.status === 'verified' ? 'OK' : 'Кликните для подтверждения') + '</div>';
-    html += '</div>';
+    /* Стрелка-разделитель. */
+    html += '<div class="ar-vfy-arrow">&rarr;</div>';
 
-    /* Референс (справа, если есть) */
+    /* Референс (или пустой placeholder того же размера). */
+    html += '<div class="ar-vfy-refbox">';
     if (art.refImage) {
-      html += '<div class="ar-verify-ref"><img src="' + art.refImage + '" alt="ref"></div>';
+      html += '<button class="ar-vfy-thumb ar-vfy-thumb-ref" type="button" title="Увеличить" '
+           + 'onclick="event.stopPropagation();arShowRefImage(' + idx + ')">'
+           + '<img src="' + art.refImage + '" alt="ref">'
+           + '<span class="ar-vfy-thumb-zoom">+</span>'
+           + '</button>';
+    } else {
+      html += '<div class="ar-vfy-refbox-empty"></div>';
     }
-
-    /* Кнопка × — отменить метч. Записывает rejected-пару в
-       ai_match_decisions (через arUnmatch), чтобы AI-метчер впредь
-       не предлагал эту пару. stopPropagation — чтобы клик не
-       триггерил arToggleVerify родительского элемента. */
-    html += '<button class="ar-unmatch-btn" onclick="event.stopPropagation();arUnmatch(' + idx + ')" title="Удалить метч">x</button>';
-
+    html += '<div class="ar-vfy-reflabel">референс</div>';
     html += '</div>';
+
+    /* SKU + категория + статус-бейдж. */
+    html += '<div class="ar-vfy-info">';
+    html += '<div class="ar-vfy-sku">' + esc(art.sku) + '</div>';
+    if (art.category) html += '<div class="ar-vfy-cat">' + esc(art.category) + '</div>';
+    html += '<div class="ar-vfy-badge ' + (verified ? 'ar-vfy-badge-on' : 'ar-vfy-badge-off') + '">'
+         + (verified ? 'Подтверждён' : 'Не проверен')
+         + '</div>';
+    html += '</div>';
+
+    /* Кнопки действий. */
+    html += '<div class="ar-vfy-actions">';
+    if (verified) {
+      html += '<button class="ar-vfy-btn ar-vfy-btn-undo" type="button" '
+           + 'onclick="arToggleVerify(' + idx + ')">Отменить</button>';
+    } else {
+      html += '<button class="ar-vfy-btn ar-vfy-btn-confirm" type="button" '
+           + 'onclick="arToggleVerify(' + idx + ')">Подтвердить</button>';
+    }
+    html += '<button class="ar-vfy-btn ar-vfy-btn-reject" type="button" '
+         + 'title="Снять метч и записать как rejected (AI-метчер не предложит снова)" '
+         + 'onclick="arUnmatch(' + idx + ')">Не тот артикул</button>';
+    html += '</div>';
+
+    html += '</div>'; /* /.ar-vfy-row */
   }
   el.innerHTML = html;
 

@@ -2549,25 +2549,11 @@ body.mob-client-mode html {
 }
 .ar-unmatch-btn:hover { background: #f0f0f0; }
 
-/* ── Блок 3: Верификация ── */
-.ar-verify-item {
-  display: flex; align-items: center; gap: 14px; padding: 10px 12px;
-  border: 1.5px solid #e8e8e8; border-radius: 6px; margin-bottom: 6px;
-  cursor: pointer; transition: border-color 0.15s, background 0.15s;
-}
-.ar-verify-item:hover { background: #fafafa; }
-.ar-verify-item.ar-verified { border-color: #4caf50; background: #e8f5e9; }
-
-.ar-verify-ref img, .ar-verify-card img {
-  height: 72px; max-width: 96px; width: auto;
-  object-fit: contain; border-radius: 4px; background: #f8f8f8;
-}
-.ar-verify-ref, .ar-verify-card { flex-shrink: 0; height: 72px; }
-.ar-verify-info { flex: 1; min-width: 0; }
-.ar-verify-sku { font-size: 14px; font-weight: 600; font-family: monospace; }
-.ar-verify-cat { font-size: 12px; color: #999; }
-.ar-verify-status { font-size: 12px; margin-top: 4px; font-weight: 600; }
-.ar-verified .ar-verify-status { color: #4caf50; }
+/* ── Блок 3: Верификация (Phase 6 — multi-photo grid) ────────────
+   Visual language matches matching menu (.ar-match-cell):
+   1.5px #e8e8e8 borders, 6px radius, monochrome.
+   Each row shows up to 3 card photos (96px tall, clickable to zoom),
+   reference image, SKU/badge, and confirm/reject buttons. */
 
 .ar-verify-toolbar {
   display: flex; gap: 8px; margin-bottom: 12px; align-items: center;
@@ -2576,11 +2562,112 @@ body.mob-client-mode html {
   font-size: 12px; color: #888;
 }
 
+.ar-vfy-row {
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 14px; margin-bottom: 8px;
+  border: 1.5px solid #e8e8e8; border-radius: 6px;
+  background: #fff;
+  transition: border-color 0.15s, background 0.15s;
+}
+.ar-vfy-row:hover { border-color: #bbb; background: #fafafa; }
+.ar-vfy-row.ar-vfy-verified { border-color: #4caf50; background: #f4faf3; }
+
+/* Multi-photo grid (left) */
+.ar-vfy-photos {
+  display: flex; gap: 4px; flex-shrink: 0; align-items: center;
+}
+
+/* Each clickable thumbnail (96px tall — bigger than matching's 68) */
+.ar-vfy-thumb {
+  position: relative;
+  display: inline-block; padding: 0;
+  border: 1px solid #e0e0e0; border-radius: 4px;
+  background: #f8f8f8; cursor: pointer; overflow: hidden;
+  transition: border-color 0.12s;
+  flex-shrink: 0;
+}
+.ar-vfy-thumb img {
+  display: block; height: 96px; width: auto; max-width: 120px;
+  object-fit: contain; background: #f8f8f8;
+}
+.ar-vfy-thumb:hover { border-color: #333; }
+.ar-vfy-thumb:hover .ar-vfy-thumb-zoom { opacity: 1; }
+.ar-vfy-thumb-zoom {
+  position: absolute; top: 4px; right: 4px;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: #fff; border: 1px solid #ccc; color: #333;
+  font-size: 13px; line-height: 18px; text-align: center;
+  opacity: 0; transition: opacity 0.12s;
+  pointer-events: none;
+}
+
+/* Empty placeholder slot — keeps 3-thumb layout consistent across rows.
+   Same outer dimensions as a real thumb (~96px tall, ~88px wide),
+   dashed border, no fill/icon — purely structural. */
+.ar-vfy-thumb-empty {
+  width: 88px; height: 96px;
+  border: 1px dashed #d8d8d8; border-radius: 4px;
+  background: transparent;
+  flex-shrink: 0;
+}
+
+/* Arrow separator between card photos and reference */
+.ar-vfy-arrow {
+  font-size: 22px; color: #bbb; flex-shrink: 0; user-select: none;
+}
+
+/* Reference image block (also clickable -> zoom) */
+.ar-vfy-refbox {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  flex-shrink: 0;
+}
+.ar-vfy-thumb-ref img { height: 96px; max-width: 110px; }
+.ar-vfy-refbox-empty {
+  width: 110px; height: 96px;
+  border: 1px dashed #d8d8d8; border-radius: 4px;
+  background: transparent;
+}
+.ar-vfy-reflabel {
+  font-size: 10px; color: #999; text-transform: uppercase; letter-spacing: 0.4px;
+}
+
+/* SKU + category + status badge */
+.ar-vfy-info { flex: 1; min-width: 0; padding-left: 4px; }
+.ar-vfy-sku  { font-size: 15px; font-weight: 600; font-family: monospace; color: #2c2c2c; }
+.ar-vfy-cat  { font-size: 12px; color: #999; margin-top: 2px; }
+
+.ar-vfy-badge {
+  display: inline-block; margin-top: 8px;
+  padding: 3px 10px; border-radius: 12px;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.3px;
+  border: 1px solid;
+}
+.ar-vfy-badge-off { color: #999;    border-color: #ddd;    background: #fafafa; }
+.ar-vfy-badge-on  { color: #2e6e2e; border-color: #4caf50; background: #e8f5e9; }
+
+/* Action buttons */
+.ar-vfy-actions {
+  display: flex; flex-direction: column; gap: 6px;
+  flex-shrink: 0; min-width: 168px;
+}
+.ar-vfy-btn {
+  padding: 10px 14px; border-radius: 6px;
+  font-size: 13px; font-weight: 600;
+  border: 1.5px solid; cursor: pointer; text-align: center;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.ar-vfy-btn-confirm { color: #fff;     background: #2c2c2c; border-color: #2c2c2c; }
+.ar-vfy-btn-confirm:hover { background: #000; border-color: #000; }
+.ar-vfy-btn-undo    { color: #2c2c2c; background: #fff;    border-color: #ccc; }
+.ar-vfy-btn-undo:hover    { border-color: #888; }
+.ar-vfy-btn-reject  { color: #888;    background: #fff;    border-color: #ddd; font-weight: 500; }
+.ar-vfy-btn-reject:hover  { color: #2c2c2c; border-color: #888; }
+
 /* ── Multi-pass фильтр: скрыть верифицированные во всех трёх блоках
-   Блок 1 (checklist tr), Блок 2 (match-row), Блок 3 (verify-item).
+   Блок 1 (checklist tr), Блок 2 (match-row), Блок 3 (vfy-row).
    Реализовано CSS-правилом вместо innerHTML rebuild — переключение
    чекбокса не вызывает blink/прыжок скролла. См. arToggleHideVerified. */
-#page-articles.ar-hide-verified .ar-verify-item.ar-verified,
+#page-articles.ar-hide-verified .ar-vfy-row.ar-vfy-verified,
 #page-articles.ar-hide-verified .ar-match-row.ar-verified,
 #page-articles.ar-hide-verified tr.ar-row.ar-verified { display: none; }
 
