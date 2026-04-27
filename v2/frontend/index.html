@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Maket CP</title>
-<link rel="stylesheet" href="css/style.css?v=19">
+<link rel="stylesheet" href="css/style.css?v=20">
 </head>
 <body>
 
@@ -586,6 +586,8 @@
 </div><!-- /app-main -->
 
 <!-- ══════════════ Скрипты ══════════════ -->
+<!-- error-reporter MUST be first so global handlers catch load-time errors in everything else -->
+<script src="js/error-reporter.js?v=1"></script>
 <!-- Supabase SDK v2 (jsdelivr CDN) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
