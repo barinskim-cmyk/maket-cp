@@ -683,10 +683,22 @@ function shRecordBatchMove(proj, photoNames, fromStage, toStage, trigger) {
 function shPhotosPerStage(proj) {
   var counts = [];
   for (var i = 0; i < PIPELINE_STAGES.length; i++) counts.push(0);
-  if (!proj.previews) return counts;
-  for (var p = 0; p < proj.previews.length; p++) {
-    var s = proj.previews[p]._stage || 0;
-    if (s >= 0 && s < counts.length) counts[s]++;
+  if (!proj || !proj.previews) return counts;
+
+  /* Phase 4: derive task buckets from canonical event log.
+     Старая логика на _stage больше не используется. */
+  if (typeof migrateProjectToEvents === 'function') migrateProjectToEvents(proj);
+  var stageIdx = {};
+  for (var k = 0; k < PIPELINE_STAGES.length; k++) stageIdx[PIPELINE_STAGES[k].id] = k;
+
+  if (typeof currentTaskOf === 'function') {
+    for (var p = 0; p < proj.previews.length; p++) {
+      var name = proj.previews[p] && proj.previews[p].name;
+      if (!name) continue;
+      var task = currentTaskOf(proj, name);
+      var i2 = stageIdx[task];
+      if (typeof i2 === 'number') counts[i2]++;
+    }
   }
   return counts;
 }
@@ -1380,11 +1392,13 @@ function shShowDetailedPipeline() {
   var proj = getActiveProject();
   if (!proj) return;
 
+  /* Phase 4: canonical source — proj._events. Migration на load уже выполнена. */
+  if (typeof migrateProjectToEvents === 'function') migrateProjectToEvents(proj);
   shEnsurePhotoStages(proj);
-  var checkpoints = (proj._checkpoints || []).slice();
+  var checkpoints = (proj._events || []).slice();
   var totalPhotos = proj.previews ? proj.previews.length : 0;
 
-  /* Sort по ts (хронологически, ascending) */
+  /* Sort по ts (хронологически, ascending). Поддерживаем legacy `date`. */
   checkpoints.sort(function(a, b) {
     var ta = new Date(a.ts || a.date || 0).getTime();
     var tb = new Date(b.ts || b.date || 0).getTime();
@@ -1475,7 +1489,7 @@ function shShowDetailedPipeline() {
    – размер кружка ∝ sqrt(count)
    ────────────────────────────────────────────────────────────────── */
 
-/** Собрать массив узлов из checkpoints. */
+/** Собрать массив узлов из event log (proj._events). */
 function _shCpBuildEventNodes(checkpoints, totalPhotos) {
   var nodes = [];
 
@@ -1483,7 +1497,8 @@ function _shCpBuildEventNodes(checkpoints, totalPhotos) {
     var cp = checkpoints[i];
     var photos = cp.photos || [];
     var count = photos.length || 0;
-    var trigger = cp.trigger || '';
+    /* Phase 4: каноническое поле — type. Legacy `trigger` поддержано для совместимости. */
+    var trigger = cp.type || cp.trigger || '';
     var isLast = (i === checkpoints.length - 1);
 
     var lane = _shCpClassifyLane(trigger, i, isLast);
@@ -1504,20 +1519,28 @@ function _shCpBuildEventNodes(checkpoints, totalPhotos) {
     /* Спец-правило: replacement_pulled → последний client_replacement_request, если есть. */
     if (trigger === 'replacement_pulled') {
       for (var p = i - 1; p >= 0; p--) {
-        if (checkpoints[p].trigger === 'client_replacement_request') { bestParent = p; break; }
+        var pt = checkpoints[p].type || checkpoints[p].trigger;
+        if (pt === 'client_replacement_request') { bestParent = p; break; }
       }
     }
     /* Fallback: предыдущий cp. */
     if (bestParent < 0 && i > 0) bestParent = i - 1;
+
+    /* Author: новый формат — actor.name; legacy — author/approved_by_name. */
+    var authorName = (cp.actor && (cp.actor.name || cp.actor.user_id || cp.actor.share_link))
+      || cp.approved_by_name
+      || cp.author
+      || '—';
+    var noteText = (cp.payload && cp.payload.note) || cp.note || '';
 
     nodes.push({
       id: cp.id || ('cp' + i),
       cpIndex: i,
       name: _shCpEventName(cp),
       count: count,
-      author: cp.approved_by_name || cp.author || '—',
+      author: authorName,
       date: _shCpFormatDate(cp.ts || cp.date),
-      description: cp.note || '',
+      description: noteText,
       lane: lane,
       trigger: trigger,
       parentIdx: bestParent,
@@ -1530,18 +1553,19 @@ function _shCpBuildEventNodes(checkpoints, totalPhotos) {
   return nodes;
 }
 
-/** Классификация lane по триггеру. */
+/** Классификация lane по типу события. Поддерживает new types и legacy triggers. */
 function _shCpClassifyLane(trigger, idx, isLast) {
   if (idx === 0) return 'main';
   if (isLast && _shCpIsDeliveryTrigger(trigger)) return 'main';
   /* Итерации / backflow → влево. */
   if (trigger === 'client_returned' || trigger === 'photo_killed' ||
-      trigger === 'retouch_returned' || trigger === 'cc_returned') {
+      trigger === 'retouch_returned' || trigger === 'cc_returned' ||
+      trigger === 'selection_removed') {
     return 'side-left';
   }
   /* Срочные / замены / skip-CC → вправо. */
   if (trigger === 'client_replacement_request' || trigger === 'replacement_pulled' ||
-      trigger === 'manual_skip_cc') {
+      trigger === 'manual_skip_cc' || trigger === 'manual_skip') {
     return 'side-right';
   }
   return 'main';
@@ -1549,13 +1573,25 @@ function _shCpClassifyLane(trigger, idx, isLast) {
 
 function _shCpIsDeliveryTrigger(t) {
   return t === 'adaptation_done' || t === 'retouch_approved' ||
-         t === 'client_approved' || t === 'retouch_loaded';
+         t === 'client_approved' || t === 'retouch_loaded' ||
+         t === 'delivered';
 }
 
 /** Человекочитаемое имя события для узла. */
 function _shCpEventName(cp) {
   var labels = {
+    /* Phase 4: canonical event types */
     'preview_loaded':            'Превью загружены',
+    'selection_added':           'В отбор',
+    'selection_removed':         'Из отбора',
+    'selection_approved':        'Отбор согласован',
+    'cc_loaded':                 'Цветокоррекция',
+    'cc_returned':               'ЦК · возврат',
+    'retouch_loaded':            'Ретушь загружена',
+    'retouch_returned':          'Ретушь возвращена',
+    'delivered':                 'Сдано клиенту',
+    'manual_skip':               'Пропуск этапа',
+    /* Legacy triggers (backward compat) */
     'selection_done':            'Преотбор команды',
     'team_selection_done':       'Команда отдала клиенту',
     'client_review_v1':          'Клиент открыл',
@@ -1568,17 +1604,14 @@ function _shCpEventName(cp) {
     'client_replacement_request':'Запрос замен',
     'replacement_pulled':        'Подобраны замены',
     'photo_killed':              'Фото удалены',
-    'cc_loaded':                 'Цветокоррекция',
     'cc_confirmed':              'ЦК подтверждена',
-    'cc_returned':               'ЦК · возврат',
     'manual_skip_cc':            'Минуют ЦК (срочно)',
-    'retouch_loaded':            'Ретушь загружена',
     'retouch_approved':          'Ретушь согласована',
-    'retouch_returned':          'Ретушь возвращена',
     'manual':                    'Ручная фиксация',
     'adaptation_done':           'Сдано клиенту'
   };
-  return labels[cp.trigger] || cp.trigger || 'Событие';
+  var key = cp.type || cp.trigger;
+  return labels[key] || key || 'Событие';
 }
 
 /** Уложить узлы по координатам. */
@@ -2501,12 +2534,20 @@ function advanceStage(stageIdx, targetIdx) {
   /* Обновить проектный этап (для backward compat) — минимальный этап с фото */
   proj._stage = shProjectFront(proj);
 
-  /* Checkpoint: ручная фиксация */
-  if (typeof cpkCreate === 'function') {
-    cpkCreate('manual', {
-      stage: currentStageObj.id,
-      photos: movedPhotos,
-      note: movedPhotos.length + ' фото: "' + currentStageObj.name + '" -> "' + PIPELINE_STAGES[nextStageIdx].name + '"'
+  /* Phase 4: emit canonical event with from/to для derived state.
+     Тип события зависит от целевого этапа — это даёт photosByTask правильный bucket. */
+  if (typeof emitEvent === 'function') {
+    var srcId = currentStageObj.id;
+    var dstId = (PIPELINE_STAGES[nextStageIdx] && PIPELINE_STAGES[nextStageIdx].id) || null;
+    var evType = 'manual_skip';
+    if (srcId === 'selection' && dstId === 'client') evType = 'selection_approved';
+    else if (dstId === 'color') evType = 'cc_loaded';
+    else if (dstId === 'retouch') evType = 'retouch_loaded';
+    else if (dstId === 'delivered') evType = 'delivered';
+    emitEvent(proj, evType, evGetCurrentActor(), movedPhotos, {
+      from: srcId,
+      to:   dstId,
+      payload: { note: movedPhotos.length + ' фото: "' + currentStageObj.name + '" -> "' + PIPELINE_STAGES[nextStageIdx].name + '"' }
     });
   }
 
@@ -3195,6 +3236,8 @@ function shLoadAutoSaved() {
         }
       }
       if (!proj.ocContainers) proj.ocContainers = [];
+      /* Phase 4: migrate to canonical event log on load */
+      if (typeof migrateProjectToEvents === 'function') migrateProjectToEvents(proj);
 
       App.projects.push(proj);
     }
@@ -3619,6 +3662,17 @@ function shClientApprove() {
     }
   }
   proj._stage = 3;
+
+  /* Phase 4: emit canonical selection_approved event.
+     Это водораздел — после него отбор зафиксирован, начинается ЦК. */
+  if (typeof emitEvent === 'function') {
+    var approvedPhotos = (typeof cpkGetSelectionList === 'function') ? cpkGetSelectionList() : [];
+    emitEvent(proj, 'selection_approved', evGetCurrentActor(), approvedPhotos, {
+      from: 'client',
+      to:   'color',
+      payload: { note: 'Клиент согласовал отбор' }
+    });
+  }
 
   /* Синхронизировать этап с облаком */
   if (typeof sbSyncStage === 'function') sbSyncStage('client_approved', timeStr);

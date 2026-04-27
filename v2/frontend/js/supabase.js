@@ -802,13 +802,13 @@ function sbDownloadProject(cloudId, callback) {
       channels: (typeof remote.channels === 'string') ? JSON.parse(remote.channels || '[]') : (remote.channels || []),
       _ocNames: (typeof remote.other_content === 'string') ? JSON.parse(remote.other_content || '[]') : (remote.other_content || []),
       _ocContainersRaw: (typeof remote.oc_containers === 'string') ? JSON.parse(remote.oc_containers || '[]') : (remote.oc_containers || []),
-      _checkpoints: (function() {
-        var cpk = remote.checkpoints;
-        if (!cpk) return [];
-        if (typeof cpk === 'string') {
-          try { return JSON.parse(cpk) || []; } catch(e) { return []; }
+      _events: (function() {
+        var ev = remote.events;
+        if (!ev) return [];
+        if (typeof ev === 'string') {
+          try { return JSON.parse(ev) || []; } catch(e) { return []; }
         }
-        return Array.isArray(cpk) ? cpk : [];
+        return Array.isArray(ev) ? ev : [];
       })(),
       cards: [],
       previews: [],
@@ -941,6 +941,8 @@ function sbDownloadProject(cloudId, callback) {
               if (typeof sbSubscribeVersions === 'function') {
                 sbSubscribeVersions(cloudId);
               }
+              /* Phase 4: migrate to canonical event log */
+              if (typeof migrateProjectToEvents === 'function') migrateProjectToEvents(proj);
               callback(null, proj);
             });
           });
@@ -1392,7 +1394,7 @@ function sbSaveCardsByToken(token, cards, callback) {
     oc_containers_data: JSON.stringify(ocCntData),
     annotations_data: (proj && proj._annotations) ? proj._annotations : {},
     comments_data: _sbCollectComments(),
-    checkpoints_data: (proj && proj._checkpoints) ? proj._checkpoints : []
+    events_data: (proj && Array.isArray(proj._events)) ? proj._events : []
   }).then(function(res) {
     if (res.error) {
       console.error('save_cards_by_token:', res.error.code, res.error.message);
@@ -1983,7 +1985,7 @@ function sbSyncCardsLight(projectId, cards, callback) {
       stage: proj._stage || 0,
       annotations: proj._annotations || {},
       comments: _sbCollectComments(),
-      checkpoints: proj._checkpoints || [],
+      events: (Array.isArray(proj._events) ? proj._events : []),
       updated_at: new Date().toISOString()
     }).eq('id', projectId).then(function() {});
   }
@@ -2261,7 +2263,7 @@ function _sbProjectFingerprint(proj) {
     if (cmts.length > 0) parts.push('cmt:' + cards[ci].id + ':' + cmts.length);
   }
   /* Checkpoints count */
-  parts.push('cpk:' + (proj._checkpoints ? proj._checkpoints.length : 0));
+  parts.push('ev:' + (Array.isArray(proj._events) ? proj._events.length : 0));
   return parts.join('|');
 }
 
@@ -2430,14 +2432,13 @@ function sbPullProject(callback) {
       _sbApplyComments(proj, _remoteCmt);
 
       /* Обновить чекпоинты из облака */
-      var _remoteCpk = data.checkpoints || [];
+      var _remoteCpk = data.events || [];
       if (typeof _remoteCpk === 'string') {
         try { _remoteCpk = JSON.parse(_remoteCpk); } catch(e) { _remoteCpk = []; }
       }
-      /* Phase 3: всегда синкаем checkpoints (даже пустой массив).
-         Раньше присваивали только при length > 0 — это блокировало проекты,
-         где cloud-checkpoints ещё не были выгружены в proj-object. */
-      proj._checkpoints = Array.isArray(_remoteCpk) ? _remoteCpk : [];
+      /* Phase 4: canonical event log. Заменяем _events из облака целиком. */
+      proj._events = Array.isArray(_remoteCpk) ? _remoteCpk : [];
+      if (typeof migrateProjectToEvents === 'function') migrateProjectToEvents(proj);
 
       /* Fingerprint ПОСЛЕ — сравниваем */
       var _fpAfter = _sbProjectFingerprint(proj);
@@ -2480,7 +2481,7 @@ function sbPullProject(callback) {
   }
 
   /* 1. Загрузить проект (stage, other_content) */
-  sbClient.from('projects').select('stage, other_content, oc_containers, annotations, comments, checkpoints, updated_at').eq('id', cloudId).single().then(function(projRes) {
+  sbClient.from('projects').select('stage, other_content, oc_containers, annotations, comments, events, updated_at').eq('id', cloudId).single().then(function(projRes) {
     if (projRes.error) { _sbPullRunning = false; callback(projRes.error.message); return; }
 
     var remote = projRes.data;
@@ -2648,12 +2649,13 @@ function sbPullProject(callback) {
         _sbApplyComments(proj, _remoteCmt2);
 
         /* Обновить чекпоинты из облака */
-        var _remoteCpk2 = remote.checkpoints || [];
+        var _remoteCpk2 = remote.events || [];
         if (typeof _remoteCpk2 === 'string') {
           try { _remoteCpk2 = JSON.parse(_remoteCpk2); } catch(e) { _remoteCpk2 = []; }
         }
-        /* Phase 3: всегда синкаем checkpoints (даже пустой массив) — см. комментарий выше. */
-        proj._checkpoints = Array.isArray(_remoteCpk2) ? _remoteCpk2 : [];
+        /* Phase 4: canonical event log. */
+        proj._events = Array.isArray(_remoteCpk2) ? _remoteCpk2 : [];
+        if (typeof migrateProjectToEvents === 'function') migrateProjectToEvents(proj);
 
         /* Fingerprint ПОСЛЕ — сравниваем */
         var _fpAfter2 = _sbProjectFingerprint(proj);

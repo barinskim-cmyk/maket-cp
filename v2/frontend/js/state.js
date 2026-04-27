@@ -338,47 +338,76 @@ var PIPELINE_STAGES = [
  *   {string[]} removed   — фото убранные из отбора (для client_saved)
  * @returns {Object|null} созданный checkpoint или null
  */
+/* Map legacy cpk triggers → canonical event types.
+   Used as a thin delegator: old call-sites continue working but
+   write to proj._events (canonical), не proj._checkpoints. */
+var _CPK_TRIGGER_TO_TYPE = {
+  'preview_loaded':   'preview_loaded',
+  'selection_done':   'selection_approved',
+  'client_received':  'preview_loaded',
+  'client_saved':     'selection_added',
+  'client_approved':  'selection_approved',
+  'client_returned':  'cc_returned',
+  'photo_killed':     'selection_removed',
+  'cc_loaded':        'cc_loaded',
+  'cc_confirmed':     'cc_loaded',
+  'retouch_comments': 'retouch_loaded',
+  'retouch_loaded':   'retouch_loaded',
+  'retouch_approved': 'delivered',
+  'retouch_returned': 'retouch_returned',
+  'manual':           'manual_skip',
+  'adaptation_done':  'delivered'
+};
+
 function cpkCreate(trigger, opts) {
   var proj = getActiveProject();
   if (!proj) return null;
-  if (!proj._checkpoints) proj._checkpoints = [];
   opts = opts || {};
-
-  var stageId = opts.stage || '';
-  if (!stageId && typeof proj._stage === 'number' && PIPELINE_STAGES[proj._stage]) {
-    stageId = PIPELINE_STAGES[proj._stage].id;
+  if (typeof emitEvent !== 'function') {
+    console.warn('cpkCreate: events.js not loaded yet, skipping');
+    return null;
   }
 
-  var cp = {
-    id: 'cpk_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
-    date: new Date().toISOString(),
-    stage: stageId,
-    trigger: trigger,
-    photos: opts.photos || [],
-    iteration: opts.iteration || 0,
-    note: opts.note || ''
-  };
+  var actor = (typeof evGetCurrentActor === 'function') ? evGetCurrentActor() : { name: 'system' };
 
-  /* Дельта для client_saved: добавленные и удалённые фото */
-  if (opts.added && opts.added.length > 0) cp.added = opts.added;
-  if (opts.removed && opts.removed.length > 0) cp.removed = opts.removed;
+  /* Special-case: client_saved может содержать added + removed одновременно —
+     разбиваем на два события (selection_added / selection_removed). */
+  if (trigger === 'client_saved') {
+    var lastEv = null;
+    if (opts.added && opts.added.length > 0) {
+      lastEv = emitEvent(proj, 'selection_added', actor, opts.added,
+        opts.note ? { payload: { note: opts.note } } : undefined);
+    }
+    if (opts.removed && opts.removed.length > 0) {
+      lastEv = emitEvent(proj, 'selection_removed', actor, opts.removed,
+        opts.note ? { payload: { note: opts.note } } : undefined);
+    }
+    if (!lastEv && opts.photos && opts.photos.length > 0) {
+      lastEv = emitEvent(proj, 'selection_added', actor, opts.photos);
+    }
+    return lastEv;
+  }
 
-  proj._checkpoints.push(cp);
+  var type = _CPK_TRIGGER_TO_TYPE[trigger] || trigger;
+  var evOpts = {};
+  var payload = {};
+  if (opts.note) payload.note = opts.note;
+  if (opts.iteration) payload.iteration = opts.iteration;
+  if (opts.stage) payload.legacy_stage = opts.stage;
+  if (Object.keys(payload).length > 0) evOpts.payload = payload;
 
-  /* Автосохранение */
-  if (typeof shAutoSave === 'function') shAutoSave();
-
-  console.log('cpkCreate: ' + trigger + ' (' + cp.photos.length + ' фото, stage=' + stageId + ')');
-  return cp;
+  return emitEvent(proj, type, actor, opts.photos || [], evOpts);
 }
 
 /**
- * Получить все чекпоинты проекта.
+ * Получить все события проекта (canonical event log).
+ * Раньше возвращало _checkpoints. Теперь возвращает _events —
+ * формат отличается (type вместо trigger, ts вместо date).
  * @returns {Array}
  */
 function cpkGetAll() {
   var proj = getActiveProject();
-  return (proj && proj._checkpoints) ? proj._checkpoints : [];
+  return (proj && Array.isArray(proj._events)) ? proj._events : [];
 }
 
 /**
