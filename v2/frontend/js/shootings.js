@@ -1111,6 +1111,10 @@ function renderPipeline() {
       if (s.id === 'retouch') {
         html += '<button class="step-action" style="border-color:#333;color:#333;margin-left:6px" onclick="pvOnLoadVersionSelect({value:\'retouch\'})" title="Загрузить ретушь версию для отбора">Загрузить ретушь</button>';
       }
+      /* Phase C: «Сдано клиенту» на финальных стадиях (retouch_ok, adaptation, retouch). */
+      if (s.id === 'retouch_ok' || s.id === 'adaptation' || s.id === 'retouch') {
+        html += '<button class="step-action" style="border-color:#0a7;color:#0a7;margin-left:6px" onclick="shDeliverProject()" title="Финализировать: emit delivered для всех фото в отборе">Сдано клиенту</button>';
+      }
     }
     /* ── Phase 5: inline badges для коротких параллельных активностей,
        которые целиком уложились в этой стадии. Рендерим внутри step-info
@@ -1405,9 +1409,14 @@ function shShowDetailedPipeline() {
     return ta - tb;
   });
 
+  /* Phase C: render-side группировка близких одинаковых событий
+     (same actor + same type, в окне 60 минут) → один visual node.
+     Data слой не трогаем — events остаются индивидуальными. */
+  var grouped = groupEventsForRender(checkpoints);
+
   var svgContent = '';
-  if (checkpoints.length > 0) {
-    var nodes = _shCpBuildEventNodes(checkpoints, totalPhotos);
+  if (grouped.length > 0) {
+    var nodes = _shCpBuildEventNodes(grouped, totalPhotos);
     var dim = _shCpLayoutEventGraph(nodes);
     svgContent = _shCpRenderEventGraphSVG(nodes, dim);
   }
@@ -1431,7 +1440,12 @@ function shShowDetailedPipeline() {
 
   html += '<div class="sh-tree-modal-footer">';
   html += 'Всего: ' + totalPhotos + ' фото';
-  if (checkpoints.length > 0) html += ' · ' + checkpoints.length + ' событий';
+  if (checkpoints.length > 0) {
+    html += ' · ' + checkpoints.length + ' событий';
+    if (grouped.length !== checkpoints.length) {
+      html += ' (сгруппировано в ' + grouped.length + ')';
+    }
+  }
   html += '</div>';
   html += '</div>';
 
@@ -1489,6 +1503,74 @@ function shShowDetailedPipeline() {
    – размер кружка ∝ sqrt(count)
    ────────────────────────────────────────────────────────────────── */
 
+/**
+ * Группировка событий для timeline render.
+ * Объединяет соседние события с одинаковыми {actor, type} в окне 60 минут.
+ * Data layer не трогается — events остаются как есть. Только для отображения.
+ *
+ * Один сгруппированный узел = объединение photos уникальных, range ts,
+ * + список original_event_ids для возможного expand-on-click.
+ *
+ * @param {Array} events — отсортированные по ts ascending
+ * @returns {Array} grouped pseudo-events (совместимы по shape с _shCpBuildEventNodes)
+ */
+function groupEventsForRender(events) {
+  var WINDOW_MS = 60 * 60 * 1000; /* 1 час */
+  var groups = [];
+  for (var i = 0; i < events.length; i++) {
+    var ev = events[i];
+    var actorKey = (ev.actor && (ev.actor.user_id || ev.actor.share_link || ev.actor.name)) || '?';
+    var type = ev.type || ev.trigger || '';
+    var ts = new Date(ev.ts || ev.date || 0).getTime();
+
+    /* Попробовать слиться с последней группой */
+    var last = groups.length > 0 ? groups[groups.length - 1] : null;
+    if (last && last._actorKey === actorKey && last._type === type && (ts - last._lastTs) <= WINDOW_MS) {
+      /* Merge: union photos, продлить range */
+      var existingPhotos = last._photoSet;
+      var photos = ev.photos || [];
+      for (var p = 0; p < photos.length; p++) {
+        if (!existingPhotos[photos[p]]) {
+          existingPhotos[photos[p]] = 1;
+          last.photos.push(photos[p]);
+        }
+      }
+      last._lastTs = ts;
+      last._eventIds.push(ev.id);
+      last._batchSize++;
+      /* note collation — берём последний non-empty */
+      var note = (ev.payload && ev.payload.note) || ev.note;
+      if (note) last._lastNote = note;
+      continue;
+    }
+
+    /* Новая группа */
+    var photoSet = {};
+    (ev.photos || []).forEach(function (n) { photoSet[n] = 1; });
+    groups.push({
+      /* Совместимость с downstream readers (_shCpBuildEventNodes) */
+      id: ev.id || ('group_' + i),
+      ts: ev.ts || ev.date,
+      type: type,
+      actor: ev.actor || {},
+      photos: (ev.photos || []).slice(),
+      from: ev.from,
+      to: ev.to,
+      payload: ev.payload,
+      /* Group-specific метаданные */
+      _actorKey: actorKey,
+      _type: type,
+      _firstTs: ts,
+      _lastTs: ts,
+      _photoSet: photoSet,
+      _eventIds: [ev.id],
+      _batchSize: 1,
+      _lastNote: (ev.payload && ev.payload.note) || ev.note || ''
+    });
+  }
+  return groups;
+}
+
 /** Собрать массив узлов из event log (proj._events). */
 function _shCpBuildEventNodes(checkpoints, totalPhotos) {
   var nodes = [];
@@ -1531,15 +1613,33 @@ function _shCpBuildEventNodes(checkpoints, totalPhotos) {
       || cp.approved_by_name
       || cp.author
       || '—';
-    var noteText = (cp.payload && cp.payload.note) || cp.note || '';
+    var noteText = (cp.payload && cp.payload.note) || cp._lastNote || cp.note || '';
+
+    /* Phase C: batch-aware date string и label.
+       Если batch (>1 событие в группе) — date = "HH:MM–HH:MM", label включает счётчик. */
+    var displayDate;
+    var displayName = _shCpEventName(cp);
+    var batchSize = cp._batchSize || 1;
+    if (batchSize > 1) {
+      var firstHHMM = _shCpFormatTimeShort(cp._firstTs);
+      var lastHHMM  = _shCpFormatTimeShort(cp._lastTs);
+      var dayStr    = _shCpFormatDayShort(cp._firstTs);
+      displayDate = (firstHHMM === lastHHMM)
+        ? (dayStr + ' ' + firstHHMM)
+        : (dayStr + ' ' + firstHHMM + '–' + lastHHMM);
+    } else {
+      displayDate = _shCpFormatDate(cp.ts || cp.date);
+    }
 
     nodes.push({
       id: cp.id || ('cp' + i),
       cpIndex: i,
-      name: _shCpEventName(cp),
+      name: displayName,
       count: count,
       author: authorName,
-      date: _shCpFormatDate(cp.ts || cp.date),
+      date: displayDate,
+      batchSize: batchSize,
+      eventIds: cp._eventIds || [cp.id],
       description: noteText,
       lane: lane,
       trigger: trigger,
@@ -1587,8 +1687,10 @@ function _shCpEventName(cp) {
     'selection_approved':        'Отбор согласован',
     'cc_loaded':                 'Цветокоррекция',
     'cc_returned':               'ЦК · возврат',
+    'cc_ready_unchanged':        'ЦК · без изменений',
     'retouch_loaded':            'Ретушь загружена',
     'retouch_returned':          'Ретушь возвращена',
+    'retouch_ready_unchanged':   'Ретушь · без изменений',
     'delivered':                 'Сдано клиенту',
     'manual_skip':               'Пропуск этапа',
     /* Legacy triggers (backward compat) */
@@ -1782,8 +1884,10 @@ function _shCpRenderNodeText(n) {
   var numY = n.y + 2;
   var descY = n.y + 11;
 
+  /* Phase C: batch label — добавляем "× N" если событий в группе больше одного. */
+  var batch = n.batchSize && n.batchSize > 1 ? n.name + ' × ' + n.batchSize : n.name;
   s += '<text class="' + nameClass + '" x="' + tx + '" y="' + nameY +
-       '" text-anchor="' + anchor + '">' + _shCpEscapeSVG(_shCpTrunc(n.name, 20)) + '</text>';
+       '" text-anchor="' + anchor + '">' + _shCpEscapeSVG(_shCpTrunc(batch, 24)) + '</text>';
 
   var countLabel = n.count > 0 ? (n.count + ' фото') : '—';
   s += '<text class="' + numClass + '" x="' + tx + '" y="' + numY +
@@ -2068,6 +2172,24 @@ function _shCpFormatDate(v) {
   var pad = function(n) { return n < 10 ? '0' + n : '' + n; };
   return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + ' ' +
          pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+
+/** "HH:MM" из timestamp (number ms или ISO/Date). */
+function _shCpFormatTimeShort(v) {
+  if (!v && v !== 0) return '';
+  var d = (v instanceof Date) ? v : new Date(v);
+  if (isNaN(d.getTime())) return '';
+  var pad = function(n) { return n < 10 ? '0' + n : '' + n; };
+  return pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+
+/** "DD.MM" из timestamp (number ms или ISO/Date). */
+function _shCpFormatDayShort(v) {
+  if (!v && v !== 0) return '';
+  var d = (v instanceof Date) ? v : new Date(v);
+  if (isNaN(d.getTime())) return '';
+  var pad = function(n) { return n < 10 ? '0' + n : '' + n; };
+  return pad(d.getDate()) + '.' + pad(d.getMonth() + 1);
 }
 
 /**
@@ -3689,6 +3811,49 @@ function shClientApprove() {
 
   /* Обновить панель — теперь покажет "Внести изменения в отбор" */
   shRenderClientBar();
+}
+
+/**
+ * Phase C: финализация проекта.
+ * Emit `delivered` для всех фото в отборе. Это водораздел —
+ * после этого projectFinishedAt(proj) возвращает ts события.
+ */
+function shDeliverProject() {
+  var proj = getActiveProject();
+  if (!proj) { alert('Выберите проект'); return; }
+
+  /* Список фото для сдачи: всё что в отборе (карточки + OC) */
+  var deliveredPhotos = (typeof cpkGetSelectionList === 'function') ? cpkGetSelectionList() : [];
+  if (deliveredPhotos.length === 0 && proj.previews) {
+    /* Fallback: если отбор пуст, берём все превью */
+    deliveredPhotos = proj.previews.map(function(p) { return p.name; }).filter(Boolean);
+  }
+  if (deliveredPhotos.length === 0) {
+    alert('Нет фото для сдачи');
+    return;
+  }
+
+  if (!confirm('Сдать ' + deliveredPhotos.length + ' фото клиенту?\n\nПосле этого проект помечается как завершённый (projectFinishedAt будет зафиксирован).')) {
+    return;
+  }
+
+  if (typeof emitEvent === 'function') {
+    var actor = (typeof evGetCurrentActor === 'function') ? evGetCurrentActor() : { name: 'system' };
+    emitEvent(proj, 'delivered', actor, deliveredPhotos, {
+      payload: { note: 'Проект сдан клиенту: ' + deliveredPhotos.length + ' фото' }
+    });
+  }
+
+  /* Synchroнизация с облаком */
+  if (proj._cloudId && typeof sbUploadProject === 'function') {
+    sbUploadProject(App.selectedProject, function(err) {
+      if (err) console.error('Ошибка синхронизации delivered:', err);
+    });
+  }
+
+  shAutoSave();
+  if (typeof renderPipeline === 'function') renderPipeline();
+  alert('Проект сдан. ' + deliveredPhotos.length + ' фото отмечено как доставленные.');
 }
 
 /**

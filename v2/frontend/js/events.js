@@ -31,16 +31,18 @@
    retouch_task, retouch, retouch_ok, adaptation, delivered).
    Vocabulary НЕ enforced — unknown типы просто не двигают bucket. */
 var EVENT_TYPE_TO_TASK = {
-  preview_loaded:     'preselect',
-  selection_added:    'selection',
-  selection_removed:  'selection',
-  selection_approved: 'client',
-  cc_loaded:          'color',
-  cc_returned:        'color',
-  retouch_loaded:     'retouch',
-  retouch_returned:   'retouch',
-  delivered:          'delivered',
-  manual_skip:        null         // skip-маркер, не двигает bucket
+  preview_loaded:           'preselect',
+  selection_added:          'selection',
+  selection_removed:        'selection',
+  selection_approved:       'client',
+  cc_loaded:                'color',
+  cc_returned:              'color',
+  cc_ready_unchanged:       'color',     // ЦК осталась прежней — фото готово
+  retouch_loaded:           'retouch',
+  retouch_returned:         'retouch',
+  retouch_ready_unchanged:  'retouch',   // ретушь осталась прежней
+  delivered:                'delivered',
+  manual_skip:              null         // skip-маркер, не двигает bucket
 };
 
 /* ──────────────────────────────────────────────

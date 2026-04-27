@@ -72,13 +72,17 @@ var CLIENT_STAGE_IDX = 2;
 function _paIsApproved(proj) {
   proj = proj || (typeof getActiveProject === 'function' ? getActiveProject() : null);
   if (!proj) return false;
-  if (!proj._stageHistory) return false;
-  /* Triggers: явный client_approved (через shClientApprove) ИЛИ
-     просто завершённый client-этап через "Завершить этап"
-     (numeric key CLIENT_STAGE_IDX в _stageHistory) ИЛИ
-     proj._stage уже за client (≥3 = ЦК и далее). */
-  if (proj._stageHistory['client_approved']) return true;
-  if (proj._stageHistory[CLIENT_STAGE_IDX]) return true;
+
+  /* Phase C: canonical detection через event log. */
+  if (typeof selectionApproved === 'function') {
+    try { if (selectionApproved(proj)) return true; } catch (e) {}
+  }
+
+  /* Fallback на legacy для проектов где events ещё не подтянулись. */
+  if (proj._stageHistory) {
+    if (proj._stageHistory['client_approved']) return true;
+    if (proj._stageHistory[CLIENT_STAGE_IDX]) return true;
+  }
   if (typeof proj._stage === 'number' && proj._stage > CLIENT_STAGE_IDX) return true;
   return false;
 }

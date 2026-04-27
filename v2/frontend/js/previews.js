@@ -889,6 +889,15 @@ window.onPreviewDone = function(data) {
       });
     }
   }
+
+  /* Phase C: после загрузки версии (ЦК/Ретушь), если в отборе есть фото
+     без загруженной версии — спрашиваем у пользователя: оставить как было
+     или догрузить позже. */
+  if (loadStage && versionCount > 0 && (loadStage === 'color' || loadStage === 'retouch')) {
+    if (typeof pvShowVersionRemainderModal === 'function') {
+      pvShowVersionRemainderModal(proj, loadStage);
+    }
+  }
 };
 
 /**
@@ -2651,6 +2660,99 @@ function pvOnLoadVersionSelect(sel) {
   }
 
   pvPickFolderAs(stageId);
+}
+
+/**
+ * Phase C: модалка после загрузки ЦК/Ретушь.
+ * Показывает: "Вы загрузили N из M. Что с остальными K?"
+ * - "готовы — осталось прежним" → emit cc_ready_unchanged / retouch_ready_unchanged
+ * - "догружу позже"             → закрыть, ничего не emit
+ */
+function pvShowVersionRemainderModal(proj, loadStage) {
+  if (!proj || !loadStage) return;
+  if (loadStage !== 'color' && loadStage !== 'retouch') return;
+
+  /* Список фото в отборе без загруженной версии */
+  var selectionSet = pvGetSelectionSet();
+  var selectionList = Object.keys(selectionSet);
+  var totalSel = selectionList.length;
+  if (totalSel === 0) return;
+
+  var remainder = [];
+  for (var i = 0; i < proj.previews.length; i++) {
+    var pv = proj.previews[i];
+    if (!pv || !pv.name) continue;
+    if (!selectionSet[pv.name]) continue;
+    var hasVersion = !!(pv.versions && pv.versions[loadStage]);
+    if (!hasVersion) remainder.push(pv.name);
+  }
+  var loadedCount = totalSel - remainder.length;
+
+  /* Если всё загружено — нечего показывать */
+  if (remainder.length === 0) return;
+
+  var stageLabel = loadStage === 'color' ? 'ЦК' : 'ретушь';
+  var unchangedType = loadStage === 'color' ? 'cc_ready_unchanged' : 'retouch_ready_unchanged';
+
+  /* Inject стили (idempotent) */
+  if (!document.getElementById('pv-remainder-modal-styles')) {
+    var st = document.createElement('style');
+    st.id = 'pv-remainder-modal-styles';
+    st.textContent = ''
+      + '.pv-rm-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10100;'
+      +   'display:flex;align-items:center;justify-content:center}'
+      + '.pv-rm-modal{background:#fff;border-radius:12px;padding:24px;max-width:480px;width:92vw;'
+      +   'box-shadow:0 20px 60px rgba(0,0,0,0.3);font-family:system-ui,-apple-system,sans-serif}'
+      + '.pv-rm-title{font-size:16px;font-weight:600;color:#222;margin:0 0 12px}'
+      + '.pv-rm-body{font-size:14px;color:#444;line-height:1.5;margin:0 0 20px}'
+      + '.pv-rm-stats{font-size:13px;color:#666;background:#f5f5f5;padding:10px 14px;border-radius:8px;margin:8px 0 16px}'
+      + '.pv-rm-actions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}'
+      + '.pv-rm-btn{font:500 13px system-ui,sans-serif;padding:9px 16px;border-radius:8px;'
+      +   'border:1px solid #ddd;background:#fff;color:#333;cursor:pointer}'
+      + '.pv-rm-btn:hover{background:#f5f5f5}'
+      + '.pv-rm-btn-primary{background:#2c2c2c;border-color:#2c2c2c;color:#fff}'
+      + '.pv-rm-btn-primary:hover{background:#000}';
+    document.head.appendChild(st);
+  }
+
+  var overlay = document.createElement('div');
+  overlay.className = 'pv-rm-overlay';
+  overlay.innerHTML = ''
+    + '<div class="pv-rm-modal" role="dialog" aria-modal="true">'
+    + '<div class="pv-rm-title">Что с остальными ' + remainder.length + ' фото?</div>'
+    + '<div class="pv-rm-stats">Вы загрузили <b>' + loadedCount + '</b> из <b>' + totalSel + '</b> фото в отборе.</div>'
+    + '<div class="pv-rm-body">Если ' + stageLabel + ' для остальных не нужна — отметим, что они готовы как есть. Если ещё догрузите — закройте окно.</div>'
+    + '<div class="pv-rm-actions">'
+    +   '<button type="button" class="pv-rm-btn" data-act="later">Догружу позже</button>'
+    +   '<button type="button" class="pv-rm-btn pv-rm-btn-primary" data-act="ready">Готовы — ' + stageLabel + ' осталась прежней</button>'
+    + '</div>'
+    + '</div>';
+  document.body.appendChild(overlay);
+
+  var close = function() {
+    if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+  };
+
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) close();
+  });
+
+  overlay.querySelector('[data-act="later"]').addEventListener('click', close);
+
+  overlay.querySelector('[data-act="ready"]').addEventListener('click', function() {
+    /* emit `cc_ready_unchanged` / `retouch_ready_unchanged` для оставшихся */
+    if (typeof emitEvent === 'function') {
+      var actor = (typeof evGetCurrentActor === 'function') ? evGetCurrentActor() : { name: 'system' };
+      var to = (loadStage === 'color') ? 'color' : 'retouch';
+      emitEvent(proj, unchangedType, actor, remainder, {
+        from: loadStage,
+        to:   to,
+        payload: { note: remainder.length + ' фото отмечены как «' + stageLabel + ' осталась прежней»' }
+      });
+    }
+    close();
+    if (typeof renderPipeline === 'function') renderPipeline();
+  });
 }
 
 // ── Удаление по имени (стабильное) ──
