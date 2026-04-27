@@ -223,7 +223,7 @@ function sbOpenShareModal() {
 var _shareRoleLabels = {
   client: 'Клиент',
   viewer: 'Зритель',
-  retoucher: 'Ретушёр'
+  retoucher: 'Команда'
 };
 
 /**

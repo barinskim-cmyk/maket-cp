@@ -3486,10 +3486,10 @@ function shRenderClientBar() {
         '</div>';
     }
   } else if (role === 'retoucher') {
-    subtitle = 'Ретушёр';
+    subtitle = 'Команда';
     buttonsHtml =
       '<div class="client-bar-buttons">' +
-        '<span style="color:#888;font-size:12px">Ретушёр</span>' +
+        '<span style="color:#888;font-size:12px">Команда</span>' +
       '</div>';
   } else {
     /* viewer */
