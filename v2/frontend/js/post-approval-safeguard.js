@@ -66,11 +66,21 @@ try { sessionStorage.removeItem(SNAPSHOT_KEY); } catch (e) {}
 
 // ─── helpers ─────────────────────────────────────────────────────────
 
+/* CLIENT_STAGE_INDEX = 2 (preselect=0, selection=1, client=2). См. PIPELINE_STAGES в state.js */
+var CLIENT_STAGE_IDX = 2;
+
 function _paIsApproved(proj) {
   proj = proj || (typeof getActiveProject === 'function' ? getActiveProject() : null);
   if (!proj) return false;
   if (!proj._stageHistory) return false;
-  return !!proj._stageHistory['client_approved'];
+  /* Triggers: явный client_approved (через shClientApprove) ИЛИ
+     просто завершённый client-этап через "Завершить этап"
+     (numeric key CLIENT_STAGE_IDX в _stageHistory) ИЛИ
+     proj._stage уже за client (≥3 = ЦК и далее). */
+  if (proj._stageHistory['client_approved']) return true;
+  if (proj._stageHistory[CLIENT_STAGE_IDX]) return true;
+  if (typeof proj._stage === 'number' && proj._stage > CLIENT_STAGE_IDX) return true;
+  return false;
 }
 
 function _paGetIntent() {
