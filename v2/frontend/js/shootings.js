@@ -837,7 +837,6 @@ function renderPipeline() {
   if (proj._cloudId) {
     html += '<div class="pipeline-sync-bar">';
     html += '<span id="pipeline-sync-status" style="font-size:11px;color:#999">Облако</span>';
-    html += ' <button class="btn btn-sm" onclick="sbPullProject(function(e){var s=document.getElementById(\'pipeline-sync-status\');if(s)s.textContent=e?\'Ошибка\':\'Обновлено\';setTimeout(function(){if(s)s.textContent=\'Облако\'},2000)})" style="font-size:11px;padding:2px 8px">Синхронизировать</button>';
     html += ' <button class="btn btn-sm" onclick="shOpenProjectMembersModal()" style="font-size:11px;padding:2px 8px">Участники</button>';
     html += '</div>';
   }
