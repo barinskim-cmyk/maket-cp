@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ru"><head>
+<meta charset="utf-8">
+<title>Bug fix demo — mixed state</title>
+<style>
+body { font: 13px -apple-system, sans-serif; padding: 16px; color:#2c2c2c; max-width:760px; }
+h1 { font-size:16px; margin:0 0 12px; }
+h2 { font-size:13px; margin:18px 0 6px; color:#444; }
+.demo { border:1px solid #e6e6e6; border-radius:8px; padding:12px; margin-bottom:16px; }
+.legend { font-size:12px; color:#666; margin-bottom:8px; }
+.row { padding:6px 8px; border-radius:4px; margin:3px 0; }
+.unverified { background:#fff8e1; }
+.verified { background:#e8f5e9; }
+#page-articles.ar-hide-verified-checklist    tr.ar-row.ar-verified         { display: none; }
+#page-articles.ar-hide-verified-matching     .ar-match-row.ar-verified     { display: none; }
+#page-articles.ar-hide-verified-verification .ar-vfy-row.ar-vfy-verified   { display: none; }
+table { border-collapse:collapse; width:100%; }
+td { padding:4px 6px; }
+</style></head><body>
+
+<h1>Mixed state: checkbox 1 OFF, 2 ON, 3 OFF — каждый блок реагирует только на свой</h1>
+
+<div class="legend">
+Желтые ряды = unverified, зелёные = verified.<br>
+Чек-лист: чекбокс OFF → verified ВИДНЫ. Сопоставление: ON → verified СКРЫТЫ. Верификация: OFF → verified ВИДНЫ.
+</div>
+
+<div id="page-articles" class="ar-hide-verified-matching">
+
+  <div class="demo">
+    <h2>1. Чек-лист артикулов  (чекбокс OFF)</h2>
+    <label><input type="checkbox"> Скрывать верифицированные</label>
+    <table style="margin-top:8px"><tbody>
+      <tr class="ar-row unverified row"><td>1</td><td>SKU-A-101</td></tr>
+      <tr class="ar-row ar-verified verified row"><td>2</td><td>SKU-A-102 (verified)</td></tr>
+      <tr class="ar-row unverified row"><td>3</td><td>SKU-A-103</td></tr>
+      <tr class="ar-row ar-verified verified row"><td>4</td><td>SKU-A-104 (verified)</td></tr>
+    </tbody></table>
+  </div>
+
+  <div class="demo">
+    <h2>2. Сопоставление  (чекбокс ON)</h2>
+    <label><input type="checkbox" checked> Скрывать верифицированные</label>
+    <div style="margin-top:8px">
+      <div class="ar-match-row unverified row">Карточка 1 — SKU-B-201</div>
+      <div class="ar-match-row ar-verified verified row">Карточка 2 — SKU-B-202 (verified)</div>
+      <div class="ar-match-row unverified row">Карточка 3 — SKU-B-203</div>
+      <div class="ar-match-row ar-verified verified row">Карточка 4 — SKU-B-204 (verified)</div>
+    </div>
+  </div>
+
+  <div class="demo">
+    <h2>3. Верификация  (чекбокс OFF)</h2>
+    <label><input type="checkbox"> Скрывать подтверждённые</label>
+    <div style="margin-top:8px">
+      <div class="ar-vfy-row unverified row">SKU-C-301 — Не проверен</div>
+      <div class="ar-vfy-row ar-vfy-verified verified row">SKU-C-302 — Подтверждён</div>
+      <div class="ar-vfy-row unverified row">SKU-C-303 — Не проверен</div>
+      <div class="ar-vfy-row ar-vfy-verified verified row">SKU-C-304 — Подтверждён</div>
+    </div>
+  </div>
+</div>
+
+</body></html>

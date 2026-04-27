@@ -2666,13 +2666,17 @@ body.mob-client-mode html {
 .ar-vfy-btn-reject  { color: #888;    background: #fff;    border-color: #ddd; font-weight: 500; }
 .ar-vfy-btn-reject:hover  { color: #2c2c2c; border-color: #888; }
 
-/* ── Multi-pass фильтр: скрыть верифицированные во всех трёх блоках
-   Блок 1 (checklist tr), Блок 2 (match-row), Блок 3 (vfy-row).
-   Реализовано CSS-правилом вместо innerHTML rebuild — переключение
-   чекбокса не вызывает blink/прыжок скролла. См. arToggleHideVerified. */
-#page-articles.ar-hide-verified .ar-vfy-row.ar-vfy-verified,
-#page-articles.ar-hide-verified .ar-match-row.ar-verified,
-#page-articles.ar-hide-verified tr.ar-row.ar-verified { display: none; }
+/* ── Multi-pass фильтр: скрыть верифицированные ПО БЛОКАМ ОТДЕЛЬНО.
+   Каждый чекбокс «Скрывать верифицированные/подтверждённые» — независимый,
+   тогл одного НЕ влияет на отображение в других. Раньше был один общий
+   класс ar-hide-verified — это вызывало coupled behavior.
+   Реализовано CSS-правилами вместо innerHTML rebuild — переключение
+   чекбокса не вызывает blink/прыжок скролла.
+   См. arToggleHideVerifiedChecklist / arToggleHideVerifiedMatching /
+       arToggleHideVerifiedVerification. */
+#page-articles.ar-hide-verified-checklist tr.ar-row.ar-verified { display: none; }
+#page-articles.ar-hide-verified-matching .ar-match-row.ar-verified { display: none; }
+#page-articles.ar-hide-verified-verification .ar-vfy-row.ar-vfy-verified { display: none; }
 
 /* ── Блок переименования ── */
 /* ── Articles: OpenAI key inline form ── */

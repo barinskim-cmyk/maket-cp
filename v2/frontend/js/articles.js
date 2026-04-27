@@ -36,10 +36,17 @@ var _arSelectedSku = null;
 /** @type {number|null} Индекс выбранной карточки для сопоставления */
 var _arSelectedCard = null;
 
-/** @type {boolean} Скрывать верифицированные артикулы из списков метчинга.
- * По умолчанию включено — чтобы метчинг можно было делать в несколько проходов:
+/* Скрывать верифицированные/подтверждённые — независимый флаг для каждого
+ * из трёх блоков (раньше был один общий `_arHideVerified`, что давало
+ * coupled behavior: тогл в одном меню скрывал/показывал в других).
+ * По умолчанию включены — чтобы метчинг можно было делать в несколько проходов:
  * сопоставил часть, подтвердил, скрыл, продолжил с оставшимися без визуального шума. */
-var _arHideVerified = true;
+/** @type {boolean} Чек-лист артикулов: скрывать верифицированные строки. */
+var _arHideVerifiedChecklist = true;
+/** @type {boolean} Меню "Сопоставление": скрывать верифицированные карточки. */
+var _arHideVerifiedMatching = true;
+/** @type {boolean} Меню "Верификация": скрывать подтверждённые ряды. */
+var _arHideVerifiedVerification = true;
 
 /** @type {string} Кэшированный OpenAI API key (загружается при старте) */
 var _arOpenAIKey = '';
@@ -743,15 +750,16 @@ function arRenderChecklist() {
     if (proj.articles[vi].status === 'verified') verifiedCount++;
   }
 
-  /* Тумблер "скрывать верифицированные" + статистика */
+  /* Тумблер "скрывать верифицированные" + статистика — flag и handler
+     ИНДИВИДУАЛЬНЫЕ для checklist (не коуплятся с matching/verification). */
   var html = '';
   if (verifiedCount > 0) {
     html += '<div class="ar-filter-bar" style="display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:12px;color:#666">'
       + '<label style="cursor:pointer;display:flex;align-items:center;gap:4px">'
-      + '<input type="checkbox"' + (_arHideVerified ? ' checked' : '') + ' onchange="arToggleHideVerified()"> '
+      + '<input type="checkbox"' + (_arHideVerifiedChecklist ? ' checked' : '') + ' onchange="arToggleHideVerifiedChecklist()"> '
       + 'Скрывать верифицированные'
       + '</label>'
-      + '<span>' + (_arHideVerified ? verifiedCount + ' скрыто' : 'Показаны все') + '</span>'
+      + '<span>' + (_arHideVerifiedChecklist ? verifiedCount + ' скрыто' : 'Показаны все') + '</span>'
       + '</div>';
   }
 
@@ -762,9 +770,9 @@ function arRenderChecklist() {
   for (var i = 0; i < proj.articles.length; i++) {
     var art = proj.articles[i];
     /* Фильтр верифицированных теперь делается CSS-правилом
-       (класс ar-verified на строке + ar-hide-verified на #page-articles),
+       (класс ar-verified на строке + ar-hide-verified-checklist на #page-articles),
        чтобы переключение чекбокса не перерисовывало таблицу и не сбрасывало
-       скролл. См. arToggleHideVerified. */
+       скролл. См. arToggleHideVerifiedChecklist. */
 
     var statusCls = 'ar-status-' + (art.status || 'unmatched');
     var statusText = art.status === 'verified' ? 'OK' : (art.status === 'matched' ? '~' : '--');
@@ -800,60 +808,85 @@ function arRenderChecklist() {
 
   el.innerHTML = html;
 
-  /* Синхронизировать класс-флаг скрытия верифицированных */
+  /* Синхронизировать класс-флаг скрытия верифицированных (только checklist) */
   var pgC = document.getElementById('page-articles');
-  if (pgC) pgC.classList.toggle('ar-hide-verified', !!_arHideVerified);
+  if (pgC) pgC.classList.toggle('ar-hide-verified-checklist', !!_arHideVerifiedChecklist);
 }
 
 
 /**
- * Переключить показ/скрытие верифицированных во всех трёх списках метчинга.
- * Поддерживает multi-pass workflow: скрыл подтверждённые — продолжил с оставшимися.
+ * Переключить показ/скрытие верифицированных В ЧЕК-ЛИСТЕ АРТИКУЛОВ.
+ * НЕ влияет на меню "Сопоставление" и "Верификация" — у каждого свой флаг.
  *
- * Реализовано через CSS-класс на #page-articles (ar-hide-verified), чтобы НЕ
- * перерисовывать innerHTML трёх списков — раньше это вызывало blink всей
+ * Реализовано через CSS-класс на #page-articles (ar-hide-verified-checklist),
+ * чтобы НЕ перерисовывать innerHTML списков — раньше это вызывало blink всей
  * страницы и прыжок скролла в начало. Сейчас переключение — мгновенный
- * class flip + точечное обновление текстов счётчиков "N скрыто / Показаны все".
+ * class flip + точечное обновление текста счётчика "N скрыто / Показаны все".
  */
-function arToggleHideVerified() {
-  _arHideVerified = !_arHideVerified;
+function arToggleHideVerifiedChecklist() {
+  _arHideVerifiedChecklist = !_arHideVerifiedChecklist;
 
   var pg = document.getElementById('page-articles');
-  if (pg) pg.classList.toggle('ar-hide-verified', _arHideVerified);
+  if (pg) pg.classList.toggle('ar-hide-verified-checklist', _arHideVerifiedChecklist);
 
-  /* Обновить тексты счётчиков в filter-bar без пересборки DOM.
-     Каждая из трёх секций может иметь свой filter-bar со своим форматом
-     счётчика — пересчитаем верифицированные отдельно для каждого контекста. */
   var proj = getActiveProject();
   if (!proj || !proj.articles) return;
 
   var verifiedTotal = 0;
-  var verifiedMatched = 0;
   for (var vi = 0; vi < proj.articles.length; vi++) {
-    if (proj.articles[vi].status === 'verified') {
-      verifiedTotal++;
-      if (proj.articles[vi].cardIdx >= 0) verifiedMatched++;
-    }
+    if (proj.articles[vi].status === 'verified') verifiedTotal++;
   }
 
-  /* Checklist bar: "N скрыто" / "Показаны все" (все верифицированные) */
   var checklistBar = document.querySelector('#ar-checklist .ar-filter-bar > span');
   if (checklistBar) {
-    checklistBar.textContent = _arHideVerified
+    checklistBar.textContent = _arHideVerifiedChecklist
       ? (verifiedTotal + ' скрыто')
       : 'Показаны все';
   }
+}
 
-  /* Matching bar: "N карточек скрыто" / "Показаны все" (верифицированные с cardIdx) */
+
+/**
+ * Переключить показ/скрытие верифицированных В МЕНЮ "СОПОСТАВЛЕНИЕ".
+ * НЕ влияет на чек-лист и меню "Верификация" — у каждого свой флаг.
+ */
+function arToggleHideVerifiedMatching() {
+  _arHideVerifiedMatching = !_arHideVerifiedMatching;
+
+  var pg = document.getElementById('page-articles');
+  if (pg) pg.classList.toggle('ar-hide-verified-matching', _arHideVerifiedMatching);
+
+  var proj = getActiveProject();
+  if (!proj || !proj.articles) return;
+
+  var verifiedMatched = 0;
+  for (var vi = 0; vi < proj.articles.length; vi++) {
+    if (proj.articles[vi].status === 'verified' && proj.articles[vi].cardIdx >= 0) {
+      verifiedMatched++;
+    }
+  }
+
   var matchingBar = document.querySelector('#ar-match-rows .ar-filter-bar > span');
   if (matchingBar) {
-    matchingBar.textContent = _arHideVerified
+    matchingBar.textContent = _arHideVerifiedMatching
       ? (verifiedMatched + ' карточек скрыто')
       : 'Показаны все';
   }
+}
 
-  /* Верификация-тулбар не показывает текстовый счётчик "скрыто" — только
-     "N / M проверено" и чекбокс. Текст проверенных не меняется от toggle. */
+
+/**
+ * Переключить показ/скрытие подтверждённых В МЕНЮ "ВЕРИФИКАЦИЯ".
+ * НЕ влияет на чек-лист и меню "Сопоставление" — у каждого свой флаг.
+ *
+ * Тулбар верификации не показывает текстовый счётчик "скрыто" — только
+ * "N / M проверено" и чекбокс. Текст проверенных не меняется от toggle.
+ */
+function arToggleHideVerifiedVerification() {
+  _arHideVerifiedVerification = !_arHideVerifiedVerification;
+
+  var pg = document.getElementById('page-articles');
+  if (pg) pg.classList.toggle('ar-hide-verified-verification', _arHideVerifiedVerification);
 }
 
 
@@ -3158,10 +3191,10 @@ function arRenderMatching() {
   if (verifiedCards > 0) {
     html += '<div class="ar-filter-bar" style="display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:12px;color:#666">'
       + '<label style="cursor:pointer;display:flex;align-items:center;gap:4px">'
-      + '<input type="checkbox"' + (_arHideVerified ? ' checked' : '') + ' onchange="arToggleHideVerified()"> '
+      + '<input type="checkbox"' + (_arHideVerifiedMatching ? ' checked' : '') + ' onchange="arToggleHideVerifiedMatching()"> '
       + 'Скрывать верифицированные'
       + '</label>'
-      + '<span>' + (_arHideVerified ? verifiedCards + ' карточек скрыто' : 'Показаны все') + '</span>'
+      + '<span>' + (_arHideVerifiedMatching ? verifiedCards + ' карточек скрыто' : 'Показаны все') + '</span>'
       + '</div>';
   }
 
@@ -3180,7 +3213,7 @@ function arRenderMatching() {
     }
 
     /* Скрытие верифицированных карточек теперь через CSS
-       (ar-verified на ряду + ar-hide-verified на #page-articles),
+       (ar-verified на ряду + ar-hide-verified-matching на #page-articles),
        чтобы тогл чекбокса не перерисовывал список и не сбрасывал скролл. */
 
     var selCard = (_arSelectedCard === c) ? ' ar-selected' : '';
@@ -3242,9 +3275,9 @@ function arRenderMatching() {
   }
   rowsEl.innerHTML = html;
 
-  /* Синхронизировать класс-флаг скрытия верифицированных */
+  /* Синхронизировать класс-флаг скрытия верифицированных (только matching) */
   var pgM = document.getElementById('page-articles');
-  if (pgM) pgM.classList.toggle('ar-hide-verified', !!_arHideVerified);
+  if (pgM) pgM.classList.toggle('ar-hide-verified-matching', !!_arHideVerifiedMatching);
 
   /* ── Свободные артикулы (не привязанные ни к одной карточке) ── */
   if (freeEl) {
@@ -4634,10 +4667,11 @@ function arRenderVerification() {
     + '<button class="btn btn-sm" onclick="arConfirmAll()">Подтвердить все</button>'
     + '<button class="btn btn-sm" onclick="arResetVerification()" style="color:#999">Сбросить</button>'
     + '<span class="ar-verify-progress">' + verifiedCount + ' / ' + matchedItems.length + ' проверено</span>';
-  /* Тумблер "скрывать верифицированные" — общий для всех трёх списков */
+  /* Тумблер "скрывать подтверждённые" — индивидуальный flag только для
+     меню верификации (не коуплится с checklist/matching). */
   if (verifiedCount > 0) {
     toolbarHtml += '<label style="cursor:pointer;display:flex;align-items:center;gap:4px;font-size:12px;color:#666;margin-left:12px">'
-      + '<input type="checkbox"' + (_arHideVerified ? ' checked' : '') + ' onchange="arToggleHideVerified()"> '
+      + '<input type="checkbox"' + (_arHideVerifiedVerification ? ' checked' : '') + ' onchange="arToggleHideVerifiedVerification()"> '
       + 'Скрывать подтверждённые'
       + '</label>';
   }
@@ -4678,8 +4712,8 @@ function arRenderVerification() {
        `continue` для верифицированных, но полное переписывание innerHTML
        при переключении чекбокса приводило к blink + прыжку скролла.
        Теперь рендерим все пары; скрытие — CSS-правилом
-       `#page-articles.ar-hide-verified .ar-vfy-row.ar-vfy-verified`
-       (см. arToggleHideVerified). */
+       `#page-articles.ar-hide-verified-verification .ar-vfy-row.ar-vfy-verified`
+       (см. arToggleHideVerifiedVerification). */
     var card = (proj.cards && proj.cards[art.cardIdx]) ? proj.cards[art.cardIdx] : null;
     var verified = (art.status === 'verified');
     var rowCls = 'ar-vfy-row' + (verified ? ' ar-vfy-verified' : '');
@@ -4757,9 +4791,9 @@ function arRenderVerification() {
   }
   el.innerHTML = html;
 
-  /* Синхронизировать класс-флаг скрытия с текущим _arHideVerified */
+  /* Синхронизировать класс-флаг скрытия с текущим _arHideVerifiedVerification */
   var pgV = document.getElementById('page-articles');
-  if (pgV) pgV.classList.toggle('ar-hide-verified', !!_arHideVerified);
+  if (pgV) pgV.classList.toggle('ar-hide-verified-verification', !!_arHideVerifiedVerification);
 
   /* Показать блок переименования если есть верифицированные */
   var renameSection = document.getElementById('ar-rename-section');
