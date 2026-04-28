@@ -1555,11 +1555,16 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   pointer-events: none; z-index: 2;
 }
 
-/* Плитка «Весь контент» — grid layout */
+/* Плитка «Весь контент» — masonry-grid (row-span считается в JS).
+   grid-auto-rows = маленькая базовая единица + acApplyMasonryLayout()
+   считает span каждой плитки по реальной высоте → нет пустых пространств
+   между фото разной ориентации/aspect ratio. */
 #ac-gallery {
   display: grid !important;
   gap: 6px;
   grid-template-columns: repeat(4, 1fr);
+  grid-auto-rows: 4px;
+  align-items: start;
 }
 .ac-tile {
   position: relative; border-radius: 4px; overflow: hidden;

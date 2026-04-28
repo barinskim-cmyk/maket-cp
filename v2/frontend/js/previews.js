@@ -764,9 +764,10 @@ window.onPreviewDone = function(data) {
       console.warn('pvVersion: пропущен ' + incoming.name + ' — нет в проекте (RAW)');
 
     } else if (existingMap.hasOwnProperty(incoming.name)) {
-      /* ── Обычная загрузка: дубликат — обновляем рейтинг + папку ── */
+      /* ── Обычная загрузка: дубликат ── */
       var idx2 = existingMap[incoming.name];
       var pv2 = proj.previews[idx2];
+
       if (incoming.rating && incoming.rating > 0) {
         pv2.rating = incoming.rating;
       }
@@ -774,14 +775,35 @@ window.onPreviewDone = function(data) {
       if (folderLabel && pv2.folders.indexOf(folderLabel) < 0) {
         pv2.folders.push(folderLabel);
       }
-      /* Миграция: первая загрузка = версия preselect */
-      if (!pv2.versions) pv2.versions = {};
-      if (!pv2.versions.preselect) {
+
+      /* До «отбор согласован» — перезаписываем превью (фотограф мог скинуть
+         кривые исходники и хочет перезалить). После approval — не трогаем
+         preview; новые версии должны идти через loadStage flow.
+         Bug 2026-04-28: re-upload превью «не работает». */
+      var _approvedNow = (typeof selectionApproved === 'function')
+        ? !!selectionApproved(proj)
+        : !!(proj._stageHistory && proj._stageHistory['client_approved']);
+
+      if (!_approvedNow) {
+        if (incoming.thumb)   pv2.thumb   = incoming.thumb;
+        if (incoming.preview) pv2.preview = incoming.preview;
+        if (incoming.path)    pv2.path    = incoming.path;
+        if (!pv2.versions) pv2.versions = {};
         pv2.versions.preselect = {
           thumb: pv2.thumb,
           preview: pv2.preview || '',
           path: pv2.path || ''
         };
+      } else {
+        /* Миграция: первая загрузка = версия preselect (legacy) */
+        if (!pv2.versions) pv2.versions = {};
+        if (!pv2.versions.preselect) {
+          pv2.versions.preselect = {
+            thumb: pv2.thumb,
+            preview: pv2.preview || '',
+            path: pv2.path || ''
+          };
+        }
       }
 
     } else {
@@ -3785,7 +3807,78 @@ function acRenderField() {
 
   /* Обновить кнопки фильтра по этапам */
   acRenderStageFilter();
+
+  /* Masonry: после рендера пересчитываем row-span'ы по фактической высоте
+     каждой плитки. Это убирает вертикальные «дырки» между фото разной
+     ориентации в одной строке. */
+  if (typeof acApplyMasonryLayout === 'function') {
+    /* deferred — даём браузеру layout pass */
+    setTimeout(acApplyMasonryLayout, 0);
+  }
 }
+
+/**
+ * Masonry layout — вычисляет grid-row-end span для каждой плитки
+ * на основании фактически отрендеренной высоты (с учётом aspect ratio картинки).
+ * Заменяет CSS-only сетку 1fr-rows: разные тайлы не выравниваются по самому
+ * высокому в строке, нет пустот.
+ *
+ * Вызывается после `gallery.innerHTML = ...` и при resize.
+ * Все .ac-tile получают `grid-row-end: span N` где N считается так,
+ * что тайл занимает столько же `grid-auto-rows` единиц + gaps,
+ * сколько нужно под актуальную высоту.
+ */
+function acApplyMasonryLayout() {
+  var gallery = document.getElementById('ac-gallery');
+  if (!gallery) return;
+  var styles = getComputedStyle(gallery);
+  var rowH = parseFloat(styles.gridAutoRows) || 4;
+  var gap = parseFloat(styles.rowGap || styles.gap || 6);
+  var tiles = gallery.querySelectorAll('.ac-tile');
+
+  function applyOne(tile) {
+    /* Сбросим старый span чтобы offsetHeight отдал natural высоту */
+    tile.style.gridRowEnd = '';
+    var h = tile.offsetHeight;
+    if (!h) return;
+    var span = Math.max(1, Math.ceil((h + gap) / (rowH + gap)));
+    tile.style.gridRowEnd = 'span ' + span;
+  }
+
+  for (var i = 0; i < tiles.length; i++) {
+    var tile = tiles[i];
+    var img = tile.querySelector('img');
+    if (img && (!img.complete || img.naturalWidth === 0)) {
+      /* Картинка ещё не загружена — отложим расчёт до load/error */
+      (function(t, im) {
+        var ran = false;
+        var cb = function() {
+          if (ran) return;
+          ran = true;
+          im.removeEventListener('load', cb);
+          im.removeEventListener('error', cb);
+          applyOne(t);
+        };
+        im.addEventListener('load', cb);
+        im.addEventListener('error', cb);
+      })(tile, img);
+    } else {
+      applyOne(tile);
+    }
+  }
+}
+
+/* Пересчёт masonry при ресайзе окна (debounced) */
+var _acMasonryResizeTimer = null;
+window.addEventListener('resize', function() {
+  if (_acMasonryResizeTimer) clearTimeout(_acMasonryResizeTimer);
+  _acMasonryResizeTimer = setTimeout(function() {
+    if (typeof acApplyMasonryLayout === 'function') acApplyMasonryLayout();
+  }, 150);
+});
+
+/* Экспортируем для tests / debug */
+window.acApplyMasonryLayout = acApplyMasonryLayout;
 
 /* ── Тогл аннотаций в галерее отбора ── */
 
