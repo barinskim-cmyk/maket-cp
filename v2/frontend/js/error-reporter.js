@@ -153,6 +153,18 @@
 
   // === Global handlers ===
   window.addEventListener('error', function(e) {
+    // Resource load failures (img/script/link) come as plain Event (not ErrorEvent).
+    // e.target — failed element, no message/error/filename.
+    if (e && e.target && e.target.tagName && e.target !== window) {
+      var tag = String(e.target.tagName).toLowerCase();
+      if (tag === 'img' || tag === 'script' || tag === 'link' || tag === 'video' || tag === 'audio') {
+        var url = e.target.src || e.target.href || '(no url)';
+        var detail = tag + ' load failed: ' + url;
+        // Truncate URL for hash dedup
+        reportError('resource_load', detail, null);
+        return;
+      }
+    }
     var msg = (e && e.message) || 'unknown error';
     var stack = (e && e.error && e.error.stack) || null;
     if (!stack && e && e.filename) {

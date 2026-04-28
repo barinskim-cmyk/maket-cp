@@ -1283,10 +1283,14 @@ function _sbDoLoadByToken(token) {
           setTimeout(function() { pvRenderGallery(); }, 200);
         }
 
-        /* Запустить авто-обновление из облака (каждые 30 сек) */
-        if (typeof sbStartAutoPull === 'function') sbStartAutoPull();
+        /* Не запускаем auto-pull для share-link guest'ов — на mobile (iPhone
+           Safari) re-render каждые 30 сек ломает уже подгруженные thumbnails:
+           они мигают и не успевают перезагрузиться, слоты остаются пустыми.
+           Realtime-подписка ниже даёт свежие версии и так.
+           Bug 2026-04-28: share-link mobile фото пропадают. */
+        // if (typeof sbStartAutoPull === 'function') sbStartAutoPull();
 
-        /* Подписаться на realtime-обновления версий */
+        /* Подписаться на realtime-обновления версий (заменяет polling для guest'ов) */
         if (typeof sbSubscribeVersions === 'function') sbSubscribeVersions(data.project_id);
 
         console.log('Проект загружен по share-ссылке:', proj.brand, 'роль:', proj._role,
