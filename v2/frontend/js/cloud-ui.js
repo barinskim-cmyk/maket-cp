@@ -624,19 +624,26 @@ function authCheckOnLoad() {
     authUnlock();
     /* Скрыть пайплайн и показать лоадер пока проект грузится */
     _showShareLoader();
-    sbLoadByShareToken(shareToken);
-    /* Safety: если через 45 сек проект не загрузился — показать ошибку */
+    try { sbLoadByShareToken(shareToken); } catch (eShare) {
+      console.error('sbLoadByShareToken threw:', eShare);
+      var ldErr = document.getElementById('share-loader');
+      if (ldErr) ldErr.textContent = 'Ошибка инициализации. Попробуйте обновить страницу.';
+    }
+    /* Safety: если через 60 сек проект не загрузился — показать ошибку.
+       Раньше было 45с, но мобильный 3G/4G иногда дольше тянет get_project_by_token. */
     window._shareLoadTimeout = setTimeout(function() {
       if (window._shareDotsTimer) { clearInterval(window._shareDotsTimer); window._shareDotsTimer = null; }
       var loader = document.getElementById('share-loader');
       if (loader) {
-        loader.innerHTML = 'Не удалось загрузить проект.<br><br>' +
+        loader.innerHTML = 'Не удалось загрузить проект.<br>' +
+          '<span style="font-size:12px;color:#aaa">Проверьте интернет-соединение.</span><br><br>' +
           '<button onclick="location.reload()" style="padding:10px 24px;font-size:15px;' +
           'background:#333;color:#fff;border:none;border-radius:8px;cursor:pointer">' +
           'Попробовать снова</button>';
       }
-    }, 45000);
-    /* Анимация точек чтобы пользователь видел что загрузка идёт */
+    }, 60000);
+    /* Прогрессивная подсказка: первые 5 сек — точки, потом «Это может занять до минуты»
+       чтобы на медленном мобильном клиент понимал, что шер-линк жив. */
     window._shareDotsTimer = setInterval(function() {
       var loader = document.getElementById('share-loader');
       if (!loader || loader.querySelector('button')) { clearInterval(window._shareDotsTimer); return; }
@@ -644,6 +651,21 @@ function authCheckOnLoad() {
       if (txt.indexOf('...') >= 0) loader.textContent = 'Загрузка';
       else loader.textContent = txt + '.';
     }, 600);
+    /* После 8 секунд добавим успокаивающее сообщение про медленный мобильный интернет. */
+    setTimeout(function() {
+      var loader = document.getElementById('share-loader');
+      if (!loader || loader.querySelector('button')) return;
+      loader.innerHTML = '<div>Загрузка проекта<span id="share-dots">...</span></div>' +
+        '<div style="font-size:12px;color:#bbb;margin-top:12px;max-width:280px;line-height:1.4">' +
+        'На мобильном интернете может занять до минуты — пожалуйста, подождите.</div>';
+      /* перенацелить _shareDotsTimer на span */
+      if (window._shareDotsTimer) { clearInterval(window._shareDotsTimer); }
+      window._shareDotsTimer = setInterval(function() {
+        var sp = document.getElementById('share-dots');
+        if (!sp) { clearInterval(window._shareDotsTimer); window._shareDotsTimer = null; return; }
+        sp.textContent = (sp.textContent.length >= 3) ? '.' : (sp.textContent + '.');
+      }, 600);
+    }, 8000);
     return;
   }
 

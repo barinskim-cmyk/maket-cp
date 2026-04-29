@@ -473,6 +473,46 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .cp-card-item.active .cp-card-item-del { color: #ddd; }
 .cp-card-item.active .cp-card-item-del:hover { background: rgba(255, 100, 100, 0.3); color: #fff; }
 
+/* Кнопка переименования (✎) — появляется на hover, рядом с × */
+.cp-card-item-edit {
+  flex-shrink: 0;
+  width: 22px; height: 22px;
+  background: transparent; border: none;
+  color: #999; font-size: 14px; line-height: 1;
+  cursor: pointer; padding: 0; border-radius: 4px;
+  opacity: 0; transition: all 0.15s;
+}
+.cp-card-item:hover .cp-card-item-edit { opacity: 1; }
+.cp-card-item-edit:hover { background: #e8e8e8; color: #333; }
+.cp-card-item.active .cp-card-item-edit { color: #ddd; }
+.cp-card-item.active .cp-card-item-edit:hover { background: rgba(255, 255, 255, 0.2); color: #fff; }
+
+/* Inline-input для переименования */
+.cp-card-item-rename-input {
+  width: 100%;
+  padding: 2px 4px;
+  font-size: 13px;
+  font-family: inherit;
+  border: 1px solid #888;
+  border-radius: 3px;
+  background: #fff;
+  color: #333;
+  box-sizing: border-box;
+}
+
+/* Кнопка hard-delete (×) в списке удалённых */
+.cp-card-item-purge {
+  flex-shrink: 0;
+  width: 22px; height: 22px;
+  background: transparent; border: 1px solid #ddd;
+  color: #999; font-size: 14px; line-height: 1;
+  cursor: pointer; padding: 0; border-radius: 4px;
+  opacity: 0.6; transition: all 0.15s;
+  margin-left: 2px;
+}
+.cp-card-item-deleted:hover .cp-card-item-purge { opacity: 1; }
+.cp-card-item-purge:hover { background: rgba(220, 50, 50, 0.15); border-color: #c33; color: #c33; }
+
 /* Блок удалённых карточек */
 .cp-deleted-block {
   margin-top: 16px;
@@ -2408,6 +2448,65 @@ body.mob-client-mode html {
   #mob-wrap { display: none !important; }
   .mob-rotate-overlay { display: flex !important; }
 }
+
+/* --- Bottom-sheet «Выбрать контейнер» (mobile share-link Options) --- */
+.mob-cnt-picker-overlay {
+  position: fixed; inset: 0; z-index: 10000;
+  display: flex; align-items: flex-end; justify-content: center;
+  pointer-events: none;
+}
+.mob-cnt-picker-overlay-bg {
+  position: absolute; inset: 0;
+  background: rgba(0, 0, 0, 0);
+  pointer-events: auto;
+  transition: background 0.2s;
+}
+.mob-cnt-picker-open .mob-cnt-picker-overlay-bg { background: rgba(0, 0, 0, 0.4); }
+.mob-cnt-picker-sheet {
+  position: relative;
+  width: 100%; max-width: 480px;
+  background: #fff;
+  border-top-left-radius: 14px; border-top-right-radius: 14px;
+  padding: 16px 16px 24px;
+  transform: translateY(100%);
+  transition: transform 0.22s ease-out;
+  pointer-events: auto;
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.12);
+  max-height: 80vh; overflow-y: auto;
+}
+.mob-cnt-picker-open .mob-cnt-picker-sheet { transform: translateY(0); }
+.mob-cnt-picker-title {
+  font-size: 17px; font-weight: 600; color: #222; margin-bottom: 4px; text-align: center;
+}
+.mob-cnt-picker-hint {
+  font-size: 12px; color: #888; margin-bottom: 14px; text-align: center;
+}
+.mob-cnt-picker-list {
+  display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px;
+}
+.mob-cnt-picker-item {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; padding: 14px 14px;
+  background: #f5f5f5; border: 1px solid transparent; border-radius: 10px;
+  font-size: 15px; color: #222; cursor: pointer;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+.mob-cnt-picker-item:active { background: #e8e8e8; }
+.mob-cnt-picker-item-name { font-weight: 500; }
+.mob-cnt-picker-item-count { font-size: 12px; color: #888; }
+.mob-cnt-picker-item-last { background: #eef7ff; border-color: #cfe4f5; }
+.mob-cnt-picker-item-last .mob-cnt-picker-item-count { color: #2a78c0; }
+.mob-cnt-picker-item-free {
+  background: transparent; border: 1px dashed #ccc; color: #555;
+}
+.mob-cnt-picker-item-free:active { background: #f5f5f5; }
+.mob-cnt-picker-cancel {
+  width: 100%; padding: 12px;
+  background: #fff; border: 1px solid #ddd; border-radius: 10px;
+  font-size: 15px; color: #666; cursor: pointer;
+}
+.mob-cnt-picker-cancel:active { background: #f5f5f5; }
 
 /* --- Адаптивные скрытия для мобильного клиента --- */
 @media (max-width: 767px) {

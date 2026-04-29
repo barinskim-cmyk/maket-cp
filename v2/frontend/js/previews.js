@@ -768,9 +768,6 @@ window.onPreviewDone = function(data) {
       var idx2 = existingMap[incoming.name];
       var pv2 = proj.previews[idx2];
 
-      if (incoming.rating && incoming.rating > 0) {
-        pv2.rating = incoming.rating;
-      }
       if (!pv2.folders) pv2.folders = [];
       if (folderLabel && pv2.folders.indexOf(folderLabel) < 0) {
         pv2.folders.push(folderLabel);
@@ -779,7 +776,10 @@ window.onPreviewDone = function(data) {
       /* До «отбор согласован» — перезаписываем превью (фотограф мог скинуть
          кривые исходники и хочет перезалить). После approval — не трогаем
          preview; новые версии должны идти через loadStage flow.
-         Bug 2026-04-28: re-upload превью «не работает». */
+         Bug 2026-04-28: re-upload превью «не работает».
+         Bug 2026-04-29: при перезаливке rating и старые версии (color/retouch)
+         оставались от предыдущего файла — теперь сбрасываются, потому что
+         это уже другая фотография. */
       var _approvedNow = (typeof selectionApproved === 'function')
         ? !!selectionApproved(proj)
         : !!(proj._stageHistory && proj._stageHistory['client_approved']);
@@ -788,13 +788,41 @@ window.onPreviewDone = function(data) {
         if (incoming.thumb)   pv2.thumb   = incoming.thumb;
         if (incoming.preview) pv2.preview = incoming.preview;
         if (incoming.path)    pv2.path    = incoming.path;
-        if (!pv2.versions) pv2.versions = {};
-        pv2.versions.preselect = {
-          thumb: pv2.thumb,
-          preview: pv2.preview || '',
-          path: pv2.path || ''
+        /* Полный сброс производных пометок: новый файл = новая фотка,
+           прежний rating + версии color/retouch принадлежали другому кадру. */
+        pv2.rating = (incoming.rating && incoming.rating > 0) ? incoming.rating : 0;
+        pv2.rotation = incoming.rotation || 0;
+        pv2.versions = {
+          preselect: {
+            thumb: pv2.thumb,
+            preview: pv2.preview || '',
+            path: pv2.path || ''
+          }
         };
+        /* Сбросить per-photo pipeline stage обратно на стадию проекта,
+           чтобы фото попало туда же, куда «свежая» загрузка. */
+        pv2._stage = (typeof proj._stage === 'number') ? proj._stage : 0;
+
+        /* Push reset rating в облако напрямую, минуя дебаунс — пользователь
+           видит мгновенно, что rating слетел, и не может «случайно» оставить
+           старую оценку. Колонка previews.rating обновляется по project + name. */
+        try {
+          if (proj._cloudId && typeof sbClient !== 'undefined' && sbClient) {
+            sbClient.from('previews')
+              .update({ rating: pv2.rating, rotation: pv2.rotation })
+              .eq('project_id', proj._cloudId)
+              .eq('file_name', pv2.name)
+              .then(function(res) {
+                if (res && res.error) console.warn('reset rating cloud:', res.error.message);
+              });
+          }
+        } catch (eRR) { console.warn('reset rating push:', eRR); }
       } else {
+        /* Post-approval: rating и версии — источник правды, обновляем только
+           если incoming реально что-то новое привёз. */
+        if (incoming.rating && incoming.rating > 0) {
+          pv2.rating = incoming.rating;
+        }
         /* Миграция: первая загрузка = версия preselect (legacy) */
         if (!pv2.versions) pv2.versions = {};
         if (!pv2.versions.preselect) {

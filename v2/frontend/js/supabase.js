@@ -920,6 +920,10 @@ function sbDownloadProject(cloudId, callback) {
           }
           delete proj._ocContainersRaw;
 
+          /* Soft-deleted карточки — отдельный fetch чтобы UI Корзины
+             переживал reload. Не блокирует основной flow. */
+          _sbLoadDeletedCards(cloudId, proj, pvByName);
+
           /* Загрузить историю этапов из stage_events */
           sbLoadStageHistory(cloudId, function(history) {
             proj._stageHistory = history;
@@ -1262,7 +1266,11 @@ function _sbDoLoadByToken(token) {
       }
       delete proj._ocContainersRaw;
 
-      /* Загрузить историю этапов из stage_events */
+      /* Загрузить историю этапов из stage_events.
+         Каждый шаг рендера обёрнут в try/catch, чтобы один поломанный
+         модуль (renderProjects/shEnterClientMode/pvRenderGallery)
+         не оставлял мобильного клиента с share-loader навсегда.
+         Bug 2026-04-29 mobile share-link silent fail. */
       sbLoadStageHistory(data.project_id, function(history) {
         proj._stageHistory = history;
 
@@ -1271,16 +1279,32 @@ function _sbDoLoadByToken(token) {
         proj._cloudClean = true;
         App.projects = [proj];
         App.selectedProject = 0;
-        if (typeof renderProjects === 'function') renderProjects();
+        try { if (typeof renderProjects === 'function') renderProjects(); }
+        catch (eRP) { console.error('renderProjects threw:', eRP); }
 
         /* Клиентский/гостевой режим (все роли кроме owner) */
+        var enteredClientMode = false;
         if (proj._role && proj._role !== 'owner' && typeof shEnterClientMode === 'function') {
-          shEnterClientMode();
+          try { shEnterClientMode(); enteredClientMode = true; }
+          catch (eEC) {
+            console.error('shEnterClientMode threw:', eEC);
+            if (typeof errReport === 'function') {
+              try { errReport('shEnterClientMode:' + (eEC && eEC.message), eEC && eEC.stack); } catch(_){}
+            }
+          }
+        }
+
+        /* Safety net: если shEnterClientMode не сработал — лоадер должен
+           быть убран всё равно, иначе пользователь видит вечную «Загрузку». */
+        if (!enteredClientMode && typeof _hideShareLoader === 'function') {
+          try { _hideShareLoader(); } catch(_) {}
         }
 
         /* Отрисовать превью */
         if (typeof pvRenderGallery === 'function') {
-          setTimeout(function() { pvRenderGallery(); }, 200);
+          setTimeout(function() {
+            try { pvRenderGallery(); } catch (ePR) { console.warn('pvRenderGallery:', ePR); }
+          }, 200);
         }
 
         /* Не запускаем auto-pull для share-link guest'ов — на mobile (iPhone
@@ -1290,8 +1314,12 @@ function _sbDoLoadByToken(token) {
            Bug 2026-04-28: share-link mobile фото пропадают. */
         // if (typeof sbStartAutoPull === 'function') sbStartAutoPull();
 
-        /* Подписаться на realtime-обновления версий (заменяет polling для guest'ов) */
-        if (typeof sbSubscribeVersions === 'function') sbSubscribeVersions(data.project_id);
+        /* Подписаться на realtime-обновления версий (заменяет polling для guest'ов).
+           Realtime требует WebSocket — на iOS Safari в Telegram in-app browser
+           может бросить синхронно. Try/catch чтобы не уронить рендер. */
+        try {
+          if (typeof sbSubscribeVersions === 'function') sbSubscribeVersions(data.project_id);
+        } catch (eSV) { console.warn('sbSubscribeVersions:', eSV); }
 
         console.log('Проект загружен по share-ссылке:', proj.brand, 'роль:', proj._role,
           'превью:', proj.previews.length, 'карточек:', proj.cards.length);
@@ -2673,6 +2701,10 @@ function sbPullProject(callback) {
         }
         if (App.currentCardIdx >= newCards.length) App.currentCardIdx = Math.max(0, newCards.length - 1);
 
+        /* Soft-deleted карточки — отдельный fetch, чтобы Корзина оставалась
+           актуальной при auto-pull (другой девайс мог удалить карточку). */
+        _sbLoadDeletedCards(cloudId, proj, pvByName);
+
         /* Загрузить историю этапов */
         sbLoadStageHistory(cloudId, function(history) {
           proj._stageHistory = history;
@@ -3041,6 +3073,83 @@ function sbSyncStageBatches(proj) {
  * @param {string} projectId — UUID проекта
  * @param {function} callback — callback(stageHistory) — объект {stageIdx: timeStr}
  */
+/**
+ * Подтянуть soft-deleted карточки в proj._deletedCards, чтобы блок «Удалённые»
+ * переживал reload и cross-device sync. Тихо игнорирует ошибки RLS / network —
+ * рестор-функция от этого не критична. Сортировка: свежие сверху (deleted_at DESC).
+ *
+ * @param {string} projectId
+ * @param {Object} proj
+ * @param {Object} pvByName — карта превью по имени для восстановления dataUrl слотов
+ */
+function _sbLoadDeletedCards(projectId, proj, pvByName) {
+  if (!sbClient || !projectId || !proj) return;
+  proj._deletedCards = proj._deletedCards || [];
+
+  sbClient.from('cards')
+    .select('*')
+    .eq('project_id', projectId)
+    .not('deleted_at', 'is', null)
+    .order('deleted_at', { ascending: false })
+    .then(function(res) {
+      if (res.error || !res.data || res.data.length === 0) return;
+
+      /* Нужно подтянуть слоты этих карточек, чтобы при восстановлении
+         не получить пустую карточку. Слоты с deleted_at NOT NULL
+         (триггер 026 проставил их при удалении). */
+      var delCardIds = res.data.map(function(rc) { return rc.id; });
+      sbClient.from('slots')
+        .select('*')
+        .in('card_id', delCardIds)
+        .order('position')
+        .then(function(slotRes) {
+          var slotsByCard = {};
+          (slotRes && slotRes.data ? slotRes.data : []).forEach(function(sl) {
+            if (!slotsByCard[sl.card_id]) slotsByCard[sl.card_id] = [];
+            slotsByCard[sl.card_id].push(sl);
+          });
+
+          var rebuilt = [];
+          for (var c = 0; c < res.data.length; c++) {
+            var rc = res.data[c];
+            var card = {
+              id: rc.id,
+              status: rc.status || 'draft',
+              name: rc.name || '',
+              _hasHero: rc.has_hero,
+              _hAspect: rc.h_aspect || '3/2',
+              _vAspect: rc.v_aspect || '2/3',
+              _lockRows: rc.lock_rows || false,
+              deletedAt: rc.deleted_at || '',
+              slots: []
+            };
+            var cs = slotsByCard[rc.id] || [];
+            for (var j = 0; j < cs.length; j++) {
+              var rs = cs[j];
+              var fn = rs.file_name;
+              var pv = fn ? pvByName[fn] : null;
+              card.slots.push({
+                orient: rs.orient || 'v',
+                weight: rs.weight || 1,
+                row: rs.row_num,
+                rotation: rs.rotation || 0,
+                file: fn,
+                dataUrl: pv ? (pv.preview || pv.thumb || null) : (rs.thumb_path || null),
+                thumbUrl: pv ? (pv.thumb || null) : (rs.thumb_path || null),
+                path: null
+              });
+            }
+            rebuilt.push(card);
+          }
+          proj._deletedCards = rebuilt;
+          /* Перерисовать корзину если sidebar уже отрисован */
+          if (typeof cpRenderDeletedList === 'function') {
+            try { cpRenderDeletedList(); } catch(_) {}
+          }
+        });
+    });
+}
+
 function sbLoadStageHistory(projectId, callback) {
   if (!sbClient) { callback({}); return; }
 

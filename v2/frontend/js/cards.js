@@ -63,9 +63,10 @@ function cpRenderList() {
       }
     }
     var cardLabel = (c.name && c.name.trim()) ? c.name.trim() : ('Карточка ' + (i + 1));
-    html += '<div class="cp-card-item' + active + '" onclick="cpShowCard(' + i + ')">';
-    html += '<span class="cp-card-item-name">' + esc(cardLabel) + '</span>';
+    html += '<div class="cp-card-item' + active + '" onclick="cpShowCard(' + i + ')" ondblclick="event.stopPropagation();cpStartRenameCard(' + i + ',event)">';
+    html += '<span class="cp-card-item-name" title="Двойной клик чтобы переименовать">' + esc(cardLabel) + '</span>';
     html += ' <span class="count">(' + fileCount + '/' + (c.slots ? c.slots.length : 0) + ')</span>';
+    html += '<button class="cp-card-item-edit" onclick="event.stopPropagation();cpStartRenameCard(' + i + ',event)" title="Переименовать">✎</button>';
     html += '<button class="cp-card-item-del" onclick="event.stopPropagation();cpDeleteCard(' + i + ')" title="Удалить карточку">&times;</button>';
     html += '</div>';
   }
@@ -101,9 +102,10 @@ function cpRenderDeletedList() {
     for (var i = 0; i < del.length; i++) {
       var c = del[i];
       var name = (c.name && c.name.trim()) ? c.name.trim() : ('Карточка ' + (i + 1));
-      html += '<div class="cp-card-item cp-card-item-deleted" title="' + esc(c.deletedAt || '') + '">';
+      html += '<div class="cp-card-item cp-card-item-deleted" title="Удалена ' + esc(c.deletedAt || '') + '">';
       html += '<span class="cp-card-item-name">' + esc(name) + '</span>';
       html += '<button class="cp-card-item-restore" onclick="event.stopPropagation();cpRestoreCard(' + i + ')" title="Восстановить">↺</button>';
+      html += '<button class="cp-card-item-purge" onclick="event.stopPropagation();cpHardDeleteCard(' + i + ')" title="Удалить навсегда">&times;</button>';
       html += '</div>';
     }
     html += '</div>';
@@ -308,6 +310,80 @@ function cpRestoreCard(delIdx) {
   if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
 }
 
+
+/**
+ * Inline rename: заменяет .cp-card-item-name на input. Enter сохраняет, Esc отменяет.
+ * @param {number} idx
+ * @param {Event} ev
+ */
+function cpStartRenameCard(idx, ev) {
+  if (ev && ev.stopPropagation) ev.stopPropagation();
+  var proj = getActiveProject();
+  if (!proj || !proj.cards || idx < 0 || idx >= proj.cards.length) return;
+  var listEl = document.getElementById('cp-cards-list');
+  if (!listEl) return;
+  var item = listEl.children[idx];
+  if (!item) return;
+  var nameSpan = item.querySelector('.cp-card-item-name');
+  if (!nameSpan || nameSpan.querySelector('input')) return;
+  var current = (proj.cards[idx].name || '').trim();
+  var input = document.createElement('input');
+  input.type = 'text';
+  input.value = current;
+  input.placeholder = 'Карточка ' + (idx + 1);
+  input.className = 'cp-card-item-rename-input';
+  input.maxLength = 80;
+  nameSpan.innerHTML = '';
+  nameSpan.appendChild(input);
+  setTimeout(function() { input.focus(); input.select(); }, 0);
+  var done = false;
+  function finish(save) {
+    if (done) return; done = true;
+    if (save) {
+      var newName = input.value.trim();
+      if (newName !== (proj.cards[idx].name || '')) {
+        proj.cards[idx].name = newName || null;
+        if (proj._cloudId && proj.cards[idx].id && typeof sbClient !== 'undefined' && sbClient) {
+          try {
+            sbClient.from('cards').update({ name: newName || null })
+              .eq('id', proj.cards[idx].id).eq('project_id', proj._cloudId)
+              .then(function(res) { if (res && res.error) console.warn('cpRenameCard cloud:', res.error.message); });
+          } catch (e) { console.warn('cpRenameCard:', e); }
+        }
+        if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
+      }
+    }
+    cpRenderList();
+  }
+  input.addEventListener('blur', function() { finish(true); });
+  input.addEventListener('click', function(e) { e.stopPropagation(); });
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+  });
+}
+
+/**
+ * Hard-delete: насовсем удалить карточку из proj._deletedCards. Из облака row удаляется физически.
+ * @param {number} delIdx
+ */
+function cpHardDeleteCard(delIdx) {
+  var proj = getActiveProject();
+  if (!proj || !proj._deletedCards || delIdx < 0 || delIdx >= proj._deletedCards.length) return;
+  var card = proj._deletedCards[delIdx];
+  var label = (card.name && card.name.trim()) || 'карточку';
+  if (!confirm('Удалить «' + label + '» НАВСЕГДА? Восстановить будет нельзя.')) return;
+  proj._deletedCards.splice(delIdx, 1);
+  cpRenderDeletedList();
+  if (proj._cloudId && card.id && typeof sbClient !== 'undefined' && sbClient) {
+    try {
+      sbClient.from('cards').delete()
+        .eq('id', card.id).eq('project_id', proj._cloudId)
+        .then(function(res) { if (res && res.error) console.warn('cpHardDeleteCard cloud:', res.error.message); });
+    } catch (e) { console.warn('cpHardDeleteCard:', e); }
+  }
+  if (typeof sbLogAction === 'function') sbLogAction('hard_delete_card', 'card', card.id, label);
+}
 
 // ══════════════════════════════════════════════
 //  Навигация по карточкам
@@ -2548,50 +2624,81 @@ function cpIsMobileClient() {
 function cpMobileInit() {
   if (!cpIsMobileClient()) return;
 
-  /* Скрыть весь десктопный контент, показать мобильную обёртку */
-  var appMain = document.getElementById('app-main');
-  if (!appMain) return;
+  /* Скрыть весь десктопный контент, показать мобильную обёртку.
+     Каждая часть обёрнута в try/catch, чтобы один сломанный шаг
+     не «подвешивал» весь шер-линк на мобильнике. Bug 2026-04-29. */
+  try {
+    var appMain = document.getElementById('app-main');
+    if (!appMain) return;
 
-  /* Создать мобильный контейнер если нет */
-  var mobWrap = document.getElementById('mob-wrap');
-  if (!mobWrap) {
-    mobWrap = document.createElement('div');
-    mobWrap.id = 'mob-wrap';
-    appMain.appendChild(mobWrap);
-  }
+    /* Создать мобильный контейнер если нет */
+    var mobWrap = document.getElementById('mob-wrap');
+    if (!mobWrap) {
+      mobWrap = document.createElement('div');
+      mobWrap.id = 'mob-wrap';
+      appMain.appendChild(mobWrap);
+    }
 
-  /* Оверлей «переверните телефон» для iOS (в CSS скрыт в ландшафте) */
-  if (!document.getElementById('mob-rotate-overlay')) {
-    var rotOverlay = document.createElement('div');
-    rotOverlay.id = 'mob-rotate-overlay';
-    rotOverlay.className = 'mob-rotate-overlay';
-    rotOverlay.innerHTML = '<div style="font-size:48px">&#8635;</div>' +
-      '<div>Пожалуйста, переверните телефон<br>в вертикальное положение</div>';
-    document.body.appendChild(rotOverlay);
-  }
+    /* Оверлей «переверните телефон» для iOS (в CSS скрыт в ландшафте) */
+    if (!document.getElementById('mob-rotate-overlay')) {
+      var rotOverlay = document.createElement('div');
+      rotOverlay.id = 'mob-rotate-overlay';
+      rotOverlay.className = 'mob-rotate-overlay';
+      rotOverlay.innerHTML = '<div style="font-size:48px">&#8635;</div>' +
+        '<div>Пожалуйста, переверните телефон<br>в вертикальное положение</div>';
+      document.body.appendChild(rotOverlay);
+    }
 
-  /* Скрыть все дочерние элементы кроме mob-wrap */
-  for (var i = 0; i < appMain.children.length; i++) {
-    var child = appMain.children[i];
-    if (child.id !== 'mob-wrap') {
-      child.style.display = 'none';
+    /* Скрыть все дочерние элементы кроме mob-wrap */
+    for (var i = 0; i < appMain.children.length; i++) {
+      var child = appMain.children[i];
+      if (child.id !== 'mob-wrap') {
+        child.style.display = 'none';
+      }
+    }
+
+    /* Пометка для CSS — чтобы html/body получили белый фон
+       (иначе под полупрозрачной адресной строкой Telegram/Safari
+       просвечивает серый body-background). */
+    document.body.classList.add('mob-client-mode');
+
+    _mobViewMode = 'cards';
+
+    /* Заблокировать поворот экрана — только портретная ориентация.
+       Работает в Android Chrome; iOS Safari не поддерживает lock и
+       может выкинуть TypeError синхронно — отдельный try/catch.
+       Bug 2026-04-29 mobile share-link silent fail. */
+    try {
+      if (screen.orientation && typeof screen.orientation.lock === 'function') {
+        var p = screen.orientation.lock('portrait');
+        if (p && typeof p['catch'] === 'function') p['catch'](function() {});
+      }
+    } catch (eLock) { /* iOS бросает синхронно — игнор */ }
+  } catch (eInit) {
+    console.error('cpMobileInit prep failed:', eInit);
+    if (typeof errReport === 'function') {
+      try { errReport('cpMobileInit:' + (eInit && eInit.message), eInit && eInit.stack); } catch(_){}
     }
   }
 
-  /* Пометка для CSS — чтобы html/body получили белый фон
-     (иначе под полупрозрачной адресной строкой Telegram/Safari
-     просвечивает серый body-background). */
-  document.body.classList.add('mob-client-mode');
-
-  _mobViewMode = 'cards';
-
-  /* Заблокировать поворот экрана — только портретная ориентация.
-     Работает в Android Chrome; iOS Safari не поддерживает lock. */
-  if (screen.orientation && typeof screen.orientation.lock === 'function') {
-    screen.orientation.lock('portrait').catch(function() { /* тихо игнорируем если не поддерживается */ });
+  /* Render всегда вызываем в отдельном try — даже если префаз упал,
+     чтобы пользователь увидел хоть что-то, а не белый экран. */
+  try {
+    cpMobileRender();
+  } catch (eRender) {
+    console.error('cpMobileRender failed:', eRender);
+    if (typeof errReport === 'function') {
+      try { errReport('cpMobileRender:' + (eRender && eRender.message), eRender && eRender.stack); } catch(_){}
+    }
+    /* Fallback: показать сообщение об ошибке вместо вечного белого экрана. */
+    var mw = document.getElementById('mob-wrap');
+    if (mw) {
+      mw.innerHTML = '<div style="padding:32px 16px;text-align:center;color:#666;font-size:14px">' +
+        'Не удалось отобразить интерфейс. ' +
+        '<a href="javascript:location.reload()" style="color:#0a7;text-decoration:underline">Обновить страницу</a>' +
+        '</div>';
+    }
   }
-
-  cpMobileRender();
 }
 
 /**
@@ -2680,11 +2787,13 @@ function cpMobileRender() {
     _fb.style.top = _hdr.offsetHeight + 'px';
   }
 
-  /* Привязать touch-события к каруселям */
+  /* Привязать touch-события к каруселям. Каждый bind в своём try/catch:
+     если на iOS браузер не понимает Pointer Events и addEventListener
+     бросит — карточки всё равно отрисуются. */
   if (_mobViewMode === 'cards') {
-    cpMobileBindCarousels();
-    cpMobileBindDoubleTap();
-    cpMobileBindSlotTap();
+    try { cpMobileBindCarousels(); } catch(eBC) { console.warn('bindCarousels:', eBC); }
+    try { cpMobileBindDoubleTap();  } catch(eDT) { console.warn('bindDoubleTap:', eDT); }
+    try { cpMobileBindSlotTap();    } catch(eST) { console.warn('bindSlotTap:', eST); }
   }
 
   /* Восстановить скролл после полного ре-рендера. */
@@ -3779,27 +3888,181 @@ function cpMobileRenderGallery() {
 
 /**
  * Переключить галочку на фото в мобильной галерее (Options).
- * Использует единую pvToggleSelection из previews.js.
+ *
+ * Поведение:
+ * - Если фото уже в отборе (карточка или допконтент) — снимаем (через
+ *   pvToggleSelection — поведение не меняется).
+ * - Если фото не в отборе И в проекте есть >= 1 контейнер допконтента —
+ *   показываем bottom-sheet «куда добавить?» (контейнеры + «Без контейнера»).
+ *   Запоминаем последний выбор в window._mobLastContainerChoice до конца сессии.
+ * - Если контейнеров нет — добавляем в свободный пул как раньше.
+ *
  * @param {string} pvName - имя файла превью
  * @param {HTMLElement} el - элемент галочки
  */
 function cpMobileToggleOC(pvName, el) {
   if (typeof pvToggleSelection !== 'function') return;
-  var done = pvToggleSelection(pvName);
-  if (!done) return;
+  var proj = (typeof getActiveProject === 'function') ? getActiveProject() : null;
 
-  /* Обновить визуал галочки.
-     pvToggleSelection уже делает: shAutoSave + delta/full sync + render.
-     Дублировать sync здесь не нужно. */
+  /* Уже в отборе → снимаем как раньше. */
   var inCard = (typeof _pvIsInCard === 'function') ? _pvIsInCard(pvName) >= 0 : false;
   var inOC = (typeof _pvIsInOtherContent === 'function') ? _pvIsInOtherContent(pvName) : false;
   if (inCard || inOC) {
-    el.className = 'mob-gallery-check checked';
-    el.innerHTML = '&#10003;';
-  } else {
+    var done = pvToggleSelection(pvName);
+    if (!done) return;
     el.className = 'mob-gallery-check';
     el.innerHTML = '';
+    return;
   }
+
+  /* Нет контейнеров — добавляем в свободный пул (старое поведение). */
+  var containers = (proj && proj.ocContainers) ? proj.ocContainers : [];
+  if (!containers.length) {
+    var done2 = pvToggleSelection(pvName);
+    if (!done2) return;
+    el.className = 'mob-gallery-check checked';
+    el.innerHTML = '&#10003;';
+    return;
+  }
+
+  /* Есть контейнеры — спросить куда. */
+  _cpMobileShowContainerPicker(pvName, el, containers);
+}
+
+/**
+ * Bottom-sheet: «Добавить в…» — выбор контейнера для фото.
+ * Показывается только в мобильной share-ссылке когда есть контейнеры.
+ * Запоминает последний выбор клиента в session-scope, чтобы при следующих
+ * галочках в той же сессии можно было «применить ко всем».
+ *
+ * @param {string} pvName
+ * @param {HTMLElement} el — элемент галочки (для визуального обновления)
+ * @param {Array} containers — proj.ocContainers
+ */
+function _cpMobileShowContainerPicker(pvName, el, containers) {
+  /* Удалить существующую (если открыта повторно) */
+  var prev = document.getElementById('mob-cnt-picker');
+  if (prev) prev.remove();
+
+  var sheet = document.createElement('div');
+  sheet.id = 'mob-cnt-picker';
+  sheet.className = 'mob-cnt-picker-overlay';
+
+  var html = '';
+  html += '<div class="mob-cnt-picker-overlay-bg" onclick="_cpMobileClosePicker()"></div>';
+  html += '<div class="mob-cnt-picker-sheet">';
+  html += '<div class="mob-cnt-picker-title">Добавить в&hellip;</div>';
+  html += '<div class="mob-cnt-picker-hint">Выберите контейнер для этого фото</div>';
+  html += '<div class="mob-cnt-picker-list">';
+
+  /* Показать last-choice первым (или пометить активным) */
+  var lastId = window._mobLastContainerChoice || null;
+
+  for (var i = 0; i < containers.length; i++) {
+    var c = containers[i];
+    var label = (c.name && c.name.trim()) ? esc(c.name.trim()) : ('Контейнер ' + (i + 1));
+    var count = (c.items || []).length;
+    var activeCls = (c.id === lastId) ? ' mob-cnt-picker-item-last' : '';
+    html += '<button class="mob-cnt-picker-item' + activeCls + '" ' +
+      'onclick="_cpMobilePickContainer(\'' + esc(pvName) + '\',\'' + esc(c.id) + '\')">' +
+      '<span class="mob-cnt-picker-item-name">' + label + '</span>' +
+      '<span class="mob-cnt-picker-item-count">' + count + ' фото</span>' +
+      '</button>';
+  }
+
+  /* «Без контейнера» — добавить в свободный пул */
+  html += '<button class="mob-cnt-picker-item mob-cnt-picker-item-free" ' +
+    'onclick="_cpMobilePickContainer(\'' + esc(pvName) + '\',\'\')">' +
+    '<span class="mob-cnt-picker-item-name">Без контейнера</span>' +
+    '<span class="mob-cnt-picker-item-count">в общий список</span>' +
+    '</button>';
+
+  html += '</div>';
+  html += '<button class="mob-cnt-picker-cancel" onclick="_cpMobileClosePicker()">Отмена</button>';
+  html += '</div>';
+
+  sheet.innerHTML = html;
+  document.body.appendChild(sheet);
+
+  /* Анимация открытия — добавляем класс через requestAnimationFrame */
+  setTimeout(function() { sheet.classList.add('mob-cnt-picker-open'); }, 10);
+
+  /* Сохранить ссылку на чек-элемент для последующего обновления */
+  sheet._checkEl = el;
+}
+
+/**
+ * Закрыть bottom-sheet picker.
+ */
+function _cpMobileClosePicker() {
+  var s = document.getElementById('mob-cnt-picker');
+  if (!s) return;
+  s.classList.remove('mob-cnt-picker-open');
+  setTimeout(function() { if (s.parentNode) s.parentNode.removeChild(s); }, 180);
+}
+
+/**
+ * Применить выбор контейнера: добавить фото туда, sync, обновить UI.
+ * @param {string} pvName
+ * @param {string} containerId — '' = «без контейнера» (свободный пул)
+ */
+function _cpMobilePickContainer(pvName, containerId) {
+  var proj = (typeof getActiveProject === 'function') ? getActiveProject() : null;
+  if (!proj) { _cpMobileClosePicker(); return; }
+
+  /* Запомнить выбор для следующих галочек в этой сессии */
+  window._mobLastContainerChoice = containerId || null;
+
+  /* Найти превью */
+  var pv = null;
+  if (proj.previews) {
+    for (var p = 0; p < proj.previews.length; p++) {
+      if (proj.previews[p].name === pvName) { pv = proj.previews[p]; break; }
+    }
+  }
+
+  if (!containerId) {
+    /* «Без контейнера» — старая логика через pvToggleSelection */
+    if (typeof pvToggleSelection === 'function') pvToggleSelection(pvName);
+  } else {
+    /* В контейнер — добавить если нет дубликата */
+    var cnt = null;
+    if (proj.ocContainers) {
+      for (var ci = 0; ci < proj.ocContainers.length; ci++) {
+        if (proj.ocContainers[ci].id === containerId) { cnt = proj.ocContainers[ci]; break; }
+      }
+    }
+    if (cnt) {
+      cnt.items = cnt.items || [];
+      var dup = false;
+      for (var it = 0; it < cnt.items.length; it++) {
+        if (cnt.items[it].name === pvName) { dup = true; break; }
+      }
+      if (!dup) {
+        cnt.items.push({
+          name: pvName,
+          path: pv ? (pv.path || '') : '',
+          thumb: pv ? (pv.thumb || '') : '',
+          preview: pv ? (pv.preview || '') : ''
+        });
+      }
+      if (typeof shAutoSave === 'function') shAutoSave();
+      /* Контейнерные изменения требуют полного sync — дельта-RPC только для свободного OC */
+      if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
+      if (typeof acRenderField === 'function') acRenderField();
+      if (typeof ocRenderField === 'function') ocRenderField();
+    }
+  }
+
+  /* Обновить визуал галочки */
+  var sheet = document.getElementById('mob-cnt-picker');
+  var checkEl = sheet ? sheet._checkEl : null;
+  if (checkEl) {
+    checkEl.className = 'mob-gallery-check checked';
+    checkEl.innerHTML = '&#10003;';
+  }
+
+  _cpMobileClosePicker();
 }
 
 /**
