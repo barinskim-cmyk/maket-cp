@@ -44,6 +44,7 @@ function cpRenderList() {
   if (!proj || !proj.cards || proj.cards.length === 0) {
     listEl.innerHTML = '';
     cpShowEmpty();
+    cpRenderDeletedList();
     return;
   }
 
@@ -63,15 +64,62 @@ function cpRenderList() {
     }
     var cardLabel = (c.name && c.name.trim()) ? c.name.trim() : ('Карточка ' + (i + 1));
     html += '<div class="cp-card-item' + active + '" onclick="cpShowCard(' + i + ')">';
-    html += esc(cardLabel);
+    html += '<span class="cp-card-item-name">' + esc(cardLabel) + '</span>';
     html += ' <span class="count">(' + fileCount + '/' + (c.slots ? c.slots.length : 0) + ')</span>';
+    html += '<button class="cp-card-item-del" onclick="event.stopPropagation();cpDeleteCard(' + i + ')" title="Удалить карточку">&times;</button>';
     html += '</div>';
   }
   listEl.innerHTML = html;
 
   cpRenderCard();
+  cpRenderDeletedList();
 
   if (typeof pvRenderAll === 'function') pvRenderAll();
+}
+
+/**
+ * Отрисовать список удалённых карточек под основным sidebar list.
+ */
+function cpRenderDeletedList() {
+  var proj = getActiveProject();
+  if (!proj) return;
+  var listEl = document.getElementById('cp-cards-list');
+  if (!listEl || !listEl.parentNode) return;
+
+  var existing = document.getElementById('cp-deleted-block');
+  if (existing) existing.remove();
+
+  var del = (proj._deletedCards || []);
+  if (del.length === 0) return;
+
+  var expanded = !!window._cpShowDeleted;
+  var html = '<div class="cp-deleted-toggle" onclick="cpToggleShowDeleted()">' +
+    (expanded ? '▾' : '▸') + ' Удалённые (' + del.length + ')</div>';
+
+  if (expanded) {
+    html += '<div class="cp-deleted-list">';
+    for (var i = 0; i < del.length; i++) {
+      var c = del[i];
+      var name = (c.name && c.name.trim()) ? c.name.trim() : ('Карточка ' + (i + 1));
+      html += '<div class="cp-card-item cp-card-item-deleted" title="' + esc(c.deletedAt || '') + '">';
+      html += '<span class="cp-card-item-name">' + esc(name) + '</span>';
+      html += '<button class="cp-card-item-restore" onclick="event.stopPropagation();cpRestoreCard(' + i + ')" title="Восстановить">↺</button>';
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+
+  var block = document.createElement('div');
+  block.id = 'cp-deleted-block';
+  block.className = 'cp-deleted-block';
+  block.innerHTML = html;
+  listEl.parentNode.insertBefore(block, listEl.nextSibling);
+}
+
+/** Toggle отображения удалённых */
+function cpToggleShowDeleted() {
+  window._cpShowDeleted = !window._cpShowDeleted;
+  cpRenderDeletedList();
 }
 
 /**
@@ -196,17 +244,66 @@ function cpAddCard() {
  */
 function cpDeleteCard(idx) {
   var proj = getActiveProject();
-  if (!proj || !proj.cards || proj.cards.length <= 0) return;
-  if (!confirm('Удалить карточку ' + (idx + 1) + '?')) return;
+  if (!proj || !proj.cards || idx < 0 || idx >= proj.cards.length) return;
+  var card = proj.cards[idx];
+  var label = (card.name && card.name.trim()) || ('Карточка ' + (idx + 1));
+  if (!confirm('Удалить «' + label + '»? (можно восстановить)')) return;
 
-  var removedCard = proj.cards[idx];
+  /* Soft delete: перенос в _deletedCards с timestamp.
+     Сохраняем все данные карточки — slots, name, layout — чтобы restore вернул всё как было. */
+  var now = new Date();
+  card.deletedAt = now.toLocaleDateString('ru-RU') + ' ' + now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
   proj.cards.splice(idx, 1);
+  if (!proj._deletedCards) proj._deletedCards = [];
+  proj._deletedCards.unshift(card); /* самые свежие сверху */
+
+  /* Если удалили текущую открытую карточку — переключаемся на соседнюю */
   if (App.currentCardIdx >= proj.cards.length) {
-    App.currentCardIdx = proj.cards.length - 1;
+    App.currentCardIdx = Math.max(0, proj.cards.length - 1);
   }
   cpRenderList();
-  if (typeof sbLogAction === 'function' && removedCard) {
-    sbLogAction('delete_card', 'card', removedCard.id, removedCard.name || ('Карточка ' + (idx + 1)));
+  if (typeof sbLogAction === 'function') {
+    sbLogAction('soft_delete_card', 'card', card.id, label);
+  }
+  /* Помечаем карточку soft-deleted в облаке (cards.deleted_at = now).
+     Pull уже фильтрует по deleted_at IS NULL — карточка не вернётся при пере-загрузке. */
+  if (proj._cloudId && card.id && typeof sbClient !== 'undefined' && sbClient) {
+    try {
+      sbClient.from('cards').update({ deleted_at: new Date().toISOString() })
+        .eq('id', card.id).eq('project_id', proj._cloudId)
+        .then(function(res) {
+          if (res && res.error) console.warn('cpDeleteCard cloud update:', res.error.message);
+        });
+    } catch (e) { console.warn('cpDeleteCard:', e); }
+  }
+  if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
+}
+
+/**
+ * Восстановить удалённую карточку обратно в proj.cards.
+ * @param {number} delIdx — индекс в proj._deletedCards
+ */
+function cpRestoreCard(delIdx) {
+  var proj = getActiveProject();
+  if (!proj || !proj._deletedCards || delIdx < 0 || delIdx >= proj._deletedCards.length) return;
+  var card = proj._deletedCards.splice(delIdx, 1)[0];
+  delete card.deletedAt;
+  if (!proj.cards) proj.cards = [];
+  proj.cards.push(card);
+  App.currentCardIdx = proj.cards.length - 1;
+  cpRenderList();
+  if (typeof sbLogAction === 'function') {
+    sbLogAction('restore_card', 'card', card.id, card.name || ('Карточка ' + proj.cards.length));
+  }
+  /* Снимаем soft-delete в облаке: deleted_at → null. Карточка снова видна. */
+  if (proj._cloudId && card.id && typeof sbClient !== 'undefined' && sbClient) {
+    try {
+      sbClient.from('cards').update({ deleted_at: null })
+        .eq('id', card.id).eq('project_id', proj._cloudId)
+        .then(function(res) {
+          if (res && res.error) console.warn('cpRestoreCard cloud update:', res.error.message);
+        });
+    } catch (e) { console.warn('cpRestoreCard:', e); }
   }
   if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
 }

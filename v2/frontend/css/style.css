@@ -451,11 +451,56 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .cp-card-item {
   padding: 8px 10px; border-radius: 6px; cursor: pointer;
   font-size: 13px; margin-bottom: 3px; transition: all 0.15s;
+  display: flex; align-items: center; gap: 4px;
 }
 .cp-card-item:hover { background: #f0f0f0; }
 .cp-card-item.active { background: #333; color: #fff; }
+.cp-card-item .cp-card-item-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cp-card-item .cat { opacity: 0.6; font-size: 11px; }
-.cp-card-item .count { opacity: 0.5; font-size: 11px; }
+.cp-card-item .count { opacity: 0.5; font-size: 11px; flex-shrink: 0; }
+
+/* Кнопка удаления карточки (×) — появляется на hover */
+.cp-card-item-del {
+  flex-shrink: 0;
+  width: 22px; height: 22px;
+  background: transparent; border: none;
+  color: #999; font-size: 18px; line-height: 1;
+  cursor: pointer; padding: 0; border-radius: 4px;
+  opacity: 0; transition: all 0.15s;
+}
+.cp-card-item:hover .cp-card-item-del { opacity: 1; }
+.cp-card-item-del:hover { background: rgba(220, 50, 50, 0.15); color: #c33; }
+.cp-card-item.active .cp-card-item-del { color: #ddd; }
+.cp-card-item.active .cp-card-item-del:hover { background: rgba(255, 100, 100, 0.3); color: #fff; }
+
+/* Блок удалённых карточек */
+.cp-deleted-block {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #eee;
+}
+.cp-deleted-toggle {
+  font-size: 12px; color: #999; cursor: pointer;
+  padding: 4px 6px; user-select: none;
+}
+.cp-deleted-toggle:hover { color: #555; }
+.cp-deleted-list { margin-top: 4px; }
+.cp-card-item-deleted {
+  opacity: 0.55;
+  font-style: italic;
+  cursor: default;
+}
+.cp-card-item-deleted:hover { background: #fafafa; }
+.cp-card-item-restore {
+  flex-shrink: 0;
+  width: 24px; height: 24px;
+  background: transparent; border: 1px solid #ccc;
+  color: #666; font-size: 14px; line-height: 1;
+  cursor: pointer; padding: 0; border-radius: 4px;
+  opacity: 0.7; transition: all 0.15s;
+}
+.cp-card-item-deleted:hover .cp-card-item-restore { opacity: 1; border-color: #888; color: #333; }
+.cp-card-item-restore:hover { background: #f0f0f0; }
 
 .cp-add-card-btn {
   display: block; width: 100%; padding: 10px; margin-top: 10px;
