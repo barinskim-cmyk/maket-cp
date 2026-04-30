@@ -62,6 +62,15 @@ config.json
 config.local.json
 v2/frontend/config.json
 
+# Secrets folder — OAuth credentials, refresh tokens, anything sensitive.
+# NEVER commit. git автоматически проигнорит всё внутри.
+secrets/
+**/secrets/
+*.credentials.json
+client_secret_*.json
+*-token.json
+*-tokens.json
+
 # Large legacy HTML files with embedded images
 BrandX_карточки товара.html
 BrandX_карточки_товара_v2.html

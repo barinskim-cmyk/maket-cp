@@ -2,3 +2,9 @@ pywebview>=4.0
 Pillow>=9.0
 pdfplumber>=0.9
 openpyxl>=3.0
+
+# Google Drive API (storage backend для оригиналов TIFF).
+# google-auth-oauthlib — OAuth-flow, google-api-python-client — Drive REST.
+google-auth>=2.20
+google-auth-oauthlib>=1.0
+google-api-python-client>=2.100
