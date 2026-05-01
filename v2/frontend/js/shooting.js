@@ -184,9 +184,15 @@ function smRecheckPerms() {
     smRenderPermsRow('accessibility', snap.accessibility);
     smRenderPermsRow('input_monitoring', snap.input_monitoring);
     smRenderPermsRow('automation_capture_one', snap.automation_capture_one);
-    var allOk = !!(snap.accessibility && snap.input_monitoring && snap.automation_capture_one);
+    // Continue is ALWAYS enabled. The basic shoot flow (FilePicker + filesystem
+    // watcher on .cos files) doesn't need any of these permissions. They are
+    // required only for advanced features:
+    //   - Accessibility / Input Monitoring → global Add-to-Card hotkey (Cmd+Shift+C)
+    //   - Automation: Capture One → AppleScript queries (selection, session path)
+    // Both can be granted later, when the user actually uses those features.
+    // Gating the basic flow on all-three was overzealous (Маша 2026-05-01).
     var btn = document.getElementById('sm-perms-continue');
-    if (btn) btn.disabled = !allOk;
+    if (btn) btn.disabled = false;
   });
 }
 
