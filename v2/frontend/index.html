@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Maket CP</title>
-<link rel="stylesheet" href="css/style.css?v=24">
+<link rel="stylesheet" href="css/style.css?v=25">
 </head>
 <body>
 
@@ -62,6 +62,7 @@
 
 <div class="nav">
   <button class="nav-btn active" id="nav-shootings" onclick="showPage('shootings')">Съёмки</button>
+  <button class="nav-btn" id="nav-shoot" onclick="showPage('shoot')" title="Активная съёмка с Capture One">Съёмка</button>
   <button class="nav-btn" id="nav-content" onclick="showPage('content')">Контент</button>
   <button class="nav-btn" id="nav-articles" onclick="showPage('articles')">Артикулы</button>
   <button class="nav-btn" id="nav-sync" onclick="showPage('sync')">Синхронизация</button>
@@ -104,6 +105,93 @@
           </div>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ Съёмка (Shooting Mode) ══════════════ -->
+<div id="page-shoot" class="page">
+  <div class="container">
+    <div class="section-title">Съёмка</div>
+
+    <div id="sm-idle">
+      <p style="color:#666;max-width:560px">
+        Запусти Capture One и нажми «Начать съёмку», чтобы выбрать активную сессию.
+        Maket CP будет логировать события (новые кадры, рейтинги, выбор) в фоне.
+      </p>
+      <p style="font-size:12px;color:#999;max-width:560px">
+        Watcher Capture One и hotkey «Add to Card» подключим следующим релизом —
+        сейчас доступна только разметка sessions: start / end.
+      </p>
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="smStartFlow()">Начать съёмку</button>
+        <button class="btn" onclick="smCheckPermissions()" title="Проверить системные разрешения вручную">Проверить разрешения</button>
+      </div>
+    </div>
+
+    <div id="sm-active" style="display:none">
+      <div style="background:#f5f5f5;padding:16px;border-radius:8px;max-width:640px">
+        <div style="font-size:14px;color:#666;margin-bottom:6px">Съёмка активна</div>
+        <div id="sm-session-path" style="font-family:monospace;font-size:12px;color:#333;word-break:break-all"></div>
+        <div style="margin-top:12px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+          <div>
+            <div style="font-size:11px;color:#999">Длительность</div>
+            <div id="sm-timer" style="font-size:24px;font-weight:600">00:00:00</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:#999">Состояние</div>
+            <div id="sm-state-text" style="font-size:14px">Logging events…</div>
+          </div>
+        </div>
+        <div style="margin-top:16px">
+          <button class="btn btn-primary" style="background:#c62828;border-color:#c62828" onclick="smEndFlow()">Завершить съёмку</button>
+        </div>
+      </div>
+
+      <div style="margin-top:24px">
+        <h3 style="margin:0 0 8px 0">События</h3>
+        <div id="sm-events" style="max-height:320px;overflow:auto;border:1px solid #eee;border-radius:6px;padding:8px;font-family:monospace;font-size:12px;background:#fafafa">
+          <div style="color:#999">Watcher отключён — события появятся когда подключим C1 watcher.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ Модалка: First-run разрешения для Shoot mode ══════════════ -->
+<div class="modal-overlay" id="modal-shoot-perms">
+  <div class="modal" style="width:520px">
+    <h3>Доступ к macOS для съёмки</h3>
+    <p style="color:#666;font-size:13px;margin:0 0 12px 0">
+      Чтобы Maket CP мог отслеживать кадры и слушать горячие клавиши,
+      нужно выдать три разрешения системы. Один раз — потом не спросит.
+    </p>
+
+    <div id="sm-perm-list">
+      <div class="sm-perm-row" data-perm="accessibility">
+        <div class="sm-perm-name">Accessibility (Универсальный доступ)</div>
+        <div class="sm-perm-desc">Нужно для глобальных клавиатурных хуков.</div>
+        <div class="sm-perm-status" data-status>проверяется…</div>
+        <button class="btn btn-sm" onclick="smOpenPerm('accessibility')">Открыть настройки</button>
+      </div>
+      <div class="sm-perm-row" data-perm="input_monitoring">
+        <div class="sm-perm-name">Input Monitoring (Мониторинг ввода)</div>
+        <div class="sm-perm-desc">Слушаем хоткеи без перехвата.</div>
+        <div class="sm-perm-status" data-status>проверяется…</div>
+        <button class="btn btn-sm" onclick="smOpenPerm('input_monitoring')">Открыть настройки</button>
+      </div>
+      <div class="sm-perm-row" data-perm="automation_capture_one">
+        <div class="sm-perm-name">Automation: Capture One</div>
+        <div class="sm-perm-desc">AppleScript-bridge для чтения сессии и выбранных кадров.</div>
+        <div class="sm-perm-status" data-status>проверяется…</div>
+        <button class="btn btn-sm" onclick="smOpenPerm('automation_capture_one')">Открыть настройки</button>
+      </div>
+    </div>
+
+    <div class="modal-buttons" style="margin-top:16px">
+      <button class="btn" onclick="closeModal('modal-shoot-perms')">Закрыть</button>
+      <button class="btn" onclick="smRecheckPerms()">Проверить ещё раз</button>
+      <button class="btn btn-primary" id="sm-perms-continue" onclick="smPermsContinue()" disabled>Продолжить</button>
     </div>
   </div>
 </div>
@@ -615,5 +703,6 @@
 <!-- Post-approval safeguard: блокирует случайный sync после
      «Согласовать отбор». См. docs/agents/dev/post-approval-safeguard.md -->
 <script src="js/post-approval-safeguard.js?v=3"></script>
+<script src="js/shooting.js?v=1"></script>
 </body>
 </html>

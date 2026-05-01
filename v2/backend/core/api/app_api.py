@@ -17,6 +17,9 @@ from ..services.project_service import ProjectService
 from ..services.preview_service import PreviewService
 from ..services.article_service import ArticleService
 from ..services.version_service import VersionService
+from ..services.shooting_service import ShootingService
+from ..services import permissions_service
+from ..infra.c1_bridge import CaptureOneBridge
 from ..domain.project import Project
 from ..domain.card import CardTemplate
 
@@ -32,6 +35,14 @@ class AppAPI:
         self.preview_service = PreviewService()
         self.article_service = ArticleService()
         self.version_service = VersionService()
+
+        # Shoot mode wiring: ShootingService logs through _emit so JS gets a
+        # push for every state transition (started/ended/aborted/event).
+        def _shoot_emit(name: str, payload: dict) -> None:
+            self._emit(f"onShoot_{name}", payload)
+        self.shooting_service = ShootingService(event_logger=_shoot_emit)
+        self.c1_bridge = CaptureOneBridge()
+
         self._project: Project | None = None
 
     def set_window(self, window: webview.Window) -> None:
@@ -505,3 +516,85 @@ class AppAPI:
             return {"error": str(e)}
 
         return {"pages": pages_b64, "total": len(pages_b64)}
+
+    # ── Shoot mode ──
+
+    def shoot_pick_session(self) -> dict:
+        """Open a folder picker for the Capture One session root.
+
+        Returns {"path": str} or {"cancelled": True}. Frontend then calls
+        shoot_start_session with the chosen path.
+        """
+        if not self._window:
+            return {"error": "Нет окна"}
+        result = self._window.create_file_dialog(
+            webview.FileDialog.FOLDER, directory="", allow_multiple=False
+        )
+        if not result:
+            return {"cancelled": True}
+        path = result[0] if isinstance(result, (list, tuple)) else result
+        return {"path": str(path)}
+
+    def shoot_start_session(self, session_path: str, project_id: str | None = None) -> dict:
+        """Begin a shoot session. Records start_time in UTC."""
+        if not session_path:
+            return {"error": "Не указан путь до сессии"}
+        try:
+            session = self.shooting_service.start_session(session_path, project_id)
+            return {"ok": True, "session": session.to_dict()}
+        except Exception as e:
+            return {"error": str(e)}
+
+    def shoot_end_session(self, session_id: str) -> dict:
+        """Close the shoot session normally."""
+        try:
+            session = self.shooting_service.end_session(session_id)
+            return {"ok": True, "session": session.to_dict()}
+        except KeyError as e:
+            return {"error": str(e)}
+
+    def shoot_abort_session(self, session_id: str) -> dict:
+        """Abort an active shoot session (no completion event)."""
+        try:
+            session = self.shooting_service.abort_session(session_id)
+            return {"ok": True, "session": session.to_dict()}
+        except KeyError as e:
+            return {"error": str(e)}
+
+    def shoot_get_active(self) -> dict | None:
+        active = self.shooting_service.get_active()
+        if active is None:
+            return None
+        return active.to_dict()
+
+    def shoot_c1_status(self) -> dict:
+        """Cheap status snapshot for the shoot view (is C1 running, path)."""
+        return {
+            "is_running": self.c1_bridge.is_running(),
+            "session_path": self.c1_bridge.get_session_path(),
+        }
+
+    # ── Permissions (first-run flow) ──
+
+    def permissions_check_all(self) -> dict:
+        """Snapshot all three permission checks for the JS modal."""
+        return permissions_service.check_all()
+
+    def permissions_check(self, name: str) -> dict:
+        """Re-check a single permission by name.
+
+        name ∈ {"accessibility", "input_monitoring", "automation_capture_one"}.
+        """
+        fn = {
+            "accessibility": permissions_service.check_accessibility,
+            "input_monitoring": permissions_service.check_input_monitoring,
+            "automation_capture_one": permissions_service.check_automation_capture_one,
+        }.get(name)
+        if not fn:
+            return {"error": f"Unknown permission: {name}"}
+        return {"name": name, "granted": bool(fn())}
+
+    def permissions_open_settings(self, name: str) -> dict:
+        """Open System Settings deep-link for a denied permission."""
+        ok = permissions_service.open_settings_for_permission(name)
+        return {"ok": ok, "name": name}

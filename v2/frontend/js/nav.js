@@ -5,7 +5,7 @@
 function showPage(name) {
   /* Permission-hardening: гость по share-ссылке не должен попадать на
      админ-вкладки (Артикулы, Синхронизация). Если попытка — редирект на съёмки. */
-  if (window._isShareLink && (name === 'articles' || name === 'sync')) {
+  if (window._isShareLink && (name === 'articles' || name === 'sync' || name === 'shoot')) {
     name = 'shootings';
   }
   App.currentPage = name;
