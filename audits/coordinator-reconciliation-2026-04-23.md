@@ -166,13 +166,13 @@ cycle: ongoing
 
 **Рекомендация.** Обновить раздел GS в `agent-team-v2.md` до актуальной Version A. Owner: CoS.
 
-### 2.5. Memory `project_status_april2026.md` держит Netlify
+### 2.5. Memory `project_status_april2026.md` ссылается на предыдущий хостинг
 
-- `.auto-memory/project_status_april2026.md` — «Site: https://creative-cp.netlify.app» (снимок 5 апреля).
-- `.auto-memory/project_web_hosting.md` — «Netlify больше не используется — подтверждено Машей 2026-04-23».
+- `.auto-memory/project_status_april2026.md` — указывает URL предыдущего хостинга (снимок 5 апреля).
+- `.auto-memory/project_web_hosting.md` — «Старый хостинг больше не используется — подтверждено Машей 2026-04-23».
 - `Maket_CP_описание_проекта.md:553` — «Веб-версия на GitHub Pages (barinskim-cmyk.github.io/maket-cp)».
 
-Общая правда = GitHub Pages, Netlify мёртв. Но стэйлый status остаётся в memory — рекоммендация пометить `project_status_april2026.md` как `partially-stale` (или архивировать).
+Общая правда = GitHub Pages, предыдущий хост отключён. Но стэйлый status остаётся в memory — рекоммендация пометить `project_status_april2026.md` как `partially-stale` (или архивировать).
 
 ### 2.6. `audit_edits.json` и `backlog_edits.json` отсутствуют, а CLAUDE.md на них ссылается
 
@@ -221,9 +221,9 @@ cycle: ongoing
 
 Все ниже — реальные pivot'ы, часть из которых не прошла каскад по всем документам.
 
-### 3.1. Netlify → GitHub Pages (2026-04-23)
+### 3.1. Previous host → GitHub Pages (2026-04-23)
 - `.auto-memory/project_web_hosting.md` — подтверждено Машей на этой дате.
-- Каскад: `Maket_CP_описание_проекта.md` — OK (GitHub Pages); memory `project_status_april2026.md` — не догнал.
+- Каскад: `Maket_CP_описание_проекта.md` — OK (GitHub Pages); memory `project_status_april2026.md` — не догнал (всё ещё ссылается на старый хост).
 
 ### 3.2. Container-centric → photo-centric (≈2026-04-16)
 - `.auto-memory/project_strategic_bets_2026_04.md` — «Фотография — минимальная живая единица процесса. Это новая опорная точка модели; в product-snapshot.md v2 центральной абстракцией был контейнер.»
