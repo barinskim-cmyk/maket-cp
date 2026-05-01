@@ -37,11 +37,15 @@ class AppAPI:
         self.version_service = VersionService()
 
         # Shoot mode wiring: ShootingService logs through _emit so JS gets a
-        # push for every state transition (started/ended/aborted/event).
+        # push for every state transition (started/ended/aborted/event,
+        # watcher.*, hotkey.*). We mangle '.' into '_' so the dispatched
+        # JS callbacks have plain identifiers.
         def _shoot_emit(name: str, payload: dict) -> None:
-            self._emit(f"onShoot_{name}", payload)
-        self.shooting_service = ShootingService(event_logger=_shoot_emit)
+            self._emit("onShoot_" + name.replace(".", "_"), payload)
         self.c1_bridge = CaptureOneBridge()
+        self.shooting_service = ShootingService(
+            event_logger=_shoot_emit, bridge=self.c1_bridge
+        )
 
         self._project: Project | None = None
 
@@ -573,6 +577,31 @@ class AppAPI:
             "is_running": self.c1_bridge.is_running(),
             "session_path": self.c1_bridge.get_session_path(),
         }
+
+    def shoot_c1_session_path(self) -> dict:
+        """Return the current C1 document path, or {error: ...}.
+
+        Frontend uses this to skip the FilePicker when C1 already has a
+        session open. Falls through to manual pick when bridge denies.
+        """
+        path = self.c1_bridge.get_session_path()
+        if path:
+            return {"path": path}
+        return {"error": "Capture One не запущен или не выдан Automation access"}
+
+    def shoot_hotkey_smoke(self) -> dict:
+        """Manual smoke trigger for the hotkey path.
+
+        Mirrors what Cmd+Shift+C does on the active session: read selected
+        variants from the bridge, mint a card_id, write keywords. Useful
+        for testing without granting Accessibility, OR when the bridge is
+        denied — caller can verify the wiring end-to-end.
+        """
+        if self.shooting_service._hotkey is None:
+            return {"error": "no active shoot session"}
+        # Direct call to the same _fire path the listener uses.
+        self.shooting_service._hotkey._fire()
+        return {"ok": True}
 
     # ── Permissions (first-run flow) ──
 
