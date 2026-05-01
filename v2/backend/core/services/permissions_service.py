@@ -44,28 +44,22 @@ def check_accessibility() -> bool:
 def check_input_monitoring() -> bool:
     """Does the host have macOS Input Monitoring?
 
-    There is no first-class API. We attempt a non-mutating pynput keyboard
-    listener: if it raises an OSError tied to `kIOHIDEventSystemClient`
-    or returns immediately on `start()`, we assume access denied. This is
-    a soft check — false positives are rare in practice, and the user
-    re-runs after granting it.
+    NOTE 2026-05-01 (Маша's machine, macOS 26.4): pynput.keyboard.Listener
+    crashes the Python process on start() due to TSMGetInputSourceProperty
+    being called from a non-main thread (SIGTRAP from dispatch_assert_queue).
+    The crash report is in ~/Library/Logs/DiagnosticReports/Python-2026-05-01-085854.ips.
+
+    Until we replace pynput with a pyobjc NSEvent-based hotkey monitor that
+    runs on the main thread, do NOT call pynput here at all. Returning True
+    optimistically is fine — the actual hotkey activation (which currently
+    no-ops on macOS, see hotkey_service.activate) is the only place that
+    really needs the permission, and it surfaces failures itself.
     """
     if not _is_macos():
         return True
-    try:
-        from pynput.keyboard import Listener  # type: ignore
-    except Exception:
-        # pynput not installed — the watcher won't run anyway, treat as denied
-        return False
-
-    try:
-        listener = Listener(on_press=lambda _k: False)
-        listener.start()
-        # Give macOS a beat to surface the missing-entitlement error.
-        listener.stop()
-        return True
-    except Exception:
-        return False
+    # Conservative: assume granted; the real test is at hotkey activation
+    # time, which is currently disabled on macOS pending pyobjc rewrite.
+    return True
 
 
 def check_automation_capture_one() -> bool:

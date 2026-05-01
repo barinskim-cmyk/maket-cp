@@ -70,7 +70,24 @@ class HotkeyService:
 
         On success: {"ok": True, "hotkey": "<cmd>+<shift>+c"}.
         On failure: {"ok": False, "error": "...", "remedy": "..."}.
+
+        NOTE 2026-05-01 (macOS 26.4): pynput.keyboard.GlobalHotKeys.start()
+        crashes the entire Python process via SIGTRAP from
+        dispatch_assert_queue (TSMGetInputSourceProperty called off
+        main thread). See ~/Library/Logs/DiagnosticReports/Python-2026-05-01-*.ips.
+        Until we rewrite this on top of pyobjc NSEvent.addGlobalMonitorFor*
+        (runs on main thread cleanly), pynput is disabled on macOS. The
+        Shoot-mode flow (rating watcher) keeps working — only the
+        Cmd+Shift+C "Add to Card" hotkey is unavailable for now.
         """
+        import sys
+        if sys.platform == "darwin":
+            return {
+                "ok": False,
+                "error": "Hotkey временно отключён на macOS",
+                "remedy": "Будет включено после переписывания на pyobjc NSEvent (без pynput).",
+                "platform_blocked": True,
+            }
         if not _PYNPUT_AVAILABLE:
             return {"ok": False, "error": "pynput not installed",
                     "remedy": "pip install pynput"}
