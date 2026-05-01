@@ -160,6 +160,11 @@ function createProject() {
   var templateId = document.getElementById('inp-template').value; /* '' = без шаблона */
   if (!brand) { alert('Введите бренд'); return; }
 
+  /* Mode picker: 'done' (default) — обычный flow; 'live' — после создания
+     проекта переключаемся на вкладку Съёмка и стартуем shoot session. */
+  var modeEl = document.querySelector('input[name="np-mode"]:checked');
+  var mode = modeEl ? modeEl.value : 'done';
+
   closeModal('modal-new-project');
 
   /**
@@ -177,6 +182,15 @@ function createProject() {
     App.selectedProject = App.projects.length - 1;
     renderProjects();
     shAutoSave();
+
+    if (mode === 'live' && typeof smStartFromProjectParams === 'function') {
+      smStartFromProjectParams({
+        brand: brand,
+        date: date,
+        templateId: templateId,
+        projectIdx: App.selectedProject
+      });
+    }
   }
 
   if (window.pywebview && window.pywebview.api) {

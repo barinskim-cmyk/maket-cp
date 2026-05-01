@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Maket CP</title>
-<link rel="stylesheet" href="css/style.css?v=25">
+<link rel="stylesheet" href="css/style.css?v=26">
 </head>
 <body>
 
@@ -61,18 +61,18 @@
 <div id="app-main" style="display:none">
 
 <div class="nav">
-  <button class="nav-btn active" id="nav-shootings" onclick="showPage('shootings')">Съёмки</button>
+  <button class="nav-btn active" id="nav-shootings" onclick="showPage('shootings')">Проекты</button>
   <button class="nav-btn" id="nav-shoot" onclick="showPage('shoot')" title="Активная съёмка с Capture One">Съёмка</button>
   <button class="nav-btn" id="nav-content" onclick="showPage('content')">Контент</button>
   <button class="nav-btn" id="nav-articles" onclick="showPage('articles')">Артикулы</button>
   <button class="nav-btn" id="nav-sync" onclick="showPage('sync')">Синхронизация</button>
 </div>
 
-<!-- ══════════════ Съёмки ══════════════ -->
+<!-- ══════════════ Проекты (внутренний id "shootings" — не трогать) ══════════════ -->
 <div id="page-shootings" class="page active">
   <div class="container">
     <div class="projects-header">
-      <div class="section-title">Съёмки</div>
+      <div class="section-title">Проекты</div>
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
         <button class="btn btn-primary" onclick="openNewProjectModal()">Новая съёмка</button>
         <button class="btn" onclick="sbOpenShareModal()" title="Поделиться ссылкой">Поделиться</button>
@@ -101,7 +101,7 @@
         <div class="pipeline-panel">
           <div class="section-title">Пайплайн</div>
           <div id="pipeline-container">
-            <div class="empty-state">Выберите съёмку</div>
+            <div class="empty-state">Выберите проект</div>
           </div>
         </div>
       </div>
@@ -326,7 +326,7 @@
 <div id="page-articles" class="page">
   <div class="container">
     <div class="section-title">Артикулы</div>
-    <div id="ar-no-project" class="empty-state">Выберите съёмку на вкладке "Съёмки"</div>
+    <div id="ar-no-project" class="empty-state">Выберите проект на вкладке "Проекты"</div>
 
     <div id="ar-main" style="display:none">
       <div class="ar-toolbar">
@@ -453,6 +453,22 @@
 <div class="modal-overlay" id="modal-new-project">
   <div class="modal">
     <h3>Новая съёмка</h3>
+    <div class="np-mode" role="radiogroup" aria-label="Режим съёмки">
+      <label class="np-mode-card">
+        <input type="radio" name="np-mode" value="done" checked>
+        <div class="np-mode-body">
+          <div class="np-mode-title">Уже отснял, добавляю готовое</div>
+          <div class="np-mode-desc">Создать проект и подгрузить файлы вручную.</div>
+        </div>
+      </label>
+      <label class="np-mode-card">
+        <input type="radio" name="np-mode" value="live">
+        <div class="np-mode-body">
+          <div class="np-mode-title">Снимаю прямо сейчас</div>
+          <div class="np-mode-desc">Синхронизация с Capture One во время съёмки.</div>
+        </div>
+      </label>
+    </div>
     <div class="modal-field">
       <label>Бренд</label>
       <input type="text" id="inp-brand" placeholder="BrandX, Partner Y...">
@@ -703,6 +719,6 @@
 <!-- Post-approval safeguard: блокирует случайный sync после
      «Согласовать отбор». См. docs/agents/dev/post-approval-safeguard.md -->
 <script src="js/post-approval-safeguard.js?v=3"></script>
-<script src="js/shooting.js?v=1"></script>
+<script src="js/shooting.js?v=2"></script>
 </body>
 </html>

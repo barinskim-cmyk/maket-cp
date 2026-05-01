@@ -48,6 +48,18 @@ function smStartFlow() {
   smPickAndStart();
 }
 
+/* Entry from the New Project modal when "Снимаю прямо сейчас" is selected.
+   Switches to the Съёмка tab and starts the live flow with project context. */
+function smStartFromProjectParams(params) {
+  if (typeof showPage === 'function') showPage('shoot');
+  if (!smHasDesktop()) {
+    alert('Live shoot mode доступен только в десктоп-версии Maket CP.');
+    return;
+  }
+  // Same gating as manual start: perms first, then pick + start.
+  smStartFlow();
+}
+
 function smPickAndStart() {
   if (!smHasDesktop()) return;
   window.pywebview.api.shoot_pick_session().then(function(res) {
