@@ -79,6 +79,15 @@ function smPickAndStart() {
   });
 }
 
+function smAddToCardManual() {
+  if (!_smActive || !smHasDesktop()) return;
+  // Calls the same code path the Cmd+Shift+C hotkey uses; on macOS this is
+  // the only way to fire it until we replace pynput with pyobjc NSEvent.
+  window.pywebview.api.shoot_hotkey_smoke().then(function(out) {
+    if (out && out.error) smAppendEvent('add-to-card error: ' + out.error);
+  });
+}
+
 function smEndFlow() {
   if (!_smActive || !smHasDesktop()) return;
   var ok = window.confirm('Завершить съёмку?');
@@ -257,6 +266,48 @@ window.onShoot_shoot_session_ended = function(payload) {
 };
 window.onShoot_shoot_session_aborted = function(payload) {
   smAppendEvent('session.aborted');
+};
+
+// Watcher push events (forwarded from SessionWatcher → ShootingService → AppAPI._emit).
+window.onShoot_watcher_watcher_started = function(p) {
+  smAppendEvent('watcher started — tracking ' + (p && p.tracked_photos != null ? p.tracked_photos : '?') + ' photos');
+};
+window.onShoot_watcher_watcher_stopped = function() {
+  smAppendEvent('watcher stopped');
+};
+window.onShoot_watcher_watcher_error = function(p) {
+  smAppendEvent('watcher error: ' + (p && p.error ? p.error : 'unknown'));
+};
+window.onShoot_watcher_photo_added = function(p) {
+  smAppendEvent('photo added: ' + (p && p.stem ? p.stem : '?') + ' rating=' + (p && p.rating != null ? p.rating : '-'));
+};
+window.onShoot_watcher_photo_changed = function(p) {
+  if (!p) return;
+  var msg = 'photo changed: ' + (p.stem || '?');
+  if (p.rating_before !== p.rating_after) msg += ' rating ' + p.rating_before + '->' + p.rating_after;
+  if (p.keywords_added && p.keywords_added.length) msg += ' +kw[' + p.keywords_added.join(',') + ']';
+  smAppendEvent(msg);
+};
+window.onShoot_watcher_selection_added = function(p) {
+  smAppendEvent('+ selection: ' + (p && p.stem ? p.stem : '?') + ' rating=' + (p && p.rating != null ? p.rating : '-'));
+};
+window.onShoot_watcher_selection_removed = function(p) {
+  smAppendEvent('- selection: ' + (p && p.stem ? p.stem : '?'));
+};
+window.onShoot_watcher_card_signal = function(p) {
+  smAppendEvent('card signal: ' + (p && p.stem ? p.stem : '?') + ' card=' + (p && p.card_id ? p.card_id.slice(0, 8) : '?') + ' slot=' + (p && p.slot != null ? p.slot : '?'));
+};
+window.onShoot_hotkey_card_created = function(p) {
+  if (!p) return;
+  if (p.error) {
+    smAppendEvent('hotkey error: ' + p.error);
+    return;
+  }
+  smAppendEvent('hotkey: card ' + (p.card_id ? p.card_id.slice(0, 8) : '?') + ' = ' + p.count + ' photos');
+};
+window.onShoot_hotkey_error = function(p) {
+  if (!p) return;
+  smAppendEvent('hotkey unavailable: ' + (p.error || '?') + (p.remedy ? ' — ' + p.remedy : ''));
 };
 window.onAppUpdated = function(payload) {
   // Soft-restart notification: backend respawns and exits, so this is

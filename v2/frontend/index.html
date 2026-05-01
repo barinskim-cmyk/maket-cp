@@ -143,7 +143,8 @@
             <div id="sm-state-text" style="font-size:14px">Logging events…</div>
           </div>
         </div>
-        <div style="margin-top:16px">
+        <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn" onclick="smAddToCardManual()" title="Прочитать выбранные кадры из Capture One и собрать карточку (замена хоткея Cmd+Shift+C)">Добавить в карточку</button>
           <button class="btn btn-primary" style="background:#c62828;border-color:#c62828" onclick="smEndFlow()">Завершить съёмку</button>
         </div>
       </div>
@@ -719,6 +720,6 @@
 <!-- Post-approval safeguard: блокирует случайный sync после
      «Согласовать отбор». См. docs/agents/dev/post-approval-safeguard.md -->
 <script src="js/post-approval-safeguard.js?v=3"></script>
-<script src="js/shooting.js?v=2"></script>
+<script src="js/shooting.js?v=3"></script>
 </body>
 </html>
