@@ -529,24 +529,40 @@ class AppAPI:
         Returns {"path": str} or {"cancelled": True}. Frontend then calls
         shoot_start_session with the chosen path.
         """
+        print("[shoot] shoot_pick_session: opening folder dialog", flush=True)
         if not self._window:
+            print("[shoot] ERROR: no window", flush=True)
             return {"error": "Нет окна"}
-        result = self._window.create_file_dialog(
-            webview.FileDialog.FOLDER, directory="", allow_multiple=False
-        )
+        try:
+            result = self._window.create_file_dialog(
+                webview.FileDialog.FOLDER, directory="", allow_multiple=False
+            )
+            print(f"[shoot] dialog returned: {result!r}", flush=True)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print(f"[shoot] dialog ERROR: {e!r}", flush=True)
+            return {"error": f"dialog: {e}"}
         if not result:
             return {"cancelled": True}
         path = result[0] if isinstance(result, (list, tuple)) else result
+        print(f"[shoot] picked path: {path}", flush=True)
         return {"path": str(path)}
 
     def shoot_start_session(self, session_path: str, project_id: str | None = None) -> dict:
         """Begin a shoot session. Records start_time in UTC."""
+        print(f"[shoot] shoot_start_session called: path={session_path!r} project_id={project_id!r}", flush=True)
         if not session_path:
+            print("[shoot] ERROR: empty session_path", flush=True)
             return {"error": "Не указан путь до сессии"}
         try:
             session = self.shooting_service.start_session(session_path, project_id)
+            print(f"[shoot] session started: id={session.id}", flush=True)
             return {"ok": True, "session": session.to_dict()}
         except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print(f"[shoot] start_session ERROR: {e!r}", flush=True)
             return {"error": str(e)}
 
     def shoot_end_session(self, session_id: str) -> dict:

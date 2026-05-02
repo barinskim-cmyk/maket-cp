@@ -37,6 +37,16 @@ function smStartFlow() {
     alert('Shoot mode доступен только в десктоп-версии Maket CP.');
     return;
   }
+  // Step 0: session must belong to a project. If no project is selected,
+  // ask the user whether to create a new one or pick an existing one.
+  var hasActive = (window.App
+                   && Array.isArray(App.projects)
+                   && App.selectedProject >= 0
+                   && App.selectedProject < App.projects.length);
+  if (!hasActive) {
+    smShowProjectChoiceModal();
+    return;
+  }
   // Step 1: gate on first-run permission modal unless we've already passed.
   var passed = false;
   try { passed = localStorage.getItem(SM_PERMS_OK_KEY) === '1'; } catch (e) {}
@@ -46,6 +56,62 @@ function smStartFlow() {
   }
   // Step 2: pick the session folder, then start.
   smPickAndStart();
+}
+
+/* ── Project choice (sessions always belong to a project) ────────── */
+
+function smShowProjectChoiceModal() {
+  // Reset list visibility on every open.
+  var list = document.getElementById('sm-project-list');
+  if (list) {
+    list.style.display = 'none';
+    list.innerHTML = '';
+  }
+  if (typeof openModal === 'function') {
+    openModal('modal-shoot-project-picker');
+  }
+}
+
+function smChooseNewProject() {
+  closeModal('modal-shoot-project-picker');
+  if (typeof openNewProjectModal === 'function') {
+    openNewProjectModal();
+    // Pre-select the "live" mode radio so the user doesn't have to click it.
+    setTimeout(function() {
+      var live = document.querySelector('input[name="np-mode"][value="live"]');
+      if (live) { live.checked = true; }
+    }, 50);
+  }
+}
+
+function smShowProjectList() {
+  var list = document.getElementById('sm-project-list');
+  if (!list) return;
+  var projects = (window.App && Array.isArray(App.projects)) ? App.projects : [];
+  if (projects.length === 0) {
+    list.innerHTML = '<div style="padding:14px;color:#888;font-size:13px">Проектов пока нет — нажми \"Создать новый\" слева.</div>';
+    list.style.display = 'block';
+    return;
+  }
+  var html = '';
+  for (var i = 0; i < projects.length; i++) {
+    var p = projects[i];
+    var brand = (p && p.brand) ? p.brand : '(без бренда)';
+    var date = (p && (p.shoot_date || p.date)) ? (p.shoot_date || p.date) : '';
+    var label = brand + (date ? ' · ' + date : '');
+    html += '<div class="sm-project-item" onclick="smPickExistingProject(' + i + ')" style="padding:10px 14px;border-bottom:1px solid #f0f0f0;cursor:pointer">' + label + '</div>';
+  }
+  list.innerHTML = html;
+  list.style.display = 'block';
+}
+
+function smPickExistingProject(idx) {
+  if (!window.App || !Array.isArray(App.projects) || idx < 0 || idx >= App.projects.length) return;
+  App.selectedProject = idx;
+  if (typeof renderProjects === 'function') renderProjects();
+  closeModal('modal-shoot-project-picker');
+  // Re-enter the start flow now that a project is active.
+  smStartFlow();
 }
 
 /* Entry from the New Project modal when "Снимаю прямо сейчас" is selected.
@@ -66,7 +132,18 @@ function smPickAndStart() {
     if (!res || res.cancelled) return;
     if (res.error) { alert('Ошибка: ' + res.error); return; }
     var path = res.path;
-    var projectId = (window.App && App.currentProjectId) ? App.currentProjectId : null;
+    // Resolve project_id from current selection. We require an active project
+    // before reaching this function (smStartFlow gates on it), but be defensive.
+    var projectId = null;
+    if (window.App && Array.isArray(App.projects)
+        && App.selectedProject >= 0
+        && App.selectedProject < App.projects.length) {
+      var p = App.projects[App.selectedProject];
+      projectId = (p && (p.id || p.project_id || p.uuid)) || null;
+    }
+    if (!projectId && window.App && App.currentProjectId) {
+      projectId = App.currentProjectId;
+    }
     window.pywebview.api.shoot_start_session(path, projectId).then(function(out) {
       if (out && out.error) { alert('Не удалось начать съёмку: ' + out.error); return; }
       if (out && out.ok) {

@@ -159,6 +159,32 @@
   </div>
 </div>
 
+<!-- ══════════════ Модалка: Выбор проекта для съёмки ══════════════ -->
+<div class="modal-overlay" id="modal-shoot-project-picker">
+  <div class="modal" style="width:520px">
+    <h3>Куда писать съёмку?</h3>
+    <p style="color:#666;font-size:13px;margin:0 0 14px 0">
+      Сессия съёмки всегда привязана к проекту — там собираются карточки, фото и история этапов.
+      Создай новый проект или выбери существующий.
+    </p>
+
+    <div style="display:flex;gap:10px;margin-bottom:14px">
+      <button class="btn btn-primary" style="flex:1" onclick="smChooseNewProject()">
+        Создать новый проект
+      </button>
+      <button class="btn" style="flex:1" onclick="smShowProjectList()">
+        Выбрать существующий
+      </button>
+    </div>
+
+    <div id="sm-project-list" style="display:none;max-height:280px;overflow-y:auto;border:1px solid #eee;border-radius:6px"></div>
+
+    <div class="modal-buttons" style="margin-top:14px">
+      <button class="btn" onclick="closeModal('modal-shoot-project-picker')">Отмена</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════════ Модалка: First-run разрешения для Shoot mode ══════════════ -->
 <div class="modal-overlay" id="modal-shoot-perms">
   <div class="modal" style="width:520px">
