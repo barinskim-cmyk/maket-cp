@@ -734,13 +734,30 @@ class AppAPI:
                 if pillow_jxl is not None:
                     img = Image.open(cop_path)
                     img.load()
+                    # Convert from C1's embedded color space (typically
+                    # ProPhoto / wide-gamut) to sRGB so the browser sees
+                    # the correct colors. Without this step, the .cop
+                    # comes out looking "raw" — colors are linear /
+                    # un-mapped because we'd be feeding wide-gamut RGB
+                    # into a tag-less sRGB <img>. Маша 2026-05-02:
+                    # «он без ЦК».
+                    icc_bytes = img.info.get("icc_profile")
+                    if icc_bytes:
+                        try:
+                            from PIL import ImageCms
+                            from io import BytesIO
+                            src_profile = ImageCms.ImageCmsProfile(BytesIO(icc_bytes))
+                            dst_profile = ImageCms.createProfile("sRGB")
+                            img = ImageCms.profileToProfile(
+                                img, src_profile, dst_profile, outputMode="RGB"
+                            )
+                        except Exception:
+                            pass
+
                     # Apply C1 rotation from .cos sidecar. Settings folder name
                     # varies (Settings82, Settings1670, …) — glob for it.
                     rotation = _read_c1_rotation(p)
                     if rotation in (90, 180, 270):
-                        # PIL.rotate is CCW; C1 stores the angle the photo
-                        # should be rotated CCW for upright display, so we
-                        # pass it directly.
                         img = img.rotate(rotation, expand=True)
                     return _encode(img, "c1_proxy")
         except Exception:
