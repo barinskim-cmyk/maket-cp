@@ -3,5 +3,8 @@ Pillow>=9.0
 pdfplumber>=0.9
 openpyxl>=3.0
 watchdog>=4.0
-pynput>=1.7
+# pynput removed 2026-05-01: it crashes the Python process on macOS 26.4
+# (SIGTRAP from TSMGetInputSourceProperty on a non-main thread). Hotkeys
+# now use NSEvent global monitor via pyobjc.
 pyobjc-framework-ApplicationServices>=10.0; sys_platform == "darwin"
+pyobjc-framework-Cocoa>=10.0; sys_platform == "darwin"

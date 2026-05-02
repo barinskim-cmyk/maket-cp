@@ -11,118 +11,170 @@ the main shoot flow:
        so the UI updates without us caring about the bridge layer.
     4. Optionally show a macOS notification banner.
 
-Why pynput: the alternative is `pyobjc + NSEvent.addGlobalMonitorFor*`,
-which is more macOS-native but adds ~120 lines of Cocoa runloop wrangling.
-pynput already abstracts both code paths, accepts macOS modifier semantics,
-and degrades cleanly when Accessibility access is denied (returns an
-exception we can catch and surface to the UI).
+**2026-05-01 rewrite — pyobjc instead of pynput:**
 
-Threading: pynput's `GlobalHotKeys` runs its own listener thread; we hand
-it a callback that posts a non-blocking `threading.Thread` to do the actual
-work so the listener stays responsive even if the bridge call is slow.
+`pynput` on macOS 26.4 crashes the Python process via SIGTRAP from
+`dispatch_assert_queue` because its keyboard listener calls
+`TSMGetInputSourceProperty` from a background thread. Apple requires that
+TSM call to happen on the main thread.
+
+We now use `NSEvent.addGlobalMonitorForEventsMatchingMask:handler:` from
+`pyobjc-framework-Cocoa`. NSEvent dispatches the handler on the main
+NSApplication run loop (which pywebview already drives), so no
+cross-thread TSM access happens. We then hand the actual work off to a
+background thread so the run loop stays responsive even if the bridge
+call is slow.
+
+Caveat: a "global" monitor only fires when *another* application is in
+front of Maket CP. That is exactly what we want — the user is in Capture
+One when they press Cmd+Shift+C, not in Maket CP itself.
 """
 from __future__ import annotations
 
 import subprocess
+import sys
 import threading
 import uuid
 from pathlib import Path
 from typing import Callable, Optional
 
-try:
-    from pynput import keyboard as _kb  # type: ignore[import]
-    _PYNPUT_AVAILABLE = True
-except Exception:
-    _PYNPUT_AVAILABLE = False
-    _kb = None  # type: ignore[assignment]
-
 from ..infra.c1_bridge import CaptureOneBridge
 from ..infra.cos_repository import CosRepository
 
+# pyobjc — main-thread-safe alternative to pynput. Imports may fail in
+# non-Darwin environments; we degrade to a soft "unsupported" status.
+try:
+    from Cocoa import NSEvent  # type: ignore[import]
+    _PYOBJC_AVAILABLE = True
+except Exception:
+    _PYOBJC_AVAILABLE = False
+    NSEvent = None  # type: ignore[assignment]
 
-# pynput format: <keys> joined with `+`, modifiers in `<...>` brackets.
-DEFAULT_HOTKEY = "<cmd>+<shift>+c"
+
+# Apple key-code (kVK_ANSI_*) and modifier-flag constants. Values are stable
+# across macOS releases; we hard-code them rather than chase the right
+# pyobjc constant name (different submodules expose different aliases).
+KVK_ANSI_C: int = 8
+
+NSEventMaskKeyDown: int = 1 << 10  # NSKeyDown
+NSEventModifierFlagShift: int = 1 << 17
+NSEventModifierFlagControl: int = 1 << 18
+NSEventModifierFlagOption: int = 1 << 19
+NSEventModifierFlagCommand: int = 1 << 20
+
+# Mask of "user-visible" modifiers — strips fn, caps lock, numeric pad, etc.
+NSEventModifierFlagDeviceIndependentFlagsMask: int = 0xFFFF0000
 
 CARD_KEYWORD_PREFIX = "_card:"
 SLOT_KEYWORD_PREFIX = "_slot:"
 
 
 class HotkeyService:
-    """Bind a global hotkey to "add selected C1 variants as a new card"."""
+    """Bind a global hotkey to "add selected C1 variants as a new card".
+
+    Defaults to Cmd+Shift+C (kVK_ANSI_C with NSCommand|NSShift modifiers).
+    """
+
+    DEFAULT_KEYCODE: int = KVK_ANSI_C
+    DEFAULT_MODIFIERS: int = NSEventModifierFlagCommand | NSEventModifierFlagShift
+    DEFAULT_LABEL: str = "Cmd+Shift+C"
 
     def __init__(
         self,
         bridge: CaptureOneBridge,
         cos_repo: CosRepository,
         on_card_created: Callable[[dict], None],
-        hotkey: str = DEFAULT_HOTKEY,
+        keycode: int = DEFAULT_KEYCODE,
+        modifiers: int = DEFAULT_MODIFIERS,
+        label: str = DEFAULT_LABEL,
     ) -> None:
         self.bridge = bridge
         self.cos_repo = cos_repo
         self.on_card_created = on_card_created
-        self.hotkey = hotkey
-        self._listener = None
+        self.keycode = keycode
+        self.modifiers = modifiers
+        self.label = label
+        self._monitor = None
 
     # ── Lifecycle ──
 
     def activate(self) -> dict:
-        """Register the global hotkey. Returns status dict.
-
-        On success: {"ok": True, "hotkey": "<cmd>+<shift>+c"}.
-        On failure: {"ok": False, "error": "...", "remedy": "..."}.
-
-        NOTE 2026-05-01 (macOS 26.4): pynput.keyboard.GlobalHotKeys.start()
-        crashes the entire Python process via SIGTRAP from
-        dispatch_assert_queue (TSMGetInputSourceProperty called off
-        main thread). See ~/Library/Logs/DiagnosticReports/Python-2026-05-01-*.ips.
-        Until we rewrite this on top of pyobjc NSEvent.addGlobalMonitorFor*
-        (runs on main thread cleanly), pynput is disabled on macOS. The
-        Shoot-mode flow (rating watcher) keeps working — only the
-        Cmd+Shift+C "Add to Card" hotkey is unavailable for now.
-        """
-        import sys
-        if sys.platform == "darwin":
+        """Register the global hotkey via NSEvent. Returns status dict."""
+        if sys.platform != "darwin":
+            return {"ok": False, "error": "Hotkey is macOS-only in this build"}
+        if not _PYOBJC_AVAILABLE:
             return {
                 "ok": False,
-                "error": "Hotkey временно отключён на macOS",
-                "remedy": "Будет включено после переписывания на pyobjc NSEvent (без pynput).",
-                "platform_blocked": True,
+                "error": "pyobjc-framework-Cocoa not available",
+                "remedy": "pip3 install pyobjc-framework-Cocoa",
             }
-        if not _PYNPUT_AVAILABLE:
-            return {"ok": False, "error": "pynput not installed",
-                    "remedy": "pip install pynput"}
-        if self._listener is not None:
-            return {"ok": True, "hotkey": self.hotkey, "note": "already active"}
+        if self._monitor is not None:
+            return {"ok": True, "hotkey": self.label, "note": "already active"}
+
         try:
-            self._listener = _kb.GlobalHotKeys({self.hotkey: self._fire_async})
-            self._listener.start()
+            mask = NSEventMaskKeyDown
+            self._monitor = NSEvent.addGlobalMonitorForEventsMatchingMask_handler_(
+                mask, self._handle_event
+            )
         except Exception as e:
-            self._listener = None
+            self._monitor = None
             return {
                 "ok": False,
-                "error": str(e),
-                "remedy": "Grant Maket CP Accessibility + Input Monitoring "
+                "error": f"NSEvent.addGlobalMonitor failed: {e}",
+                "remedy": "Grant Maket CP / Terminal Input Monitoring "
                           "in System Settings → Privacy & Security.",
             }
-        return {"ok": True, "hotkey": self.hotkey}
+
+        if self._monitor is None:
+            # NSEvent returns None when permission is missing — it does not
+            # raise. Treat that as a soft failure with a helpful remedy.
+            return {
+                "ok": False,
+                "error": "NSEvent monitor returned None (permission missing?)",
+                "remedy": "Grant Maket CP / Terminal Input Monitoring "
+                          "in System Settings → Privacy & Security.",
+            }
+
+        return {"ok": True, "hotkey": self.label}
 
     def deactivate(self) -> None:
-        if self._listener is not None:
+        """Stop listening. Idempotent."""
+        if self._monitor is not None and _PYOBJC_AVAILABLE:
             try:
-                self._listener.stop()
+                NSEvent.removeMonitor_(self._monitor)
             except Exception:
                 pass
-            self._listener = None
+            self._monitor = None
 
     def is_active(self) -> bool:
-        return self._listener is not None
+        return self._monitor is not None
 
-    # ── Trigger ──
+    # ── Event handling ──
 
-    def _fire_async(self) -> None:
-        """Hand off the actual work to a worker thread so the listener
-        thread doesn't block on AppleScript / file I/O."""
+    def _handle_event(self, event) -> None:
+        """NSEvent handler — runs on the main NSApplication run loop.
+
+        We do the cheapest possible filter here, then hand off to a worker
+        thread so the run loop never blocks on AppleScript or disk I/O.
+        """
+        try:
+            keycode = int(event.keyCode())
+            mods = int(event.modifierFlags()) & NSEventModifierFlagDeviceIndependentFlagsMask
+        except Exception:
+            return
+
+        if keycode != self.keycode:
+            return
+        # Require ALL configured modifiers and forbid any extras (Ctrl/Option).
+        if (mods & self.modifiers) != self.modifiers:
+            return
+        extra = mods & ~self.modifiers
+        if extra & (NSEventModifierFlagControl | NSEventModifierFlagOption):
+            return
+
         threading.Thread(target=self._fire, daemon=True).start()
+
+    # ── Core action ──
 
     def _fire(self) -> None:
         try:
