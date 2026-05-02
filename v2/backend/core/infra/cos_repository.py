@@ -62,6 +62,11 @@ class CosRepository:
         except Exception:
             return {"rating": None, "keywords": []}
 
+        # NB 2026-05-02: C1 stores Basic_Rating AT LEAST TWICE per .cos —
+        # an initial "0" entry from import time and a later entry with the
+        # current rating. Earlier code `break`-ed on the first match and
+        # always reported 0 for any photo that started at zero. We now keep
+        # iterating and take the last value, which is what C1 itself reads.
         rating: int | None = None
         for elem in root.iter("E"):
             if elem.get("K") == "Basic_Rating":
@@ -69,7 +74,7 @@ class CosRepository:
                     rating = int(elem.get("V") or "")
                 except (TypeError, ValueError):
                     rating = None
-                break
+                # no break — keep iterating so the latest value wins
 
         keywords: list[str] = []
         # Form A: dedicated container

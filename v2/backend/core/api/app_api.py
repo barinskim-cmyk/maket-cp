@@ -621,6 +621,7 @@ class AppAPI:
         UI can show a hint when CC isn't available yet.
         Never raises.
         """
+        print(f"[shoot_get_thumb] called: path={image_path!r}", flush=True)
         try:
             p = Path(image_path)
         except Exception as e:
