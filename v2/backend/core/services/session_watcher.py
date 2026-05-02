@@ -43,7 +43,7 @@ from ..infra.cos_repository import CosRepository
 # but they can also live in subfolders (e.g. AlbumName/CaptureOne/Settings82/).
 # Watchdog's recursive=True means we don't have to enumerate.
 COS_SUFFIX = ".cos"
-SELECTION_RATING_THRESHOLD = 2
+SELECTION_RATING_THRESHOLD = 1
 
 CARD_KEYWORD_PREFIX = "_card:"
 SLOT_KEYWORD_PREFIX = "_slot:"
