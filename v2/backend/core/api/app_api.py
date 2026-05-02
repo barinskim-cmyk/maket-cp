@@ -676,10 +676,32 @@ class AppAPI:
             except Exception:
                 return False
 
-        # ── Stage 1: Capture One Proxies (.cop = JPEG XL, full-res preview) ─
+        # ── Stage 1: Capture One Thumbnails (.cot, ~300x450 JPEG) ────────
+        # Layout: <photo.parent>/CaptureOne/Cache/Thumbnails/<photo.name>.<uuid>.cot
+        # Маша 2026-05-02: «может нам .cot подойдёт». Yes — these are
+        # already correctly oriented by C1 (no separate rotation field
+        # to apply) and are plain JPEG so Pillow reads them natively.
+        # Tried .cop first earlier but sips JPEG XL → JPEG can drop the
+        # orientation tag, leaving photos sideways in the UI.
+        try:
+            thumbs_dir = p.parent / "CaptureOne" / "Cache" / "Thumbnails"
+            if thumbs_dir.is_dir():
+                candidates = sorted(
+                    [c for c in thumbs_dir.glob(p.name + ".*.cot")
+                     if not c.name.startswith("._")]
+                )
+                if candidates:
+                    img = Image.open(candidates[0])
+                    img.load()
+                    return _encode(img, "c1_thumb")
+        except Exception:
+            pass
+
+        # ── Stage 2: Capture One Proxies (.cop = JPEG XL, full-res) ──────
         # Layout: <photo.parent>/CaptureOne/Cache/Proxies/<photo.name>.cop
         # macOS sips natively decodes JPEG XL → JPEG with CC applied.
-        # This is what C1 shows in its main viewer / lightbox.
+        # This is what C1 shows in its main viewer / lightbox — useful
+        # when we want a larger render than the .cot can provide.
         try:
             cop_path = p.parent / "CaptureOne" / "Cache" / "Proxies" / (p.name + ".cop")
             if cop_path.exists() and not cop_path.name.startswith("._"):
@@ -695,24 +717,6 @@ class AppAPI:
                         tmp_path.unlink(missing_ok=True)
                     except Exception:
                         pass
-        except Exception:
-            pass
-
-        # ── Stage 2: Capture One Thumbnails cache (.cot = small JPEG) ────
-        # Layout: <photo.parent>/CaptureOne/Cache/Thumbnails/<photo.name>.<uuid>.cot
-        # Plain JPEG ~300x450 with CC applied. Faster than the proxy when
-        # the caller only wants a small preview and Pillow reads it natively.
-        try:
-            thumbs_dir = p.parent / "CaptureOne" / "Cache" / "Thumbnails"
-            if thumbs_dir.is_dir():
-                candidates = sorted(
-                    [c for c in thumbs_dir.glob(p.name + ".*.cot")
-                     if not c.name.startswith("._")]
-                )
-                if candidates:
-                    img = Image.open(candidates[0])
-                    img.load()
-                    return _encode(img, "c1_thumb")
         except Exception:
             pass
 
