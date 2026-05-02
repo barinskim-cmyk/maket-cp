@@ -715,57 +715,21 @@ class AppAPI:
             except Exception:
                 return False
 
-        # ── Stage 1: Capture One Proxies (.cop, native JXL via pillow-jxl) ──
-        # Маша 2026-05-02 (после неудачного захода через sips): нужно
-        # большее разрешение чем .cot (300x450) даёт. C1 хранит .cop
-        # как JPEG XL, ~720x480 native, с применённой ЦК. Раньше я гнала
-        # его через sips → JPEG, но sips терял ЦК и получались "raw"
-        # цвета + рандомный поворот. Теперь читаем JXL напрямую через
-        # pillow-jxl-plugin (Pillow видит JXL как обычный формат) и
-        # явно применяем `Rotation` из соседнего .cos через PIL.rotate.
-        try:
-            cop_path = p.parent / "CaptureOne" / "Cache" / "Proxies" / (p.name + ".cop")
-            if cop_path.exists() and not cop_path.name.startswith("._"):
-                # Lazy-import pillow_jxl so missing plugin → fall through to .cot.
-                try:
-                    import pillow_jxl  # noqa: F401  (registers JXL with PIL)
-                except Exception:
-                    pillow_jxl = None  # type: ignore[assignment]
-                if pillow_jxl is not None:
-                    img = Image.open(cop_path)
-                    img.load()
-                    # Convert from C1's embedded color space (typically
-                    # ProPhoto / wide-gamut) to sRGB so the browser sees
-                    # the correct colors. Without this step, the .cop
-                    # comes out looking "raw" — colors are linear /
-                    # un-mapped because we'd be feeding wide-gamut RGB
-                    # into a tag-less sRGB <img>. Маша 2026-05-02:
-                    # «он без ЦК».
-                    icc_bytes = img.info.get("icc_profile")
-                    if icc_bytes:
-                        try:
-                            from PIL import ImageCms
-                            from io import BytesIO
-                            src_profile = ImageCms.ImageCmsProfile(BytesIO(icc_bytes))
-                            dst_profile = ImageCms.createProfile("sRGB")
-                            img = ImageCms.profileToProfile(
-                                img, src_profile, dst_profile, outputMode="RGB"
-                            )
-                        except Exception:
-                            pass
-
-                    # Apply C1 rotation from .cos sidecar. Settings folder name
-                    # varies (Settings82, Settings1670, …) — glob for it.
-                    rotation = _read_c1_rotation(p)
-                    if rotation in (90, 180, 270):
-                        img = img.rotate(rotation, expand=True)
-                    return _encode(img, "c1_proxy")
-        except Exception:
-            pass
-
-        # ── Stage 2: Capture One Thumbnails (.cot, plain JPEG, CC + oriented) ─
-        # Fallback when .cop / pillow-jxl path didn't fire — .cot is plain
-        # JPEG ~300x450 which Pillow reads natively, already rotated by C1.
+        # ── Stage 1: Capture One Thumbnails (.cot — only source with CC) ────
+        # Маша 2026-05-02: «явно смещённый ББ и отсутствуют коррекции»
+        # после .cop захода. Diagnosed: .cop is the camera-embedded JPEG
+        # that C1 stores as-is for fast loading, NOT a C1-rendered output.
+        # CC is applied live in C1's viewer over the .cop. Reading .cop
+        # natively (даже с ICC-конверсией) даёт исходник без ЦК.
+        #
+        # .cot is the only on-disk source where C1 has actually baked CC
+        # in — it's the small grid thumbnail. Resolution is ~300x450, so
+        # for bigger card slots / lightbox we'd need either:
+        #   1. trigger C1 Process Recipe per photo (slow, queue-based), or
+        #   2. C1's "Optimized previews" preference re-generating bigger
+        #      .cot files (Маша parallel set the quality preference,
+        #      should propagate as those previews rebuild).
+        # Until either lands, .cot stays primary.
         try:
             thumbs_dir = p.parent / "CaptureOne" / "Cache" / "Thumbnails"
             if thumbs_dir.is_dir():
