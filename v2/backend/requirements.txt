@@ -8,3 +8,7 @@ watchdog>=4.0
 # now use NSEvent global monitor via pyobjc.
 pyobjc-framework-ApplicationServices>=10.0; sys_platform == "darwin"
 pyobjc-framework-Cocoa>=10.0; sys_platform == "darwin"
+# Read Capture One's .cop (JPEG XL) previews directly so we keep CC and
+# control rotation explicitly, instead of going through `sips` which lost
+# both. Маша 2026-05-02.
+pillow-jxl-plugin>=1.3

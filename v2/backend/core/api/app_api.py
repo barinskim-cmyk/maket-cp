@@ -656,6 +656,45 @@ class AppAPI:
         import subprocess
         import tempfile
 
+        def _read_c1_rotation(image_path: Path) -> int:
+            """Read the `Rotation` field from C1's .cos sidecar.
+
+            Layout: <session>/Capture/CaptureOne/Settings<N>/<image.name>.cos
+            <N> varies (Settings82, Settings1670, etc.) so we glob.
+            Returns 0 / 90 / 180 / 270, or 0 on any failure.
+            """
+            try:
+                cap_co = image_path.parent / "CaptureOne"
+                if not cap_co.is_dir():
+                    return 0
+                target = image_path.name + ".cos"
+                for settings_dir in cap_co.iterdir():
+                    if not settings_dir.is_dir():
+                        continue
+                    if not settings_dir.name.startswith("Settings"):
+                        continue
+                    cos_path = settings_dir / target
+                    if cos_path.exists() and not cos_path.name.startswith("._"):
+                        import xml.etree.ElementTree as ET
+                        try:
+                            root = ET.fromstring(cos_path.read_bytes())
+                        except Exception:
+                            return 0
+                        rotation = 0
+                        for elem in root.iter("E"):
+                            if elem.get("K") == "Rotation":
+                                try:
+                                    rotation = int(elem.get("V") or "0") % 360
+                                except (TypeError, ValueError):
+                                    rotation = 0
+                                # Don't break — last value wins, mirroring
+                                # cos_repository.read_metadata's fix for
+                                # multi-entry Basic_Rating quirk.
+                        return rotation
+            except Exception:
+                pass
+            return 0
+
         def _sips_to_jpg(src: Path, dst: Path) -> bool:
             """Run macOS sips to decode any image (incl. JXL `.cop`, RAW)
             into a temp JPEG sized to fit `edge`. Returns True on success."""
@@ -676,13 +715,40 @@ class AppAPI:
             except Exception:
                 return False
 
-        # ── Stage 1: Capture One Thumbnails (.cot, plain JPEG, CC + oriented) ─
-        # Маша 2026-05-02: «возвращай .cot». The .cop / sips path made the
-        # photos look like raw (no CC) and rotated wrong (180° upside down),
-        # while .cot renders correctly: plain JPEG, ~300x450, with CC and
-        # rotation already applied by C1. Stay with .cot for now; .cop is
-        # parked for later when we wire pillow-jxl + read .cos Rotation
-        # explicitly.
+        # ── Stage 1: Capture One Proxies (.cop, native JXL via pillow-jxl) ──
+        # Маша 2026-05-02 (после неудачного захода через sips): нужно
+        # большее разрешение чем .cot (300x450) даёт. C1 хранит .cop
+        # как JPEG XL, ~720x480 native, с применённой ЦК. Раньше я гнала
+        # его через sips → JPEG, но sips терял ЦК и получались "raw"
+        # цвета + рандомный поворот. Теперь читаем JXL напрямую через
+        # pillow-jxl-plugin (Pillow видит JXL как обычный формат) и
+        # явно применяем `Rotation` из соседнего .cos через PIL.rotate.
+        try:
+            cop_path = p.parent / "CaptureOne" / "Cache" / "Proxies" / (p.name + ".cop")
+            if cop_path.exists() and not cop_path.name.startswith("._"):
+                # Lazy-import pillow_jxl so missing plugin → fall through to .cot.
+                try:
+                    import pillow_jxl  # noqa: F401  (registers JXL with PIL)
+                except Exception:
+                    pillow_jxl = None  # type: ignore[assignment]
+                if pillow_jxl is not None:
+                    img = Image.open(cop_path)
+                    img.load()
+                    # Apply C1 rotation from .cos sidecar. Settings folder name
+                    # varies (Settings82, Settings1670, …) — glob for it.
+                    rotation = _read_c1_rotation(p)
+                    if rotation in (90, 180, 270):
+                        # PIL.rotate is CCW; C1 stores the angle the photo
+                        # should be rotated CCW for upright display, so we
+                        # pass it directly.
+                        img = img.rotate(rotation, expand=True)
+                    return _encode(img, "c1_proxy")
+        except Exception:
+            pass
+
+        # ── Stage 2: Capture One Thumbnails (.cot, plain JPEG, CC + oriented) ─
+        # Fallback when .cop / pillow-jxl path didn't fire — .cot is plain
+        # JPEG ~300x450 which Pillow reads natively, already rotated by C1.
         try:
             thumbs_dir = p.parent / "CaptureOne" / "Cache" / "Thumbnails"
             if thumbs_dir.is_dir():
