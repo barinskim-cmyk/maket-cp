@@ -566,6 +566,38 @@ window.onShoot_watcher_selection_removed = function(p) {
   if (photo) photo._preselect = false;
   smRefreshUI(proj);
 };
+window.onShoot_watcher_thumb_updated = function(p) {
+  if (!p || !p.stem) return;
+  // C1 re-rendered the .cot/.cop (e.g. after a CC tweak). Drop our
+  // cached data URL and re-fetch via shoot_get_thumb so the gallery
+  // shows the new render.
+  var proj = smCurrentProj(); if (!proj) return;
+  if (!Array.isArray(proj.previews)) return;
+  for (var i = 0; i < proj.previews.length; i++) {
+    var ph = proj.previews[i];
+    if (ph && ph.stem === p.stem) {
+      ph.preview = null;
+      ph.thumb = null;
+      ph._thumbLoading = false;
+      if (p.image_path && !ph.path) ph.path = p.image_path;
+      smLoadThumbFor(ph);
+      // Also nudge any card slots that reference this stem.
+      if (Array.isArray(proj.cards)) {
+        for (var ci = 0; ci < proj.cards.length; ci++) {
+          var slots = proj.cards[ci].slots || [];
+          for (var si = 0; si < slots.length; si++) {
+            if (slots[si].stem === p.stem) {
+              slots[si].dataUrl = null;
+              slots[si].preview = null;
+              slots[si].thumb = null;
+            }
+          }
+        }
+      }
+      break;
+    }
+  }
+};
 window.onShoot_watcher_card_signal = function(p) {
   smAppendEvent('card signal: ' + (p && p.stem ? p.stem : '?') + ' card=' + (p && p.card_id ? p.card_id.slice(0, 8) : '?') + ' slot=' + (p && p.slot != null ? p.slot : '?'));
   // Card signals from XMP arrive one-per-photo; we already create the card

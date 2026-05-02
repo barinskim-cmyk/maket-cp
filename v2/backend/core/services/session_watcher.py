@@ -56,12 +56,35 @@ class _PhotoState:
     keywords: list[str] = field(default_factory=list)
 
 
+COT_SUFFIX = ".cot"
+COP_SUFFIX = ".cop"
+
+
 class _CosEventHandler(FileSystemEventHandler):
-    """Translates raw filesystem events into semantic "photo changed" calls."""
+    """Translates raw filesystem events into semantic "photo changed" calls.
+
+    Two channels:
+      * .cos files (XML sidecar) → rating / keyword changes.
+      * .cot / .cop files (image cache) → C1 re-rendered the preview
+        (e.g. after a Color Correction edit). We re-fire the thumb
+        load so the UI picks up the new pixels.
+    """
 
     def __init__(self, watcher: "SessionWatcher"):
         super().__init__()
         self.watcher = watcher
+
+    def _route(self, src_path: str, kind: str) -> None:
+        if not src_path:
+            return
+        # Skip macOS resource fork files.
+        name = Path(src_path).name
+        if name.startswith("._"):
+            return
+        if src_path.endswith(COS_SUFFIX):
+            self.watcher._on_cos_event(Path(src_path), kind=kind)
+        elif src_path.endswith(COT_SUFFIX) or src_path.endswith(COP_SUFFIX):
+            self.watcher._on_thumb_cache_event(Path(src_path), kind=kind)
 
     # watchdog's "modified" fires twice per save (xattrs + content) on macOS,
     # so we just react to both create and modify; idempotent state diff in
@@ -69,18 +92,17 @@ class _CosEventHandler(FileSystemEventHandler):
     def on_created(self, event):
         if event.is_directory:
             return
-        if event.src_path.endswith(COS_SUFFIX):
-            self.watcher._on_cos_event(Path(event.src_path), kind="created")
+        self._route(event.src_path, "created")
 
     def on_modified(self, event):
         if event.is_directory:
             return
-        if event.src_path.endswith(COS_SUFFIX):
-            self.watcher._on_cos_event(Path(event.src_path), kind="modified")
+        self._route(event.src_path, "modified")
 
     def on_moved(self, event):
-        if getattr(event, "dest_path", "").endswith(COS_SUFFIX):
-            self.watcher._on_cos_event(Path(event.dest_path), kind="modified")
+        dst = getattr(event, "dest_path", "")
+        if dst:
+            self._route(dst, "moved")
 
 
 class SessionWatcher:
@@ -279,6 +301,76 @@ class SessionWatcher:
             # Update cached state
             prev.rating = new_rating
             prev.keywords = new_keywords
+
+    def _on_thumb_cache_event(self, cache_path: Path, kind: str) -> None:
+        """C1 re-rendered a thumbnail/proxy (e.g. after CC edit).
+
+        Layout:
+          .cot → <session>/Capture/CaptureOne/Cache/Thumbnails/<stem>.<ext>.<uuid>.cot
+          .cop → <session>/Capture/CaptureOne/Cache/Proxies/<stem>.<ext>.cop
+
+        We only need to surface the stem so the frontend can drop its
+        cached data URL and re-fetch via shoot_get_thumb. The image
+        itself is still on disk; nothing to read here.
+
+        Throttle: if the same stem fired in the last ~2s we drop —
+        watchdog tends to deliver ten modify events per save on macOS.
+        """
+        try:
+            name = cache_path.name
+            # Filename: "<stem>.<ext>.<uuid>.cot" or "<stem>.<ext>.cop"
+            # Strip trailing ".cot" / ".cop" first.
+            if name.endswith(".cot"):
+                # .cot has a UUID suffix in brackets — strip it.
+                # "2026-04-021605.CR3.[8c963...].cot" → "2026-04-021605.CR3"
+                base = name[: -len(".cot")]
+                if base.endswith("]"):
+                    bracket = base.rfind(".[")
+                    if bracket > 0:
+                        base = base[:bracket]
+            elif name.endswith(".cop"):
+                base = name[: -len(".cop")]
+            else:
+                return
+            # base is now like "2026-04-021605.CR3" — drop the extension.
+            stem = Path(base).stem
+            if not stem:
+                return
+
+            # Find image_path the same way we do in _on_cos_event so the
+            # frontend can re-issue shoot_get_thumb with the right argument.
+            image_path = None
+            try:
+                cap = self.session_root / "Capture" / Path(base).name
+                if cap.exists():
+                    image_path = str(cap)
+                else:
+                    # Fallback scan (rare).
+                    for f in self.session_root.rglob(Path(base).name):
+                        if f.is_file():
+                            image_path = str(f)
+                            break
+            except Exception:
+                pass
+
+            with self._lock:
+                last = getattr(self, "_thumb_event_last", {})
+                import time as _t
+                now = _t.time()
+                if last.get(stem, 0) > now - 2:
+                    return
+                last[stem] = now
+                self._thumb_event_last = last  # ensure attribute persists
+
+            self.on_event("thumb_updated", {
+                "stem": stem,
+                "image_path": image_path,
+                "kind": kind,
+            })
+        except Exception as e:
+            self.on_event("watcher_error", {
+                "error": f"thumb cache event ({cache_path}): {e}",
+            })
 
     def _maybe_emit_selection(
         self,
