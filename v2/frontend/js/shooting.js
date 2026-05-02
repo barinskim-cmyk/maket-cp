@@ -449,7 +449,7 @@ window.onShoot_watcher_photo_added = function(p) {
   var proj = smCurrentProj(); if (!proj) return;
   var photo = smEnsurePhoto(proj, p);
   if (photo && p.rating != null) photo.rating = p.rating;
-  if (photo && p.rating != null && p.rating >= 2) photo._preselect = true;
+  if (photo && p.rating != null && p.rating >= 1) photo._preselect = true;
   smRefreshUI(proj);
 };
 window.onShoot_watcher_photo_changed = function(p) {
