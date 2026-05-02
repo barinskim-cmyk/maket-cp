@@ -494,7 +494,11 @@ function _smThumbDrain() {
     var photo = _smThumbQueue.shift();
     _smThumbInflight++;
     (function(ph) {
-      window.pywebview.api.shoot_get_thumb(ph.path, 600).then(function(res) {
+      // Ask for 1200px on the long edge — .cot itself is ~300-450px, so
+      // shoot_get_thumb LANCZOS-upscales to the request. Doesn't add new
+      // detail but stops the WebKit nearest-neighbor stretch, and gives
+      // the lightbox a cleaner read.
+      window.pywebview.api.shoot_get_thumb(ph.path, 1200).then(function(res) {
         ph._thumbLoading = false;
         if (res && res.data_url) {
           ph.preview = res.data_url;

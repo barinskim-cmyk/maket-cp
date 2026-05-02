@@ -642,9 +642,20 @@ class AppAPI:
                 pass
             if img.mode in ("RGBA", "P", "LA"):
                 img = img.convert("RGB")
-            img.thumbnail((edge, edge), Image.LANCZOS)
+            # Image.thumbnail only downsizes. When the source is smaller
+            # than the requested edge (typical for .cot ~300x450 vs a 600
+            # request), explicitly LANCZOS-upscale so the browser doesn't
+            # nearest-neighbor-stretch and pixelate. We don't gain real
+            # detail but the result reads cleanly at card-slot sizes.
+            longest = max(img.width, img.height)
+            if longest < edge:
+                scale = edge / float(longest)
+                new_size = (int(round(img.width * scale)), int(round(img.height * scale)))
+                img = img.resize(new_size, Image.LANCZOS)
+            else:
+                img.thumbnail((edge, edge), Image.LANCZOS)
             buf = io.BytesIO()
-            img.save(buf, format="JPEG", quality=80, optimize=True)
+            img.save(buf, format="JPEG", quality=82, optimize=True)
             return {
                 "data_url": "data:image/jpeg;base64,"
                             + base64.b64encode(buf.getvalue()).decode("ascii"),
