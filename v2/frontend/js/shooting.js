@@ -443,13 +443,49 @@ function smRefreshUI(proj) {
   try { if (typeof renderProjects === 'function') renderProjects(); } catch (e) {}
 }
 
+/* Lazy-load thumb for a photo via the AppAPI. WebKit blocks file:// URLs
+   that point outside the page's own directory, so we shuttle JPEG bytes
+   through Python and inject them as a base64 data URL. Idempotent — only
+   fires once per photo. */
+function smLoadThumbFor(photo) {
+  if (!photo || !photo.path) return;
+  if (photo._thumbLoading) return;
+  if (photo.preview && photo.preview.indexOf('data:') === 0) return;  // already loaded
+  if (!smHasDesktop() || !window.pywebview.api.shoot_get_thumb) return;
+  photo._thumbLoading = true;
+  window.pywebview.api.shoot_get_thumb(photo.path, 800).then(function(res) {
+    photo._thumbLoading = false;
+    if (!res || res.error) return;
+    if (res.data_url) {
+      photo.preview = res.data_url;
+      photo.thumb = res.data_url;
+      // Also update any card slots that reference this photo.
+      var proj = smCurrentProj();
+      if (proj && Array.isArray(proj.cards)) {
+        for (var ci = 0; ci < proj.cards.length; ci++) {
+          var slots = proj.cards[ci].slots || [];
+          for (var si = 0; si < slots.length; si++) {
+            if (slots[si].stem === photo.stem) {
+              slots[si].dataUrl = res.data_url;
+              slots[si].preview = res.data_url;
+              slots[si].thumb = res.data_url;
+            }
+          }
+        }
+      }
+      if (proj) smRefreshUI(proj);
+    }
+  });
+}
+
 window.onShoot_watcher_photo_added = function(p) {
   smAppendEvent('photo added: ' + (p && p.stem ? p.stem : '?') + ' rating=' + (p && p.rating != null ? p.rating : '-'));
   if (!p) return;
   var proj = smCurrentProj(); if (!proj) return;
   var photo = smEnsurePhoto(proj, p);
   if (photo && p.rating != null) photo.rating = p.rating;
-  if (photo && p.rating != null && p.rating >= 1) photo._preselect = true;
+  if (photo && p.rating != null && p.rating >= 2) photo._preselect = true;
+  if (photo && photo._preselect) smLoadThumbFor(photo);
   smRefreshUI(proj);
 };
 window.onShoot_watcher_photo_changed = function(p) {
@@ -461,6 +497,7 @@ window.onShoot_watcher_photo_changed = function(p) {
   var proj = smCurrentProj(); if (!proj) return;
   var photo = smEnsurePhoto(proj, p);
   if (photo && p.rating_after != null) photo.rating = p.rating_after;
+  if (photo && photo._preselect) smLoadThumbFor(photo);
   smRefreshUI(proj);
 };
 window.onShoot_watcher_selection_added = function(p) {
@@ -471,6 +508,7 @@ window.onShoot_watcher_selection_added = function(p) {
   if (photo) {
     photo._preselect = true;
     if (p.rating != null) photo.rating = p.rating;
+    smLoadThumbFor(photo);
   }
   smRefreshUI(proj);
 };
@@ -498,7 +536,13 @@ window.onShoot_hotkey_card_created = function(p) {
   smAppendEvent('hotkey: card ' + (p.card_id ? p.card_id.slice(0, 8) : '?') + ' = ' + p.count + ' photos');
 
   var proj = smCurrentProj();
-  if (!proj) return;
+  if (!proj) {
+    var idx = (window.App && App.selectedProject != null) ? App.selectedProject : 'undef';
+    var len = (window.App && Array.isArray(App.projects)) ? App.projects.length : 'undef';
+    smAppendEvent('  ! no active project (selectedProject=' + idx + ', projects.length=' + len + ')');
+    return;
+  }
+  smAppendEvent('  → push to proj.cards (current: ' + (proj.cards ? proj.cards.length : 0) + ', brand: ' + (proj.brand || '?') + ')');
 
   // Make sure each photo exists in proj.photos; build the slots list.
   var slots = [];
@@ -511,7 +555,8 @@ window.onShoot_hotkey_card_created = function(p) {
     var imgPath = v.path || null;
     if (imgPath && /\.cos$/i.test(imgPath)) imgPath = null;  // safety
     var photoInfo = { stem: v.stem, image_path: imgPath, name: v.stem };
-    smEnsurePhoto(proj, photoInfo);
+    var photo = smEnsurePhoto(proj, photoInfo);
+    if (photo) smLoadThumbFor(photo);
     var fileUrl = imgPath ? 'file://' + encodeURI(imgPath) : null;
     slots.push({
       orient: 'v',

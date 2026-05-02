@@ -43,7 +43,7 @@ from ..infra.cos_repository import CosRepository
 # but they can also live in subfolders (e.g. AlbumName/CaptureOne/Settings82/).
 # Watchdog's recursive=True means we don't have to enumerate.
 COS_SUFFIX = ".cos"
-SELECTION_RATING_THRESHOLD = 1
+SELECTION_RATING_THRESHOLD = 2
 
 CARD_KEYWORD_PREFIX = "_card:"
 SLOT_KEYWORD_PREFIX = "_slot:"
@@ -149,7 +149,16 @@ class SessionWatcher:
     # ── Internals ──
 
     def _seed_initial_state(self) -> None:
-        """Pre-populate self._states from .cos files already on disk."""
+        """Pre-populate self._states from .cos files already on disk.
+
+        Also emits `selection_added` for every photo whose rating already
+        meets the threshold — so when the user starts a session over an
+        existing C1 session, all previously-rated photos load into
+        pre-selection without requiring fresh rating events. Без этого
+        watcher детектил только изменения после старта, а Маша ждала
+        чтобы при подключении сессии всё что ≥2 звёзд сразу попало в
+        превью.
+        """
         for cos in self.session_root.rglob("*" + COS_SUFFIX):
             # Skip macOS resource fork files (._<name>.JPG.cos).
             if cos.name.startswith("._"):
@@ -157,10 +166,28 @@ class SessionWatcher:
             try:
                 stem = Path(cos.stem).stem  # strip the second .ext
                 meta = self.cos_repo.read_metadata(cos)
+                rating = meta["rating"]
+                keywords = list(meta["keywords"])
                 self._states[stem] = _PhotoState(
-                    rating=meta["rating"],
-                    keywords=list(meta["keywords"]),
+                    rating=rating,
+                    keywords=keywords,
                 )
+                # Initial seed: surface already-rated photos as preselect.
+                if rating is not None and rating >= self.rating_threshold:
+                    img_path = self._parent_image_path(cos)
+                    img_path_str = str(img_path) if img_path else None
+                    self.on_event("photo_added", {
+                        "stem": stem,
+                        "path": str(cos),
+                        "image_path": img_path_str,
+                        "rating": rating,
+                        "keywords": keywords,
+                    })
+                    self.on_event("selection_added", {
+                        "stem": stem,
+                        "rating": rating,
+                        "image_path": img_path_str,
+                    })
             except Exception:
                 continue
 

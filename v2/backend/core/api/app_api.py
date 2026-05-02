@@ -594,6 +594,64 @@ class AppAPI:
             "session_path": self.c1_bridge.get_session_path(),
         }
 
+    def shoot_get_thumb(self, image_path: str, max_edge: int = 600) -> dict:
+        """Read a JPG/RAW from disk and return as base64 data URL.
+
+        Why: WebKit (pywebview's WKWebView on macOS) blocks
+        ``file://`` <img> loads from a different directory than the page
+        for security reasons. The page lives under v2/frontend/, but the
+        photographer's session lives under /Volumes/<drive>/<session>/, so
+        direct file:// URLs render as broken images. Encoding the file
+        as base64 sidesteps that boundary.
+
+        We resize via Pillow to keep the data URL small enough to ship
+        through ``window.evaluate_js`` (≤ ~600px on the long edge → ~80–120 KB
+        JPEG). Original on-disk file is untouched.
+
+        Returns ``{data_url: ..., width: ..., height: ...}`` or
+        ``{error: ...}``. Never raises.
+        """
+        try:
+            p = Path(image_path)
+        except Exception as e:
+            return {"error": f"bad path: {e}"}
+        if not p.exists():
+            return {"error": "file not found"}
+        try:
+            from PIL import Image
+            import io
+            import base64
+
+            img = Image.open(p)
+            try:
+                img.load()  # force read so .thumbnail can resize
+            except Exception:
+                pass
+
+            # Apply EXIF orientation so portraits aren't sideways in the UI.
+            try:
+                from PIL import ImageOps
+                img = ImageOps.exif_transpose(img)
+            except Exception:
+                pass
+
+            if img.mode in ("RGBA", "P", "LA"):
+                img = img.convert("RGB")
+
+            edge = max(64, min(int(max_edge), 2000))
+            img.thumbnail((edge, edge), Image.LANCZOS)
+
+            buf = io.BytesIO()
+            img.save(buf, format="JPEG", quality=78, optimize=True)
+            b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+            return {
+                "data_url": "data:image/jpeg;base64," + b64,
+                "width": img.width,
+                "height": img.height,
+            }
+        except Exception as e:
+            return {"error": f"thumb: {e}"}
+
     def shoot_c1_session_path(self) -> dict:
         """Return the current C1 document path, or {error: ...}.
 
