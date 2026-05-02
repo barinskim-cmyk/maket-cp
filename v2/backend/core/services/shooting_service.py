@@ -170,6 +170,15 @@ class ShootingService:
 
     def _forward_watcher_event(self, sid: str, evt: str, payload: dict) -> None:
         """Append + emit a watcher event tied to the active session."""
+        try:
+            print(
+                f"[shoot] watcher.{evt} stem={payload.get('stem')!r} "
+                f"rating={payload.get('rating') if 'rating' in payload else payload.get('rating_after')} "
+                f"image_path={payload.get('image_path')!r}",
+                flush=True,
+            )
+        except Exception:
+            pass
         session = self._sessions.get(sid)
         if session is not None and evt not in ("watcher_started", "watcher_stopped"):
             session.events.append({
@@ -180,6 +189,14 @@ class ShootingService:
         self._emit(f"watcher.{evt}", {"session_id": sid, **payload})
 
     def _forward_hotkey_event(self, sid: str, result: dict) -> None:
+        try:
+            print(
+                f"[shoot] hotkey.card_created card={result.get('card_id')!r} "
+                f"count={result.get('count')} errors={result.get('errors')!r}",
+                flush=True,
+            )
+        except Exception:
+            pass
         session = self._sessions.get(sid)
         if session is not None:
             session.events.append({

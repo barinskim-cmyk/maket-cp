@@ -151,6 +151,9 @@ class SessionWatcher:
     def _seed_initial_state(self) -> None:
         """Pre-populate self._states from .cos files already on disk."""
         for cos in self.session_root.rglob("*" + COS_SUFFIX):
+            # Skip macOS resource fork files (._<name>.JPG.cos).
+            if cos.name.startswith("._"):
+                continue
             try:
                 stem = Path(cos.stem).stem  # strip the second .ext
                 meta = self.cos_repo.read_metadata(cos)
@@ -161,8 +164,39 @@ class SessionWatcher:
             except Exception:
                 continue
 
+    def _parent_image_path(self, cos_path: Path) -> Optional[Path]:
+        """Resolve the parent JPG/RAW path for a .cos file.
+
+        C1 session layout:
+            <session>/Capture/CaptureOne/Settings<N>/<name>.<ext>.cos
+
+        We go up 3 levels (Settings<N> → CaptureOne → Capture) and append
+        cos_path.stem (which already retains the original extension, e.g.
+        "2026-04-020010.JPG"). This handles both JPGs and RAWs without
+        special-casing.
+        """
+        try:
+            candidate = cos_path.parents[2] / cos_path.stem
+            if candidate.exists():
+                return candidate
+        except Exception:
+            pass
+        # Fallback: scan <session>/Capture for any file matching cos.stem.
+        try:
+            cap = self.session_root / "Capture"
+            if cap.exists():
+                target = cap / cos_path.stem
+                if target.exists():
+                    return target
+        except Exception:
+            pass
+        return None
+
     def _on_cos_event(self, cos_path: Path, kind: str) -> None:
         """Diff the new .cos against last known state; emit semantic events."""
+        # Skip macOS resource fork files.
+        if cos_path.name.startswith("._"):
+            return
         try:
             stem = Path(cos_path.stem).stem
             meta = self.cos_repo.read_metadata(cos_path)
@@ -174,6 +208,8 @@ class SessionWatcher:
 
         new_rating: Optional[int] = meta["rating"]
         new_keywords: list[str] = list(meta["keywords"])
+        img_path = self._parent_image_path(cos_path)
+        img_path_str = str(img_path) if img_path else None
 
         with self._lock:
             prev = self._states.get(stem)
@@ -184,10 +220,11 @@ class SessionWatcher:
                 self.on_event("photo_added", {
                     "stem": stem,
                     "path": str(cos_path),
+                    "image_path": img_path_str,
                     "rating": new_rating,
                     "keywords": new_keywords,
                 })
-                self._maybe_emit_selection(stem, None, new_rating)
+                self._maybe_emit_selection(stem, None, new_rating, img_path_str)
                 self._maybe_emit_card_signal(stem, [], new_keywords)
                 return
 
@@ -200,6 +237,7 @@ class SessionWatcher:
                 self.on_event("photo_changed", {
                     "stem": stem,
                     "path": str(cos_path),
+                    "image_path": img_path_str,
                     "rating_before": prev.rating,
                     "rating_after": new_rating,
                     "keywords_added": kw_added,
@@ -207,7 +245,7 @@ class SessionWatcher:
                 })
 
             if rating_changed:
-                self._maybe_emit_selection(stem, prev.rating, new_rating)
+                self._maybe_emit_selection(stem, prev.rating, new_rating, img_path_str)
             if kw_added:
                 self._maybe_emit_card_signal(stem, prev.keywords, new_keywords)
 
@@ -216,7 +254,11 @@ class SessionWatcher:
             prev.keywords = new_keywords
 
     def _maybe_emit_selection(
-        self, stem: str, before: Optional[int], after: Optional[int]
+        self,
+        stem: str,
+        before: Optional[int],
+        after: Optional[int],
+        image_path: Optional[str] = None,
     ) -> None:
         """Emit selection_added / removed when rating crosses threshold."""
         was_in = (before or 0) >= self.rating_threshold
@@ -224,9 +266,17 @@ class SessionWatcher:
         if was_in == is_in:
             return
         if is_in:
-            self.on_event("selection_added", {"stem": stem, "rating": after})
+            self.on_event("selection_added", {
+                "stem": stem,
+                "rating": after,
+                "image_path": image_path,
+            })
         else:
-            self.on_event("selection_removed", {"stem": stem, "rating": after})
+            self.on_event("selection_removed", {
+                "stem": stem,
+                "rating": after,
+                "image_path": image_path,
+            })
 
     def _maybe_emit_card_signal(
         self, stem: str, prev_keywords: list[str], new_keywords: list[str]

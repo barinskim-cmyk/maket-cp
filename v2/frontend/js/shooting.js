@@ -401,28 +401,35 @@ function smEnsurePhoto(proj, info) {
   if (!proj.photos) proj.photos = [];
   var stem = info.stem || (info.name ? String(info.name).replace(/\.[^.]+$/, '') : '');
   if (!stem) return null;
+  // Prefer image_path (parent JPG/RAW) over path (which is the .cos file).
+  // The .cos is XML metadata — pointing <img src> at it would render nothing.
+  var imgPath = info.image_path || null;
+  // Fall back to path only if it looks like an image (not a .cos file).
+  if (!imgPath && info.path && !/\.cos$/i.test(info.path)) {
+    imgPath = info.path;
+  }
   for (var i = 0; i < proj.photos.length; i++) {
     if (proj.photos[i].stem === stem) {
       var existing = proj.photos[i];
-      if (info.path && !existing.path) existing.path = info.path;
-      // Use file:// URL as preview source (pywebview can render local files).
-      if (existing.path && !existing.preview) existing.preview = 'file://' + existing.path;
-      if (existing.path && !existing.thumb) existing.thumb = 'file://' + existing.path;
+      if (imgPath && !existing.path) existing.path = imgPath;
+      if (existing.path && !existing.preview) existing.preview = 'file://' + encodeURI(existing.path);
+      if (existing.path && !existing.thumb) existing.thumb = 'file://' + encodeURI(existing.path);
       return existing;
     }
   }
   var photo = {
-    name: info.name || stem + '.jpg',
+    name: info.name || stem + (imgPath ? imgPath.replace(/.*\./, '.') : '.jpg'),
     stem: stem,
-    path: info.path || null,
+    path: imgPath,
     rating: info.rating != null ? info.rating : 0,
     rotation: 0,
     tags: Array.isArray(info.keywords) ? info.keywords.slice() : [],
     source: 'shoot'
   };
   if (photo.path) {
-    photo.preview = 'file://' + photo.path;
-    photo.thumb = 'file://' + photo.path;
+    var url = 'file://' + encodeURI(photo.path);
+    photo.preview = url;
+    photo.thumb = url;
   }
   proj.photos.push(photo);
   return photo;
@@ -500,17 +507,21 @@ window.onShoot_hotkey_card_created = function(p) {
   });
   for (var i = 0; i < variants.length; i++) {
     var v = variants[i];
-    smEnsurePhoto(proj, v);
-    var fileUrl = v.path ? 'file://' + v.path : null;
+    // The hotkey path comes from C1 directly — that's already a JPG/RAW.
+    var imgPath = v.path || null;
+    if (imgPath && /\.cos$/i.test(imgPath)) imgPath = null;  // safety
+    var photoInfo = { stem: v.stem, image_path: imgPath, name: v.stem };
+    smEnsurePhoto(proj, photoInfo);
+    var fileUrl = imgPath ? 'file://' + encodeURI(imgPath) : null;
     slots.push({
       orient: 'v',
       weight: i === 0 ? 2 : 1,
       aspect: null,
-      file: null,
+      file: v.stem ? (v.stem + (imgPath ? imgPath.replace(/.*\./, '.') : '.jpg')) : null,
       dataUrl: fileUrl,
       preview: fileUrl,
       thumb: fileUrl,
-      path: v.path || null,
+      path: imgPath,
       stem: v.stem || null
     });
   }
