@@ -676,63 +676,13 @@ class AppAPI:
             except Exception:
                 return False
 
-        # ── Stage 1: Capture One Proxies (.cop, full-res) — оriented from .cot ─
-        # Layout: <photo.parent>/CaptureOne/Cache/Proxies/<photo.name>.cop
-        # macOS sips decodes JPEG XL → JPEG with CC applied. Сама .cop НЕ
-        # повёрнута, поэтому ориентацию подсматриваем у соседнего .cot
-        # (C1 его уже развернул как нужно). Маша 2026-05-02: «возьмём .cop
-        # и ориентацию из .cot».
-        # Когда .cop отсутствует (например, кэш ещё не построен), падаем
-        # на стадию 2 (.cot напрямую) — тоже даёт корректный кадр, просто
-        # в меньшем разрешении.
-        try:
-            cop_path = p.parent / "CaptureOne" / "Cache" / "Proxies" / (p.name + ".cop")
-            if cop_path.exists() and not cop_path.name.startswith("._"):
-                # Probe target orientation from .cot dimensions.
-                target_portrait = None
-                try:
-                    thumbs_dir = p.parent / "CaptureOne" / "Cache" / "Thumbnails"
-                    if thumbs_dir.is_dir():
-                        for cot in sorted(thumbs_dir.glob(p.name + ".*.cot")):
-                            if cot.name.startswith("._"):
-                                continue
-                            with Image.open(cot) as cot_img:
-                                target_portrait = cot_img.height > cot_img.width
-                            break
-                except Exception:
-                    pass
-
-                with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
-                    tmp_path = Path(tmp.name)
-                try:
-                    if _sips_to_jpg(cop_path, tmp_path):
-                        img = Image.open(tmp_path)
-                        img.load()
-                        # If .cot says portrait but the .cop render is
-                        # landscape (or vice versa), rotate to match. C1
-                        # stores rotation in the .cos as 0 / 90 / 180 / 270;
-                        # we don't need the exact value — just bring the
-                        # proxy aspect into agreement with the thumbnail.
-                        if target_portrait is not None:
-                            current_portrait = img.height > img.width
-                            if target_portrait != current_portrait:
-                                # 270° CCW (= 90° CW) is the common case
-                                # for Canon portraits. If Маша sees a
-                                # specific photo flipped 180°, we'll add
-                                # an explicit .cos Rotation read here.
-                                img = img.rotate(-90, expand=True)
-                        return _encode(img, "c1_proxy")
-                finally:
-                    try:
-                        tmp_path.unlink(missing_ok=True)
-                    except Exception:
-                        pass
-        except Exception:
-            pass
-
-        # ── Stage 2: Capture One Thumbnails (.cot, ~300x450 JPEG) ────────
-        # Fallback when .cop isn't there (fresh session, cache not built).
-        # .cot is plain JPEG, already correctly rotated by C1.
+        # ── Stage 1: Capture One Thumbnails (.cot, plain JPEG, CC + oriented) ─
+        # Маша 2026-05-02: «возвращай .cot». The .cop / sips path made the
+        # photos look like raw (no CC) and rotated wrong (180° upside down),
+        # while .cot renders correctly: plain JPEG, ~300x450, with CC and
+        # rotation already applied by C1. Stay with .cot for now; .cop is
+        # parked for later when we wire pillow-jxl + read .cos Rotation
+        # explicitly.
         try:
             thumbs_dir = p.parent / "CaptureOne" / "Cache" / "Thumbnails"
             if thumbs_dir.is_dir():
