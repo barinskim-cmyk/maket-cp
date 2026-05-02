@@ -595,43 +595,120 @@ class AppAPI:
         }
 
     def shoot_export_previews(self) -> dict:
-        """Trigger Capture One to Process all rated variants of the current
-        document with the currently-active recipe.
+        """Trigger Capture One to Process variants matching shoot-mode
+        selection criteria using a Maket-CP-managed recipe (created /
+        configured from this script — NOT C1's active recipe).
 
-        Маша 2026-05-02: «во время съёмки грузим как сейчас, потом
-        нажимаем кнопку загрузить превью — экспортируется и
-        автоматически подгружается». This is the trigger half. The
-        watching half (auto-pull JPGs from Output) is wired in the
-        existing session_watcher: any new file under <session>/Output/
-        will fire watchdog events; an upcoming patch will route them
-        into the same shoot_get_thumb pipeline so previews swap to
-        full-res with CC applied.
+        Маша 2026-05-02: «нужен не активный рецепт а скриптом задавать
+        нужные настройки экспорта прямо из макета».
 
-        Returns {ok: True, count, output_dir} or {error: ...}.
+        Selection criteria (OR):
+          - rating >= 1, OR
+          - variant has any keyword starting with "_card:" (added by
+            shoot-mode hotkey when user pulls a variant into a card)
+
+        Output goes wherever C1's currently-active recipe is configured to
+        write — not into a Maket-CP-controlled folder. Маша's preference:
+        Output folder shouldn't fill up. So the recipe should be set to
+        either an ephemeral location (e.g. /tmp/MaketCP_Previews/) or to
+        ~/Library/Application Support/MaketCP/previews/<session>/. The
+        upcoming auto-pull half of this feature will discover those JPGs
+        wherever they land via watchdog events on the session root.
+
+        Returns {ok, count, recipe_hint} or {error}.
         """
         try:
-            session_path = self.c1_bridge.get_session_path()
-            output_dir = None
-            if session_path:
-                output_dir = str(Path(session_path).parent / "Output")
-            # The bridge's process_selected_to_jpg uses the current selection.
-            # For "all rated" we need a different AppleScript variant — for
-            # this iteration we trigger Process on all variants whose rating
-            # is >= 1 via AppleScript. Falls back to a useful error if C1
-            # isn't reachable or no recipe is active.
             app = self.c1_bridge._app_name or self.c1_bridge._detect_app_name()
             if not app:
                 return {"error": "Capture One не запущен или AppleScript-доступ не выдан"}
+
+            # Maket-CP-managed recipe: create or update with our settings.
+            # JPEG, sRGB, ~1920px long edge, output to a session-relative
+            # subfolder so the watcher trivially picks up JPGs without us
+            # configuring a global path.
+            recipe_name = "Maket CP Preview"
+            sub_folder = "MaketCP_Previews"
+
+            # Selection: rating >= 1 OR has any _card:* keyword.
+            # We then dedupe via AppleScript `does not contain`.
+            # Recipe configuration uses the most common C1 property names —
+            # if any is unrecognized in your C1 version, the property
+            # assignment is wrapped in its own try so the rest still runs.
             script = (
+                f'on hasCardKeyword(v)\n'
+                f'  try\n'
+                f'    tell application "{app}"\n'
+                f'      repeat with k in (keywords of v)\n'
+                f'        if (name of k as text) starts with "_card:" then return true\n'
+                f'      end repeat\n'
+                f'    end tell\n'
+                f'  end try\n'
+                f'  return false\n'
+                f'end hasCardKeyword\n'
                 f'tell application "{app}"\n'
                 f'  try\n'
-                f'    set targets to (variants of current document whose rating >= 1)\n'
-                f'    if (count of targets) is 0 then return "no variants with rating >= 1"\n'
-                f'    process targets\n'
-                f'    return ("queued:" & (count of targets))\n'
-                f'  on error errMsg\n'
-                f'    return errMsg\n'
+                f'    set doc to current document\n'
+                f'  on error\n'
+                f'    return "no current document — open a session in C1 first"\n'
                 f'  end try\n'
+                f'  -- Find or create our recipe.\n'
+                f'  set r to missing value\n'
+                f'  try\n'
+                f'    set r to (first recipe of doc whose name is "{recipe_name}")\n'
+                f'  end try\n'
+                f'  if r is missing value then\n'
+                f'    try\n'
+                f'      set r to make new recipe at end of recipes of doc with properties {{name:"{recipe_name}"}}\n'
+                f'    on error errMake\n'
+                f'      return ("create recipe: " & errMake)\n'
+                f'    end try\n'
+                f'  end if\n'
+                f'  -- Configure recipe; each setter wrapped in its own try.\n'
+                f'  try\n'
+                f'    set output format of r to JPEG\n'
+                f'  end try\n'
+                f'  try\n'
+                f'    set output sub folder of r to "{sub_folder}"\n'
+                f'  end try\n'
+                f'  try\n'
+                f'    set color space of r to "sRGB"\n'
+                f'  end try\n'
+                f'  try\n'
+                f'    set jpeg quality of r to 85\n'
+                f'  end try\n'
+                f'  try\n'
+                f'    set scaling of r to long edge\n'
+                f'  end try\n'
+                f'  try\n'
+                f'    set scale value of r to 1920\n'
+                f'  end try\n'
+                f'  try\n'
+                f'    set enabled of r to true\n'
+                f'  end try\n'
+                f'  -- Build target list (rating>=1 ∪ has _card: keyword).\n'
+                f'  set picked to {{}}\n'
+                f'  set rated to (variants of doc whose rating >= 1)\n'
+                f'  repeat with v in rated\n'
+                f'    set end of picked to v\n'
+                f'  end repeat\n'
+                f'  repeat with v in (variants of doc)\n'
+                f'    if my hasCardKeyword(v) then\n'
+                f'      if picked does not contain v then set end of picked to v\n'
+                f'    end if\n'
+                f'  end repeat\n'
+                f'  if (count of picked) is 0 then return "no variants matched (rating>=1 or _card: keyword)"\n'
+                f'  -- Process with our recipe specifically.\n'
+                f'  try\n'
+                f'    process picked with recipe r\n'
+                f'  on error errProc\n'
+                f'    -- Some C1 versions use `using recipe`. Fallback.\n'
+                f'    try\n'
+                f'      process picked using recipe r\n'
+                f'    on error\n'
+                f'      return ("process: " & errProc)\n'
+                f'    end try\n'
+                f'  end try\n'
+                f'  return ("queued:" & (count of picked))\n'
                 f'end tell'
             )
             raw = self.c1_bridge._run_script(script).strip()
@@ -642,7 +719,12 @@ class AppAPI:
                     count = int(raw.split(":", 1)[1])
                 except Exception:
                     count = 0
-                return {"ok": True, "count": count, "output_dir": output_dir}
+                return {
+                    "ok": True,
+                    "count": count,
+                    "recipe": recipe_name,
+                    "output_subfolder": sub_folder,
+                }
             return {"error": raw}
         except Exception as e:
             return {"error": str(e)}
