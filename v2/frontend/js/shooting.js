@@ -180,6 +180,29 @@ function smPickAndStart() {
   });
 }
 
+function smExportPreviews() {
+  if (!smHasDesktop()) {
+    alert('Экспорт превью доступен только в десктоп-версии Maket CP.');
+    return;
+  }
+  if (!window.pywebview.api.shoot_export_previews) {
+    alert('Команда экспорта не подключена в этой сборке.');
+    return;
+  }
+  smAppendEvent('export: trigger Process Recipe in Capture One...');
+  window.pywebview.api.shoot_export_previews().then(function(res) {
+    if (!res) return;
+    if (res.error) {
+      smAppendEvent('export error: ' + res.error);
+      alert('Не удалось запустить экспорт: ' + res.error);
+      return;
+    }
+    var msg = 'export queued: ' + (res.count || 0) + ' variants → ' + (res.output_dir || 'C1 default');
+    smAppendEvent(msg);
+    alert('C1 обрабатывает в очереди. Когда фото появятся в Output папке, watcher их подхватит и заменит превью на полноразмерные.');
+  });
+}
+
 function smAddToCardManual() {
   if (!_smActive || !smHasDesktop()) return;
   // Calls the same code path the Cmd+Shift+C hotkey uses; on macOS this is

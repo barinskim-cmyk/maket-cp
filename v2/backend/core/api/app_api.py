@@ -594,6 +594,59 @@ class AppAPI:
             "session_path": self.c1_bridge.get_session_path(),
         }
 
+    def shoot_export_previews(self) -> dict:
+        """Trigger Capture One to Process all rated variants of the current
+        document with the currently-active recipe.
+
+        Маша 2026-05-02: «во время съёмки грузим как сейчас, потом
+        нажимаем кнопку загрузить превью — экспортируется и
+        автоматически подгружается». This is the trigger half. The
+        watching half (auto-pull JPGs from Output) is wired in the
+        existing session_watcher: any new file under <session>/Output/
+        will fire watchdog events; an upcoming patch will route them
+        into the same shoot_get_thumb pipeline so previews swap to
+        full-res with CC applied.
+
+        Returns {ok: True, count, output_dir} or {error: ...}.
+        """
+        try:
+            session_path = self.c1_bridge.get_session_path()
+            output_dir = None
+            if session_path:
+                output_dir = str(Path(session_path).parent / "Output")
+            # The bridge's process_selected_to_jpg uses the current selection.
+            # For "all rated" we need a different AppleScript variant — for
+            # this iteration we trigger Process on all variants whose rating
+            # is >= 1 via AppleScript. Falls back to a useful error if C1
+            # isn't reachable or no recipe is active.
+            app = self.c1_bridge._app_name or self.c1_bridge._detect_app_name()
+            if not app:
+                return {"error": "Capture One не запущен или AppleScript-доступ не выдан"}
+            script = (
+                f'tell application "{app}"\n'
+                f'  try\n'
+                f'    set targets to (variants of current document whose rating >= 1)\n'
+                f'    if (count of targets) is 0 then return "no variants with rating >= 1"\n'
+                f'    process targets\n'
+                f'    return ("queued:" & (count of targets))\n'
+                f'  on error errMsg\n'
+                f'    return errMsg\n'
+                f'  end try\n'
+                f'end tell'
+            )
+            raw = self.c1_bridge._run_script(script).strip()
+            if not raw:
+                return {"error": "пустой ответ AppleScript (Capture One не отвечает)"}
+            if raw.startswith("queued:"):
+                try:
+                    count = int(raw.split(":", 1)[1])
+                except Exception:
+                    count = 0
+                return {"ok": True, "count": count, "output_dir": output_dir}
+            return {"error": raw}
+        except Exception as e:
+            return {"error": str(e)}
+
     def shoot_get_thumb(self, image_path: str, max_edge: int = 600) -> dict:
         """Read a thumbnail for a photo and return as base64 data URL.
 
