@@ -398,40 +398,40 @@ function smCurrentProj() {
 }
 
 function smEnsurePhoto(proj, info) {
-  if (!proj.photos) proj.photos = [];
+  // The existing gallery (previews.js) renders proj.previews, NOT
+  // proj.previews. Маша 2026-05-02: «проблема со связью с проектом» —
+  // exactly this. Storing under .photos meant pvRenderGallery never
+  // saw our shoot-mode entries; she got events in the log but an empty
+  // gallery. We now own a slot in proj.previews and let the existing
+  // pvGetThumb / pvGetPreview / pvGetPath pipeline pick it up.
+  if (!proj.previews) proj.previews = [];
   var stem = info.stem || (info.name ? String(info.name).replace(/\.[^.]+$/, '') : '');
   if (!stem) return null;
-  // Prefer image_path (parent JPG/RAW) over path (which is the .cos file).
-  // The .cos is XML metadata — pointing <img src> at it would render nothing.
   var imgPath = info.image_path || null;
-  // Fall back to path only if it looks like an image (not a .cos file).
   if (!imgPath && info.path && !/\.cos$/i.test(info.path)) {
     imgPath = info.path;
   }
-  for (var i = 0; i < proj.photos.length; i++) {
-    if (proj.photos[i].stem === stem) {
-      var existing = proj.photos[i];
+  var name = info.name || stem + (imgPath ? imgPath.replace(/.*\./, '.') : '.jpg');
+  for (var i = 0; i < proj.previews.length; i++) {
+    var existing = proj.previews[i];
+    if (existing && (existing.stem === stem || existing.name === name)) {
       if (imgPath && !existing.path) existing.path = imgPath;
-      if (existing.path && !existing.preview) existing.preview = 'file://' + encodeURI(existing.path);
-      if (existing.path && !existing.thumb) existing.thumb = 'file://' + encodeURI(existing.path);
       return existing;
     }
   }
   var photo = {
-    name: info.name || stem + (imgPath ? imgPath.replace(/.*\./, '.') : '.jpg'),
+    name: name,
     stem: stem,
     path: imgPath,
     rating: info.rating != null ? info.rating : 0,
     rotation: 0,
     tags: Array.isArray(info.keywords) ? info.keywords.slice() : [],
+    folders: [],
     source: 'shoot'
   };
-  if (photo.path) {
-    var url = 'file://' + encodeURI(photo.path);
-    photo.preview = url;
-    photo.thumb = url;
-  }
-  proj.photos.push(photo);
+  // preview/thumb get filled by smLoadThumbFor with a base64 data URL.
+  // Skipping the broken file:// URL avoids a flash of <img onerror>.
+  proj.previews.push(photo);
   return photo;
 }
 
@@ -590,7 +590,7 @@ window.onShoot_hotkey_card_created = function(p) {
   }
   smAppendEvent('  → push to proj.cards (current: ' + (proj.cards ? proj.cards.length : 0) + ', brand: ' + (proj.brand || '?') + ')');
 
-  // Make sure each photo exists in proj.photos; build the slots list.
+  // Make sure each photo exists in proj.previews; build the slots list.
   var slots = [];
   var variants = (p.variants || []).slice().sort(function(a, b) {
     return (a.slot || 0) - (b.slot || 0);

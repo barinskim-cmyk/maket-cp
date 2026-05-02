@@ -3102,17 +3102,26 @@ function _shProjKey(proj) {
  * @returns {Array}
  */
 function _shLightenPreviews(previews) {
+  // Strip data: URLs from thumb fields. Shoot-mode populates them with
+  // ~10 KB base64 each — at 1000+ photos the localStorage quota dies.
+  // Re-fetched lazily via shoot_get_thumb on the next session start.
+  function _safeThumb(t) {
+    if (typeof t !== 'string') return '';
+    return t.indexOf('data:') === 0 ? '' : t;
+  }
   var result = [];
   for (var i = 0; i < previews.length; i++) {
     var pv = previews[i];
     var lightPv = {
       name: pv.name,
       path: pv.path || '',
-      thumb: pv.thumb || '',
+      thumb: _safeThumb(pv.thumb),
       rating: pv.rating || 0,
       orient: pv.orient || 'v',
       folders: pv.folders || []
     };
+    if (pv._preselect) lightPv._preselect = true;
+    if (pv.source) lightPv.source = pv.source;
     /* Сохраняем мета-информацию о версиях (какие этапы загружены),
        но без тяжёлых base64 данных -- они в IndexedDB.
        Формат: versions: {stageId: {thumb: '300px base64'}} -- только thumbs */
@@ -3120,7 +3129,7 @@ function _shLightenPreviews(previews) {
       lightPv.versions = {};
       for (var sid in pv.versions) {
         if (pv.versions.hasOwnProperty(sid)) {
-          lightPv.versions[sid] = { thumb: pv.versions[sid].thumb || '' };
+          lightPv.versions[sid] = { thumb: _safeThumb(pv.versions[sid].thumb) };
         }
       }
     }
