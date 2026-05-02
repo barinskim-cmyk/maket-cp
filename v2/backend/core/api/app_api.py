@@ -604,12 +604,18 @@ class AppAPI:
         direct file:// URLs render as broken images. Encoding the file
         as base64 sidesteps that boundary.
 
-        We resize via Pillow to keep the data URL small enough to ship
-        through ``window.evaluate_js`` (≤ ~600px on the long edge → ~80–120 KB
-        JPEG). Original on-disk file is untouched.
+        Two-stage decoding:
+        1. Try Pillow — works for JPG/PNG/TIFF/HEIC.
+        2. If that fails (Canon CR3, Sony ARW, etc. — Pillow has no
+           native RAW codec), fall back to macOS ``sips`` which uses
+           Apple's RAW pipeline. Outputs a tmp JPEG, we re-encode via
+           Pillow to control quality and size.
 
-        Returns ``{data_url: ..., width: ..., height: ...}`` or
-        ``{error: ...}``. Never raises.
+        We resize so the data URL stays small enough to ship through
+        ``window.evaluate_js`` (~80–120 KB JPEG at 600px edge).
+
+        Returns ``{data_url, width, height}`` or ``{error: ...}``.
+        Never raises.
         """
         try:
             p = Path(image_path)
@@ -617,20 +623,22 @@ class AppAPI:
             return {"error": f"bad path: {e}"}
         if not p.exists():
             return {"error": "file not found"}
+
+        edge = max(64, min(int(max_edge), 2000))
+
+        # ── Stage 1: Pillow direct ───────────────────────────────
         try:
-            from PIL import Image
+            from PIL import Image, ImageOps
             import io
             import base64
 
             img = Image.open(p)
             try:
-                img.load()  # force read so .thumbnail can resize
+                img.load()
             except Exception:
-                pass
+                raise  # let stage 2 take over
 
-            # Apply EXIF orientation so portraits aren't sideways in the UI.
             try:
-                from PIL import ImageOps
                 img = ImageOps.exif_transpose(img)
             except Exception:
                 pass
@@ -638,9 +646,7 @@ class AppAPI:
             if img.mode in ("RGBA", "P", "LA"):
                 img = img.convert("RGB")
 
-            edge = max(64, min(int(max_edge), 2000))
             img.thumbnail((edge, edge), Image.LANCZOS)
-
             buf = io.BytesIO()
             img.save(buf, format="JPEG", quality=78, optimize=True)
             b64 = base64.b64encode(buf.getvalue()).decode("ascii")
@@ -649,8 +655,60 @@ class AppAPI:
                 "width": img.width,
                 "height": img.height,
             }
+        except Exception:
+            pass  # fall through to RAW path
+
+        # ── Stage 2: macOS sips fallback (RAW: CR3, ARW, NEF, RAF…) ─
+        try:
+            import subprocess
+            import tempfile
+            import io
+            import base64
+            from PIL import Image, ImageOps
+
+            with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+                tmp_path = tmp.name
+            try:
+                # sips uses Apple's RAW conversion pipeline. -Z fits within
+                # the box preserving aspect ratio. Quiet on success.
+                cp = subprocess.run(
+                    [
+                        "sips",
+                        "-s", "format", "jpeg",
+                        "-Z", str(edge),
+                        str(p),
+                        "--out", tmp_path,
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=20,
+                )
+                if cp.returncode != 0:
+                    return {"error": f"sips failed: {cp.stderr.strip() or cp.stdout.strip()}"}
+
+                img = Image.open(tmp_path)
+                img.load()
+                try:
+                    img = ImageOps.exif_transpose(img)
+                except Exception:
+                    pass
+                if img.mode in ("RGBA", "P", "LA"):
+                    img = img.convert("RGB")
+                buf = io.BytesIO()
+                img.save(buf, format="JPEG", quality=78, optimize=True)
+                b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+                return {
+                    "data_url": "data:image/jpeg;base64," + b64,
+                    "width": img.width,
+                    "height": img.height,
+                }
+            finally:
+                try:
+                    Path(tmp_path).unlink(missing_ok=True)
+                except Exception:
+                    pass
         except Exception as e:
-            return {"error": f"thumb: {e}"}
+            return {"error": f"thumb (raw fallback): {e}"}
 
     def shoot_c1_session_path(self) -> dict:
         """Return the current C1 document path, or {error: ...}.
