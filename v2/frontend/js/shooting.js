@@ -435,47 +435,93 @@ function smEnsurePhoto(proj, info) {
   return photo;
 }
 
+/* UI refresh is intentionally debounced. The watcher can fire 1000+ events
+   in a burst when an existing C1 session has many already-rated photos —
+   re-rendering on every event freezes the WebKit. We coalesce into one
+   refresh per ~250ms. */
+var _smRefreshTimer = null;
+var _smRefreshProj = null;
 function smRefreshUI(proj) {
-  // Best-effort UI refresh — these functions exist in different modules.
-  try { if (typeof shAutoSave === 'function') shAutoSave(); } catch (e) {}
-  try { if (typeof pvRenderGallery === 'function') pvRenderGallery(proj); } catch (e) {}
-  try { if (typeof cpRenderCards === 'function') cpRenderCards(); } catch (e) {}
-  try { if (typeof renderProjects === 'function') renderProjects(); } catch (e) {}
+  _smRefreshProj = proj || _smRefreshProj;
+  if (_smRefreshTimer) return;
+  _smRefreshTimer = setTimeout(function() {
+    _smRefreshTimer = null;
+    var p = _smRefreshProj;
+    _smRefreshProj = null;
+    if (!p) return;
+    try { if (typeof shAutoSave === 'function') shAutoSave(); } catch (e) {}
+    try { if (typeof pvRenderGallery === 'function') pvRenderGallery(p); } catch (e) {}
+    try { if (typeof cpRenderCards === 'function') cpRenderCards(); } catch (e) {}
+    try { if (typeof renderProjects === 'function') renderProjects(); } catch (e) {}
+  }, 250);
 }
 
-/* Lazy-load thumb for a photo via the AppAPI. WebKit blocks file:// URLs
-   that point outside the page's own directory, so we shuttle JPEG bytes
-   through Python and inject them as a base64 data URL. Idempotent — only
-   fires once per photo. */
+/* Cap the number of events kept in the DOM. Append-only would balloon
+   the events panel into a 1000+ row table on a populated session and
+   slow the renderer. */
+var SM_EVENTS_MAX = 200;
+var _smAppendCount = 0;
+var _smAppendOriginal = window.smAppendEvent;
+window.smAppendEvent = function(text) {
+  try {
+    if (typeof _smAppendOriginal === 'function') _smAppendOriginal(text);
+    _smAppendCount++;
+    if (_smAppendCount % 50 !== 0) return;
+    var pane = document.getElementById('sm-events');
+    if (!pane) return;
+    while (pane.children.length > SM_EVENTS_MAX) {
+      pane.removeChild(pane.firstChild);
+    }
+  } catch (e) {}
+};
+
+/* Bounded-concurrency thumb loader. Without a queue, a 1000+ event burst
+   spawns 1000+ concurrent pywebview ↔ Python calls and freezes the WebKit. */
+var SM_THUMB_PARALLEL = 4;
+var _smThumbQueue = [];
+var _smThumbInflight = 0;
 function smLoadThumbFor(photo) {
   if (!photo || !photo.path) return;
   if (photo._thumbLoading) return;
   if (photo.preview && photo.preview.indexOf('data:') === 0) return;  // already loaded
   if (!smHasDesktop() || !window.pywebview.api.shoot_get_thumb) return;
   photo._thumbLoading = true;
-  window.pywebview.api.shoot_get_thumb(photo.path, 800).then(function(res) {
-    photo._thumbLoading = false;
-    if (!res || res.error) return;
-    if (res.data_url) {
-      photo.preview = res.data_url;
-      photo.thumb = res.data_url;
-      // Also update any card slots that reference this photo.
-      var proj = smCurrentProj();
-      if (proj && Array.isArray(proj.cards)) {
-        for (var ci = 0; ci < proj.cards.length; ci++) {
-          var slots = proj.cards[ci].slots || [];
-          for (var si = 0; si < slots.length; si++) {
-            if (slots[si].stem === photo.stem) {
-              slots[si].dataUrl = res.data_url;
-              slots[si].preview = res.data_url;
-              slots[si].thumb = res.data_url;
+  _smThumbQueue.push(photo);
+  _smThumbDrain();
+}
+function _smThumbDrain() {
+  while (_smThumbInflight < SM_THUMB_PARALLEL && _smThumbQueue.length > 0) {
+    var photo = _smThumbQueue.shift();
+    _smThumbInflight++;
+    (function(ph) {
+      window.pywebview.api.shoot_get_thumb(ph.path, 600).then(function(res) {
+        ph._thumbLoading = false;
+        if (res && res.data_url) {
+          ph.preview = res.data_url;
+          ph.thumb = res.data_url;
+          var proj = smCurrentProj();
+          if (proj && Array.isArray(proj.cards)) {
+            for (var ci = 0; ci < proj.cards.length; ci++) {
+              var slots = proj.cards[ci].slots || [];
+              for (var si = 0; si < slots.length; si++) {
+                if (slots[si].stem === ph.stem) {
+                  slots[si].dataUrl = res.data_url;
+                  slots[si].preview = res.data_url;
+                  slots[si].thumb = res.data_url;
+                }
+              }
             }
           }
+          if (proj) smRefreshUI(proj);
         }
-      }
-      if (proj) smRefreshUI(proj);
-    }
-  });
+      })['catch'](function() {
+        ph._thumbLoading = false;
+      })['finally'](function() {
+        _smThumbInflight--;
+        _smThumbDrain();
+      });
+    })(photo);
+  }
 }
 
 window.onShoot_watcher_photo_added = function(p) {
