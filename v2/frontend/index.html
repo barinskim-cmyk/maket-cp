@@ -161,19 +161,22 @@
 
 <!-- ══════════════ Модалка: Выбор проекта для съёмки ══════════════ -->
 <div class="modal-overlay" id="modal-shoot-project-picker">
-  <div class="modal" style="width:520px">
+  <div class="modal" style="width:560px">
     <h3>Куда писать съёмку?</h3>
     <p style="color:#666;font-size:13px;margin:0 0 14px 0">
       Сессия съёмки всегда привязана к проекту — там собираются карточки, фото и история этапов.
-      Создай новый проект или выбери существующий.
+      Выбери куда писать эту съёмку.
     </p>
+
+    <!-- Опция «использовать активный» рендерится JS-ом при открытии модалки. -->
+    <div id="sm-active-project-row" style="display:none;margin-bottom:12px"></div>
 
     <div style="display:flex;gap:10px;margin-bottom:14px">
       <button class="btn btn-primary" style="flex:1" onclick="smChooseNewProject()">
         Создать новый проект
       </button>
       <button class="btn" style="flex:1" onclick="smShowProjectList()">
-        Выбрать существующий
+        Выбрать другой существующий
       </button>
     </div>
 

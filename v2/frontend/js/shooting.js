@@ -37,16 +37,15 @@ function smStartFlow() {
     alert('Shoot mode доступен только в десктоп-версии Maket CP.');
     return;
   }
-  // Step 0: session must belong to a project. If no project is selected,
-  // ask the user whether to create a new one or pick an existing one.
-  var hasActive = (window.App
-                   && Array.isArray(App.projects)
-                   && App.selectedProject >= 0
-                   && App.selectedProject < App.projects.length);
-  if (!hasActive) {
-    smShowProjectChoiceModal();
-    return;
-  }
+  // Step 0: ALWAYS ask the user where to write the session — current project,
+  // a new one, or an existing one. Per-Маша feedback (2026-05-01): there is
+  // always *some* project selected by default, so silently using it is
+  // confusing. The chooser makes the destination explicit each time.
+  smShowProjectChoiceModal();
+}
+
+/* Continues the start flow once a project is chosen (or confirmed). */
+function smContinueAfterProjectChosen() {
   // Step 1: gate on first-run permission modal unless we've already passed.
   var passed = false;
   try { passed = localStorage.getItem(SM_PERMS_OK_KEY) === '1'; } catch (e) {}
@@ -67,9 +66,34 @@ function smShowProjectChoiceModal() {
     list.style.display = 'none';
     list.innerHTML = '';
   }
+  // Render the "use currently active project" row if there is one.
+  var activeRow = document.getElementById('sm-active-project-row');
+  if (activeRow) {
+    activeRow.innerHTML = '';
+    activeRow.style.display = 'none';
+    if (window.App && Array.isArray(App.projects)
+        && App.selectedProject >= 0
+        && App.selectedProject < App.projects.length) {
+      var p = App.projects[App.selectedProject];
+      var brand = (p && p.brand) ? p.brand : '(без бренда)';
+      var date = (p && (p.shoot_date || p.date)) ? (p.shoot_date || p.date) : '';
+      var label = brand + (date ? ' · ' + date : '');
+      activeRow.innerHTML =
+        '<button class="btn btn-primary" style="width:100%;text-align:left" onclick="smUseActiveProject()">' +
+          '<div style="font-size:11px;opacity:0.85">Активный проект</div>' +
+          '<div style="font-size:14px;font-weight:600">' + label + '</div>' +
+        '</button>';
+      activeRow.style.display = 'block';
+    }
+  }
   if (typeof openModal === 'function') {
     openModal('modal-shoot-project-picker');
   }
+}
+
+function smUseActiveProject() {
+  closeModal('modal-shoot-project-picker');
+  smContinueAfterProjectChosen();
 }
 
 function smChooseNewProject() {
@@ -110,8 +134,8 @@ function smPickExistingProject(idx) {
   App.selectedProject = idx;
   if (typeof renderProjects === 'function') renderProjects();
   closeModal('modal-shoot-project-picker');
-  // Re-enter the start flow now that a project is active.
-  smStartFlow();
+  // Continue without re-prompting (smStartFlow would just re-open this modal).
+  smContinueAfterProjectChosen();
 }
 
 /* Entry from the New Project modal when "Снимаю прямо сейчас" is selected.
