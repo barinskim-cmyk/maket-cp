@@ -652,13 +652,58 @@ class AppAPI:
                 "source": source,
             }
 
-        # ── Stage 1: Capture One Thumbnails cache (CC applied) ───
+        import subprocess
+        import tempfile
+
+        def _sips_to_jpg(src: Path, dst: Path) -> bool:
+            """Run macOS sips to decode any image (incl. JXL `.cop`, RAW)
+            into a temp JPEG sized to fit `edge`. Returns True on success."""
+            try:
+                cp = subprocess.run(
+                    [
+                        "sips",
+                        "-s", "format", "jpeg",
+                        "-Z", str(edge),
+                        str(src),
+                        "--out", str(dst),
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=20,
+                )
+                return cp.returncode == 0 and dst.exists()
+            except Exception:
+                return False
+
+        # ── Stage 1: Capture One Proxies (.cop = JPEG XL, full-res preview) ─
+        # Layout: <photo.parent>/CaptureOne/Cache/Proxies/<photo.name>.cop
+        # macOS sips natively decodes JPEG XL → JPEG with CC applied.
+        # This is what C1 shows in its main viewer / lightbox.
+        try:
+            cop_path = p.parent / "CaptureOne" / "Cache" / "Proxies" / (p.name + ".cop")
+            if cop_path.exists() and not cop_path.name.startswith("._"):
+                with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+                    tmp_path = Path(tmp.name)
+                try:
+                    if _sips_to_jpg(cop_path, tmp_path):
+                        img = Image.open(tmp_path)
+                        img.load()
+                        return _encode(img, "c1_proxy")
+                finally:
+                    try:
+                        tmp_path.unlink(missing_ok=True)
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+        # ── Stage 2: Capture One Thumbnails cache (.cot = small JPEG) ────
         # Layout: <photo.parent>/CaptureOne/Cache/Thumbnails/<photo.name>.<uuid>.cot
-        # The UUID part is variable, so we glob.
+        # Plain JPEG ~300x450 with CC applied. Faster than the proxy when
+        # the caller only wants a small preview and Pillow reads it natively.
         try:
             thumbs_dir = p.parent / "CaptureOne" / "Cache" / "Thumbnails"
             if thumbs_dir.is_dir():
-                # ._<name> macOS resource forks must be filtered.
                 candidates = sorted(
                     [c for c in thumbs_dir.glob(p.name + ".*.cot")
                      if not c.name.startswith("._")]
@@ -670,7 +715,7 @@ class AppAPI:
         except Exception:
             pass
 
-        # ── Stage 2: Pillow direct (source JPG/PNG/TIFF) ─────────
+        # ── Stage 3: Pillow direct (source JPG/PNG/TIFF) ─────────
         try:
             img = Image.open(p)
             img.load()
@@ -678,35 +723,20 @@ class AppAPI:
         except Exception:
             pass
 
-        # ── Stage 3: macOS sips fallback (CR3/ARW/NEF/RAF) ──────
+        # ── Stage 4: macOS sips fallback (CR3/ARW/NEF/RAF) ──────
         # Last resort — no CC, just a renderable preview from RAW.
         try:
-            import subprocess
-            import tempfile
-
             with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
-                tmp_path = tmp.name
+                tmp_path = Path(tmp.name)
             try:
-                cp = subprocess.run(
-                    [
-                        "sips",
-                        "-s", "format", "jpeg",
-                        "-Z", str(edge),
-                        str(p),
-                        "--out", tmp_path,
-                    ],
-                    capture_output=True,
-                    text=True,
-                    timeout=20,
-                )
-                if cp.returncode != 0:
-                    return {"error": f"sips failed: {cp.stderr.strip() or cp.stdout.strip()}"}
+                if not _sips_to_jpg(p, tmp_path):
+                    return {"error": "sips failed (raw fallback)"}
                 img = Image.open(tmp_path)
                 img.load()
                 return _encode(img, "sips")
             finally:
                 try:
-                    Path(tmp_path).unlink(missing_ok=True)
+                    tmp_path.unlink(missing_ok=True)
                 except Exception:
                     pass
         except Exception as e:
