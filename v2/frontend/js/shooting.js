@@ -385,8 +385,65 @@ window.onShoot_watcher_watcher_stopped = function() {
 window.onShoot_watcher_watcher_error = function(p) {
   smAppendEvent('watcher error: ' + (p && p.error ? p.error : 'unknown'));
 };
+/* ── Project state wire-up ─────────────────────────────
+   Watcher events used to just write to the events panel; now they also
+   mutate the active project so previews + cards actually appear. */
+
+function smCurrentProj() {
+  if (!window.App || !Array.isArray(App.projects)
+      || App.selectedProject < 0 || App.selectedProject >= App.projects.length) {
+    return null;
+  }
+  return App.projects[App.selectedProject];
+}
+
+function smEnsurePhoto(proj, info) {
+  if (!proj.photos) proj.photos = [];
+  var stem = info.stem || (info.name ? String(info.name).replace(/\.[^.]+$/, '') : '');
+  if (!stem) return null;
+  for (var i = 0; i < proj.photos.length; i++) {
+    if (proj.photos[i].stem === stem) {
+      var existing = proj.photos[i];
+      if (info.path && !existing.path) existing.path = info.path;
+      // Use file:// URL as preview source (pywebview can render local files).
+      if (existing.path && !existing.preview) existing.preview = 'file://' + existing.path;
+      if (existing.path && !existing.thumb) existing.thumb = 'file://' + existing.path;
+      return existing;
+    }
+  }
+  var photo = {
+    name: info.name || stem + '.jpg',
+    stem: stem,
+    path: info.path || null,
+    rating: info.rating != null ? info.rating : 0,
+    rotation: 0,
+    tags: Array.isArray(info.keywords) ? info.keywords.slice() : [],
+    source: 'shoot'
+  };
+  if (photo.path) {
+    photo.preview = 'file://' + photo.path;
+    photo.thumb = 'file://' + photo.path;
+  }
+  proj.photos.push(photo);
+  return photo;
+}
+
+function smRefreshUI(proj) {
+  // Best-effort UI refresh — these functions exist in different modules.
+  try { if (typeof shAutoSave === 'function') shAutoSave(); } catch (e) {}
+  try { if (typeof pvRenderGallery === 'function') pvRenderGallery(proj); } catch (e) {}
+  try { if (typeof cpRenderCards === 'function') cpRenderCards(); } catch (e) {}
+  try { if (typeof renderProjects === 'function') renderProjects(); } catch (e) {}
+}
+
 window.onShoot_watcher_photo_added = function(p) {
   smAppendEvent('photo added: ' + (p && p.stem ? p.stem : '?') + ' rating=' + (p && p.rating != null ? p.rating : '-'));
+  if (!p) return;
+  var proj = smCurrentProj(); if (!proj) return;
+  var photo = smEnsurePhoto(proj, p);
+  if (photo && p.rating != null) photo.rating = p.rating;
+  if (photo && p.rating != null && p.rating >= 2) photo._preselect = true;
+  smRefreshUI(proj);
 };
 window.onShoot_watcher_photo_changed = function(p) {
   if (!p) return;
@@ -394,15 +451,36 @@ window.onShoot_watcher_photo_changed = function(p) {
   if (p.rating_before !== p.rating_after) msg += ' rating ' + p.rating_before + '->' + p.rating_after;
   if (p.keywords_added && p.keywords_added.length) msg += ' +kw[' + p.keywords_added.join(',') + ']';
   smAppendEvent(msg);
+  var proj = smCurrentProj(); if (!proj) return;
+  var photo = smEnsurePhoto(proj, p);
+  if (photo && p.rating_after != null) photo.rating = p.rating_after;
+  smRefreshUI(proj);
 };
 window.onShoot_watcher_selection_added = function(p) {
   smAppendEvent('+ selection: ' + (p && p.stem ? p.stem : '?') + ' rating=' + (p && p.rating != null ? p.rating : '-'));
+  if (!p) return;
+  var proj = smCurrentProj(); if (!proj) return;
+  var photo = smEnsurePhoto(proj, p);
+  if (photo) {
+    photo._preselect = true;
+    if (p.rating != null) photo.rating = p.rating;
+  }
+  smRefreshUI(proj);
 };
 window.onShoot_watcher_selection_removed = function(p) {
   smAppendEvent('- selection: ' + (p && p.stem ? p.stem : '?'));
+  if (!p) return;
+  var proj = smCurrentProj(); if (!proj) return;
+  var photo = smEnsurePhoto(proj, p);
+  if (photo) photo._preselect = false;
+  smRefreshUI(proj);
 };
 window.onShoot_watcher_card_signal = function(p) {
   smAppendEvent('card signal: ' + (p && p.stem ? p.stem : '?') + ' card=' + (p && p.card_id ? p.card_id.slice(0, 8) : '?') + ' slot=' + (p && p.slot != null ? p.slot : '?'));
+  // Card signals from XMP arrive one-per-photo; we already create the card
+  // explicitly in onShoot_hotkey_card_created. If a user adds _card:/_slot:
+  // tags manually in C1 we'd want to assemble cards here too, but that's a
+  // separate workflow — defer to next iteration.
 };
 window.onShoot_hotkey_card_created = function(p) {
   if (!p) return;
@@ -411,6 +489,47 @@ window.onShoot_hotkey_card_created = function(p) {
     return;
   }
   smAppendEvent('hotkey: card ' + (p.card_id ? p.card_id.slice(0, 8) : '?') + ' = ' + p.count + ' photos');
+
+  var proj = smCurrentProj();
+  if (!proj) return;
+
+  // Make sure each photo exists in proj.photos; build the slots list.
+  var slots = [];
+  var variants = (p.variants || []).slice().sort(function(a, b) {
+    return (a.slot || 0) - (b.slot || 0);
+  });
+  for (var i = 0; i < variants.length; i++) {
+    var v = variants[i];
+    smEnsurePhoto(proj, v);
+    var fileUrl = v.path ? 'file://' + v.path : null;
+    slots.push({
+      orient: 'v',
+      weight: i === 0 ? 2 : 1,
+      aspect: null,
+      file: null,
+      dataUrl: fileUrl,
+      preview: fileUrl,
+      thumb: fileUrl,
+      path: v.path || null,
+      stem: v.stem || null
+    });
+  }
+
+  if (!proj.cards) proj.cards = [];
+  // Avoid duplicate cards if the same card_id was emitted twice.
+  var exists = false;
+  for (var j = 0; j < proj.cards.length; j++) {
+    if (proj.cards[j].id === p.card_id) { exists = true; break; }
+  }
+  if (!exists) {
+    proj.cards.push({
+      id: p.card_id,
+      category: '',
+      slots: slots,
+      _hAspect: null, _vAspect: null
+    });
+  }
+  smRefreshUI(proj);
 };
 window.onShoot_hotkey_error = function(p) {
   if (!p) return;
