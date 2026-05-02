@@ -595,26 +595,30 @@ class AppAPI:
         }
 
     def shoot_get_thumb(self, image_path: str, max_edge: int = 600) -> dict:
-        """Read a JPG/RAW from disk and return as base64 data URL.
+        """Read a thumbnail for a photo and return as base64 data URL.
 
         Why: WebKit (pywebview's WKWebView on macOS) blocks
-        ``file://`` <img> loads from a different directory than the page
-        for security reasons. The page lives under v2/frontend/, but the
-        photographer's session lives under /Volumes/<drive>/<session>/, so
-        direct file:// URLs render as broken images. Encoding the file
-        as base64 sidesteps that boundary.
+        ``file://`` <img> loads from a different directory than the page,
+        so we shuttle JPEG bytes through Python and inject as base64.
 
-        Two-stage decoding:
-        1. Try Pillow — works for JPG/PNG/TIFF/HEIC.
-        2. If that fails (Canon CR3, Sony ARW, etc. — Pillow has no
-           native RAW codec), fall back to macOS ``sips`` which uses
-           Apple's RAW pipeline. Outputs a tmp JPEG, we re-encode via
-           Pillow to control quality and size.
+        Source priority — Маша 2026-05-02 «найти где превью которые
+        Capture One рендерит» — мы хотим картинку с применёнными
+        Color Correction'ами C1, не голую RAW-декодировку:
 
-        We resize so the data URL stays small enough to ship through
-        ``window.evaluate_js`` (~80–120 KB JPEG at 600px edge).
+        1. **Capture One thumbnail cache** at
+           ``<session>/Capture/CaptureOne/Cache/Thumbnails/<name>.<uuid>.cot``.
+           These are standard JPEGs (~300x450) with C1's CC applied —
+           fastest, smallest, и уже с правильными цветами.
+        2. **Capture One proxy** ``.cop`` — JPEG XL, нужен pillow-jxl;
+           пропускаем пока (пишем в TODO).
+        3. **Source JPG** via Pillow — when the original is itself a JPG
+           with no C1 cache yet (rare on a session that's been opened in C1).
+        4. **macOS sips** — fallback for raw CR3/ARW/NEF/RAF; uses
+           Apple's RAW pipeline (no CC, but at least renders something).
 
-        Returns ``{data_url, width, height}`` or ``{error: ...}``.
+        Returns ``{data_url, width, height, source}`` or ``{error: ...}``.
+        ``source`` is one of ``"c1_thumb" | "pillow" | "sips"`` so the
+        UI can show a hint when CC isn't available yet.
         Never raises.
         """
         try:
@@ -626,51 +630,63 @@ class AppAPI:
 
         edge = max(64, min(int(max_edge), 2000))
 
-        # ── Stage 1: Pillow direct ───────────────────────────────
-        try:
-            from PIL import Image, ImageOps
-            import io
-            import base64
+        from PIL import Image, ImageOps
+        import io
+        import base64
 
-            img = Image.open(p)
-            try:
-                img.load()
-            except Exception:
-                raise  # let stage 2 take over
-
+        def _encode(img, source: str) -> dict:
             try:
                 img = ImageOps.exif_transpose(img)
             except Exception:
                 pass
-
             if img.mode in ("RGBA", "P", "LA"):
                 img = img.convert("RGB")
-
             img.thumbnail((edge, edge), Image.LANCZOS)
             buf = io.BytesIO()
-            img.save(buf, format="JPEG", quality=78, optimize=True)
-            b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+            img.save(buf, format="JPEG", quality=80, optimize=True)
             return {
-                "data_url": "data:image/jpeg;base64," + b64,
+                "data_url": "data:image/jpeg;base64,"
+                            + base64.b64encode(buf.getvalue()).decode("ascii"),
                 "width": img.width,
                 "height": img.height,
+                "source": source,
             }
-        except Exception:
-            pass  # fall through to RAW path
 
-        # ── Stage 2: macOS sips fallback (RAW: CR3, ARW, NEF, RAF…) ─
+        # ── Stage 1: Capture One Thumbnails cache (CC applied) ───
+        # Layout: <photo.parent>/CaptureOne/Cache/Thumbnails/<photo.name>.<uuid>.cot
+        # The UUID part is variable, so we glob.
+        try:
+            thumbs_dir = p.parent / "CaptureOne" / "Cache" / "Thumbnails"
+            if thumbs_dir.is_dir():
+                # ._<name> macOS resource forks must be filtered.
+                candidates = sorted(
+                    [c for c in thumbs_dir.glob(p.name + ".*.cot")
+                     if not c.name.startswith("._")]
+                )
+                if candidates:
+                    img = Image.open(candidates[0])
+                    img.load()
+                    return _encode(img, "c1_thumb")
+        except Exception:
+            pass
+
+        # ── Stage 2: Pillow direct (source JPG/PNG/TIFF) ─────────
+        try:
+            img = Image.open(p)
+            img.load()
+            return _encode(img, "pillow")
+        except Exception:
+            pass
+
+        # ── Stage 3: macOS sips fallback (CR3/ARW/NEF/RAF) ──────
+        # Last resort — no CC, just a renderable preview from RAW.
         try:
             import subprocess
             import tempfile
-            import io
-            import base64
-            from PIL import Image, ImageOps
 
             with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
                 tmp_path = tmp.name
             try:
-                # sips uses Apple's RAW conversion pipeline. -Z fits within
-                # the box preserving aspect ratio. Quiet on success.
                 cp = subprocess.run(
                     [
                         "sips",
@@ -685,23 +701,9 @@ class AppAPI:
                 )
                 if cp.returncode != 0:
                     return {"error": f"sips failed: {cp.stderr.strip() or cp.stdout.strip()}"}
-
                 img = Image.open(tmp_path)
                 img.load()
-                try:
-                    img = ImageOps.exif_transpose(img)
-                except Exception:
-                    pass
-                if img.mode in ("RGBA", "P", "LA"):
-                    img = img.convert("RGB")
-                buf = io.BytesIO()
-                img.save(buf, format="JPEG", quality=78, optimize=True)
-                b64 = base64.b64encode(buf.getvalue()).decode("ascii")
-                return {
-                    "data_url": "data:image/jpeg;base64," + b64,
-                    "width": img.width,
-                    "height": img.height,
-                }
+                return _encode(img, "sips")
             finally:
                 try:
                     Path(tmp_path).unlink(missing_ok=True)
