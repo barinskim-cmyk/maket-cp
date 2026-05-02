@@ -130,6 +130,11 @@ class CaptureOneBridge:
         # We pipe through JSON to avoid AppleScript-list parse hell. C1
         # AppleScript supports `repeat with` and we manually concat. We
         # JSON-escape the strings inside AppleScript before joining.
+        #
+        # NOTE 2026-05-02 (Маша's C1): the property `selected variants of
+        # current document` does NOT exist (-1728). The working pattern is
+        # `variants of current document whose selected is true`. Verified
+        # via osascript on her machine — returned 3 selected variants.
         script = (
             f'on jsonEscape(s)\n'
             f'  set s to s as text\n'
@@ -148,7 +153,7 @@ class CaptureOneBridge:
             f'end jsonEscape\n'
             f'tell application "{app}"\n'
             f'  try\n'
-            f'    set vs to selected variants of current document\n'
+            f'    set vs to (variants of current document whose selected is true)\n'
             f'  on error\n'
             f'    return "[]"\n'
             f'  end try\n'
@@ -171,7 +176,7 @@ class CaptureOneBridge:
             f'    end try\n'
             f'    set vPath to ""\n'
             f'    try\n'
-            f'      set vPath to my jsonEscape(POSIX path of (file of parent image of v))\n'
+            f'      set vPath to my jsonEscape(path of parent image of v)\n'
             f'    end try\n'
             f'    if idx > 1 then set out to out & ","\n'
             f'    set out to out & "{{\\"name\\":\\"" & vName & "\\",\\"path\\":\\"" & vPath\n'
