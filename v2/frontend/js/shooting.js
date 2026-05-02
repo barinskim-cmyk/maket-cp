@@ -627,23 +627,25 @@ window.onShoot_hotkey_card_created = function(p) {
   var variants = (p.variants || []).slice().sort(function(a, b) {
     return (a.slot || 0) - (b.slot || 0);
   });
+  // First variant defines the hero. Backend already probed orient from the
+  // C1 .cot cache so it matches what the user sees inside C1 (rotation
+  // already applied) — better than guessing from EXIF.
+  var heroOrient = (variants.length > 0 && variants[0].orient) ? variants[0].orient : 'v';
   for (var i = 0; i < variants.length; i++) {
     var v = variants[i];
-    // The hotkey path comes from C1 directly — that's already a JPG/RAW.
     var imgPath = v.path || null;
     if (imgPath && /\.cos$/i.test(imgPath)) imgPath = null;  // safety
     var photoInfo = { stem: v.stem, image_path: imgPath, name: v.stem };
     var photo = smEnsurePhoto(proj, photoInfo);
     if (photo) smLoadThumbFor(photo);
-    var fileUrl = imgPath ? 'file://' + encodeURI(imgPath) : null;
     slots.push({
-      orient: 'v',
-      weight: i === 0 ? 2 : 1,
+      orient: v.orient || 'v',
+      weight: i === 0 ? 2 : 1,  // hero gets weight 2 → triggers книжная / альбомная layout in cards.js
       aspect: null,
       file: v.stem ? (v.stem + (imgPath ? imgPath.replace(/.*\./, '.') : '.jpg')) : null,
-      dataUrl: fileUrl,
-      preview: fileUrl,
-      thumb: fileUrl,
+      dataUrl: null,
+      preview: null,
+      thumb: null,
       path: imgPath,
       stem: v.stem || null
     });
@@ -660,7 +662,10 @@ window.onShoot_hotkey_card_created = function(p) {
       id: p.card_id,
       category: '',
       slots: slots,
-      _hAspect: null, _vAspect: null
+      _hAspect: '3/2',          // sensible default; cards.js falls back if null
+      _vAspect: '2/3',
+      _hasHero: slots.length > 1,  // first slot is hero when there's anything to be hero of
+      _heroOrient: heroOrient
     });
   }
   smRefreshUI(proj);

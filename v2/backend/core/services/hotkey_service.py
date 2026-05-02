@@ -218,6 +218,7 @@ class HotkeyService:
                 "slot": slot_idx,
                 "rating": v.get("rating"),
                 "path": v.get("path"),
+                "orient": self._probe_orient(v.get("path")),
             })
 
         result = {
@@ -230,6 +231,38 @@ class HotkeyService:
         self._notify(f"В карточку добавлено {len(tagged)} фото")
 
     # ── Helpers ──
+
+    @staticmethod
+    def _probe_orient(image_path: Optional[str]) -> str:
+        """Return 'h' or 'v' based on the C1 thumbnail dimensions.
+
+        Reads <session>/Capture/CaptureOne/Cache/Thumbnails/<name>.<uuid>.cot
+        which is C1's already-rotated preview, so orientation matches what
+        the user sees in the C1 viewer (no need to read .cos rotation).
+        Defaults to 'v' on any failure — the slot will still render, just
+        in a vertical container.
+        """
+        if not image_path:
+            return "v"
+        try:
+            p = Path(image_path)
+            thumbs = p.parent / "CaptureOne" / "Cache" / "Thumbnails"
+            if thumbs.is_dir():
+                for f in sorted(thumbs.glob(p.name + ".*.cot")):
+                    if f.name.startswith("._"):
+                        continue
+                    from PIL import Image
+                    img = Image.open(f)
+                    return "h" if img.width > img.height else "v"
+        except Exception:
+            pass
+        # Fallback: read source dimensions if the cot cache hasn't built yet.
+        try:
+            from PIL import Image
+            img = Image.open(image_path)
+            return "h" if img.width > img.height else "v"
+        except Exception:
+            return "v"
 
     @staticmethod
     def _stem_from_variant(v: dict) -> Optional[str]:
