@@ -3270,9 +3270,33 @@ function _shBuildSavePayload(aggressive) {
     if (light.articles && light.articles.length > 0) {
       light.articles = _shLightenArticles(light.articles);
     }
+    /* Shoot-mode populates proj.photos with base64 data URLs in
+       preview/thumb/dataUrl. Saving 1000+ photos × ~10KB blows the
+       localStorage quota immediately. Strip data: URLs from photos
+       before save — they re-fetch from C1's cache on next session. */
+    if (light.photos && light.photos.length > 0) {
+      light.photos = _shLightenPhotos(light.photos);
+    }
     toSave.push(light);
   }
   return toSave;
+}
+
+function _shLightenPhotos(photos) {
+  var out = [];
+  for (var i = 0; i < photos.length; i++) {
+    var ph = photos[i];
+    if (!ph) continue;
+    var copy = {};
+    for (var k in ph) {
+      if (!ph.hasOwnProperty(k)) continue;
+      var v = ph[k];
+      if (typeof v === 'string' && v.indexOf('data:') === 0) continue;
+      copy[k] = v;
+    }
+    out.push(copy);
+  }
+  return out;
 }
 
 /**

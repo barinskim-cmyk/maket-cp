@@ -439,9 +439,11 @@ function cpPackRows(slots) {
 function cpRenderCard() {
   var view = document.getElementById('cp-view');
   var proj = getActiveProject();
-  if (!proj || !proj.cards || App.currentCardIdx < 0) { cpShowEmpty(); return; }
+  if (!proj || !proj.cards || App.currentCardIdx < 0
+      || App.currentCardIdx >= proj.cards.length) { cpShowEmpty(); return; }
 
   var card = proj.cards[App.currentCardIdx];
+  if (!card) { cpShowEmpty(); return; }
   var idx = App.currentCardIdx;
   var totalSlots = card.slots ? card.slots.length : 0;
 
