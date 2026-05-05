@@ -148,16 +148,25 @@ class AppAPI:
         def task():
             mode = payload.get("mode", "folder")
             strip_tails = payload.get("strip_tails", False)
+            # User-typed affixes from the UI text field — comma-separated
+            # in the frontend, arrives as list[str]. Stripped from BOTH
+            # ends so a single input covers prefix or suffix.
+            custom_strip_raw = payload.get("custom_strip") or []
+            custom_strip = [s for s in custom_strip_raw if isinstance(s, str) and s]
 
             if mode == "folder":
                 source_dir = Path(payload.get("source_dir", ""))
                 if not source_dir.exists():
                     self._emit("onRateSetterDone", {"error": "Папка источника не найдена"})
                     return
-                stems = self.rate_setter.collect_source_stems(source_dir, strip_tails=strip_tails)
+                stems = self.rate_setter.collect_source_stems(
+                    source_dir, strip_tails=strip_tails, custom_strip=custom_strip,
+                )
             else:
                 text = payload.get("text_list", "")
-                stems = self.rate_setter.parse_stems_from_text(text, strip_tails=strip_tails)
+                stems = self.rate_setter.parse_stems_from_text(
+                    text, strip_tails=strip_tails, custom_strip=custom_strip,
+                )
                 if not stems:
                     self._emit("onRateSetterDone", {"error": "Список имён пуст"})
                     return

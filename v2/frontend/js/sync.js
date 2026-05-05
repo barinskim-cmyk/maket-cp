@@ -149,10 +149,18 @@ function runRateSetter(dryRun) {
   var sessionDir = document.getElementById('rs-session-dir').value;
   if (!sessionDir) { alert('Выберите папку сессии Capture One'); return; }
 
+  // Custom strip values: comma-separated. Each entry stripped from BOTH
+  // start and end of the stem (so "1 " catches "1 IMG_0001" → "IMG_0001",
+  // and "_v2" catches "IMG_0001_v2" → "IMG_0001"). Whitespace inside an
+  // entry is preserved (don't auto-trim — "1 " with a space is meaningful).
+  var customStripRaw = document.getElementById('rs-custom-strip-suffix').value || '';
+  var customStrip = customStripRaw.split(',').filter(function(s) { return s.length > 0; });
+
   var payload = {
     mode: mode,
     session_dir: sessionDir,
     strip_tails: document.getElementById('rs-strip-tails').checked,
+    custom_strip: customStrip,
   };
 
   if (mode === 'text') {

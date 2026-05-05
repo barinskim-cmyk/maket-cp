@@ -462,6 +462,11 @@
             <label for="rs-strip-tails">Убирать суффиксы (_preview, _web, _copy...)</label>
           </div>
 
+          <div class="sync-field">
+            <label for="rs-custom-strip-suffix">Свой суффикс/префикс (через запятую — стрипается с начала и/или конца)</label>
+            <input type="text" id="rs-custom-strip-suffix" placeholder="например: _v2, 1 , -draft">
+          </div>
+
           <div style="display:flex; gap:8px;">
             <button class="btn btn-primary" id="rs-run-btn" onclick="runRateSetter(false)">Запустить</button>
             <button class="btn" onclick="runRateSetter(true)">Пробный запуск</button>
