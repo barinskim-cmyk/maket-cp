@@ -749,9 +749,17 @@ window.onShoot_hotkey_card_created = function(p) {
       slots: slots,
       _hAspect: '3/2',          // sensible default; cards.js falls back if null
       _vAspect: '2/3',
-      _hasHero: slots.length > 1,  // first slot is hero when there's anything to be hero of
+      _hasHero: slots.length > 1,
       _heroOrient: heroOrient
     });
+    // Diagnostic so Маша can see what landed in the slots from the events
+    // panel without opening DevTools.
+    var diagPaths = slots.map(function(s) {
+      return s.stem + ':' + (s.dataUrl ? 'thumb-loaded' : 'pending') + ':' + (s.file || '?');
+    }).join(' | ');
+    smAppendEvent('  card push: ' + slots.length + ' slots — ' + diagPaths);
+    smAppendEvent('  proj.previews.length=' + (proj.previews ? proj.previews.length : 0)
+                  + ', proj.cards.length=' + (proj.cards ? proj.cards.length : 0));
   }
   smRefreshUI(proj);
 };
