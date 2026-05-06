@@ -152,15 +152,25 @@ function smStartFromProjectParams(params) {
 
 function smPickAndStart() {
   if (!smHasDesktop()) return;
-  // Маша 2026-05-02: «появляется и карточка и удаляется». Diagnosed: the
-  // active project has a _cloudId, so sbStartAutoPull periodically pulls
-  // and OVERWRITES proj.cards with cloud state. Hotkey-built cards
-  // weren't pushed to cloud (Маша's own «не засирай Supabase» rule
-  // during testing) → next pull replaces them with the empty cloud
-  // version → they vanish a few seconds after creation. Stop auto-pull
-  // for the duration of the shoot session.
+  // Маша 2026-05-02: «появляется и карточка и удаляется» / «опять не
+  // сохраняет новые картинки в карточки». sbStartAutoPull keeps pulling
+  // cloud state every SB_PULL_INTERVAL ms while the project has a
+  // _cloudId, and overwrites proj.cards from the cloud version (which
+  // doesn't know about hotkey-built cards because we explicitly don't
+  // push them during testing). Stopping the timer isn't enough — a
+  // pull already in flight when we stop still completes and overwrites
+  // local state. Belt + suspenders: stop the interval AND monkey-patch
+  // sbPullProject to no-op for the duration of the live shoot.
   if (typeof sbStopAutoPull === 'function') {
     try { sbStopAutoPull(); } catch (e) {}
+  }
+  if (typeof window.sbPullProject === 'function' && !window._smOriginalSbPullProject) {
+    window._smOriginalSbPullProject = window.sbPullProject;
+    window.sbPullProject = function(cb) {
+      // Don't surface this as an error — the interval timer expects
+      // graceful 'skipped' results during local edits.
+      if (typeof cb === 'function') cb('Пропущен: shoot session active');
+    };
   }
   window.pywebview.api.shoot_pick_session().then(function(res) {
     if (!res || res.cancelled) return;
@@ -227,6 +237,11 @@ function smAddToCardManual() {
    between devices after Маша closes shoot mode. */
 function _smRestoreAutoPullIfNeeded() {
   try {
+    // Restore the real sbPullProject before re-enabling the interval.
+    if (window._smOriginalSbPullProject) {
+      window.sbPullProject = window._smOriginalSbPullProject;
+      window._smOriginalSbPullProject = null;
+    }
     var proj = smCurrentProj();
     if (proj && proj._cloudId && typeof sbStartAutoPull === 'function') {
       sbStartAutoPull();
