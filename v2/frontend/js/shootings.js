@@ -3186,8 +3186,15 @@ function _shDoAutoSave() {
     }
 
     /* Попытка сохранить; при переполнении — aggressive mode */
+    var savedJson = JSON.stringify(toSave);
+    // Disk fallback: also mirror to ~/Library/Application Support/MaketCP/
+    // projects.json so projects survive a kill -9 of the pywebview host.
+    // Маша 2026-05-02. Best-effort — non-fatal on failure.
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.save_projects_to_disk) {
+      try { window.pywebview.api.save_projects_to_disk(savedJson); } catch (e) {}
+    }
     try {
-      localStorage.setItem(SH_AUTOSAVE_KEY, JSON.stringify(toSave));
+      localStorage.setItem(SH_AUTOSAVE_KEY, savedJson);
     } catch(quotaErr) {
       console.warn('Автосохранение: localStorage переполнен, aggressive mode...');
       toSave = _shBuildSavePayload(true);
@@ -3356,12 +3363,48 @@ function _shLightenCards(cards, aggressive) {
  * Загрузить автосохранённые проекты из localStorage (при старте).
  * Восстанавливает превью из отдельных ключей.
  */
+function _shLoadFromDiskFallback() {
+  if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.load_projects_from_disk) return;
+  try {
+    window.pywebview.api.load_projects_from_disk().then(function(res) {
+      if (!res || res.error || !res.projects_json) return;
+      try {
+        var saved = JSON.parse(res.projects_json);
+        if (!Array.isArray(saved) || saved.length === 0) return;
+        // Mirror back into localStorage so subsequent reads hit fast path.
+        try { localStorage.setItem(SH_AUTOSAVE_KEY, res.projects_json); } catch (e) {}
+        // Re-run the existing loader against the now-populated localStorage.
+        // It does the heavy lifting (preview restore, _hAspect defaults, etc.)
+        // so we avoid duplicating that here.
+        shLoadAutoSaved();
+        if (typeof renderProjects === 'function') renderProjects();
+        console.log('Restored ' + saved.length + ' projects from disk fallback');
+      } catch (e) {
+        console.warn('disk fallback parse failed:', e);
+      }
+    });
+  } catch (e) {
+    console.warn('disk fallback API failed:', e);
+  }
+}
+
 function shLoadAutoSaved() {
   try {
     var raw = localStorage.getItem(SH_AUTOSAVE_KEY);
-    if (!raw) return;
+    if (!raw) {
+      // localStorage может быть пустой — например, после kill -9 процесса
+      // pywebview не успел сбросить WebKit-сторадж на диск. Маша 2026-05-02:
+      // «сделай чтобы проекты сохранялись между перезапусками». Disk-backed
+      // fallback: shAutoSave дополнительно пишет JSON в Application Support,
+      // и здесь мы его подбираем синхронно. Через AppAPI, ждём промиса.
+      _shLoadFromDiskFallback();
+      return;
+    }
     var saved = JSON.parse(raw);
-    if (!Array.isArray(saved) || saved.length === 0) return;
+    if (!Array.isArray(saved) || saved.length === 0) {
+      _shLoadFromDiskFallback();
+      return;
+    }
 
     for (var i = 0; i < saved.length; i++) {
       var proj = saved[i];

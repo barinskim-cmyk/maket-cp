@@ -6,6 +6,8 @@
 from __future__ import annotations
 
 import json
+import os
+import sys
 import threading
 from pathlib import Path
 
@@ -595,6 +597,45 @@ class AppAPI:
         if active is None:
             return None
         return active.to_dict()
+
+    # ── Disk-backed project persistence ──────────────────────────────────
+    # WebKit2's localStorage on macOS doesn't reliably survive a hard
+    # kill of the Python host (pkill -9 happens often during dev — Маша
+    # 2026-05-02). We mirror App.projects to ~/Library/Application
+    # Support/MaketCP/projects.json on every shAutoSave; on startup the
+    # frontend reads it back if localStorage is empty. This is purely
+    # a fallback — when localStorage works, it wins.
+
+    @staticmethod
+    def _projects_disk_path() -> Path:
+        if sys.platform == "darwin":
+            base = Path.home() / "Library" / "Application Support" / "MaketCP"
+        elif sys.platform.startswith("win"):
+            base = Path(os.environ.get("APPDATA", str(Path.home()))) / "MaketCP"
+        else:
+            base = Path.home() / ".config" / "MaketCP"
+        try:
+            base.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
+        return base / "projects.json"
+
+    def save_projects_to_disk(self, projects_json: str) -> dict:
+        try:
+            p = self._projects_disk_path()
+            p.write_text(projects_json, encoding="utf-8")
+            return {"ok": True, "path": str(p), "size": len(projects_json)}
+        except Exception as e:
+            return {"error": str(e)}
+
+    def load_projects_from_disk(self) -> dict:
+        try:
+            p = self._projects_disk_path()
+            if not p.exists():
+                return {"ok": True, "projects_json": ""}
+            return {"ok": True, "projects_json": p.read_text(encoding="utf-8")}
+        except Exception as e:
+            return {"error": str(e)}
 
     def shoot_c1_status(self) -> dict:
         """Cheap status snapshot for the shoot view (is C1 running, path)."""
