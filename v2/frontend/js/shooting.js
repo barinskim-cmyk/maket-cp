@@ -551,14 +551,50 @@ function _smThumbDrain() {
   }
 }
 
+/* Маша 2026-05-02: «сохраняются все кадры с 0 рейтингом тоже». Filter
+   here — only photos that meet the selection criteria (rating >= 1 OR
+   has _card: keyword) belong in proj.previews. Photos with rating 0
+   and no card tag stay invisible to Maket CP until the user actually
+   rates or assigns them. */
+function _smShouldKeepPhoto(p) {
+  if (!p) return false;
+  if (typeof p.rating === 'number' && p.rating >= 1) return true;
+  if (typeof p.rating_after === 'number' && p.rating_after >= 1) return true;
+  if (Array.isArray(p.keywords)) {
+    for (var i = 0; i < p.keywords.length; i++) {
+      if (typeof p.keywords[i] === 'string' && p.keywords[i].indexOf('_card:') === 0) {
+        return true;
+      }
+    }
+  }
+  if (Array.isArray(p.keywords_added)) {
+    for (var j = 0; j < p.keywords_added.length; j++) {
+      if (typeof p.keywords_added[j] === 'string' && p.keywords_added[j].indexOf('_card:') === 0) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function _smRemovePhotoByStem(proj, stem) {
+  if (!stem || !Array.isArray(proj.previews)) return;
+  for (var i = proj.previews.length - 1; i >= 0; i--) {
+    if (proj.previews[i] && proj.previews[i].stem === stem) {
+      proj.previews.splice(i, 1);
+    }
+  }
+}
+
 window.onShoot_watcher_photo_added = function(p) {
   smAppendEvent('photo added: ' + (p && p.stem ? p.stem : '?') + ' rating=' + (p && p.rating != null ? p.rating : '-'));
   if (!p) return;
+  if (!_smShouldKeepPhoto(p)) return;
   var proj = smCurrentProj(); if (!proj) return;
   var photo = smEnsurePhoto(proj, p);
   if (photo && p.rating != null) photo.rating = p.rating;
   if (photo && p.rating != null && p.rating >= 1) photo._preselect = true;
-  if (photo && photo._preselect) smLoadThumbFor(photo);
+  if (photo) smLoadThumbFor(photo);
   smRefreshUI(proj);
 };
 window.onShoot_watcher_photo_changed = function(p) {
@@ -568,9 +604,18 @@ window.onShoot_watcher_photo_changed = function(p) {
   if (p.keywords_added && p.keywords_added.length) msg += ' +kw[' + p.keywords_added.join(',') + ']';
   smAppendEvent(msg);
   var proj = smCurrentProj(); if (!proj) return;
+  // Rating dropped to 0 and no card tag → remove from gallery.
+  if (!_smShouldKeepPhoto(p)) {
+    _smRemovePhotoByStem(proj, p.stem);
+    smRefreshUI(proj);
+    return;
+  }
   var photo = smEnsurePhoto(proj, p);
-  if (photo && p.rating_after != null) photo.rating = p.rating_after;
-  if (photo && photo._preselect) smLoadThumbFor(photo);
+  if (photo && p.rating_after != null) {
+    photo.rating = p.rating_after;
+    photo._preselect = (p.rating_after >= 1);
+  }
+  if (photo) smLoadThumbFor(photo);
   smRefreshUI(proj);
 };
 window.onShoot_watcher_selection_added = function(p) {
@@ -665,14 +710,27 @@ window.onShoot_hotkey_card_created = function(p) {
     var photoInfo = { stem: v.stem, image_path: imgPath, name: v.stem };
     var photo = smEnsurePhoto(proj, photoInfo);
     if (photo) smLoadThumbFor(photo);
+    // photo.name is what proj.previews lookups in cards.js compare against
+    // (line ~618: `proj.previews[pi].name === slot.file`). Use the photo's
+    // own name rather than re-deriving — they were drifting (smEnsurePhoto
+    // sets name=stem, while we were building 'stem.ext' here).
+    var slotFile = (photo && photo.name) || (v.stem || null);
+    // Маша 2026-05-02: «первая карточка сохранила состав, остальные нет
+    // только карточки создаются». Cause: smLoadThumbFor returns early
+    // when photo._thumbLoading or photo.preview already set, so slots
+    // built AFTER the first card never receive the data URL. We now
+    // pre-fill slot.dataUrl directly when the photo already has one.
+    var existingPreview = photo && typeof photo.preview === 'string'
+                           && photo.preview.indexOf('data:') === 0
+                           ? photo.preview : null;
     slots.push({
       orient: v.orient || 'v',
-      weight: i === 0 ? 2 : 1,  // hero gets weight 2 → triggers книжная / альбомная layout in cards.js
+      weight: i === 0 ? 2 : 1,  // hero → книжная / альбомная in cards.js
       aspect: null,
-      file: v.stem ? (v.stem + (imgPath ? imgPath.replace(/.*\./, '.') : '.jpg')) : null,
-      dataUrl: null,
-      preview: null,
-      thumb: null,
+      file: slotFile,
+      dataUrl: existingPreview,
+      preview: existingPreview,
+      thumb: existingPreview,
       path: imgPath,
       stem: v.stem || null
     });
