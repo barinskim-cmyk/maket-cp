@@ -152,6 +152,16 @@ function smStartFromProjectParams(params) {
 
 function smPickAndStart() {
   if (!smHasDesktop()) return;
+  // Маша 2026-05-02: «появляется и карточка и удаляется». Diagnosed: the
+  // active project has a _cloudId, so sbStartAutoPull periodically pulls
+  // and OVERWRITES proj.cards with cloud state. Hotkey-built cards
+  // weren't pushed to cloud (Маша's own «не засирай Supabase» rule
+  // during testing) → next pull replaces them with the empty cloud
+  // version → they vanish a few seconds after creation. Stop auto-pull
+  // for the duration of the shoot session.
+  if (typeof sbStopAutoPull === 'function') {
+    try { sbStopAutoPull(); } catch (e) {}
+  }
   window.pywebview.api.shoot_pick_session().then(function(res) {
     if (!res || res.cancelled) return;
     if (res.error) { alert('Ошибка: ' + res.error); return; }
@@ -212,6 +222,18 @@ function smAddToCardManual() {
   });
 }
 
+/* Symmetric to smPickAndStart — restore cloud auto-pull when the user
+   finishes the live shoot. Without this the project would stop syncing
+   between devices after Маша closes shoot mode. */
+function _smRestoreAutoPullIfNeeded() {
+  try {
+    var proj = smCurrentProj();
+    if (proj && proj._cloudId && typeof sbStartAutoPull === 'function') {
+      sbStartAutoPull();
+    }
+  } catch (e) {}
+}
+
 function smEndFlow() {
   if (!_smActive || !smHasDesktop()) return;
   var ok = window.confirm('Завершить съёмку?');
@@ -222,6 +244,7 @@ function smEndFlow() {
       smPersistEndToSupabase(out.session);
       _smActive = null;
       smRenderIdle();
+      _smRestoreAutoPullIfNeeded();
     }
   });
 }
