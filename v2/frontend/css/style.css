@@ -2142,8 +2142,10 @@ body.mob-client-mode html {
   color: #888; background: #f5f5f5;
 }
 .mob-card-slots {
-  display: flex; flex-wrap: wrap; gap: 2px;
-  padding: 2px;
+  /* Маша 2026-05-07: «должна быть непрерывная плитка» — между слотами
+     одной карточки никаких зазоров и наружного padding'а. */
+  display: flex; flex-wrap: wrap; gap: 0;
+  padding: 0;
 }
 
 /* Hero: на всю ширину */
@@ -2162,10 +2164,11 @@ body.mob-client-mode html {
   width: 100%; height: auto; display: block;
 }
 
-/* Вертикаль: по 2 в ряд.
+/* Вертикаль: по 2 в ряд. Без -1px компенсации — gap у .mob-card-slots = 0,
+   плитка непрерывная (Маша 2026-05-07).
    aspect-ratio задаётся inline стилем из card._vAspect (fallback 2/3 в CSS). */
 .mob-slot-v {
-  width: calc(50% - 1px); position: relative;
+  width: 50%; position: relative;
   aspect-ratio: 2 / 3; overflow: hidden; /* fallback если inline не задан */
 }
 .mob-slot-v img {
