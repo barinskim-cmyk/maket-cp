@@ -271,18 +271,23 @@ class SessionWatcher:
         new_keywords: list[str] = list(meta["keywords"])
         img_path = self._parent_image_path(cos_path)
         img_path_str = str(img_path) if img_path else None
-        # Маша 2026-05-07: «давай сохранять [время съёмки] даже когда грузим
-        # превью». Primary source — Exp_Date из .cos (UNIX-таймштамп момента
-        # затвора, который C1 записывает при импорте). Если его нет — fallback
-        # на mtime image-файла, далее mtime .cos. Exp_Date устойчив к copy/touch
-        # и доступен из того же XML где и rating, без отдельной зависимости.
-        captured_at = meta.get("exp_date")
+        # Маша 2026-05-07: «при загрузке во время съёмки — как ты предложил».
+        # Live event = свежий снимок только что прилетел в C1 — mtime image-
+        # файла равен моменту записи (capture time). .cos в этот момент
+        # может быть ещё не сохранён или пустоват по полям. Так что primary
+        # — mtime image, fallback — Exp_Date если уже есть, и mtime .cos
+        # совсем напоследок.
+        captured_at = None
+        try:
+            if img_path is not None and img_path.exists():
+                captured_at = float(img_path.stat().st_mtime)
+        except Exception:
+            captured_at = None
+        if captured_at is None:
+            captured_at = meta.get("exp_date")
         if captured_at is None:
             try:
-                if img_path is not None and img_path.exists():
-                    captured_at = float(img_path.stat().st_mtime)
-                else:
-                    captured_at = float(cos_path.stat().st_mtime)
+                captured_at = float(cos_path.stat().st_mtime)
             except Exception:
                 captured_at = None
 
