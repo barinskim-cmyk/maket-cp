@@ -160,6 +160,11 @@ function createProject() {
   var templateId = document.getElementById('inp-template').value; /* '' = без шаблона */
   if (!brand) { alert('Введите бренд'); return; }
 
+  /* Mode picker: 'done' (default) — обычный flow; 'live' — после создания
+     проекта переключаемся на вкладку Съёмка и стартуем shoot session. */
+  var modeEl = document.querySelector('input[name="np-mode"]:checked');
+  var mode = modeEl ? modeEl.value : 'done';
+
   closeModal('modal-new-project');
 
   /**
@@ -177,6 +182,15 @@ function createProject() {
     App.selectedProject = App.projects.length - 1;
     renderProjects();
     shAutoSave();
+
+    if (mode === 'live' && typeof smStartFromProjectParams === 'function') {
+      smStartFromProjectParams({
+        brand: brand,
+        date: date,
+        templateId: templateId,
+        projectIdx: App.selectedProject
+      });
+    }
   }
 
   if (window.pywebview && window.pywebview.api) {
@@ -3088,17 +3102,26 @@ function _shProjKey(proj) {
  * @returns {Array}
  */
 function _shLightenPreviews(previews) {
+  // Strip data: URLs from thumb fields. Shoot-mode populates them with
+  // ~10 KB base64 each — at 1000+ photos the localStorage quota dies.
+  // Re-fetched lazily via shoot_get_thumb on the next session start.
+  function _safeThumb(t) {
+    if (typeof t !== 'string') return '';
+    return t.indexOf('data:') === 0 ? '' : t;
+  }
   var result = [];
   for (var i = 0; i < previews.length; i++) {
     var pv = previews[i];
     var lightPv = {
       name: pv.name,
       path: pv.path || '',
-      thumb: pv.thumb || '',
+      thumb: _safeThumb(pv.thumb),
       rating: pv.rating || 0,
       orient: pv.orient || 'v',
       folders: pv.folders || []
     };
+    if (pv._preselect) lightPv._preselect = true;
+    if (pv.source) lightPv.source = pv.source;
     /* Сохраняем мета-информацию о версиях (какие этапы загружены),
        но без тяжёлых base64 данных -- они в IndexedDB.
        Формат: versions: {stageId: {thumb: '300px base64'}} -- только thumbs */
@@ -3106,7 +3129,7 @@ function _shLightenPreviews(previews) {
       lightPv.versions = {};
       for (var sid in pv.versions) {
         if (pv.versions.hasOwnProperty(sid)) {
-          lightPv.versions[sid] = { thumb: pv.versions[sid].thumb || '' };
+          lightPv.versions[sid] = { thumb: _safeThumb(pv.versions[sid].thumb) };
         }
       }
     }
@@ -3163,8 +3186,15 @@ function _shDoAutoSave() {
     }
 
     /* Попытка сохранить; при переполнении — aggressive mode */
+    var savedJson = JSON.stringify(toSave);
+    // Disk fallback: also mirror to ~/Library/Application Support/MaketCP/
+    // projects.json so projects survive a kill -9 of the pywebview host.
+    // Маша 2026-05-02. Best-effort — non-fatal on failure.
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.save_projects_to_disk) {
+      try { window.pywebview.api.save_projects_to_disk(savedJson); } catch (e) {}
+    }
     try {
-      localStorage.setItem(SH_AUTOSAVE_KEY, JSON.stringify(toSave));
+      localStorage.setItem(SH_AUTOSAVE_KEY, savedJson);
     } catch(quotaErr) {
       console.warn('Автосохранение: localStorage переполнен, aggressive mode...');
       toSave = _shBuildSavePayload(true);
@@ -3256,9 +3286,33 @@ function _shBuildSavePayload(aggressive) {
     if (light.articles && light.articles.length > 0) {
       light.articles = _shLightenArticles(light.articles);
     }
+    /* Shoot-mode populates proj.photos with base64 data URLs in
+       preview/thumb/dataUrl. Saving 1000+ photos × ~10KB blows the
+       localStorage quota immediately. Strip data: URLs from photos
+       before save — they re-fetch from C1's cache on next session. */
+    if (light.photos && light.photos.length > 0) {
+      light.photos = _shLightenPhotos(light.photos);
+    }
     toSave.push(light);
   }
   return toSave;
+}
+
+function _shLightenPhotos(photos) {
+  var out = [];
+  for (var i = 0; i < photos.length; i++) {
+    var ph = photos[i];
+    if (!ph) continue;
+    var copy = {};
+    for (var k in ph) {
+      if (!ph.hasOwnProperty(k)) continue;
+      var v = ph[k];
+      if (typeof v === 'string' && v.indexOf('data:') === 0) continue;
+      copy[k] = v;
+    }
+    out.push(copy);
+  }
+  return out;
 }
 
 /**
@@ -3309,12 +3363,48 @@ function _shLightenCards(cards, aggressive) {
  * Загрузить автосохранённые проекты из localStorage (при старте).
  * Восстанавливает превью из отдельных ключей.
  */
+function _shLoadFromDiskFallback() {
+  if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.load_projects_from_disk) return;
+  try {
+    window.pywebview.api.load_projects_from_disk().then(function(res) {
+      if (!res || res.error || !res.projects_json) return;
+      try {
+        var saved = JSON.parse(res.projects_json);
+        if (!Array.isArray(saved) || saved.length === 0) return;
+        // Mirror back into localStorage so subsequent reads hit fast path.
+        try { localStorage.setItem(SH_AUTOSAVE_KEY, res.projects_json); } catch (e) {}
+        // Re-run the existing loader against the now-populated localStorage.
+        // It does the heavy lifting (preview restore, _hAspect defaults, etc.)
+        // so we avoid duplicating that here.
+        shLoadAutoSaved();
+        if (typeof renderProjects === 'function') renderProjects();
+        console.log('Restored ' + saved.length + ' projects from disk fallback');
+      } catch (e) {
+        console.warn('disk fallback parse failed:', e);
+      }
+    });
+  } catch (e) {
+    console.warn('disk fallback API failed:', e);
+  }
+}
+
 function shLoadAutoSaved() {
   try {
     var raw = localStorage.getItem(SH_AUTOSAVE_KEY);
-    if (!raw) return;
+    if (!raw) {
+      // localStorage может быть пустой — например, после kill -9 процесса
+      // pywebview не успел сбросить WebKit-сторадж на диск. Маша 2026-05-02:
+      // «сделай чтобы проекты сохранялись между перезапусками». Disk-backed
+      // fallback: shAutoSave дополнительно пишет JSON в Application Support,
+      // и здесь мы его подбираем синхронно. Через AppAPI, ждём промиса.
+      _shLoadFromDiskFallback();
+      return;
+    }
     var saved = JSON.parse(raw);
-    if (!Array.isArray(saved) || saved.length === 0) return;
+    if (!Array.isArray(saved) || saved.length === 0) {
+      _shLoadFromDiskFallback();
+      return;
+    }
 
     for (var i = 0; i < saved.length; i++) {
       var proj = saved[i];

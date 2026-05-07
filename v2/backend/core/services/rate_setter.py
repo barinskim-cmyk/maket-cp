@@ -31,33 +31,69 @@ class RateSetterService:
         return p.stem if p.suffix.lower() in KNOWN_EXTENSIONS else name
 
     @staticmethod
-    def strip_tail(stem: str) -> str:
+    def strip_tail(stem: str, custom_strip: list[str] | None = None) -> str:
+        """Strip well-known and user-supplied affixes from BOTH ends of stem.
+
+        Маша 2026-05-02: «у всех есть префикс „1 “… давай добавим
+        возможность ввести значение которое убираем». Custom entries are
+        applied case-insensitively from start AND end so a single field
+        in the UI handles either side of the filename.
+        """
         result = stem
-        for suf in KNOWN_SUFFIXES:
+        suffixes = list(KNOWN_SUFFIXES)
+        if custom_strip:
+            for s in custom_strip:
+                if s and s not in suffixes:
+                    suffixes.append(s)
+        # Suffix pass: strip from end.
+        for suf in suffixes:
             result = re.sub(re.escape(suf) + r"$", "", result, flags=re.IGNORECASE)
+        # Prefix pass: only the user-supplied entries (KNOWN_SUFFIXES are
+        # tail-shaped on purpose). Strip from start.
+        if custom_strip:
+            for s in custom_strip:
+                if s:
+                    result = re.sub(r"^" + re.escape(s), "", result, flags=re.IGNORECASE)
         return result
 
-    def clean_name(self, name: str, strip_tails: bool = False) -> str:
+    def clean_name(
+        self,
+        name: str,
+        strip_tails: bool = False,
+        custom_strip: list[str] | None = None,
+    ) -> str:
         result = self.strip_extension(name.strip())
-        if strip_tails:
-            result = self.strip_tail(result)
+        # If the user supplied custom affixes we apply them even when the
+        # checkbox is off — they wouldn't have typed anything otherwise.
+        if strip_tails or custom_strip:
+            result = self.strip_tail(result, custom_strip=custom_strip)
         return result
 
-    def parse_stems_from_text(self, text: str, strip_tails: bool = False) -> set[str]:
+    def parse_stems_from_text(
+        self,
+        text: str,
+        strip_tails: bool = False,
+        custom_strip: list[str] | None = None,
+    ) -> set[str]:
         stems = set()
         for line in text.strip().splitlines():
             line = line.strip()
             if line:
-                stem = self.clean_name(line, strip_tails=strip_tails)
+                stem = self.clean_name(line, strip_tails=strip_tails, custom_strip=custom_strip)
                 if stem:
                     stems.add(stem)
         return stems
 
-    def collect_source_stems(self, source_dir: Path, strip_tails: bool = False) -> set[str]:
+    def collect_source_stems(
+        self,
+        source_dir: Path,
+        strip_tails: bool = False,
+        custom_strip: list[str] | None = None,
+    ) -> set[str]:
         stems = set()
         for p in source_dir.iterdir():
             if p.is_file():
-                stems.add(self.clean_name(p.name, strip_tails=strip_tails))
+                stems.add(self.clean_name(p.name, strip_tails=strip_tails, custom_strip=custom_strip))
         return stems
 
     # ── Основной метод ──

@@ -8,3 +8,17 @@ openpyxl>=3.0
 google-auth>=2.20
 google-auth-oauthlib>=1.0
 google-api-python-client>=2.100
+
+# Live shoot (session_watcher → ShootingService).
+watchdog>=4.0
+
+# pynput removed 2026-05-01: it crashes the Python process on macOS 26.4
+# (SIGTRAP from TSMGetInputSourceProperty on a non-main thread). Hotkeys
+# now use NSEvent global monitor via pyobjc.
+pyobjc-framework-ApplicationServices>=10.0; sys_platform == "darwin"
+pyobjc-framework-Cocoa>=10.0; sys_platform == "darwin"
+
+# Read Capture One's .cop (JPEG XL) previews directly so we keep CC and
+# control rotation explicitly, instead of going through `sips` which lost
+# both. Маша 2026-05-02.
+pillow-jxl-plugin>=1.3
