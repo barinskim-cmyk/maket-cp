@@ -4,7 +4,20 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Maket CP</title>
-<link rel="stylesheet" href="css/style.css?v=26">
+<!-- Share-link bootstrap: помечаем <html> ДО рендера auth-gate, чтобы CSS
+     сразу его скрыл. authCheckOnLoad срабатывает только через 500мс после
+     DOMContentLoaded, и в это время гость по share-ссылке успевал увидеть
+     экран входа. Маша 2026-05-07 «сначала выкидывает на меню входа». -->
+<script>
+(function () {
+  try {
+    if (new URLSearchParams(location.search).get('share')) {
+      document.documentElement.classList.add('is-share-link');
+    }
+  } catch (e) {}
+})();
+</script>
+<link rel="stylesheet" href="css/style.css?v=27">
 </head>
 <body>
 
