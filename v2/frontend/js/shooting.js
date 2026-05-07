@@ -510,6 +510,17 @@ function smEnsurePhoto(proj, info) {
   return photo;
 }
 
+/* Извлекает хвостовые цифры stem'а — это camera counter. Маша 2026-05-07
+   просила сортировать по нему как primary key. EKONIKA_2026-05-060335 →
+   060335 → 60335. parseInt чтобы 0301 / 301 сравнивались корректно. */
+function _smTailCounter(s) {
+  if (!s) return null;
+  var m = String(s).match(/(\d+)$/);
+  if (!m) return null;
+  var n = parseInt(m[1], 10);
+  return isFinite(n) ? n : null;
+}
+
 /* UI refresh is intentionally debounced. The watcher can fire 1000+ events
    in a burst when an existing C1 session has many already-rated photos —
    re-rendering on every event freezes the WebKit. We coalesce into one
@@ -524,14 +535,18 @@ function smRefreshUI(proj) {
     var p = _smRefreshProj;
     _smRefreshProj = null;
     if (!p) return;
-    // Маша 2026-05-06: «галерея должна сортироваться по дате съёмки по
-    // возрастающей». session_watcher теперь даёт captured_at (mtime
-    // image-файла = время съёмки на свежем шуте), используем его как
-    // первичный ключ. Stem-fallback остаётся на случай старых записей
-    // или если по какой-то причине captured_at не пришёл.
+    // Маша 2026-05-07: первичный ключ — счётчик камеры (хвостовые
+    // цифры stem'а, типа EKONIKA_2026-05-060335 → 060335). Это самый
+    // стабильный порядок: монотонно растёт по факту срабатывания
+    // затвора, не зависит от mtime'а файла. Если у одного из файлов
+    // счётчика нет (или совпали) — fallback на captured_at, далее на
+    // stem-numeric.
     if (Array.isArray(p.previews)) {
       try {
         p.previews.sort(function(a, b) {
+          var ca = _smTailCounter(a && (a.stem || a.name));
+          var cb = _smTailCounter(b && (b.stem || b.name));
+          if (ca != null && cb != null && ca !== cb) return ca - cb;
           var ta = a && typeof a.captured_at === 'number' && isFinite(a.captured_at) ? a.captured_at : null;
           var tb = b && typeof b.captured_at === 'number' && isFinite(b.captured_at) ? b.captured_at : null;
           if (ta != null && tb != null && ta !== tb) return ta - tb;
