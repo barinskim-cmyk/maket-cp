@@ -71,6 +71,137 @@ var LAY_GAP = 0; /* px — единый gap для всех раскладок. 
 
 
 // ══════════════════════════════════════════════
+//  Justified Layout (Flickr-style, Маша 2026-05-07
+//  «такая же раскладка как в Яндекс.Диске»)
+//  ──────────────────────────────────────────────
+//  Используем библиотеку flickr/justified-layout (js/lib/justified-layout.min.js,
+//  глобал window.justifiedLayout).
+//
+//  layJustifiedHTML(slots, slotHTMLFn, opts) — возвращает HTML-строку
+//  responsive-контейнера: фото лежат в рядах с natural aspect, без crop'а,
+//  по ширине растягиваются на 100% контейнера. Высота контейнера —
+//  через padding-top trick (так как ширина у нас fluid).
+//
+//  opts:
+//    targetRowHeight  — целевая высота ряда в px относительно ширины 1060
+//                       (justified-layout сам клампит ±25%, потом мы скейлим)
+//    boxSpacing       — горизонт + вертикал зазор в тех же относительных px
+//    containerPadding — отступ контейнера, тоже в относительных px
+//    aspectFn(slot, i) → number — для каждого слота возвращает aspect = w/h.
+//                                  Если у preview есть width/height — это
+//                                  primary; если нет, fallback из orient.
+// ══════════════════════════════════════════════
+
+var _LAY_JUST_REF_WIDTH = 1060; /* эталонная ширина для justified-layout. */
+
+function layJustifiedHTML(slots, slotHTMLFn, opts) {
+  if (!slots || slots.length === 0) {
+    return '<div class="lay-container"><div class="cp-empty">Добавьте слоты</div></div>';
+  }
+  if (typeof window.justifiedLayout !== 'function') {
+    /* Библиотека не подгрузилась — fallback: вертикальная стопка */
+    var fb = '<div class="lay-just lay-just-fallback">';
+    for (var fi = 0; fi < slots.length; fi++) {
+      fb += '<div class="lay-just-box">' + slotHTMLFn(fi) + '</div>';
+    }
+    fb += '</div>';
+    return fb;
+  }
+
+  opts = opts || {};
+  var aspects = [];
+  for (var i = 0; i < slots.length; i++) {
+    var ar = opts.aspectFn ? opts.aspectFn(slots[i], i) : 1.5;
+    if (!isFinite(ar) || ar <= 0) ar = 1.5;
+    aspects.push(ar);
+  }
+
+  var cw = _LAY_JUST_REF_WIDTH;
+  var spacing = (opts.boxSpacing != null) ? opts.boxSpacing : 0;
+  var pad = (opts.containerPadding != null) ? opts.containerPadding : 0;
+  var trh = opts.targetRowHeight || 320;
+
+  var geom;
+  try {
+    geom = window.justifiedLayout(aspects, {
+      containerWidth: cw,
+      containerPadding: pad,
+      boxSpacing: spacing,
+      targetRowHeight: trh,
+      targetRowHeightTolerance: 0.25,
+      showWidows: true,
+      widowLayoutStyle: 'justify'
+    });
+  } catch (e) {
+    console.warn('justifiedLayout failed:', e);
+    return '<div class="lay-container"><div class="cp-empty">Ошибка раскладки</div></div>';
+  }
+  if (!geom || !geom.boxes || !geom.boxes.length) {
+    return '<div class="lay-container"><div class="cp-empty">Нет фото</div></div>';
+  }
+
+  var ratio = (geom.containerHeight > 0 && cw > 0) ? (geom.containerHeight / cw) : 0.6;
+  var html = '<div class="lay-just" style="position:relative;width:100%;padding-top:' + (ratio * 100) + '%;">';
+  for (var j = 0; j < geom.boxes.length; j++) {
+    var b = geom.boxes[j];
+    var left = b.left / cw * 100;
+    var top = b.top / cw * 100;
+    var width = b.width / cw * 100;
+    var height = b.height / cw * 100;
+    html += '<div class="lay-just-box" style="position:absolute;left:' + left.toFixed(4) + '%;top:'
+         + top.toFixed(4) + '%;width:' + width.toFixed(4) + '%;height:' + height.toFixed(4) + '%;">';
+    html += slotHTMLFn(j);
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+/* Helper: построить индекс preview по name/stem для быстрого lookup. */
+function _layBuildPvIndex(proj) {
+  var idx = {};
+  if (!proj || !Array.isArray(proj.previews)) return idx;
+  for (var i = 0; i < proj.previews.length; i++) {
+    var pv = proj.previews[i];
+    if (!pv) continue;
+    if (pv.name) idx[pv.name] = pv;
+    if (pv.stem) idx[pv.stem] = pv;
+    if (pv.name) idx[String(pv.name).replace(/\.[^.]+$/, '')] = pv;
+  }
+  return idx;
+}
+
+/* Helper: вернуть aspect (w/h) для слота. Primary — natural из preview;
+   fallback — orient (h=1.5, v≈0.667), затем 1.0. */
+function _layResolveAspect(slot, pvIndex, template) {
+  if (!slot) return 1.5;
+  var key = slot.file || slot.stem || slot.name || '';
+  var stemKey = key ? String(key).replace(/\.[^.]+$/, '') : '';
+  var pv = pvIndex[key] || pvIndex[stemKey] || null;
+  if (pv && pv.width && pv.height && isFinite(pv.width / pv.height)) {
+    return pv.width / pv.height;
+  }
+  var orient = slot.orient || 'v';
+  if (orient === 'h') {
+    var hAspect = (template && template.hAspect) || '3/2';
+    var hp = String(hAspect).split('/');
+    if (hp.length === 2) {
+      var hv = parseFloat(hp[0]) / parseFloat(hp[1]);
+      if (isFinite(hv) && hv > 0) return hv;
+    }
+    return 1.5;
+  }
+  var vAspect = (template && template.vAspect) || '2/3';
+  var vp = String(vAspect).split('/');
+  if (vp.length === 2) {
+    var vv = parseFloat(vp[0]) / parseFloat(vp[1]);
+    if (isFinite(vv) && vv > 0) return vv;
+  }
+  return 0.6667;
+}
+
+
+// ══════════════════════════════════════════════
 //  Утилиты: aspect-ratio
 // ══════════════════════════════════════════════
 
@@ -378,27 +509,22 @@ function layBuildLayout(card, template, slotHTMLFn) {
     return '<div class="lay-container"><div class="cp-empty">Добавьте слоты кнопкой +</div></div>';
   }
 
-  var hAspect = (template && template.hAspect) || '3/2';
-  var vAspect = (template && template.vAspect) || '2/3';
-  var lockRows = (template && template.lockRows) || false;
-  var hasHero = (template && template.hasHero !== undefined) ? template.hasHero : undefined;
+  /* Маша 2026-05-07: переходим на justified-layout (Flickr / Яндекс.Диск).
+     Шаблоны (h_aspect/v_aspect/hasHero/lockRows) больше не управляют
+     раскладкой — только сохраняют структуру слотов. Aspect берём из
+     натурального width/height фото (proj.previews[].width/height), а
+     если фото ещё не загружено — fallback на slot.orient. */
+  var proj = (typeof getActiveProject === 'function') ? getActiveProject() : null;
+  var pvIndex = _layBuildPvIndex(proj);
 
-  var mode = layDetectMode(slots, hasHero);
-
-  if (mode === 'equal') {
-    return _layBuildEqual(slots, hAspect, vAspect, lockRows, slotHTMLFn);
-  }
-
-  var heroIdx = layFindPrimaryHero(slots, hasHero);
-  var restIdxs = [];
-  for (var i = 0; i < slots.length; i++) {
-    if (i !== heroIdx) restIdxs.push(i);
-  }
-
-  if (mode === 'portrait') {
-    return _layBuildPortrait(slots, heroIdx, restIdxs, hAspect, vAspect, lockRows, slotHTMLFn);
-  }
-  return _layBuildLandscape(slots, heroIdx, restIdxs, hAspect, vAspect, lockRows, slotHTMLFn);
+  return layJustifiedHTML(slots, slotHTMLFn, {
+    targetRowHeight: 280,
+    boxSpacing: 0,
+    containerPadding: 0,
+    aspectFn: function (slot) {
+      return _layResolveAspect(slot, pvIndex, template);
+    }
+  });
 }
 
 
