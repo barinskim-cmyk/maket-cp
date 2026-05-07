@@ -198,17 +198,27 @@ class SessionWatcher:
                 if rating is not None and rating >= self.rating_threshold:
                     img_path = self._parent_image_path(cos)
                     img_path_str = str(img_path) if img_path else None
+                    captured_at_seed = None
+                    try:
+                        if img_path is not None and img_path.exists():
+                            captured_at_seed = float(img_path.stat().st_mtime)
+                        else:
+                            captured_at_seed = float(cos.stat().st_mtime)
+                    except Exception:
+                        captured_at_seed = None
                     self.on_event("photo_added", {
                         "stem": stem,
                         "path": str(cos),
                         "image_path": img_path_str,
                         "rating": rating,
                         "keywords": keywords,
+                        "captured_at": captured_at_seed,
                     })
                     self.on_event("selection_added", {
                         "stem": stem,
                         "rating": rating,
                         "image_path": img_path_str,
+                        "captured_at": captured_at_seed,
                     })
             except Exception:
                 continue
@@ -259,6 +269,21 @@ class SessionWatcher:
         new_keywords: list[str] = list(meta["keywords"])
         img_path = self._parent_image_path(cos_path)
         img_path_str = str(img_path) if img_path else None
+        # Маша 2026-05-06: «давай при загрузке будем извлекать дату и
+        # время съёмки из exif или из чего мы там рейтинг тащим». Источник
+        # правды дешёвый — mtime источника (камера ставит capture-time на
+        # файл при импорте; для RAW в C1-сессии это и есть момент съёмки).
+        # EXIF DateTimeOriginal был бы строже, но для CR3 без exiftool это
+        # отдельная зависимость. mtime даёт ту же монотонность, которой
+        # достаточно для сортировки по съёмке. Fallback — mtime .cos.
+        captured_at = None
+        try:
+            if img_path is not None and img_path.exists():
+                captured_at = float(img_path.stat().st_mtime)
+            else:
+                captured_at = float(cos_path.stat().st_mtime)
+        except Exception:
+            captured_at = None
 
         with self._lock:
             prev = self._states.get(stem)
@@ -272,8 +297,9 @@ class SessionWatcher:
                     "image_path": img_path_str,
                     "rating": new_rating,
                     "keywords": new_keywords,
+                    "captured_at": captured_at,
                 })
-                self._maybe_emit_selection(stem, None, new_rating, img_path_str)
+                self._maybe_emit_selection(stem, None, new_rating, img_path_str, captured_at)
                 self._maybe_emit_card_signal(stem, [], new_keywords)
                 return
 
@@ -291,10 +317,11 @@ class SessionWatcher:
                     "rating_after": new_rating,
                     "keywords_added": kw_added,
                     "keywords_removed": kw_removed,
+                    "captured_at": captured_at,
                 })
 
             if rating_changed:
-                self._maybe_emit_selection(stem, prev.rating, new_rating, img_path_str)
+                self._maybe_emit_selection(stem, prev.rating, new_rating, img_path_str, captured_at)
             if kw_added:
                 self._maybe_emit_card_signal(stem, prev.keywords, new_keywords)
 
@@ -378,6 +405,7 @@ class SessionWatcher:
         before: Optional[int],
         after: Optional[int],
         image_path: Optional[str] = None,
+        captured_at: Optional[float] = None,
     ) -> None:
         """Emit selection_added / removed when rating crosses threshold."""
         was_in = (before or 0) >= self.rating_threshold
@@ -389,6 +417,7 @@ class SessionWatcher:
                 "stem": stem,
                 "rating": after,
                 "image_path": image_path,
+                "captured_at": captured_at,
             })
         else:
             self.on_event("selection_removed", {

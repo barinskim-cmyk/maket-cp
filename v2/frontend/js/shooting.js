@@ -473,10 +473,23 @@ function smEnsurePhoto(proj, info) {
     imgPath = info.path;
   }
   var name = info.name || stem + (imgPath ? imgPath.replace(/.*\./, '.') : '.jpg');
+  // Маша 2026-05-06: «давай при загрузке будем извлекать дату и время
+  // съёмки из exif или из чего мы там рейтинг тащим». session_watcher
+  // emits captured_at (file mtime of the image, equals capture time on
+  // a fresh shoot). Store it so the gallery sort can use a real
+  // chronological key instead of the brittle stem-based one.
+  var capturedAt = (typeof info.captured_at === 'number' && isFinite(info.captured_at))
+    ? info.captured_at
+    : (typeof info.captured_at_seed === 'number' && isFinite(info.captured_at_seed)
+        ? info.captured_at_seed
+        : null);
   for (var i = 0; i < proj.previews.length; i++) {
     var existing = proj.previews[i];
     if (existing && (existing.stem === stem || existing.name === name)) {
       if (imgPath && !existing.path) existing.path = imgPath;
+      if (capturedAt != null && existing.captured_at == null) {
+        existing.captured_at = capturedAt;
+      }
       return existing;
     }
   }
@@ -488,7 +501,8 @@ function smEnsurePhoto(proj, info) {
     rotation: 0,
     tags: Array.isArray(info.keywords) ? info.keywords.slice() : [],
     folders: [],
-    source: 'shoot'
+    source: 'shoot',
+    captured_at: capturedAt
   };
   // preview/thumb get filled by smLoadThumbFor with a base64 data URL.
   // Skipping the broken file:// URL avoids a flash of <img onerror>.
@@ -511,14 +525,18 @@ function smRefreshUI(proj) {
     _smRefreshProj = null;
     if (!p) return;
     // Маша 2026-05-06: «галерея должна сортироваться по дате съёмки по
-    // возрастающей / по названию по возрастающей — у меня месс в
-    // превью». EKONIKA filenames are <brand>_<date>_<seq>, so a
-    // numeric-aware ascending sort by stem produces the same order
-    // as capture time. Apply on every render so any new entry slots
-    // into its correct position.
+    // возрастающей». session_watcher теперь даёт captured_at (mtime
+    // image-файла = время съёмки на свежем шуте), используем его как
+    // первичный ключ. Stem-fallback остаётся на случай старых записей
+    // или если по какой-то причине captured_at не пришёл.
     if (Array.isArray(p.previews)) {
       try {
         p.previews.sort(function(a, b) {
+          var ta = a && typeof a.captured_at === 'number' && isFinite(a.captured_at) ? a.captured_at : null;
+          var tb = b && typeof b.captured_at === 'number' && isFinite(b.captured_at) ? b.captured_at : null;
+          if (ta != null && tb != null && ta !== tb) return ta - tb;
+          if (ta != null && tb == null) return -1;
+          if (ta == null && tb != null) return 1;
           var sa = (a && (a.stem || a.name)) || '';
           var sb = (b && (b.stem || b.name)) || '';
           return String(sa).localeCompare(String(sb), undefined, { numeric: true, sensitivity: 'base' });
