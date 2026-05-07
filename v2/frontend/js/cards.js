@@ -439,9 +439,11 @@ function cpPackRows(slots) {
 function cpRenderCard() {
   var view = document.getElementById('cp-view');
   var proj = getActiveProject();
-  if (!proj || !proj.cards || App.currentCardIdx < 0) { cpShowEmpty(); return; }
+  if (!proj || !proj.cards || App.currentCardIdx < 0
+      || App.currentCardIdx >= proj.cards.length) { cpShowEmpty(); return; }
 
   var card = proj.cards[App.currentCardIdx];
+  if (!card) { cpShowEmpty(); return; }
   var idx = App.currentCardIdx;
   var totalSlots = card.slots ? card.slots.length : 0;
 
@@ -611,12 +613,21 @@ function cpSlotHTML(slotIdx, span, hasHero) {
   var toolbar = '<div class="slot-toolbar"></div>';
 
   if (slot.dataUrl || slot.file) {
-    /* Версионно-зависимый src: ищем pv-объект и берём актуальное превью */
+    /* Версионно-зависимый src: ищем pv-объект и берём актуальное превью.
+       Маша 2026-05-06: «нужно чтобы учитывалось только название а
+       формат (расширение) не влиял (при загрузке превью)». При
+       подмене .CR3 превью на .jpg high-res имена слота и preview
+       расходятся — раньше lookup промахивался, теперь нормализуем
+       обе стороны до stem'а. */
     var src = '';
     if (slot.file && proj.previews && typeof pvGetPreview === 'function') {
+      var slotStem = String(slot.file).replace(/\.[^.\\/]+$/, '');
       for (var pi = 0; pi < proj.previews.length; pi++) {
-        if (proj.previews[pi].name === slot.file) {
-          src = pvGetPreview(proj.previews[pi]) || pvGetThumb(proj.previews[pi]) || '';
+        var pv = proj.previews[pi];
+        if (!pv) continue;
+        var pvStem = pv.stem || (pv.name ? String(pv.name).replace(/\.[^.\\/]+$/, '') : '');
+        if (pv.name === slot.file || pvStem === slotStem) {
+          src = pvGetPreview(pv) || pvGetThumb(pv) || '';
           break;
         }
       }
@@ -865,8 +876,12 @@ function cpShowFullscreen(slotIdx, e) {
      Слот карточки всегда открывает только свою фотографию. */
   if (slot.file && proj.previews && typeof _pvLbOpen === 'function') {
     var pv = null;
+    var slotStem2 = String(slot.file).replace(/\.[^.\\/]+$/, '');
     for (var pi = 0; pi < proj.previews.length; pi++) {
-      if (proj.previews[pi].name === slot.file) { pv = proj.previews[pi]; break; }
+      var pvX = proj.previews[pi];
+      if (!pvX) continue;
+      var pvStem2 = pvX.stem || (pvX.name ? String(pvX.name).replace(/\.[^.\\/]+$/, '') : '');
+      if (pvX.name === slot.file || pvStem2 === slotStem2) { pv = pvX; break; }
     }
     if (pv) {
       _pvLbList = [pv];
