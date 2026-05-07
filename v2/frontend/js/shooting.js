@@ -512,10 +512,14 @@ function smEnsurePhoto(proj, info) {
 
 /* Извлекает хвостовые цифры stem'а — это camera counter. Маша 2026-05-07
    просила сортировать по нему как primary key. EKONIKA_2026-05-060335 →
-   060335 → 60335. parseInt чтобы 0301 / 301 сравнивались корректно. */
+   060335 → 60335. parseInt чтобы 0301 / 301 сравнивались корректно.
+   ВАЖНО: вход может прийти как `name` с расширением (`....jpg`) — это
+   случай sbDownloadPreviews, где stem не сохраняется. Сначала срезаем
+   расширение, иначе regex упирается в `.jpg` и возвращает null. */
 function _smTailCounter(s) {
   if (!s) return null;
-  var m = String(s).match(/(\d+)$/);
+  var stem = String(s).replace(/\.[^.]+$/, '');
+  var m = stem.match(/(\d+)$/);
   if (!m) return null;
   var n = parseInt(m[1], 10);
   return isFinite(n) ? n : null;
