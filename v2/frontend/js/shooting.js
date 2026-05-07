@@ -671,6 +671,114 @@ function _smShouldKeepPhoto(p) {
   return false;
 }
 
+/* Dev helper — выпиливает превью с captured_at в указанной локальной
+   дате (или диапазоне дат) из активного проекта. Также чистит ссылки
+   на эти фото в card slots и otherContent. После — shAutoSave +
+   pvRenderAll + cpRenderCards. Маша 2026-05-07: «почисть пожалуйста
+   проект от вчерашней даты». Вызов из DevTools console:
+       smPurgeByDate('2026-05-06')                  // одна дата
+       smPurgeByDate('2026-05-06', '2026-05-06')    // диапазон [from, to]
+   Возвращает {removed, remaining}. Идемпотентен. */
+window.smPurgeByDate = function(fromDate, toDate) {
+  var proj = (typeof smCurrentProj === 'function') ? smCurrentProj() : null;
+  if (!proj) {
+    console.warn('[smPurgeByDate] no active project'); return null;
+  }
+  if (!toDate) toDate = fromDate;
+  function _dayBoundary(s, endOfDay) {
+    // 'YYYY-MM-DD' → epoch seconds at local midnight (or next midnight)
+    var parts = String(s).split('-');
+    if (parts.length !== 3) return null;
+    var y = parseInt(parts[0], 10), m = parseInt(parts[1], 10) - 1, d = parseInt(parts[2], 10);
+    if (!isFinite(y) || !isFinite(m) || !isFinite(d)) return null;
+    if (endOfDay) d += 1;
+    return new Date(y, m, d, 0, 0, 0, 0).getTime() / 1000;
+  }
+  var fromTs = _dayBoundary(fromDate, false);
+  var toTs   = _dayBoundary(toDate, true);
+  if (fromTs == null || toTs == null) {
+    console.warn('[smPurgeByDate] bad date format, expected YYYY-MM-DD'); return null;
+  }
+  // Старым превью могло не достаться captured_at — для них fallback на
+  // строку в stem'е: ищем 'YYYY-MM-DD' в любом месте имени для каждой
+  // даты в диапазоне (одна дата → один substring; диапазон длиннее
+  // одной недели — fallback не сработает, считаем редким случаем).
+  var stemDates = [];
+  for (var dx = fromTs; dx < toTs; dx += 86400) {
+    var dt = new Date(dx * 1000);
+    var ds = dt.getFullYear() + '-' +
+             String(dt.getMonth() + 1).padStart(2, '0') + '-' +
+             String(dt.getDate()).padStart(2, '0');
+    stemDates.push(ds);
+  }
+  function _stemMatchesRange(name) {
+    if (!name) return false;
+    var s = String(name);
+    for (var di = 0; di < stemDates.length; di++) {
+      if (s.indexOf(stemDates[di]) !== -1) return true;
+    }
+    return false;
+  }
+  var removed = [];
+  if (Array.isArray(proj.previews)) {
+    for (var i = proj.previews.length - 1; i >= 0; i--) {
+      var pv = proj.previews[i];
+      if (!pv) continue;
+      var ts = (typeof pv.captured_at === 'number' && isFinite(pv.captured_at)) ? pv.captured_at : null;
+      var hit = false;
+      if (ts != null) {
+        hit = (ts >= fromTs && ts < toTs);
+      } else {
+        // fallback на substring даты в имени/stem'е
+        hit = _stemMatchesRange(pv.stem) || _stemMatchesRange(pv.name);
+      }
+      if (hit) {
+        removed.push(pv.name || pv.stem);
+        proj.previews.splice(i, 1);
+      }
+    }
+  }
+  // Освободить slots в карточках, на которые ссылаются удалённые
+  var removedSet = {};
+  for (var k = 0; k < removed.length; k++) {
+    if (removed[k]) {
+      var nm = String(removed[k]);
+      removedSet[nm] = true;
+      removedSet[nm.replace(/\.[^.]+$/, '')] = true;
+    }
+  }
+  if (Array.isArray(proj.cards)) {
+    for (var ci = 0; ci < proj.cards.length; ci++) {
+      var slots = proj.cards[ci].slots || [];
+      for (var si = 0; si < slots.length; si++) {
+        var sf = slots[si].file || '';
+        var sStem = String(sf).replace(/\.[^.]+$/, '');
+        if (removedSet[sf] || removedSet[sStem]) {
+          slots[si].file = '';
+          slots[si].stem = '';
+          slots[si].dataUrl = '';
+          slots[si].preview = '';
+          slots[si].thumb = '';
+        }
+      }
+    }
+  }
+  // Допконтент тоже
+  if (Array.isArray(proj.otherContent)) {
+    for (var oi = proj.otherContent.length - 1; oi >= 0; oi--) {
+      var oc = proj.otherContent[oi];
+      if (oc && (removedSet[oc.name] || removedSet[String(oc.name).replace(/\.[^.]+$/, '')])) {
+        proj.otherContent.splice(oi, 1);
+      }
+    }
+  }
+  try { if (typeof shAutoSave === 'function') shAutoSave(); } catch (e) {}
+  try { if (typeof pvRenderAll === 'function') pvRenderAll(); } catch (e) {}
+  try { if (typeof cpRenderCards === 'function') cpRenderCards(); } catch (e) {}
+  console.log('[smPurgeByDate] removed', removed.length, removed);
+  return { removed: removed, remaining: (proj.previews || []).length };
+};
+
 function _smRemovePhotoByStem(proj, stem) {
   if (!stem || !Array.isArray(proj.previews)) return;
   for (var i = proj.previews.length - 1; i >= 0; i--) {
