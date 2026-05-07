@@ -3742,7 +3742,7 @@ function shRenderClientBar() {
         '</div>';
     } else {
       /* Ещё не согласовано — стандартные кнопки */
-      subtitle = 'Просмотрите карточки и примите решение';
+      subtitle = 'Можно отредактировать отбор — изменения сохранятся';
       buttonsHtml =
         '<div class="client-bar-buttons">' +
           '<button class="btn client-btn-extra" onclick="shClientRequestExtra()">Запросить доп. кадры</button>' +
