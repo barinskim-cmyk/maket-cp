@@ -1,8 +1,9 @@
-"""CosRepository — поиск и обновление .cos файлов Capture One."""
+"""CosRepository — поиск, чтение и обновление .cos файлов Capture One."""
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from typing import Optional
 
 
 class CosRepository:
@@ -10,7 +11,11 @@ class CosRepository:
 
     .cos — XML-файлы с настройками обработки каждого кадра.
     Имя файла: <photo_stem>.<ext>.cos (например IMG_0001.CR3.cos).
-    Содержат тег <E K="Basic_Rating" V="5"/> для рейтинга.
+    Содержат:
+      - <E K="Basic_Rating" V="5"/>      рейтинг
+      - <E K="Exp_Date"     V="..."/>    UNIX-таймштамп съёмки
+      - <KeywordsContainer><K N="..."/>… ключевые слова (Form A)
+      - <E K="Keywords"     V="kw1; …"/> ключевые слова (Form B, legacy)
     """
 
     def __init__(self, session_root: Path):
@@ -41,6 +46,112 @@ class CosRepository:
         """Найти .cos файлы по стему фотографии."""
         index = self.build_index()
         return index.get(stem, [])
+
+    # ── Read API (used by SessionWatcher) ──
+
+    def read_metadata(self, cos_path: Path) -> dict:
+        """Read rating + keywords + exp_date from a .cos file.
+
+        Returns a dict {"rating": int|None, "keywords": list[str],
+        "exp_date": float|None}. Robust to missing tags; never raises on
+        parse error (returns the empty default).
+
+        Schema:
+        - Rating:    <E K="Basic_Rating" V="N"/>
+        - Exp_Date:  <E K="Exp_Date"     V="<unix-seconds-float>"/>
+        - Keywords:  <KeywordsContainer><K N="kw1" S="set"/>…</KeywordsContainer>
+          Some C1 versions store keywords as <E K="Keywords" V="kw1; kw2"/> —
+          either form accepted.
+        """
+        try:
+            data = cos_path.read_bytes()
+            root = ET.fromstring(data)
+        except Exception:
+            return {"rating": None, "keywords": [], "exp_date": None}
+
+        # NB 2026-05-02: C1 stores Basic_Rating AT LEAST TWICE per .cos —
+        # an initial "0" entry from import time and a later entry with the
+        # current rating. Earlier code `break`-ed on the first match and
+        # always reported 0 for any photo that started at zero. We keep
+        # iterating and take the last value, which is what C1 itself reads.
+        rating: int | None = None
+        # 2026-05-07: Exp_Date — UNIX timestamp момента срабатывания затвора,
+        # который C1 записывает в .cos при импорте. Источник истины для
+        # capture-time, в отличие от mtime файла, который сбивается при copy.
+        exp_date: float | None = None
+        for elem in root.iter("E"):
+            k = elem.get("K")
+            if k == "Basic_Rating":
+                try:
+                    rating = int(elem.get("V") or "")
+                except (TypeError, ValueError):
+                    rating = None
+                # no break — keep iterating so the latest value wins
+            elif k == "Exp_Date" and exp_date is None:
+                try:
+                    exp_date = float(elem.get("V") or "")
+                except (TypeError, ValueError):
+                    exp_date = None
+
+        keywords: list[str] = []
+        # Form A: dedicated container
+        container = root.find(".//KeywordsContainer")
+        if container is not None:
+            for kk in container.findall("K"):
+                name = kk.get("N")
+                if name:
+                    keywords.append(name)
+        # Form B: legacy single E tag (semicolon-joined)
+        if not keywords:
+            for elem in root.iter("E"):
+                if elem.get("K") in ("Keywords", "IPTC_Keywords"):
+                    raw = elem.get("V") or ""
+                    keywords = [s.strip() for s in raw.split(";") if s.strip()]
+                    break
+
+        return {"rating": rating, "keywords": keywords, "exp_date": exp_date}
+
+    def read_exp_date(self, cos_path: Path) -> Optional[float]:
+        """Чистое чтение Exp_Date — UNIX-таймштамп съёмки. None если нет."""
+        return self.read_metadata(cos_path).get("exp_date")
+
+    def update_keywords(self, cos_path: Path, keywords: list[str], backup: bool = True) -> bool:
+        """Add keywords to a .cos file (union with existing).
+
+        Used by HotkeyService to tag selected variants with `_card:<uuid>` and
+        `_slot:<n>`. Never removes existing keywords. Returns True if file
+        was modified.
+        """
+        if not keywords:
+            return False
+        data = cos_path.read_bytes()
+        try:
+            root = ET.fromstring(data)
+        except ET.ParseError as e:
+            raise RuntimeError(f"XML parse error in {cos_path}: {e}") from e
+
+        container = root.find(".//KeywordsContainer")
+        if container is None:
+            dl = root.find(".//DL")
+            if dl is None:
+                raise RuntimeError(f"<DL> tag missing in {cos_path}")
+            container = ET.SubElement(dl, "KeywordsContainer")
+
+        existing = {k.get("N") for k in container.findall("K") if k.get("N")}
+        changed = False
+        for kw in keywords:
+            if kw and kw not in existing:
+                ET.SubElement(container, "K", {"N": kw, "S": "MaketCP"})
+                existing.add(kw)
+                changed = True
+
+        if changed:
+            if backup:
+                bak = cos_path.with_suffix(cos_path.suffix + ".bak")
+                if not bak.exists():
+                    bak.write_bytes(data)
+            cos_path.write_bytes(ET.tostring(root, encoding="utf-8", xml_declaration=True))
+        return changed
 
     def update_rating(self, cos_path: Path, rating: str, backup: bool = True) -> bool:
         """Обновить Basic_Rating в .cos файле.

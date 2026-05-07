@@ -10,6 +10,7 @@ import os
 import sys
 import threading
 from pathlib import Path
+from typing import Optional
 
 import webview
 
@@ -841,16 +842,60 @@ class AppAPI:
                 img.thumbnail((edge, edge), Image.LANCZOS)
             buf = io.BytesIO()
             img.save(buf, format="JPEG", quality=82, optimize=True)
-            return {
+            # Маша 2026-05-07: «давай сохранять [время съёмки] даже когда
+            # грузим превью». Параллельно с превью пробуем достать Exp_Date
+            # из .cos-сайдкара — frontend кладёт его на photo, gallery
+            # сортируется по нему. Не критично если упало.
+            captured_at = _read_c1_exp_date(p)
+            out = {
                 "data_url": "data:image/jpeg;base64,"
                             + base64.b64encode(buf.getvalue()).decode("ascii"),
                 "width": img.width,
                 "height": img.height,
                 "source": source,
             }
+            if captured_at is not None:
+                out["captured_at"] = captured_at
+            return out
 
         import subprocess
         import tempfile
+
+        def _read_c1_exp_date(image_path: Path) -> Optional[float]:
+            """Read `Exp_Date` (UNIX timestamp of shutter) from .cos sidecar.
+
+            Layout matches _read_c1_rotation. Returns None if .cos missing,
+            tag absent, or parse fails — caller should not depend on it.
+            Маша 2026-05-07: capture-time живёт в Exp_Date, hotkey path
+            и watcher seed уже его читают; preview-load теперь тоже.
+            """
+            try:
+                cap_co = image_path.parent / "CaptureOne"
+                if not cap_co.is_dir():
+                    return None
+                target = image_path.name + ".cos"
+                for settings_dir in cap_co.iterdir():
+                    if not settings_dir.is_dir():
+                        continue
+                    if not settings_dir.name.startswith("Settings"):
+                        continue
+                    cos_path = settings_dir / target
+                    if cos_path.exists() and not cos_path.name.startswith("._"):
+                        import xml.etree.ElementTree as ET
+                        try:
+                            root = ET.fromstring(cos_path.read_bytes())
+                        except Exception:
+                            return None
+                        for elem in root.iter("E"):
+                            if elem.get("K") == "Exp_Date":
+                                try:
+                                    return float(elem.get("V") or "")
+                                except (TypeError, ValueError):
+                                    return None
+                        return None
+            except Exception:
+                pass
+            return None
 
         def _read_c1_rotation(image_path: Path) -> int:
             """Read the `Rotation` field from C1's .cos sidecar.

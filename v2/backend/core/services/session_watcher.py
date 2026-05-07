@@ -198,14 +198,16 @@ class SessionWatcher:
                 if rating is not None and rating >= self.rating_threshold:
                     img_path = self._parent_image_path(cos)
                     img_path_str = str(img_path) if img_path else None
-                    captured_at_seed = None
-                    try:
-                        if img_path is not None and img_path.exists():
-                            captured_at_seed = float(img_path.stat().st_mtime)
-                        else:
-                            captured_at_seed = float(cos.stat().st_mtime)
-                    except Exception:
-                        captured_at_seed = None
+                    # Primary source — Exp_Date из meta; fallback на mtime.
+                    captured_at_seed = meta.get("exp_date")
+                    if captured_at_seed is None:
+                        try:
+                            if img_path is not None and img_path.exists():
+                                captured_at_seed = float(img_path.stat().st_mtime)
+                            else:
+                                captured_at_seed = float(cos.stat().st_mtime)
+                        except Exception:
+                            captured_at_seed = None
                     self.on_event("photo_added", {
                         "stem": stem,
                         "path": str(cos),
@@ -269,21 +271,20 @@ class SessionWatcher:
         new_keywords: list[str] = list(meta["keywords"])
         img_path = self._parent_image_path(cos_path)
         img_path_str = str(img_path) if img_path else None
-        # Маша 2026-05-06: «давай при загрузке будем извлекать дату и
-        # время съёмки из exif или из чего мы там рейтинг тащим». Источник
-        # правды дешёвый — mtime источника (камера ставит capture-time на
-        # файл при импорте; для RAW в C1-сессии это и есть момент съёмки).
-        # EXIF DateTimeOriginal был бы строже, но для CR3 без exiftool это
-        # отдельная зависимость. mtime даёт ту же монотонность, которой
-        # достаточно для сортировки по съёмке. Fallback — mtime .cos.
-        captured_at = None
-        try:
-            if img_path is not None and img_path.exists():
-                captured_at = float(img_path.stat().st_mtime)
-            else:
-                captured_at = float(cos_path.stat().st_mtime)
-        except Exception:
-            captured_at = None
+        # Маша 2026-05-07: «давай сохранять [время съёмки] даже когда грузим
+        # превью». Primary source — Exp_Date из .cos (UNIX-таймштамп момента
+        # затвора, который C1 записывает при импорте). Если его нет — fallback
+        # на mtime image-файла, далее mtime .cos. Exp_Date устойчив к copy/touch
+        # и доступен из того же XML где и rating, без отдельной зависимости.
+        captured_at = meta.get("exp_date")
+        if captured_at is None:
+            try:
+                if img_path is not None and img_path.exists():
+                    captured_at = float(img_path.stat().st_mtime)
+                else:
+                    captured_at = float(cos_path.stat().st_mtime)
+            except Exception:
+                captured_at = None
 
         with self._lock:
             prev = self._states.get(stem)

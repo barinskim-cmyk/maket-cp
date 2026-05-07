@@ -612,6 +612,14 @@ function _smThumbDrain() {
         if (res && res.data_url) {
           ph.preview = res.data_url;
           ph.thumb = res.data_url;
+          // Маша 2026-05-07: «давай сохранять [время съёмки] даже когда
+          // грузим превью». shoot_get_thumb теперь параллельно с jpeg'ом
+          // отдаёт captured_at (Exp_Date из .cos). Если у photo его ещё
+          // нет (watcher seed мог не сработать на старте) — кладём.
+          if (typeof res.captured_at === 'number' && isFinite(res.captured_at)
+              && (ph.captured_at == null || !isFinite(ph.captured_at))) {
+            ph.captured_at = res.captured_at;
+          }
           var proj = smCurrentProj();
           if (proj && Array.isArray(proj.cards)) {
             for (var ci = 0; ci < proj.cards.length; ci++) {
