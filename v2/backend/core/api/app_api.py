@@ -911,6 +911,45 @@ class AppAPI:
             except Exception:
                 return False
 
+        # ── Stage 0: Maket CP Preview export from C1 ────────────────────────
+        # «Загрузить превью из C1» button triggers Process Recipe with
+        # output going to <session>/Output/MaketCP_Previews/<stem>.jpg
+        # (full-res, sRGB, with the photographer's CC applied because C1
+        # rendered it). Маша 2026-05-06: «при перезагрузке произойдет
+        # замена» — yes: when this stage finds a JPG it returns it instead
+        # of falling through to .cot, so the gallery and card slots swap
+        # to the high-res render.
+        try:
+            # Walk up from <session>/Capture/ to find the session root and
+            # check Output/MaketCP_Previews/<stem>.<ext> for any JPG that
+            # matches the source stem (extension-agnostic — Маша's «формат
+            # не должен влиять» rule).
+            session_root = p.parent
+            # If the photo lives under <session>/Capture/<...>, p.parent
+            # ends with 'Capture'. Walk up until we leave that subtree.
+            for cap_check in [p.parent, p.parent.parent, p.parent.parent.parent]:
+                cand = cap_check.parent / "Output" / "MaketCP_Previews"
+                if cand.is_dir():
+                    session_root = cap_check.parent
+                    break
+            export_dir = session_root / "Output" / "MaketCP_Previews"
+            if export_dir.is_dir():
+                stem_only = p.stem
+                # Match any extension — we wrote them as .jpg, but stay
+                # tolerant of .jpeg / .tif / .tiff / future renames.
+                for fn in export_dir.iterdir():
+                    if fn.name.startswith("._"):
+                        continue
+                    if fn.is_file() and fn.stem == stem_only:
+                        try:
+                            img = Image.open(fn)
+                            img.load()
+                            return _encode(img, "c1_export")
+                        except Exception:
+                            pass
+        except Exception:
+            pass
+
         # ── Stage 1: Capture One Thumbnails (.cot — only source with CC) ────
         # Маша 2026-05-02: «явно смещённый ББ и отсутствуют коррекции»
         # после .cop захода. Diagnosed: .cop is the camera-embedded JPEG
