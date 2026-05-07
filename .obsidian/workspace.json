@@ -1,0 +1,220 @@
+{
+  "main": {
+    "id": "60d616e252c2ea0a",
+    "type": "split",
+    "children": [
+      {
+        "id": "7a406e032e5b0f98",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "a0b1719884c2c23e",
+            "type": "leaf",
+            "state": {
+              "type": "graph",
+              "state": {},
+              "icon": "lucide-git-fork",
+              "title": "Граф"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "a3af5a5c2c4b13cc",
+    "type": "split",
+    "children": [
+      {
+        "id": "d510f5beb9dd5822",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "c27d251376c084ae",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Файловый менеджер"
+            }
+          },
+          {
+            "id": "17582f0173ba11b5",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Поиск"
+            }
+          },
+          {
+            "id": "29c4061bb2055db7",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Закладки"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "c33be27157391fbb",
+    "type": "split",
+    "children": [
+      {
+        "id": "fb3a8e69afbb9bce",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "871f37b0174bdbb7",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Обратные ссылки"
+            }
+          },
+          {
+            "id": "79de4975521c7ab7",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Исходящие ссылки"
+            }
+          },
+          {
+            "id": "9ed8f612ec450da9",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Теги"
+            }
+          },
+          {
+            "id": "2cd9460ebff684be",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "Все свойства"
+            }
+          },
+          {
+            "id": "d09d9795e1df0505",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Структура"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Меню быстрого перехода": false,
+      "graph:Граф": false,
+      "canvas:Создать новый холст": false,
+      "daily-notes:Сегодняшняя заметка": false,
+      "templates:Вставить шаблон": false,
+      "command-palette:Открыть палитру команд": false,
+      "bases:Создать новую базу": false
+    }
+  },
+  "active": "a0b1719884c2c23e",
+  "lastOpenFiles": [
+    "v2/frontend/js/_smoke.js",
+    "v2/frontend/js/events.js",
+    "v2/frontend/js/error-reporter.js",
+    "docs/agents/dev/error-telemetry.md",
+    "docs/agents/dev/post-approval-safeguard.md",
+    "v2/frontend/js/post-approval-safeguard.js",
+    "bugs/2026-04-27-shared-hide-verified-checkboxes.md",
+    "bugs/_artifacts/2026-04-27-shared-hide-verified/screenshot_mixed.png",
+    "bugs/_artifacts/2026-04-27-shared-hide-verified/visual_demo_mixed.html",
+    "bugs/_artifacts/2026-04-27-shared-hide-verified/screenshot_after.png",
+    "bugs/_artifacts/2026-04-27-shared-hide-verified/visual_demo.html",
+    "bugs/_artifacts/2026-04-27-shared-hide-verified/verify_decoupling.mjs",
+    "bugs/_artifacts/2026-04-27-shared-hide-verified",
+    "bugs/_artifacts",
+    "docs/agents/dev/status-2026-04-26.md",
+    "bugs/2026-04-25-pipeline-counter-after-selection.md",
+    "docs/agents/dev/prd-per-brand-rename.md",
+    "docs/agents/design/compare-view/handoff-pa.md",
+    "docs/agents/design/compare-view/handoff.md",
+    "tests/e2e/pending/photo-versions-full.spec.ts.draft",
+    "docs/agents/dev/compare-view-integration-notes.md",
+    "docs/agents/design/compare-view/copy.md",
+    "v2/frontend/js/compare-view.js",
+    "docs/agents/qa/test-plans/photo-versions-regression.md",
+    "docs/agents/design/compare-view/spec.md",
+    "bugs/2026-04-24-share-link-mobile-save-error.md",
+    "docs/agents/legal/drafts/oferta-v1.1.md",
+    "docs/agents/legal/drafts/oferta-v1.0-backup.md",
+    "people/candidate-a-tracker.md",
+    "people/README.md",
+    "docs/agents/ops/_agent.md",
+    "docs/agents/legal/_agent.md",
+    "docs/agents/qa/_agent.md",
+    "docs/agents/design/_agent.md",
+    "docs/agents/marketing/_agent.md",
+    "docs/agents/clients/_agent.md",
+    "docs/agents/dev/_agent.md",
+    "Без названия.canvas"
+  ]
+}
