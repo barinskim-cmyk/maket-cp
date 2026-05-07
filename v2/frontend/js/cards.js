@@ -3034,54 +3034,53 @@ function cpMobileRenderFeed() {
     html += '<div class="mob-card-divider">Карточка ' + (ci + 1) + ' / ' + proj.cards.length + '</div>';
     html += '<div class="mob-card-slots">';
 
-    /* Маша 2026-05-07: justified-layout (Flickr/Яндекс.Диск) вместо
-       template-aspect-ratio. Натуральные пропорции фото, без crop'а
-       и без дыр между плитками. */
-    var _mobPvIndex = (typeof _layBuildPvIndex === 'function') ? _layBuildPvIndex(proj) : {};
-    var _mobTemplate = {
-      hAspect: card._hAspect || '3/2',
-      vAspect: card._vAspect || '2/3',
-      hasHero: cardHasHero
-    };
-    var _mobAspectFn = function (slot) {
-      if (typeof _layResolveAspect === 'function') {
-        return _layResolveAspect(slot, _mobPvIndex, _mobTemplate);
-      }
-      var or = slot.orient || 'v';
-      return or === 'h' ? 1.5 : 0.6667;
-    };
-    var _mobSlotHTML = function (si) {
+    for (var si = 0; si < card.slots.length; si++) {
       var slot = card.slots[si];
-      if (!slot) return '';
+      var orient = slot.orient || 'v';
+      var isHero = (cardHasHero && si === 0);
+      var weight = slot.weight || 1;
+      var isHeroByWeight = (weight >= 2 && si === 0);
+
+      /* Класс слота: hero/h/v */
+      var slotClass = 'mob-slot-v';
+      if (isHero || isHeroByWeight) slotClass = 'mob-slot-hero';
+      else if (orient === 'h') slotClass = 'mob-slot-h';
+
+      /* Aspect ratio из шаблона карточки (например '2/3', '3/4', '4/5').
+         Для вертикальных берём _vAspect, для горизонтальных — _hAspect.
+         Hero-слот показывается в полную ширину без фиксированного соотношения. */
+      var slotStyle = '';
+      if (slotClass === 'mob-slot-v') {
+        var vAspect = card._vAspect || '2/3';
+        slotStyle = ' style="aspect-ratio:' + vAspect.replace('/', ' / ') + '"';
+      } else if (slotClass === 'mob-slot-h') {
+        var hAspect = card._hAspect || '3/2';
+        slotStyle = ' style="aspect-ratio:' + hAspect.replace('/', ' / ') + '"';
+      }
+
       var hasFoto = slot.file || slot.dataUrl;
+
       if (hasFoto) {
         var src = slot.dataUrl || slot.thumbUrl || slot.thumb || '';
-        var s = '';
-        s += '<div class="mob-carousel-wrap" data-card="' + ci + '" data-slot="' + si + '">';
-        s += '<img src="' + src + '" loading="lazy">';
-        s += '<div class="mob-carousel-controls mob-controls-hidden" data-controls="' + ci + '-' + si + '">';
-        s += '<div class="mob-carousel-arrows">';
-        s += '<button class="mob-carousel-arrow" onclick="cpMobileCarousel(' + ci + ',' + si + ',-1,event)">&lsaquo;</button>';
-        s += '<button class="mob-carousel-arrow" onclick="cpMobileCarousel(' + ci + ',' + si + ',1,event)">&rsaquo;</button>';
-        s += '</div>';
-        s += '<button class="mob-slot-zoom" onclick="cpMobileSlotFullscreen(' + ci + ',' + si + ',event)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>';
-        s += '<button class="mob-slot-remove" onclick="cpMobileClearSlot(' + ci + ',' + si + ')">&times;</button>';
-        s += '</div>';
-        s += '</div>';
-        return s;
+        html += '<div class="' + slotClass + ' mob-carousel-wrap"' + slotStyle + ' data-card="' + ci + '" data-slot="' + si + '">';
+        html += '<img src="' + src + '" loading="lazy">';
+        /* Стрелки и удаление — скрыты, появляются по тапу на этот слот */
+        html += '<div class="mob-carousel-controls mob-controls-hidden" data-controls="' + ci + '-' + si + '">';
+        html += '<div class="mob-carousel-arrows">';
+        html += '<button class="mob-carousel-arrow" onclick="cpMobileCarousel(' + ci + ',' + si + ',-1,event)">&lsaquo;</button>';
+        html += '<button class="mob-carousel-arrow" onclick="cpMobileCarousel(' + ci + ',' + si + ',1,event)">&rsaquo;</button>';
+        html += '</div>';
+        html += '<button class="mob-slot-zoom" onclick="cpMobileSlotFullscreen(' + ci + ',' + si + ',event)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>';
+        html += '<button class="mob-slot-remove" onclick="cpMobileClearSlot(' + ci + ',' + si + ')">&times;</button>';
+        html += '</div>';
+        html += '</div>';
+      } else {
+        /* Пустой слот */
+        html += '<div class="' + slotClass + ' mob-slot-empty"' + slotStyle + ' data-card="' + ci + '" data-slot="' + si + '">';
+        html += '<div class="mob-slot-empty-text">Нажмите дважды чтобы добавить фото</div>';
+        html += '</div>';
       }
-      var ee = '<div class="mob-slot-empty" data-card="' + ci + '" data-slot="' + si + '">';
-      ee += '<div class="mob-slot-empty-text">Нажмите дважды чтобы добавить фото</div>';
-      ee += '</div>';
-      return ee;
-    };
-    var _mobIsNarrow = (typeof window !== 'undefined' && window.innerWidth && window.innerWidth < 768);
-    html += layJustifiedHTML(card.slots, _mobSlotHTML, {
-      targetRowHeight: _mobIsNarrow ? 200 : 280,
-      boxSpacing: 0,
-      containerPadding: 0,
-      aspectFn: _mobAspectFn
-    });
+    }
 
     html += '</div>'; /* mob-card-slots */
 

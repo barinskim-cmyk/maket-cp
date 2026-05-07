@@ -2142,9 +2142,10 @@ body.mob-client-mode html {
   color: #888; background: #f5f5f5;
 }
 .mob-card-slots {
-  /* Маша 2026-05-07: justified-layout сам считает позиции слотов через
-     padding-top trick (.lay-just); тут только zero gap container. */
-  display: block;
+  /* Маша 2026-05-07: «должна быть непрерывная плитка» — между слотами
+     одной карточки никаких зазоров и наружного padding'а. Правило:
+     hero и горизонталь на всю ширину, вертикали по 2 в ряд. */
+  display: flex; flex-wrap: wrap; gap: 0;
   padding: 0;
 }
 

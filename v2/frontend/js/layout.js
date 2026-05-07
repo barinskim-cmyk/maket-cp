@@ -509,22 +509,27 @@ function layBuildLayout(card, template, slotHTMLFn) {
     return '<div class="lay-container"><div class="cp-empty">Добавьте слоты кнопкой +</div></div>';
   }
 
-  /* Маша 2026-05-07: переходим на justified-layout (Flickr / Яндекс.Диск).
-     Шаблоны (h_aspect/v_aspect/hasHero/lockRows) больше не управляют
-     раскладкой — только сохраняют структуру слотов. Aspect берём из
-     натурального width/height фото (proj.previews[].width/height), а
-     если фото ещё не загружено — fallback на slot.orient. */
-  var proj = (typeof getActiveProject === 'function') ? getActiveProject() : null;
-  var pvIndex = _layBuildPvIndex(proj);
+  var hAspect = (template && template.hAspect) || '3/2';
+  var vAspect = (template && template.vAspect) || '2/3';
+  var lockRows = (template && template.lockRows) || false;
+  var hasHero = (template && template.hasHero !== undefined) ? template.hasHero : undefined;
 
-  return layJustifiedHTML(slots, slotHTMLFn, {
-    targetRowHeight: 280,
-    boxSpacing: 0,
-    containerPadding: 0,
-    aspectFn: function (slot) {
-      return _layResolveAspect(slot, pvIndex, template);
-    }
-  });
+  var mode = layDetectMode(slots, hasHero);
+
+  if (mode === 'equal') {
+    return _layBuildEqual(slots, hAspect, vAspect, lockRows, slotHTMLFn);
+  }
+
+  var heroIdx = layFindPrimaryHero(slots, hasHero);
+  var restIdxs = [];
+  for (var i = 0; i < slots.length; i++) {
+    if (i !== heroIdx) restIdxs.push(i);
+  }
+
+  if (mode === 'portrait') {
+    return _layBuildPortrait(slots, heroIdx, restIdxs, hAspect, vAspect, lockRows, slotHTMLFn);
+  }
+  return _layBuildLandscape(slots, heroIdx, restIdxs, hAspect, vAspect, lockRows, slotHTMLFn);
 }
 
 
