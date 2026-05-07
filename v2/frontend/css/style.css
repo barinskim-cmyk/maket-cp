@@ -2148,20 +2148,25 @@ body.mob-client-mode html {
   padding: 0;
 }
 
-/* Hero: на всю ширину */
+/* Hero: на всю ширину. inline aspect-ratio из card-level overrides
+   делает слот фиксированной высоты — img cover-заполняет, излишки
+   обрезаются. Маша 2026-05-07: «фото не масштабируется адекватно,
+   видны куски фона куда фото не влезало». */
 .mob-slot-hero {
-  width: 100%; position: relative;
+  width: 100%; position: relative; overflow: hidden;
 }
 .mob-slot-hero img {
-  width: 100%; height: auto; display: block;
+  width: 100%; height: 100%; display: block;
+  object-fit: cover; position: absolute; top: 0; left: 0;
 }
 
-/* Горизонталь (не hero): на всю ширину */
+/* Горизонталь (не hero): на всю ширину, с фиксированным aspect и cover-img. */
 .mob-slot-h {
-  width: 100%; position: relative;
+  width: 100%; position: relative; overflow: hidden;
 }
 .mob-slot-h img {
-  width: 100%; height: auto; display: block;
+  width: 100%; height: 100%; display: block;
+  object-fit: cover; position: absolute; top: 0; left: 0;
 }
 
 /* Вертикаль: по 2 в ряд. Без -1px компенсации — gap у .mob-card-slots = 0,
