@@ -183,6 +183,16 @@ function createProject() {
     renderProjects();
     shAutoSave();
 
+    /* Маша 2026-05-07: «у нас никто ничего не заливает оно должно
+       автоматически заливаться и сохраняться». Создание проекта —
+       явное действие пользователя; до этого фикса cloud sync ждал
+       первой правки слота / карточки, и если юзер делал reload до
+       любого следующего шага — проект терялся (только localStorage,
+       никаких _cloudId). Стартуем upload сразу после создания. */
+    if (typeof shCloudSyncExplicit === 'function') {
+      try { shCloudSyncExplicit(); } catch (e) {}
+    }
+
     if (mode === 'live' && typeof smStartFromProjectParams === 'function') {
       smStartFromProjectParams({
         brand: brand,
