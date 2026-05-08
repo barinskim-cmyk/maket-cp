@@ -3559,22 +3559,29 @@ function cpMobileRenderSelect() {
     return '<div style="padding:40px 16px;text-align:center;color:#999">Нет фото в отборе</div>';
   }
 
-  var html = '<div class="mob-select">';
+  /* Маша 2026-05-07: Select / Options используют justified-layout
+     (Flickr/Yandex/Google-стиль): натуральные пропорции фото без
+     crop'а, ряды переменной высоты, max 3 фото в ряд на мобилке /
+     5 на десктопе. */
+  var proj = (typeof getActiveProject === 'function') ? getActiveProject() : null;
+  var pvIndex = (typeof _layBuildPvIndex === 'function') ? _layBuildPvIndex(proj) : {};
+  var isNarrow = (typeof window !== 'undefined' && window.innerWidth && window.innerWidth < 768);
 
-  for (var i = 0; i < items.length; i++) {
+  var html = '<div class="mob-select-just">';
+  html += layJustifiedHTML(items, function (i) {
     var it = items[i];
     var src = it.preview || it.thumb || '';
-    if (!src) continue;
-
-    var orient = it.orient || 'v';
-    /* Горизонталь — на всю ширину, вертикаль — по 2 в ряд */
-    var itemClass = orient === 'h' ? 'mob-select-item-h' : 'mob-select-item-v';
-
-    html += '<div class="mob-select-item ' + itemClass + '">';
-    html += '<img src="' + src + '" loading="lazy" onclick="cpMobileSelectFullscreen(' + i + ')">';
-    html += '</div>';
-  }
-
+    if (!src) return '';
+    return '<img src="' + src + '" loading="lazy" onclick="cpMobileSelectFullscreen(' + i + ')">';
+  }, {
+    targetRowHeight: isNarrow ? 200 : 280,
+    boxSpacing: 4,
+    containerPadding: 0,
+    maxItemsPerRow: isNarrow ? 3 : 5,
+    aspectFn: function (it) {
+      return _layItemAspect(it, pvIndex);
+    }
+  });
   html += '</div>';
 
   /* Кнопки согласования */
@@ -3585,6 +3592,23 @@ function cpMobileRenderSelect() {
   html += '</div>';
 
   return html;
+}
+
+/* Helper: aspect для item из Select/Options/Other. Primary — natural
+   width/height из proj.previews по name; fallback — item.orient. */
+function _layItemAspect(item, pvIndex) {
+  if (!item) return 1.5;
+  var key = item.name || item.stem || '';
+  var stemKey = key ? String(key).replace(/\.[^.]+$/, '') : '';
+  var pv = pvIndex && (pvIndex[key] || pvIndex[stemKey]);
+  if (pv && pv.width && pv.height && isFinite(pv.width / pv.height)) {
+    return pv.width / pv.height;
+  }
+  if (item.width && item.height && isFinite(item.width / item.height)) {
+    return item.width / item.height;
+  }
+  var orient = item.orient || 'v';
+  return orient === 'h' ? 1.5 : 0.6667;
 }
 
 /**
@@ -3625,28 +3649,24 @@ function cpMobileRenderOther() {
     return html;
   }
 
-  /* Найти ориентацию через превью, если есть */
-  var pvMap = {};
-  if (proj && proj.previews) {
-    for (var p = 0; p < proj.previews.length; p++) {
-      pvMap[proj.previews[p].name] = proj.previews[p];
+  /* Маша 2026-05-07: Other / контейнеры — justified-layout, max 3/5 в ряд. */
+  var pvIndexOther = (typeof _layBuildPvIndex === 'function') ? _layBuildPvIndex(proj) : {};
+  var isNarrowOther = (typeof window !== 'undefined' && window.innerWidth && window.innerWidth < 768);
+  var otherJustOpts = {
+    targetRowHeight: isNarrowOther ? 200 : 280,
+    boxSpacing: 4,
+    containerPadding: 0,
+    maxItemsPerRow: isNarrowOther ? 3 : 5,
+    aspectFn: function (item) {
+      return _layItemAspect(item, pvIndexOther);
     }
-  }
+  };
 
-  /* Хелпер: генерация плитки фото */
-  function _mobOcTile(item, onclickFn, removeFn) {
+  function _otherTileHTML(item, onclickFn, removeFn) {
     var src = item.preview || item.thumb || '';
     if (!src) return '';
-    var pv = pvMap[item.name];
-    var orient = 'v';
-    if (pv) {
-      orient = (pv.width && pv.height) ? (pv.width > pv.height ? 'h' : 'v') : (pv.orient || 'v');
-    }
-    var itemClass = orient === 'h' ? 'mob-select-item-h' : 'mob-select-item-v';
-    var t = '<div class="mob-select-item ' + itemClass + '">';
-    t += '<img src="' + src + '" loading="lazy" onclick="' + onclickFn + '">';
+    var t = '<img src="' + src + '" loading="lazy" onclick="' + onclickFn + '">';
     t += '<button class="mob-oc-remove" onclick="' + removeFn + '">&times;</button>';
-    t += '</div>';
     return t;
   }
 
@@ -3661,14 +3681,16 @@ function cpMobileRenderOther() {
     html += '<button class="mob-oc-cnt-del" onclick="cpMobileDeleteContainer(' + c + ')">&times;</button>';
     html += '</div>';
     if (items.length > 0) {
-      html += '<div class="mob-select">';
-      for (var i = 0; i < items.length; i++) {
-        html += _mobOcTile(
-          items[i],
-          'cpMobileContainerFullscreen(' + c + ',' + i + ')',
-          'cpMobileContainerRemove(' + c + ',' + i + ',event)'
-        );
-      }
+      html += '<div class="mob-other-just">';
+      html += layJustifiedHTML(items, (function (cIdx, itemsRef) {
+        return function (k) {
+          var it = itemsRef[k];
+          if (!it) return '';
+          return _otherTileHTML(it,
+            'cpMobileContainerFullscreen(' + cIdx + ',' + k + ')',
+            'cpMobileContainerRemove(' + cIdx + ',' + k + ',event)');
+        };
+      })(c, items), otherJustOpts);
       html += '</div>';
     } else {
       html += '<div style="padding:16px;text-align:center;color:#ccc;font-size:13px">Пусто</div>';
@@ -3681,14 +3703,14 @@ function cpMobileRenderOther() {
     if (containers.length > 0) {
       html += '<div style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:0.5px;padding:8px 16px 4px">Свободные фото</div>';
     }
-    html += '<div class="mob-select">';
-    for (var f = 0; f < freeStore.length; f++) {
-      html += _mobOcTile(
-        freeStore[f],
-        'cpMobileOtherFullscreen(' + f + ')',
-        'cpMobileOtherRemove(' + f + ',event)'
-      );
-    }
+    html += '<div class="mob-other-just">';
+    html += layJustifiedHTML(freeStore, function (k) {
+      var it = freeStore[k];
+      if (!it) return '';
+      return _otherTileHTML(it,
+        'cpMobileOtherFullscreen(' + k + ')',
+        'cpMobileOtherRemove(' + k + ',event)');
+    }, otherJustOpts);
     html += '</div>';
   }
 
@@ -3870,33 +3892,48 @@ function cpMobileRenderGallery() {
 
   var minR = _mobOptionsFilter || 0;
 
-  html += '<div class="mob-gallery">';
+  /* Маша 2026-05-07: Options/Gallery — justified-layout как в
+     Яндекс.Диске. Натуральные пропорции, max 3/5 фото в ряд. */
+  var visiblePvs = [];
+  for (var pi = 0; pi < proj.previews.length; pi++) {
+    var pvCheck = proj.previews[pi];
+    if (minR > 0 && (pvCheck.rating || 0) < minR) continue;
+    var srcCheck = pvCheck.preview || pvCheck.thumb || '';
+    if (!srcCheck) continue;
+    visiblePvs.push({ pv: pvCheck, origIdx: pi });
+  }
 
-  for (var i = 0; i < proj.previews.length; i++) {
-    var pv = proj.previews[i];
-
-    /* Фильтр по рейтингу */
-    if (minR > 0 && (pv.rating || 0) < minR) continue;
-
+  var isNarrowOpts = (typeof window !== 'undefined' && window.innerWidth && window.innerWidth < 768);
+  html += '<div class="mob-gallery-just">';
+  html += layJustifiedHTML(visiblePvs, function (k) {
+    var entry = visiblePvs[k];
+    if (!entry) return '';
+    var pv = entry.pv;
+    var origIdx = entry.origIdx;
     var src = pv.preview || pv.thumb || '';
-    if (!src) continue;
-
-    var pvOrient = (pv.width && pv.height) ? (pv.width > pv.height ? 'h' : 'v') :
-      (pv.orient || 'v');
-    var itemClass = pvOrient === 'h' ? 'mob-gallery-item-h' : 'mob-gallery-item-v';
     var pvName = pv.name || pv.stem || '';
     var inCard = cardMap[pvName];
     var inOC = ocMap[pvName];
     var isChecked = (inCard || inOC) ? ' checked' : '';
-
-    html += '<div class="mob-gallery-item ' + itemClass + '">';
-    html += '<img src="' + src + '" loading="lazy" onclick="cpMobileGalleryFullscreen(' + i + ')">';
-    html += '<div class="mob-gallery-check' + isChecked + '" onclick="cpMobileToggleOC(\'' + esc(pvName) + '\',this)">';
-    html += isChecked ? '&#10003;' : '';
-    html += '</div>';
-    html += '</div>';
-  }
-
+    var s = '<img src="' + src + '" loading="lazy" onclick="cpMobileGalleryFullscreen(' + origIdx + ')">';
+    s += '<div class="mob-gallery-check' + isChecked + '" onclick="cpMobileToggleOC(\'' + esc(pvName) + '\',this)">';
+    s += isChecked ? '&#10003;' : '';
+    s += '</div>';
+    return s;
+  }, {
+    targetRowHeight: isNarrowOpts ? 200 : 280,
+    boxSpacing: 4,
+    containerPadding: 0,
+    maxItemsPerRow: isNarrowOpts ? 3 : 5,
+    aspectFn: function (entry) {
+      var pv = entry && entry.pv;
+      if (pv && pv.width && pv.height && isFinite(pv.width / pv.height)) {
+        return pv.width / pv.height;
+      }
+      var or = (pv && pv.orient) || 'v';
+      return or === 'h' ? 1.5 : 0.6667;
+    }
+  });
   html += '</div>';
   return html;
 }
