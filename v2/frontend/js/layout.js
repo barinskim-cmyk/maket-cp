@@ -65,9 +65,7 @@
    ══════════════════════════════════════════════ */
 
 
-var LAY_GAP = 0; /* px — единый gap для всех раскладок. Маша 2026-05-07:
-                    «должна быть непрерывная плитка» — фото должны прилегать
-                    друг к другу без видимого фона между ними. */
+var LAY_GAP = 4; /* px — единый gap для всех раскладок */
 
 
 // ══════════════════════════════════════════════
@@ -94,21 +92,84 @@ var LAY_GAP = 0; /* px — единый gap для всех раскладок. 
 
 var _LAY_JUST_REF_WIDTH = 1060; /* эталонная ширина для justified-layout. */
 
+/* Свой simple justified — поддерживает maxItemsPerRow (это критично для
+   Маша 2026-05-07: «в мобилке max 3 в ряд, в десктопе max 5»).
+   flickr/justified-layout этой опции не имеет. Алгоритм: накапливаем
+   фото в текущий ряд пока (а) не достигли maxItemsPerRow, или (б) пока
+   высота при сложенной сумме aspect'ов опустилась ниже target × 0.7
+   (ряд иначе слишком короткий). Затем «justify»: scale-up последнего
+   ряда до контейнера, чтобы все фото впритык. Натуральный aspect
+   сохраняется, фото не обрезаются. */
+function _laySimpleJustified(aspects, opts) {
+  var cw = opts.containerWidth || 1060;
+  var maxItems = opts.maxItemsPerRow || Number.POSITIVE_INFINITY;
+  var spacing = (opts.boxSpacing != null) ? opts.boxSpacing : 0;
+  var trh = opts.targetRowHeight || 320;
+  var minRowHeight = trh * 0.5;
+
+  var boxes = [];
+  var top = 0;
+  var i = 0;
+  var rowsClosed = 0;
+
+  while (i < aspects.length) {
+    var rowAspects = [];
+    var sumAspect = 0;
+
+    while (i < aspects.length && rowAspects.length < maxItems) {
+      var ar = aspects[i];
+      var trialSum = sumAspect + ar;
+      var availableWidth = cw - (rowAspects.length /* spacing slots */) * spacing;
+      var trialHeight = availableWidth / trialSum;
+
+      if (rowAspects.length === 0) {
+        rowAspects.push(ar);
+        sumAspect = trialSum;
+        i++;
+        if (trialHeight <= trh) break;
+        continue;
+      }
+
+      if (trialHeight < minRowHeight) {
+        break;
+      }
+
+      rowAspects.push(ar);
+      sumAspect = trialSum;
+      i++;
+
+      if (trialHeight <= trh) break;
+    }
+
+    if (rowAspects.length === 0) break;
+
+    var rowAvailableWidth = cw - (rowAspects.length - 1) * spacing;
+    var rowHeight = rowAvailableWidth / sumAspect;
+    var isLastRow = (i >= aspects.length);
+    if (isLastRow && rowHeight > trh * 1.3) {
+      rowHeight = trh;
+    }
+
+    var x = 0;
+    for (var j = 0; j < rowAspects.length; j++) {
+      var w = rowAspects[j] * rowHeight;
+      boxes.push({ left: x, top: top, width: w, height: rowHeight });
+      x += w + spacing;
+    }
+    top += rowHeight + spacing;
+    rowsClosed++;
+  }
+
+  var containerHeight = (top > 0) ? top - spacing : 0;
+  return { containerHeight: containerHeight, boxes: boxes };
+}
+
 function layJustifiedHTML(slots, slotHTMLFn, opts) {
   if (!slots || slots.length === 0) {
     return '<div class="lay-container"><div class="cp-empty">Добавьте слоты</div></div>';
   }
-  if (typeof window.justifiedLayout !== 'function') {
-    /* Библиотека не подгрузилась — fallback: вертикальная стопка */
-    var fb = '<div class="lay-just lay-just-fallback">';
-    for (var fi = 0; fi < slots.length; fi++) {
-      fb += '<div class="lay-just-box">' + slotHTMLFn(fi) + '</div>';
-    }
-    fb += '</div>';
-    return fb;
-  }
-
   opts = opts || {};
+
   var aspects = [];
   for (var i = 0; i < slots.length; i++) {
     var ar = opts.aspectFn ? opts.aspectFn(slots[i], i) : 1.5;
@@ -120,37 +181,65 @@ function layJustifiedHTML(slots, slotHTMLFn, opts) {
   var spacing = (opts.boxSpacing != null) ? opts.boxSpacing : 0;
   var pad = (opts.containerPadding != null) ? opts.containerPadding : 0;
   var trh = opts.targetRowHeight || 320;
+  var maxItemsPerRow = opts.maxItemsPerRow || 0;
 
   var geom;
-  try {
-    geom = window.justifiedLayout(aspects, {
-      containerWidth: cw,
-      containerPadding: pad,
+
+  if (maxItemsPerRow > 0) {
+    /* Маша 2026-05-07: «max 3 в мобилке / 5 в десктопе» — flickr-lib
+       это не умеет, используем свою простую реализацию. */
+    geom = _laySimpleJustified(aspects, {
+      containerWidth: cw - 2 * pad,
+      maxItemsPerRow: maxItemsPerRow,
       boxSpacing: spacing,
-      targetRowHeight: trh,
-      targetRowHeightTolerance: 0.25,
-      showWidows: true,
-      widowLayoutStyle: 'justify'
+      targetRowHeight: trh
     });
-  } catch (e) {
-    console.warn('justifiedLayout failed:', e);
-    return '<div class="lay-container"><div class="cp-empty">Ошибка раскладки</div></div>';
+    /* Сдвинуть боксы на pad, добавить нижний pad */
+    if (geom && geom.boxes) {
+      for (var bi = 0; bi < geom.boxes.length; bi++) {
+        geom.boxes[bi].left += pad;
+        geom.boxes[bi].top += pad;
+      }
+      geom.containerHeight += 2 * pad;
+    }
+  } else if (typeof window.justifiedLayout === 'function') {
+    try {
+      geom = window.justifiedLayout(aspects, {
+        containerWidth: cw,
+        containerPadding: pad,
+        boxSpacing: spacing,
+        targetRowHeight: trh,
+        targetRowHeightTolerance: 0.25,
+        showWidows: true,
+        widowLayoutStyle: 'justify'
+      });
+    } catch (e) {
+      console.warn('justifiedLayout failed:', e);
+    }
   }
+
   if (!geom || !geom.boxes || !geom.boxes.length) {
-    return '<div class="lay-container"><div class="cp-empty">Нет фото</div></div>';
+    /* fallback */
+    var fb = '<div class="lay-just lay-just-fallback">';
+    for (var fi = 0; fi < slots.length; fi++) {
+      fb += '<div class="lay-just-box">' + slotHTMLFn(fi) + '</div>';
+    }
+    fb += '</div>';
+    return fb;
   }
 
   var ratio = (geom.containerHeight > 0 && cw > 0) ? (geom.containerHeight / cw) : 0.6;
   var html = '<div class="lay-just" style="position:relative;width:100%;padding-top:' + (ratio * 100) + '%;">';
-  for (var j = 0; j < geom.boxes.length; j++) {
-    var b = geom.boxes[j];
+  for (var j2 = 0; j2 < geom.boxes.length; j2++) {
+    var b = geom.boxes[j2];
     var left = b.left / cw * 100;
-    var top = b.top / cw * 100;
+    var bxTop = b.top / cw * 100;
     var width = b.width / cw * 100;
     var height = b.height / cw * 100;
-    html += '<div class="lay-just-box" style="position:absolute;left:' + left.toFixed(4) + '%;top:'
-         + top.toFixed(4) + '%;width:' + width.toFixed(4) + '%;height:' + height.toFixed(4) + '%;">';
-    html += slotHTMLFn(j);
+    html += '<div class="lay-just-box" data-just-idx="' + j2 + '" style="position:absolute;left:'
+         + left.toFixed(4) + '%;top:' + bxTop.toFixed(4) + '%;width:'
+         + width.toFixed(4) + '%;height:' + height.toFixed(4) + '%;">';
+    html += slotHTMLFn(j2);
     html += '</div>';
   }
   html += '</div>';
