@@ -2150,60 +2150,15 @@ body.mob-client-mode html {
    layJustifiedHTML рендерит контейнер .lay-just с position:relative и
    padding-top заданным в %, чтобы держать высоту от ширины. Боксы внутри
    .lay-just-box position:absolute с left/top/width/height в % контейнера.
-   img внутри fill контейнер с object-fit:cover (aspect-ratio бокса равен
-   aspect-ratio фото — нет crop'а и нет фона). Маша 2026-05-07: «такая
-   же раскладка как в Яндекс.Диске». max-3 (mobile) / max-5 (desktop) в
-   ряд — реализовано в layJustifiedHTML через maxItemsPerRow. */
+   img внутри fill контейнер с object-fit:cover (на самом деле aspect-ratio
+   бокса = aspect-ratio фото, так что cover/contain эквивалентны — фото
+   точно в размер). Маша 2026-05-07: «такая же раскладка как в Яндекс.Диске». */
 .lay-just { box-sizing: border-box; }
 .lay-just-box { box-sizing: border-box; overflow: hidden; }
 .lay-just-box > * { width: 100%; height: 100%; display: block; }
 .lay-just-box img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .lay-just-fallback { display: flex; flex-direction: column; gap: 0; }
 .lay-just-fallback .lay-just-box { width: 100%; aspect-ratio: 3 / 2; position: relative; }
-
-/* Desktop "Весь контент" в justified-режиме — отключаем grid, тайлы
-   .ac-tile становятся полным размером своего lay-just-box'а с
-   object-fit:cover на img'е. */
-#ac-gallery.ac-gallery-just-mode {
-  display: block !important;
-  grid-template-columns: none !important;
-  grid-auto-rows: auto !important;
-}
-#ac-gallery.ac-gallery-just-mode .ac-tile {
-  width: 100%; height: 100%;
-  border-radius: 0; border: none;
-}
-#ac-gallery.ac-gallery-just-mode .ac-tile img {
-  width: 100%; height: 100%; object-fit: cover;
-}
-#ac-gallery.ac-gallery-just-mode .ac-tile:hover {
-  border: none;
-}
-
-/* Mobile select/options/other в justified-режиме — img внутри
-   .lay-just-box заполняет ровно бокс без crop'а (aspect совпадает). */
-.mob-select-just .lay-just-box,
-.mob-other-just .lay-just-box,
-.mob-gallery-just .lay-just-box { background: #f0f0f0; }
-.mob-gallery-just .lay-just-box .mob-gallery-check {
-  position: absolute; top: 6px; right: 6px;
-  width: 22px; height: 22px;
-  background: rgba(0,0,0,0.4); border: 2px solid rgba(255,255,255,0.7);
-  border-radius: 50%; color: #fff; font-size: 13px;
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer; z-index: 2;
-}
-.mob-gallery-just .lay-just-box .mob-gallery-check.checked {
-  background: #333; border-color: #fff;
-}
-.mob-other-just .lay-just-box .mob-oc-remove {
-  position: absolute; top: 4px; right: 4px;
-  width: 22px; height: 22px;
-  background: rgba(0,0,0,0.5); border: none; border-radius: 50%;
-  color: #fff; font-size: 14px; cursor: pointer; z-index: 2;
-  display: flex; align-items: center; justify-content: center;
-  padding: 0;
-}
 
 /* Hero: на всю ширину */
 .mob-slot-hero {

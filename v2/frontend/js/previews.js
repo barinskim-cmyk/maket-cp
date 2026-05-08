@@ -3787,11 +3787,7 @@ function acRenderField() {
   }
   if (empty) empty.style.display = 'none';
 
-  /* Маша 2026-05-07: «автоматическая раскладка как в Яндекс.Диске,
-     max 5 в ряд на десктопе, 3 на мобилке». Раньше тут был CSS Grid
-     с masonry-span'ами по orient — заменяем на justified-layout. */
-  gallery.style.gridTemplateColumns = '';
-  gallery.classList.add('ac-gallery-just-mode');
+  gallery.style.gridTemplateColumns = 'repeat(' + _acColumns + ', 1fr)';
 
   /* Карта превью для версионного отображения */
   var acProj = getActiveProject();
@@ -3804,63 +3800,30 @@ function acRenderField() {
 
   var zoomSvg = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
 
-  var pvIndexAc = (typeof _layBuildPvIndex === 'function') ? _layBuildPvIndex(acProj) : {};
-  var isNarrowAc = (typeof window !== 'undefined' && window.innerWidth && window.innerWidth < 768);
-
   var html = '';
-  if (typeof layJustifiedHTML === 'function') {
-    html = layJustifiedHTML(items, function (k) {
-      var it = items[k];
-      if (!it) return '';
-      var acSrc = (_acPvMap[it.name] && typeof pvGetPreview === 'function')
-        ? (pvGetPreview(_acPvMap[it.name]) || it.preview || it.thumb)
-        : (it.preview || it.thumb);
-      var s = '<div class="ac-tile" title="' + esc(it.name)
-        + '" onclick="acViewFrom(\'' + esc(it.name).replace(/'/g, "\\'") + '\',event)">';
-      s += '<img src="' + acSrc + '" loading="lazy">';
-      if (it.source === 'card') {
-        s += '<button class="ac-check ac-check-on" onclick="acToggleCard(\''
-          + esc(it.name).replace(/'/g, "\\'") + '\',' + it.cardIdx
-          + ',event)" title="Убрать из карточки"></button>';
-        s += '<span class="ac-check-label">К' + (it.cardIdx + 1) + '</span>';
-      } else {
-        s += '<button class="ac-check ac-check-on" onclick="acRemoveOC(\''
-          + esc(it.name).replace(/'/g, "\\'") + '\',event)" title="Убрать из отбора"></button>';
-        s += '<span class="ac-check-label">Доп.</span>';
-      }
-      s += '<button class="ac-zoom" onclick="acViewFrom(\''
-        + esc(it.name).replace(/'/g, "\\'") + '\',event)" title="Посмотреть опции">'
-        + zoomSvg + '</button>';
-      s += '</div>';
-      return s;
-    }, {
-      targetRowHeight: isNarrowAc ? 200 : 280,
-      boxSpacing: 4,
-      containerPadding: 0,
-      maxItemsPerRow: isNarrowAc ? 3 : 5,
-      aspectFn: function (it) {
-        return _layItemAspect(it, pvIndexAc);
-      }
-    });
-  } else {
-    /* fallback на старый grid-рендер */
-    for (var i = 0; i < items.length; i++) {
-      var itf = items[i];
-      var isHf = itf.orient === 'h';
-      var spanStyleF = isHf ? ' style="grid-column: span 2"' : '';
-      var acSrcF = (_acPvMap[itf.name] && typeof pvGetPreview === 'function') ? (pvGetPreview(_acPvMap[itf.name]) || itf.preview || itf.thumb) : (itf.preview || itf.thumb);
-      html += '<div class="ac-tile' + (isHf ? ' ac-tile-h' : '') + '"' + spanStyleF + ' title="' + esc(itf.name) + '" onclick="acViewFrom(\'' + esc(itf.name).replace(/'/g, "\\'") + '\',event)">';
-      html += '<img src="' + acSrcF + '" loading="lazy">';
-      if (itf.source === 'card') {
-        html += '<button class="ac-check ac-check-on" onclick="acToggleCard(\'' + esc(itf.name).replace(/'/g, "\\'") + '\',' + itf.cardIdx + ',event)" title="Убрать из карточки"></button>';
-        html += '<span class="ac-check-label">К' + (itf.cardIdx + 1) + '</span>';
-      } else {
-        html += '<button class="ac-check ac-check-on" onclick="acRemoveOC(\'' + esc(itf.name).replace(/'/g, "\\'") + '\',event)" title="Убрать из отбора"></button>';
-        html += '<span class="ac-check-label">Доп.</span>';
-      }
-      html += '<button class="ac-zoom" onclick="acViewFrom(\'' + esc(itf.name).replace(/'/g, "\\'") + '\',event)" title="Посмотреть опции">' + zoomSvg + '</button>';
-      html += '</div>';
+  for (var i = 0; i < items.length; i++) {
+    var it = items[i];
+    var isH = it.orient === 'h';
+    var spanStyle = isH ? ' style="grid-column: span 2"' : '';
+
+    /* Версионно-зависимый src из pv-объекта */
+    var acSrc = (_acPvMap[it.name] && typeof pvGetPreview === 'function') ? (pvGetPreview(_acPvMap[it.name]) || it.preview || it.thumb) : (it.preview || it.thumb);
+    html += '<div class="ac-tile' + (isH ? ' ac-tile-h' : '') + '"' + spanStyle + ' title="' + esc(it.name) + '" onclick="acViewFrom(\'' + esc(it.name).replace(/'/g, "\\'") + '\',event)">';
+    html += '<img src="' + acSrc + '" loading="lazy">';
+
+    if (it.source === 'card') {
+      /* Фото из карточки — крестик (убрать из карточки) */
+      html += '<button class="ac-check ac-check-on" onclick="acToggleCard(\'' + esc(it.name).replace(/'/g, "\\'") + '\',' + it.cardIdx + ',event)" title="Убрать из карточки"></button>';
+      html += '<span class="ac-check-label">К' + (it.cardIdx + 1) + '</span>';
+    } else {
+      /* Фото из допконтента — крестик (убрать) */
+      html += '<button class="ac-check ac-check-on" onclick="acRemoveOC(\'' + esc(it.name).replace(/'/g, "\\'") + '\',event)" title="Убрать из отбора"></button>';
+      html += '<span class="ac-check-label">Доп.</span>';
     }
+
+    /* Кнопка «посмотреть опции» → лайтбокс со ВСЕМИ превью начиная с этого файла */
+    html += '<button class="ac-zoom" onclick="acViewFrom(\'' + esc(it.name).replace(/'/g, "\\'") + '\',event)" title="Посмотреть опции">' + zoomSvg + '</button>';
+    html += '</div>';
   }
   gallery.innerHTML = html;
 
@@ -3872,6 +3835,14 @@ function acRenderField() {
 
   /* Обновить кнопки фильтра по этапам */
   acRenderStageFilter();
+
+  /* Masonry: после рендера пересчитываем row-span'ы по фактической высоте
+     каждой плитки. Это убирает вертикальные «дырки» между фото разной
+     ориентации в одной строке. */
+  if (typeof acApplyMasonryLayout === 'function') {
+    /* deferred — даём браузеру layout pass */
+    setTimeout(acApplyMasonryLayout, 0);
+  }
 }
 
 /**
