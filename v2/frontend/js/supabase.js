@@ -1419,14 +1419,20 @@ function sbSaveCardsByToken(token, cards, callback) {
     return { id: cnt.id, name: cnt.name, items: (cnt.items || []).map(function(it) { return it.name; }) };
   }) : [];
 
+  /* Маша 2026-05-07: «при замене карточек клиентом по ссылке выдает
+     ошибку сохранения». Причина — клиент слал events_data, но
+     RPC save_cards_by_token принимает только {share_token, cards_data,
+     oc_data, oc_containers_data, annotations_data, comments_data,
+     checkpoints_data}. Незнакомый параметр events_data заставлял
+     PostgREST отклонять вызов целиком («could not find function … with
+     these parameters»). Убрали лишний параметр. */
   sbClient.rpc('save_cards_by_token', {
     share_token: token,
     cards_data: cardsJson,
     oc_data: JSON.stringify(ocNames),
     oc_containers_data: JSON.stringify(ocCntData),
     annotations_data: (proj && proj._annotations) ? proj._annotations : {},
-    comments_data: _sbCollectComments(),
-    events_data: (proj && Array.isArray(proj._events)) ? proj._events : []
+    comments_data: _sbCollectComments()
   }).then(function(res) {
     if (res.error) {
       console.error('save_cards_by_token:', res.error.code, res.error.message);
