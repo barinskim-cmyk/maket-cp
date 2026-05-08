@@ -3896,14 +3896,36 @@ function shClientApprove() {
     });
   }
 
-  /* Синхронизировать этап с облаком */
-  if (typeof sbSyncStage === 'function') sbSyncStage('client_approved', timeStr);
-
-  /* Синхронизировать в облако */
-  if (proj._cloudId && typeof sbUploadProject === 'function') {
-    sbUploadProject(App.selectedProject, function(err) {
-      if (err) console.error('Ошибка синхронизации:', err);
+  /* Маша 2026-05-08: «когда клиент нажмёт "Согласовать отбор" мы должны
+     видеть». До фикса гость по share-link шёл sbSyncStage → INSERT в
+     stage_events напрямую → RLS отбивал (auth.uid() = NULL). Действие
+     не долетало до фотографа. Теперь — отдельный RPC client_approve_by_token
+     который обходит RLS как security definer и пишет stage_events +
+     action_log одной транзакцией. */
+  var isGuest = !!(window._shareToken && (typeof sbIsLoggedIn !== 'function' || !sbIsLoggedIn()));
+  if (isGuest && typeof sbClient !== 'undefined' && sbClient && proj._cloudId) {
+    var actorName = (typeof window._shareUserName === 'string') ? window._shareUserName : '';
+    sbClient.rpc('client_approve_by_token', {
+      p_share_token: window._shareToken,
+      p_note: 'Согласовано в Maket CP ' + timeStr,
+      p_actor_name: actorName
+    }).then(function(res) {
+      if (res && res.error) {
+        console.warn('client_approve_by_token:', res.error.message);
+      } else {
+        console.log('client_approve_by_token: stage_event id =', res && res.data);
+      }
+    })['catch'](function(err) {
+      console.warn('client_approve_by_token (catch):', err);
     });
+  } else {
+    /* Owner — старый путь через sbSyncStage + sbUploadProject. */
+    if (typeof sbSyncStage === 'function') sbSyncStage('client_approved', timeStr);
+    if (proj._cloudId && typeof sbUploadProject === 'function') {
+      sbUploadProject(App.selectedProject, function(err) {
+        if (err) console.error('Ошибка синхронизации:', err);
+      });
+    }
   }
 
   shAutoSave();
