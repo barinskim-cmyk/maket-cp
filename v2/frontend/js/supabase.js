@@ -612,8 +612,15 @@ function sbUploadPreviews(projectId, previews, callback) {
         var end = Math.min(idx + BATCH, newPreviews.length);
         var batchCount = end - idx;
         var batchDone = 0;
+        var startIdx = idx;
+        /* Маша 2026-05-12: RangeError «Maximum call stack size exceeded» в
+           sbPullProject. Bug: idx двигали ПОСЛЕ for-loop, но callback'и при
+           URL-only (без base64-upload) выполняются СИНХРОННО — nextBatch()
+           вызывался рекурсивно ДО того как idx обновился. → бесконечная
+           рекурсия и переполнение стека. Двигаем idx ДО loop. */
+        idx = end;
 
-        for (var i = idx; i < end; i++) {
+        for (var i = startIdx; i < end; i++) {
           (function(item) {
             var pv = item.pv;
             var thumbData = pv.thumb || '';
