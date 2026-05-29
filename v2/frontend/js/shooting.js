@@ -539,23 +539,17 @@ function smRefreshUI(proj) {
     var p = _smRefreshProj;
     _smRefreshProj = null;
     if (!p) return;
-    // Маша 2026-05-07: первичный ключ — счётчик камеры (хвостовые
-    // цифры stem'а, типа EKONIKA_2026-05-060335 → 060335). Это самый
-    // стабильный порядок: монотонно растёт по факту срабатывания
-    // затвора, не зависит от mtime'а файла. Если у одного из файлов
-    // счётчика нет (или совпали) — fallback на captured_at, далее на
-    // stem-numeric.
+    // Маша 2026-05-29: сортировка по имени файла (natural numeric).
+    // Раньше primary key был хвостовой счётчик stem'а (camera counter),
+    // но в проектах с Process Recipe'ми C1 пишет имена вида
+    // `EKONIKA_2026-05-270001 1.jpg`, `... 2.jpg` — хвостовая цифра это
+    // НЕ counter, а recipe number. Sort по ней давал интерливинг:
+    // `0001 1, 0003 1, 0005 1, …, 0001 2, 0003 2, …`. Natural compare
+    // на полном stem'е расставляет правильно: внутри одного shot'а сначала
+    // recipe 1, потом 2, 3 — потом следующий shot.
     if (Array.isArray(p.previews)) {
       try {
         p.previews.sort(function(a, b) {
-          var ca = _smTailCounter(a && (a.stem || a.name));
-          var cb = _smTailCounter(b && (b.stem || b.name));
-          if (ca != null && cb != null && ca !== cb) return ca - cb;
-          var ta = a && typeof a.captured_at === 'number' && isFinite(a.captured_at) ? a.captured_at : null;
-          var tb = b && typeof b.captured_at === 'number' && isFinite(b.captured_at) ? b.captured_at : null;
-          if (ta != null && tb != null && ta !== tb) return ta - tb;
-          if (ta != null && tb == null) return -1;
-          if (ta == null && tb != null) return 1;
           var sa = (a && (a.stem || a.name)) || '';
           var sb = (b && (b.stem || b.name)) || '';
           return String(sa).localeCompare(String(sb), undefined, { numeric: true, sensitivity: 'base' });

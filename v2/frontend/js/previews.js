@@ -1722,8 +1722,11 @@ function pvRenderPanel(galleryId, toolbarId, countId, dropzoneId) {
   var toolbar = document.getElementById(toolbarId);
   var countEl = document.getElementById(countId);
   var dropzone = document.getElementById(dropzoneId);
+  // Маша 2026-05-29: natural numeric compare — иначе `..._0001 10.jpg`
+  // оказывается перед `..._0001 2.jpg`. С numeric:true числовые подстроки
+  // парсятся как числа, и имена внутри shot'а упорядочиваются 1,2,…,10.
   var allStore = pvGetStore().slice().sort(function(a, b) {
-    return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+    return String(a.name).localeCompare(String(b.name), undefined, { numeric: true, sensitivity: 'base' });
   });
   var used = pvUsedInCards();
 
@@ -3700,9 +3703,9 @@ function acGetAllContent() {
     });
   }
 
-  /* Сортировка по имени файла */
+  /* Сортировка по имени файла (natural numeric — см. pvRenderPanel) */
   result.sort(function(a, b) {
-    return a.name.localeCompare(b.name);
+    return String(a.name).localeCompare(String(b.name), undefined, { numeric: true, sensitivity: 'base' });
   });
 
   return result;
