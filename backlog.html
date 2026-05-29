@@ -969,6 +969,18 @@ tr:hover td { background: #fafafa; }
   <td contenteditable="true" class="my-comment"></td>
 </tr>
 
+<tr data-row="save-cards-soft-delete-bloat-recurring">
+  <td><span class="s-todo">TODO</span></td>
+  <td>Облако / БД</td>
+  <td contenteditable="true"><strong>save_cards_by_token: рекуррентное раздутие soft-deleted (пост-цикл)</strong></td>
+  <td>—</td>
+  <td>Проблема повторяется: за обычный цикл работы (отбор клиента, правки) накапливаются сотни soft-deleted карточек/слотов. На 2026-05-29: проект EKONIKA 27/05 (фрэш, создан утром) — 410 deleted cards + 1230 deleted slots при 42 активных; проект 07/05 — 384 + 1152 при 64 активных. Видимо HARD-DELETE-fix миграции `save_cards_by_token_no_soft_delete` где-то не отрабатывает (триггер `trg_soft_delete_cards` BEFORE-DELETE перехватывает обратно? RLS-контекст вызывает не ту версию функции?). Каждое сохранение клиентом через save_cards_by_token заново порождает мусор. Сейчас лечим вручную через RPC `_purge_soft_deleted_cards_slots()` (использует SET LOCAL session_replication_role = 'replica'). По решению Маши 2026-05-29 — структурный fix откладываем до момента когда не будет активных съёмок/клиентских ссылок, чтобы не рисковать клиентскими сейвами. Подходы (выбрать в момент работы): (а) добавить `SET LOCAL session_replication_role = 'replica'` ВНУТРЬ save_cards_by_token (тогда BEFORE-DELETE триггеры пропустятся, DELETE становится действительно hard); (б) переписать save_cards_by_token на UPSERT по (project_id, position) вместо DELETE+INSERT — тогда триггер вообще не зовётся; (в) добавить хук на конец save_cards_by_token, который зовёт _purge_soft_deleted_cards_slots() сразу после успешного сейва. План: воспроизвести в staging-ветке, профайлить triggers через pg_event_trigger, выбрать (а/б/в), миграция + smoke на 2-3 фейковых save'ах.</td>
+  <td class="files">save_cards_by_token RPC, trg_soft_delete_cards/slots, supabase.js (sbSaveCardsByToken)</td>
+  <td>—</td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment">Воспроизводится после каждого крупного сейва клиентом. Ручная чистка — да, фикс — после цикла.</td>
+</tr>
+
 <tr data-row="log-from-stage-0">
   <td><span class="s-done">DONE</span></td>
   <td>Облако / Аналитика</td>
