@@ -2557,7 +2557,15 @@ function _arParsePdfHybrid(file, callback) {
  * @returns {string[]}  массив data-URL jpeg
  */
 function _arExtractJpegsFromBuffer(uint8) {
+  /* Минимальные размеры — отсекаем pixel-level артефакты:
+     PDF от поставщиков часто содержит 1-пиксельные jpeg-черточки
+     (разделители таблиц), которые шли в общий поток JPEG и шифтили
+     пайринг SKU↔картинка. Любая «настоящая» миниатюра товара ≥30 px. */
+  var MIN_W = 10;
+  var MIN_H = 10;
+
   var jpegs = [];
+  var skipped = 0;
   var i = 0;
   while (i < uint8.length - 3) {
     /* JPEG SOI = FF D8, за которым любой маркер FF */
@@ -2568,7 +2576,14 @@ function _arExtractJpegsFromBuffer(uint8) {
       while (i < uint8.length - 1) {
         if (uint8[i] === 0xFF && uint8[i+1] === 0xD9) {
           i += 2;
-          jpegs.push('data:image/jpeg;base64,' + _arUint8ToBase64(uint8.slice(start, i)));
+          var bytes = uint8.slice(start, i);
+          var dim = _arJpegDimensions(bytes);
+          if (dim && (dim.w < MIN_W || dim.h < MIN_H)) {
+            skipped++;
+            /* Пропускаем артефакт — не добавляем в jpegs[]. */
+          } else {
+            jpegs.push('data:image/jpeg;base64,' + _arUint8ToBase64(bytes));
+          }
           break;
         }
         i++;
@@ -2577,7 +2592,51 @@ function _arExtractJpegsFromBuffer(uint8) {
       i++;
     }
   }
+  if (skipped > 0) {
+    console.log('_arExtractJpegsFromBuffer: пропущено ' + skipped +
+                ' артефакт-jpeg <' + MIN_W + 'x' + MIN_H + ' (защита от ' +
+                'разделителей-черточек в PDF от поставщиков)');
+  }
   return jpegs;
+}
+
+
+/**
+ * Прочитать ширину/высоту JPEG из SOF (Start Of Frame) маркера.
+ * Возвращает {w, h} или null если SOF не найден. JPEG layout:
+ *   FF D8                          — SOI
+ *   FF Cx LL LL P HH HH WW WW ...  — SOF (Cx ∈ C0..CF, кроме C4/C8/CC)
+ *   FF D9                          — EOI
+ * LL = длина сегмента (вкл. сами эти 2 байта), HH/WW = big-endian.
+ * @param {Uint8Array} bytes
+ */
+function _arJpegDimensions(bytes) {
+  var j = 2;  /* skip SOI */
+  while (j < bytes.length - 8) {
+    if (bytes[j] !== 0xFF) { j++; continue; }
+    /* пропустить fill bytes (FF FF FF ...) */
+    while (j < bytes.length && bytes[j] === 0xFF) j++;
+    if (j >= bytes.length) break;
+    var m = bytes[j]; j++;
+    /* SOF markers: C0..CF, кроме DHT(C4)/JPG(C8)/DAC(CC) */
+    if (m >= 0xC0 && m <= 0xCF && m !== 0xC4 && m !== 0xC8 && m !== 0xCC) {
+      /* j указывает на байт после маркера → +2 length +1 precision = +3
+         → высота, потом ширина */
+      if (j + 6 >= bytes.length) return null;
+      var h = (bytes[j+3] << 8) | bytes[j+4];
+      var w = (bytes[j+5] << 8) | bytes[j+6];
+      return { w: w, h: h };
+    }
+    /* EOI / SOI / RST — без длины */
+    if (m === 0xD9 || m === 0xD8) break;
+    if (m >= 0xD0 && m <= 0xD7) continue;
+    /* остальные маркеры имеют 2-байтовую длину сразу после маркера */
+    if (j + 1 >= bytes.length) break;
+    var seg_len = (bytes[j] << 8) | bytes[j+1];
+    if (seg_len < 2) break;
+    j += seg_len;
+  }
+  return null;
 }
 
 
