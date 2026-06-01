@@ -5213,6 +5213,14 @@ function arGenerateRenameList(allMatched) {
     return;
   }
 
+  /* Маша 2026-06-01: имя файла теперь конструируется через rnBuildName
+     (см. rename.js). Если у проекта есть собственный конфиг в localStorage
+     — используем его; иначе rnGetEffectiveConfig вернёт бренд-пресет
+     (EKONIKA → артикул + promo/vert/dop) или дефолт (card_name + NN). */
+  var cfg = (typeof rnGetEffectiveConfig === 'function')
+    ? rnGetEffectiveConfig(proj)
+    : null;
+
   var lines = [];
   var count = 0;
 
@@ -5225,22 +5233,30 @@ function arGenerateRenameList(allMatched) {
     var card = proj.cards[art.cardIdx];
     if (!card || !card.slots) continue;
 
-    var sku = art.sku || ('article_' + i);
-    var photoNum = 0;
-
     for (var s = 0; s < card.slots.length; s++) {
       var slot = card.slots[s];
       if (!slot.file) continue;
-      photoNum++;
 
-      /* Расширение из оригинального файла */
-      var ext = '';
-      var dotPos = slot.file.lastIndexOf('.');
-      if (dotPos >= 0) ext = slot.file.substring(dotPos);
-
-      /* Номер фото: 01, 02, 03... */
-      var numStr = photoNum < 10 ? ('0' + photoNum) : ('' + photoNum);
-      var newName = sku + '_' + numStr + ext;
+      var newName;
+      if (cfg && typeof rnBuildName === 'function') {
+        newName = rnBuildName(cfg, {
+          project: proj,
+          card: card,
+          cardIdx: art.cardIdx,
+          slot: slot,
+          slotIdx: s,
+          article: art
+        });
+      } else {
+        /* Fallback на legacy-формулу если rename.js не загружен */
+        var sku = art.sku || ('article_' + i);
+        var ext = '';
+        var dotPos = slot.file.lastIndexOf('.');
+        if (dotPos >= 0) ext = slot.file.substring(dotPos);
+        var photoNum = s + 1;
+        var numStr = photoNum < 10 ? ('0' + photoNum) : ('' + photoNum);
+        newName = sku + '_' + numStr + ext;
+      }
 
       lines.push(slot.file + ',' + newName);
       count++;
