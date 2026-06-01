@@ -2811,9 +2811,23 @@ function cpMobileRender() {
     try { cpMobileBindSlotTap();    } catch(eST) { console.warn('bindSlotTap:', eST); }
   }
 
-  /* Восстановить скролл после полного ре-рендера. */
+  /* Восстановить скролл после полного ре-рендера.
+     Маша 2026-06-01: синхронный scrollTo сразу после innerHTML работал
+     криво — на момент его вызова браузер ещё не сделал layout для новых
+     lazy-loaded <img>, document.documentElement.scrollHeight был меньше
+     `_mobSavedScroll`, и scrollTo автоматически клампился в 0 (т.е.
+     прыжок в начало при смене звёзд-фильтра). Решение:
+     (а) делаем rAF чтобы дождаться первого layout-pass;
+     (б) повторяем через 250 мс, когда изображения дозагрузились и
+         документ дорос до старой высоты — тогда clamp уже не сработает. */
   if (_mobSavedScroll > 0) {
-    try { window.scrollTo(0, _mobSavedScroll); } catch(e) {}
+    var _restore = function() {
+      try { window.scrollTo(0, _mobSavedScroll); } catch(e) {}
+    };
+    requestAnimationFrame(function() {
+      _restore();
+      setTimeout(_restore, 250);
+    });
   }
 }
 
