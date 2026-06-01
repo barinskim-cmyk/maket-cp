@@ -1824,6 +1824,17 @@ function pvRenderPanel(galleryId, toolbarId, countId, dropzoneId) {
 
   var limit = Math.min(store.length, PV_RENDER_BATCH);
   var html = pvBuildHTML(store, used, 0, limit);
+
+  /* Маша 2026-06-01: сохраняем scrollTop у скроллабельного родителя
+     ДО replace innerHTML, потом restore. Без этого клиент по share-link
+     каждый раз когда дропает картинку в слот → cpRenderList вызывает
+     pvRenderAll → галерея ре-рендерится → scroll слетает в начало.
+     Lazy-loaded thumbs делают документ короче сохранённой Y, поэтому
+     браузер сам клампит scrollTop в 0. Делаем retry-loop с rAF до 3
+     секунд — как только высота восстановилась, скроллим точно. */
+  var scrollParent = gallery.closest('.cp-previews');
+  var savedScroll = scrollParent ? (scrollParent.scrollTop || 0) : 0;
+
   gallery.innerHTML = html;
   gallery._pvRendered = limit;
   gallery._pvStore = store;
@@ -1834,8 +1845,28 @@ function pvRenderPanel(galleryId, toolbarId, countId, dropzoneId) {
   /* Применяем пользовательский размер миниатюр */
   if (pvColumns !== 3) pvApplyColumnWidth();
 
-  var scrollParent = gallery.closest('.cp-previews');
   if (scrollParent && store.length > limit) pvBindLazyScroll(scrollParent, gallery);
+
+  if (scrollParent && savedScroll > 0) {
+    var _target = savedScroll;
+    var _start = Date.now();
+    var _maxMs = 3000;
+    var _tryRestore = function() {
+      try {
+        var maxY = Math.max(0, scrollParent.scrollHeight - scrollParent.clientHeight);
+        if (maxY >= _target) {
+          scrollParent.scrollTop = _target;
+          if (Math.abs(scrollParent.scrollTop - _target) < 2) return;
+        } else {
+          scrollParent.scrollTop = maxY;
+        }
+      } catch (e) {}
+      if (Date.now() - _start < _maxMs) {
+        requestAnimationFrame(function() { setTimeout(_tryRestore, 50); });
+      }
+    };
+    requestAnimationFrame(_tryRestore);
+  }
 }
 
 /**
