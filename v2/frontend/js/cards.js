@@ -2812,22 +2812,43 @@ function cpMobileRender() {
   }
 
   /* Восстановить скролл после полного ре-рендера.
-     Маша 2026-06-01: синхронный scrollTo сразу после innerHTML работал
-     криво — на момент его вызова браузер ещё не сделал layout для новых
-     lazy-loaded <img>, document.documentElement.scrollHeight был меньше
-     `_mobSavedScroll`, и scrollTo автоматически клампился в 0 (т.е.
-     прыжок в начало при смене звёзд-фильтра). Решение:
-     (а) делаем rAF чтобы дождаться первого layout-pass;
-     (б) повторяем через 250 мс, когда изображения дозагрузились и
-         документ дорос до старой высоты — тогда clamp уже не сработает. */
+     Маша 2026-06-01: на share-link мобильной с 5000+ превью lazy-loaded
+     <img> заполняют документ постепенно. Синхронный scrollTo сразу после
+     innerHTML клампится в 0, т.к. документ короче `_mobSavedScroll`.
+     Решение: retry-loop — пытаемся до 3 сек или пока документ не дорастёт
+     до сохранённой Y. Прекращаем когда (а) положение установилось или
+     (б) превысили окно retry. */
   if (_mobSavedScroll > 0) {
-    var _restore = function() {
-      try { window.scrollTo(0, _mobSavedScroll); } catch(e) {}
+    var _target = _mobSavedScroll;
+    var _restoreStart = Date.now();
+    var _restoreMaxMs = 3000;
+
+    var _tryRestore = function() {
+      try {
+        var docH = Math.max(
+          document.documentElement.scrollHeight,
+          document.body ? document.body.scrollHeight : 0
+        );
+        var winH = window.innerHeight || document.documentElement.clientHeight || 0;
+        var maxY = Math.max(0, docH - winH);
+
+        if (maxY >= _target) {
+          /* документ достаточно вырос — можно скроллить точно. */
+          window.scrollTo(0, _target);
+          var cur = window.scrollY || window.pageYOffset || 0;
+          if (Math.abs(cur - _target) < 2) return;  /* успех */
+        } else {
+          /* документ ещё короче цели — скроллим максимум что можем,
+             чтобы юзер хотя бы не торчал в самом верху. */
+          window.scrollTo(0, maxY);
+        }
+      } catch (e) {}
+
+      if (Date.now() - _restoreStart < _restoreMaxMs) {
+        requestAnimationFrame(function() { setTimeout(_tryRestore, 50); });
+      }
     };
-    requestAnimationFrame(function() {
-      _restore();
-      setTimeout(_restore, 250);
-    });
+    requestAnimationFrame(_tryRestore);
   }
 }
 
