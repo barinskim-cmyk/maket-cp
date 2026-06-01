@@ -1907,6 +1907,39 @@ function pvDetectOrient(gallery) {
  * @param {boolean} inCard  — true: добавить «в карточке» класс + check;
  *                            false: снять.
  */
+/**
+ * Пробежаться по всем превью текущего проекта и привести «в карточке»
+ * метки на видимых плитках в соответствие с реальным состоянием
+ * proj.cards. Используется после pull'а из облака, чтобы не дёргать
+ * полный pvRenderAll и не сбивать скролл. Маша 2026-06-01.
+ */
+function pvSyncInCardMarkers() {
+  var proj = (typeof getActiveProject === 'function') ? getActiveProject() : null;
+  if (!proj) return;
+  /* Собираем set всех файлов которые сейчас в слотах активных карточек. */
+  var inCardSet = {};
+  var cards = proj.cards || [];
+  for (var c = 0; c < cards.length; c++) {
+    var slots = cards[c].slots || [];
+    for (var s = 0; s < slots.length; s++) {
+      if (slots[s] && slots[s].file) inCardSet[slots[s].file] = true;
+    }
+  }
+  /* Все видимые pv-thumb в DOM — синхронизируем класс/check. */
+  var thumbs = document.querySelectorAll('.pv-thumb[data-pv-name]');
+  for (var i = 0; i < thumbs.length; i++) {
+    var t = thumbs[i];
+    var name = t.getAttribute('data-pv-name');
+    if (!name) continue;
+    var shouldBeIn = !!inCardSet[name];
+    var hasClass = t.classList.contains('pv-in-card');
+    if (shouldBeIn !== hasClass) {
+      pvMarkThumbInCard(name, shouldBeIn);
+    }
+  }
+}
+
+
 function pvMarkThumbInCard(pvName, inCard) {
   if (!pvName) return;
   /* Может быть несколько галерей (pv-gallery, oc-pv-gallery, ac-gallery). */

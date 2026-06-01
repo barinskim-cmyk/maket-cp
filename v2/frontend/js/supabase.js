@@ -2498,14 +2498,19 @@ function sbPullProject(callback) {
       if (App.currentCardIdx >= newCards.length) App.currentCardIdx = Math.max(0, newCards.length - 1);
 
       /* Обновить UI только если данные реально изменились.
-         Если ничего не изменилось — не трогаем DOM, не мерцаем, не сбрасываем поля ввода. */
+         Если ничего не изменилось — не трогаем DOM, не мерцаем, не сбрасываем поля ввода.
+         Маша 2026-06-01: галерею превью НЕ ребилдим — на share-link клиенте
+         с 5000+ thumb'ами полный pvRenderAll сбрасывал скролл. Вместо этого
+         точечно синхронизируем «в-карточке» метки через pvSyncInCardMarkers.
+         Превью-плитки сами не изменились (порядок/фильтры тоже), их трогать
+         не за чем. */
       if (_hasChanges) {
         if (typeof renderPipeline === 'function') renderPipeline();
-        if (typeof cpRenderList === 'function') cpRenderList();
+        if (typeof cpRenderList === 'function') cpRenderList({ skipGallery: true });
         if (typeof cpRenderCard === 'function') cpRenderCard();
         if (typeof acRenderField === 'function') acRenderField();
         if (typeof ocRenderField === 'function') ocRenderField();
-        if (typeof pvRenderAll === 'function') pvRenderAll();
+        if (typeof pvSyncInCardMarkers === 'function') pvSyncInCardMarkers();
         /* Мобильный клиент: cpRenderCard не рендерит мобильную ленту.
            Нужен отдельный вызов cpMobileRender, иначе подгруженные с облака
            комментарии остаются невидимыми до первого ручного действия. */
@@ -2723,13 +2728,15 @@ function sbPullProject(callback) {
           proj._stageHistory = history;
           _sbPullRunning = false;
 
-          /* Обновить UI только если данные реально изменились */
+          /* Обновить UI только если данные реально изменились.
+             Маша 2026-06-01: галерею превью не ребилдим — см. коммент
+             в client-branch выше. */
           if (_hasChanges2) {
             if (typeof renderPipeline === 'function') renderPipeline();
-            if (typeof cpRenderList === 'function') cpRenderList();
+            if (typeof cpRenderList === 'function') cpRenderList({ skipGallery: true });
             if (typeof acRenderField === 'function') acRenderField();
             if (typeof ocRenderField === 'function') ocRenderField();
-            if (typeof pvRenderAll === 'function') pvRenderAll();
+            if (typeof pvSyncInCardMarkers === 'function') pvSyncInCardMarkers();
             /* Мобильная лента — отдельный рендер, см. коммент выше. */
             if (typeof cpIsMobileClient === 'function' && cpIsMobileClient() &&
                 typeof cpMobileRender === 'function') {
