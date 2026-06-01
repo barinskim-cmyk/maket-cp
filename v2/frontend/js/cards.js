@@ -37,7 +37,13 @@ var CP_MAX_HISTORY = 10;
  * Отрисовать список карточек в сайдбаре.
  * Подсвечивает активную карточку и показывает счётчик файлов.
  */
-function cpRenderList() {
+function cpRenderList(opts) {
+  /* opts:
+       skipGallery — не дёргать pvRenderAll в конце (drop handler сам
+       сделает хирургический pvMarkThumbInCard, чтобы не сбрасывать
+       скролл всей галереи превью).
+     Маша 2026-06-01. */
+  opts = opts || {};
   var listEl = document.getElementById('cp-cards-list');
   var proj = getActiveProject();
 
@@ -75,7 +81,7 @@ function cpRenderList() {
   cpRenderCard();
   cpRenderDeletedList();
 
-  if (typeof pvRenderAll === 'function') pvRenderAll();
+  if (!opts.skipGallery && typeof pvRenderAll === 'function') pvRenderAll();
 }
 
 /**
@@ -2007,6 +2013,9 @@ function cpBindSlotEvents() {
         try {
           var pv = JSON.parse(pvData);
           cpSaveHistory();
+          /* Может оказаться что в этом слоте УЖЕ был файл — тогда тот
+             уходит из «в-карточке», нужно убрать с него метку. */
+          var oldFile = slot.file || '';
           slot.file = pv.name;
           slot.path = (typeof pvGetPath === 'function') ? pvGetPath(pv) : (pv.path || '');
           /* Используем preview (1200px) для карточки, thumb (300px) как фолбэк */
@@ -2018,7 +2027,29 @@ function cpBindSlotEvents() {
           if (typeof sbLogAction === 'function') sbLogAction('add_to_slot', 'card', card.id, card.name, pv.name);
           cpSyncFiles(card);
           cpRenderCard();
-          cpRenderList();
+          /* Маша 2026-06-01: НЕ ребилдим всю превью-галерею через
+             pvRenderAll — иначе у клиента со 5000+ превью слетает
+             скролл. Вместо этого: cpRenderList без галереи + точечная
+             пометка только дропнутой плитки (галочка), и точечный снос
+             пометки со старого файла слота, если был. */
+          cpRenderList({ skipGallery: true });
+          if (typeof pvMarkThumbInCard === 'function') {
+            pvMarkThumbInCard(pv.name, true);
+            /* Старый файл может сидеть и в других слотах; если нет —
+               пометку с него тоже снимем. Проверяем чтобы не снять
+               преждевременно: всё ещё используется? */
+            if (oldFile && oldFile !== pv.name) {
+              var stillUsed = false;
+              var allCards = getActiveProject().cards || [];
+              for (var oc = 0; oc < allCards.length && !stillUsed; oc++) {
+                var oslots = allCards[oc].slots || [];
+                for (var os = 0; os < oslots.length; os++) {
+                  if (oslots[os] && oslots[os].file === oldFile) { stillUsed = true; break; }
+                }
+              }
+              if (!stillUsed) pvMarkThumbInCard(oldFile, false);
+            }
+          }
           if (typeof shAutoSave === 'function') shAutoSave();
 
           /* Desktop: если preview (1200px) нет, подгрузить оригинал через pywebview */

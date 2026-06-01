@@ -1896,6 +1896,58 @@ function pvDetectOrient(gallery) {
   }
 }
 
+/**
+ * Хирургически пометить превью «в отборе» / снять метку — без полного
+ * pvRenderAll. Используется когда клиент дропает фото в слот: дёшево
+ * обновить ровно одну плитку (зелёная галочка появилась) и не трогать
+ * скролл всей галереи (особенно когда 4000+ thumb'ов).
+ * Маша 2026-06-01.
+ *
+ * @param {string}  pvName  — имя файла превью
+ * @param {boolean} inCard  — true: добавить «в карточке» класс + check;
+ *                            false: снять.
+ */
+function pvMarkThumbInCard(pvName, inCard) {
+  if (!pvName) return;
+  /* Может быть несколько галерей (pv-gallery, oc-pv-gallery, ac-gallery). */
+  var thumbs = document.querySelectorAll(
+    '.pv-thumb[data-pv-name="' + (window.CSS && CSS.escape ? CSS.escape(pvName) : pvName.replace(/"/g, '\\"')) + '"]'
+  );
+  for (var i = 0; i < thumbs.length; i++) {
+    var t = thumbs[i];
+    var hasClass = t.classList.contains('pv-in-card');
+    if (inCard && !hasClass) {
+      t.classList.add('pv-in-card');
+      /* Вставить .pv-check + .pv-deselect (как в pvBuildHTML) сразу после
+         элементов которые идут до них (после .pv-no-version или после img). */
+      if (!t.querySelector('.pv-check')) {
+        var check = document.createElement('span');
+        check.className = 'pv-check';
+        check.title = 'В отборе';
+        t.appendChild(check);
+      }
+      if (!t.querySelector('.pv-deselect')) {
+        var btn = document.createElement('button');
+        btn.className = 'pv-deselect';
+        btn.title = 'Убрать из отбора';
+        btn.innerHTML = '&times;';
+        btn.onclick = function(ev) {
+          ev.stopPropagation();
+          if (typeof pvToggleSelection === 'function') pvToggleSelection(pvName, ev);
+        };
+        t.appendChild(btn);
+      }
+    } else if (!inCard && hasClass) {
+      t.classList.remove('pv-in-card');
+      var oldCheck = t.querySelector('.pv-check');
+      if (oldCheck) oldCheck.remove();
+      var oldBtn = t.querySelector('.pv-deselect');
+      if (oldBtn) oldBtn.remove();
+    }
+  }
+}
+
+
 function pvBuildHTML(store, used, from, to) {
   var html = '';
   for (var i = from; i < to; i++) {
