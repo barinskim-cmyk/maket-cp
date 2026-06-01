@@ -1825,15 +1825,22 @@ function pvRenderPanel(galleryId, toolbarId, countId, dropzoneId) {
   var limit = Math.min(store.length, PV_RENDER_BATCH);
   var html = pvBuildHTML(store, used, 0, limit);
 
-  /* Маша 2026-06-01: сохраняем scrollTop у скроллабельного родителя
-     ДО replace innerHTML, потом restore. Без этого клиент по share-link
-     каждый раз когда дропает картинку в слот → cpRenderList вызывает
-     pvRenderAll → галерея ре-рендерится → scroll слетает в начало.
-     Lazy-loaded thumbs делают документ короче сохранённой Y, поэтому
-     браузер сам клампит scrollTop в 0. Делаем retry-loop с rAF до 3
-     секунд — как только высота восстановилась, скроллим точно. */
+  /* Маша 2026-06-01 (v2): «центровая привязка» вместо tan scrollTop.
+     Сохраняем имя фото которое сейчас в центре viewport + насколько
+     центр viewport отстоит от центра этой плитки (offset). После
+     ре-рендера:
+       • если фото осталось в новом DOM (например фильтр расширился /
+         не отрезал его) — скроллим так, чтобы это фото оказалось в
+         той же экранной точке как до фильтра.
+       • если фото отфильтровалось — идём по соседям в сортированном
+         списке `pvGetStore()` (это полный массив, ровно тот же что
+         рендерится), шаг наружу: idx-1, idx+1, idx-2, idx+2 … пока
+         не найдём имя которое осталось в новом DOM. Скроллим к нему
+         центром.
+     Это работает в обе стороны: расширили фильтр → исходное фото
+     ровно в той же точке; сузили → ближайший сосед в центре. */
   var scrollParent = gallery.closest('.cp-previews');
-  var savedScroll = scrollParent ? (scrollParent.scrollTop || 0) : 0;
+  var anchor = _pvFindCenterAnchor(scrollParent, gallery);
 
   gallery.innerHTML = html;
   gallery._pvRendered = limit;
@@ -1847,26 +1854,114 @@ function pvRenderPanel(galleryId, toolbarId, countId, dropzoneId) {
 
   if (scrollParent && store.length > limit) pvBindLazyScroll(scrollParent, gallery);
 
-  if (scrollParent && savedScroll > 0) {
-    var _target = savedScroll;
+  if (scrollParent && anchor) {
     var _start = Date.now();
     var _maxMs = 3000;
     var _tryRestore = function() {
-      try {
-        var maxY = Math.max(0, scrollParent.scrollHeight - scrollParent.clientHeight);
-        if (maxY >= _target) {
-          scrollParent.scrollTop = _target;
-          if (Math.abs(scrollParent.scrollTop - _target) < 2) return;
-        } else {
-          scrollParent.scrollTop = maxY;
-        }
-      } catch (e) {}
+      var ok = _pvRestoreToAnchor(scrollParent, gallery, anchor);
+      if (ok) return;
       if (Date.now() - _start < _maxMs) {
         requestAnimationFrame(function() { setTimeout(_tryRestore, 50); });
       }
     };
     requestAnimationFrame(_tryRestore);
   }
+}
+
+
+/**
+ * Найти плитку которая сейчас визуально в центре viewport
+ * скроллируемого контейнера. Возвращает {name, offsetFromCenter, scroll}.
+ * Если плиток нет — null.
+ */
+function _pvFindCenterAnchor(scrollParent, gallery) {
+  if (!scrollParent || !gallery) return null;
+  var viewportCenterY = scrollParent.scrollTop + scrollParent.clientHeight / 2;
+  var thumbs = gallery.querySelectorAll('.pv-thumb[data-pv-name]');
+  if (!thumbs.length) return null;
+  var closest = null;
+  var minDist = Infinity;
+  for (var i = 0; i < thumbs.length; i++) {
+    var t = thumbs[i];
+    /* offsetTop у плитки внутри gallery; нам нужно её положение
+       относительно scrollParent. Используем разницу bounding rects. */
+    var rect = t.getBoundingClientRect();
+    var parentRect = scrollParent.getBoundingClientRect();
+    var thumbCenterRelativeToParent = (rect.top - parentRect.top) + rect.height / 2 + scrollParent.scrollTop;
+    var dist = Math.abs(thumbCenterRelativeToParent - viewportCenterY);
+    if (dist < minDist) {
+      minDist = dist;
+      closest = {
+        name: t.getAttribute('data-pv-name'),
+        thumbCenterY: thumbCenterRelativeToParent
+      };
+    }
+  }
+  if (!closest) return null;
+  return {
+    name: closest.name,
+    /* Сдвиг центра viewport от центра плитки (для расширения фильтра
+       — чтобы фото оказалось ровно в той же экранной точке). */
+    offsetFromCenter: viewportCenterY - closest.thumbCenterY,
+    viewportCenterY: viewportCenterY
+  };
+}
+
+
+/**
+ * Восстановить скролл с центровой привязкой. Возвращает true если
+ * получилось (плитка найдена и доскроллили); false — если ещё рано
+ * (DOM не готов, плитки не выложились) и нужно ретрайнуть.
+ */
+function _pvRestoreToAnchor(scrollParent, gallery, anchor) {
+  if (!scrollParent || !gallery || !anchor || !anchor.name) return true;
+  var escapedName = (window.CSS && CSS.escape) ? CSS.escape(anchor.name) : anchor.name.replace(/"/g, '\\"');
+
+  var t = gallery.querySelector('.pv-thumb[data-pv-name="' + escapedName + '"]');
+  if (!t) {
+    /* Имя отфильтровалось — ищем ближайшего соседа в полном sorted-store. */
+    var fullStore = (typeof pvGetStore === 'function') ? pvGetStore() : [];
+    var anchorIdx = -1;
+    for (var i = 0; i < fullStore.length; i++) {
+      if (fullStore[i].name === anchor.name) { anchorIdx = i; break; }
+    }
+    if (anchorIdx < 0) return true;  /* анкер потерян совсем — выйти. */
+    var max = Math.max(anchorIdx, fullStore.length - anchorIdx);
+    for (var off = 1; off <= max; off++) {
+      var lefti = anchorIdx - off;
+      var righti = anchorIdx + off;
+      if (lefti >= 0) {
+        var ln = fullStore[lefti].name;
+        var lt = gallery.querySelector('.pv-thumb[data-pv-name="' + ((window.CSS && CSS.escape) ? CSS.escape(ln) : ln.replace(/"/g, '\\"')) + '"]');
+        if (lt) { t = lt; break; }
+      }
+      if (righti < fullStore.length) {
+        var rn = fullStore[righti].name;
+        var rt = gallery.querySelector('.pv-thumb[data-pv-name="' + ((window.CSS && CSS.escape) ? CSS.escape(rn) : rn.replace(/"/g, '\\"')) + '"]');
+        if (rt) { t = rt; break; }
+      }
+    }
+    if (!t) return true;  /* ничего из соседей не пришлось рядом — оставить как есть. */
+  }
+
+  /* Проверка готовности DOM: если плитка имеет нулевую высоту — ещё не
+     раскладывалась, ретрайнуть. */
+  if (!t.offsetHeight) return false;
+
+  var rect = t.getBoundingClientRect();
+  var parentRect = scrollParent.getBoundingClientRect();
+  var newThumbCenterY = (rect.top - parentRect.top) + rect.height / 2 + scrollParent.scrollTop;
+
+  /* Если нашли исходную плитку — восстанавливаем offsetFromCenter (фото
+     попадает в ту же экранную точку). Если нашли только соседа — кладём
+     соседа ровно в центр (offsetFromCenter=0). */
+  var isOriginal = (t.getAttribute('data-pv-name') === anchor.name);
+  var targetCenter = newThumbCenterY + (isOriginal ? anchor.offsetFromCenter : 0);
+  var targetScroll = targetCenter - scrollParent.clientHeight / 2;
+  /* Ограничиваем maxY чтобы не уйти ниже доступного. */
+  var maxY = Math.max(0, scrollParent.scrollHeight - scrollParent.clientHeight);
+  scrollParent.scrollTop = Math.max(0, Math.min(targetScroll, maxY));
+  return true;
 }
 
 /**
