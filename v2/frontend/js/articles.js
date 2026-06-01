@@ -4739,9 +4739,18 @@ function arRenderVerification() {
   }
   /* Кнопка формирования списка переименования (доступна после верификации) */
   if (verifiedCount > 0) {
+    toolbarHtml += '<button class="btn btn-sm" onclick="rnOpenConfigEditor()" '
+      + 'style="margin-left:auto" title="Настроить шаблон имени файла для этого проекта">'
+      + 'Шаблон имён</button>';
     toolbarHtml += '<button class="btn btn-sm btn-primary" onclick="arGenerateRenameList()" '
-      + 'style="margin-left:auto" title="Скачать CSV-файл для переименования">'
+      + 'title="Скачать CSV-файл для переименования">'
       + 'Список на переименование (' + verifiedCount + ')</button>';
+    /* Desktop only: кнопка «Переименовать папку» — Python os.rename по CSV. */
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.rename_in_folder) {
+      toolbarHtml += '<button class="btn btn-sm" onclick="rnRenameFolder()" '
+        + 'title="Применить шаблон к файлам в локальной папке (десктоп)">'
+        + 'Переименовать папку</button>';
+    }
   }
   toolbarHtml += '<span id="ar-rename-status" style="font-size:12px;margin-left:8px"></span>'
     + '</div>';
