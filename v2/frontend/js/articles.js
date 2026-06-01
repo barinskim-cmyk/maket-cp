@@ -3727,6 +3727,9 @@ function _arMatchWithPdfPages(cards, skuList, pdfPages, apiKey, proj, statusEl) 
       if (statusEl) statusEl.textContent = 'AI: ' + idx + '/' + total + ' — пауза, сохраняю прогресс...';
       arRenderChecklist();
       arRenderMatching();
+      arRenderVerification();  /* Маша 2026-05-31: иначе блок «На проверку»
+        стоит display:none с момента начала автоматча и пользователь думает
+        что ничего не происходит, пока матчер пыхтит на 44 кадрах. */
       arUpdateStats();
       if (typeof shAutoSave === 'function') shAutoSave();
       if (typeof arCloudSync === 'function') arCloudSync();
