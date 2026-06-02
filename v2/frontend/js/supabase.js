@@ -745,38 +745,58 @@ function _sbInsertPreviewRows(rows, callback) {
  * @param {function} callback — callback(error, previews[])
  */
 function sbDownloadPreviews(projectId, callback) {
-  sbClient.from('previews')
-    .select('*')
-    .eq('project_id', projectId)
-    .order('position')
-    .then(function(res) {
-      if (res.error) { callback(res.error.message, []); return; }
+  /* Маша 2026-06-02: пагинация через .range(). PostgREST по дефолту
+     отрезает выдачу на 1000 строк, поэтому для проектов с 1000+ превью
+     один SELECT возвращал ровно 1000 → клиент видел "только 1000 из 5000".
+     Грузим батчами по 1000 пока не вернётся короткий батч. */
+  var BATCH = 1000;
+  var all = [];
 
-      var previews = [];
-      var rows = res.data || [];
-      for (var i = 0; i < rows.length; i++) {
-        var r = rows[i];
-        previews.push({
-          name: r.file_name,
-          thumb: r.thumb_path || '',
-          preview: r.preview_path || r.thumb_path || '',
-          width: r.width || 0,
-          height: r.height || 0,
-          rating: r.rating || 0,
-          orient: r.orient || 'v',
-          path: '',
-          folders: [],
-          /* Per-photo pipeline stage from previews.stage column.
-             shEnsurePhotoStages() respects it because it only fills
-             undefined _stage; an explicit number wins. */
-          _stage: (typeof r.stage === 'number') ? r.stage : 0
-        });
-      }
-      callback(null, previews);
-    })['catch'](function(err) {
-      console.error('sbDownloadPreviews catch:', err);
-      callback(err.message || 'Network error', []);
-    });
+  function loadBatch(from) {
+    sbClient.from('previews')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('position')
+      .range(from, from + BATCH - 1)
+      .then(function(res) {
+        if (res.error) { callback(res.error.message, []); return; }
+        var rows = res.data || [];
+        all = all.concat(rows);
+        if (rows.length === BATCH) {
+          /* Возможно есть ещё — тянем следующий батч. */
+          loadBatch(from + BATCH);
+          return;
+        }
+        /* Закончили — собираем результат. */
+        var previews = [];
+        for (var i = 0; i < all.length; i++) {
+          var r = all[i];
+          previews.push({
+            name: r.file_name,
+            thumb: r.thumb_path || '',
+            preview: r.preview_path || r.thumb_path || '',
+            width: r.width || 0,
+            height: r.height || 0,
+            rating: r.rating || 0,
+            orient: r.orient || 'v',
+            path: '',
+            folders: [],
+            /* Per-photo pipeline stage from previews.stage column.
+               shEnsurePhotoStages() respects it because it only fills
+               undefined _stage; an explicit number wins. */
+            _stage: (typeof r.stage === 'number') ? r.stage : 0
+          });
+        }
+        if (from > 0) {
+          console.log('sbDownloadPreviews: загружено ' + previews.length + ' превью (пагинация, ' + (Math.floor(from / BATCH) + 1) + ' батч.)');
+        }
+        callback(null, previews);
+      })['catch'](function(err) {
+        console.error('sbDownloadPreviews catch:', err);
+        callback(err.message || 'Network error', []);
+      });
+  }
+  loadBatch(0);
 }
 
 
