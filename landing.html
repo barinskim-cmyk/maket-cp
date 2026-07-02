@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Maket CP — Платформа для визуального продакшена</title>
+<title>Content Pulse — Платформа для визуального продакшена</title>
 <meta name="description" content="Отражает реальный процесс команды. Вы видите его и управляете по-настоящему. Экономит время и деньги.">
-<meta property="og:title" content="Maket CP — Платформа для визуального продакшена">
+<meta property="og:title" content="Content Pulse — Платформа для визуального продакшена">
 <meta property="og:description" content="Отражает реальный процесс команды — вы видите его и управляете по-настоящему. Экономит время и деньги.">
 <meta property="og:image" content="https://barinskim-cmyk.github.io/maket-landing/og-image.png">
 <meta property="og:type" content="website">
@@ -45,8 +45,10 @@ section{scroll-margin-top:0}
 
 /* ── Шапка ── */
 .topbar{position:absolute;z-index:3;left:0;right:0;top:0;display:flex;align-items:center;justify-content:space-between;padding:26px max(24px,4vw);max-width:1240px;margin:0 auto}
-.logo{font-weight:400;font-size:16px;color:#f4f4f3;letter-spacing:.18em}
-.logo .cp{font-family:'IBM Plex Mono',monospace;font-size:11px;color:#808080}
+/* Лого-блок: CONTENT сверху, PULSE растянут под ним — прямоугольник */
+.logo{display:inline-block;line-height:1.25;color:#f4f4f3}
+.logo .lg1{display:block;font-weight:400;font-size:16px;letter-spacing:.18em;margin-right:-.18em}
+.logo .cp{display:block;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#808080;text-align-last:justify;-moz-text-align-last:justify}
 .topnav{display:flex;gap:32px;align-items:center;font-size:14px;color:#8c8c8b}
 .btn-pilot-sm{padding:11px 24px;background:#f2f2f1;color:#131313;font-weight:400;font-size:14px}
 
@@ -189,7 +191,7 @@ section{scroll-margin-top:0}
 .pilot-terms{display:flex;justify-content:center;gap:14px 32px;flex-wrap:wrap;margin-top:44px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.12em;color:#7a7a79}
 .pilot-terms .dot{color:#3f3f3e}
 .footer{max-width:1180px;margin:96px auto 0;padding-top:28px;border-top:1px solid #262626;display:flex;justify-content:space-between;align-items:center;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.12em;color:#6d6d6c;gap:12px;flex-wrap:wrap}
-.footer .logo{font-size:15px}
+.footer .logo .lg1{font-size:15px}
 
 /* ── Адаптив ── */
 @media (max-width:900px){
@@ -219,10 +221,9 @@ section{scroll-margin-top:0}
 <!-- ═══════════ 1. HERO (dark) ═══════════ -->
 <section class="hero" data-screen-label="Hero">
   <div class="topbar">
-    <span class="logo">MAKET <span class="cp">CP</span></span>
+    <span class="logo"><span class="lg1">CONTENT</span><span class="cp">P U L S E</span></span>
     <nav class="topnav">
       <a href="#problem">Проблема</a><a href="#pipeline">Пайплайн</a><a href="#approve">Согласование</a>
-      <a href="#cta" class="btn-pilot-sm">Pilot — 3 места</a>
     </nav>
   </div>
 
@@ -433,10 +434,10 @@ section{scroll-margin-top:0}
 <section id="cta" class="cta" data-screen-label="CTA">
   <div class="cta-inner">
     <div class="cta-tag">PILOT / ОТКРЫТО 3 МЕСТА</div>
-    <h2>Запустите Maket CP на своей съёмке</h2>
+    <h2>Запустите Content Pulse на своей съёмке</h2>
     <p class="cta-lead">Загрузите реальный каталог — увидите весь процесс в одном месте уже на первом проекте.</p>
     <div class="btn-row">
-      <a href="mailto:barinski.m@gmail.com?subject=%D0%9F%D0%B8%D0%BB%D0%BE%D1%82%20Maket%20CP" class="btn-primary" style="padding:15px 34px;font-size:15px">Запустить пилот</a>
+      <a href="mailto:barinski.m@gmail.com?subject=%D0%9F%D0%B8%D0%BB%D0%BE%D1%82%20Content%20Pulse" class="btn-primary" style="padding:15px 34px;font-size:15px">Запустить пилот</a>
       <a href="#pipeline" class="btn-ghost" style="padding:15px 30px;font-size:15px">Открыть демо</a>
     </div>
     <!-- Условия пилота — сокращённая версия блока из прежнего лендинга -->
@@ -446,7 +447,7 @@ section{scroll-margin-top:0}
   </div>
 
   <div class="footer">
-    <span class="logo">MAKET <span class="cp">CP</span></span>
+    <span class="logo"><span class="lg1">CONTENT</span><span class="cp">P U L S E</span></span>
     <span>© 2026 — ВИЗУАЛЬНЫЙ ПРОДАКШЕН</span>
   </div>
 </section>
@@ -546,54 +547,22 @@ section{scroll-margin-top:0}
     svg += '</svg>';
     wrap.innerHTML = svg;
 
-    /* Рисование линии: измеряем длину пути, анимируем dashoffset */
+    /* Бесконечная отрисовка линии, как ЭКГ-монитор:
+       линия рисуется слева направо ~11 с, держится 2.5 с, затем цикл заново.
+       При prefers-reduced-motion линия просто видна без анимации. */
     var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var pathEl = wrap.querySelector('path');
-    if(pathEl && !reduceMotion){
+    if(pathEl && !reduceMotion && pathEl.animate){
       var L = Math.ceil(pathEl.getTotalLength()) + 20;
       pathEl.style.strokeDasharray = L;
-      pathEl.style.strokeDashoffset = L;
-      pathEl.style.transition = 'none';
-      requestAnimationFrame(function(){ requestAnimationFrame(function(){
-        pathEl.style.transition = 'stroke-dashoffset 3.4s cubic-bezier(.4,0,.1,1)';
-        pathEl.style.strokeDashoffset = '0';
-      }); });
-    }
-
-    /* Бегущая точка по кардиограмме (бесконечный цикл, как монитор ЭКГ).
-       Стартует после отрисовки линии; при reduce-motion не запускается. */
-    if(pathEl && !reduceMotion){
-      var svgEl = wrap.querySelector('svg');
-      var totalLen = pathEl.getTotalLength();
-      var dot = document.createElementNS('http://www.w3.org/2000/svg','circle');
-      dot.setAttribute('r','4.5');
-      dot.setAttribute('fill','#131313');
-      dot.setAttribute('stroke','#f4f3f0');
-      dot.setAttribute('stroke-width','2.5');
-      dot.style.opacity = '0';
-      svgEl.appendChild(dot);
-      var trail = document.createElementNS('http://www.w3.org/2000/svg','circle');
-      trail.setAttribute('r','7');
-      trail.setAttribute('fill','none');
-      trail.setAttribute('stroke','#131313');
-      trail.setAttribute('stroke-width','1');
-      trail.style.opacity = '0';
-      svgEl.appendChild(trail);
-      var SWEEP_MS = 14000, startT = null;
-      function sweep(ts){
-        if(startT === null) startT = ts;
-        var prog = ((ts - startT) % SWEEP_MS) / SWEEP_MS;
-        var pt = pathEl.getPointAtLength(prog * totalLen);
-        dot.setAttribute('cx', pt.x); dot.setAttribute('cy', pt.y);
-        trail.setAttribute('cx', pt.x); trail.setAttribute('cy', pt.y);
-        /* пульсация кольца вокруг точки */
-        var beat = 0.5 + 0.5 * Math.sin(ts / 180);
-        trail.setAttribute('r', 7 + beat * 6);
-        trail.style.opacity = (0.5 - beat * 0.35).toFixed(2);
-        dot.style.opacity = '1';
-        requestAnimationFrame(sweep);
-      }
-      setTimeout(function(){ requestAnimationFrame(sweep); }, 3600); /* после отрисовки линии */
+      pathEl.animate(
+        [
+          {strokeDashoffset: L, offset: 0},
+          {strokeDashoffset: 0, offset: 0.82, easing: 'linear'},
+          {strokeDashoffset: 0, offset: 1}
+        ],
+        {duration: 13500, iterations: Infinity}
+      );
     }
 
     /* Ховер по пикам -> блок деталей */
