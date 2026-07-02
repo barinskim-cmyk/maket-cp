@@ -3176,9 +3176,12 @@ function pvAutoAdvanceToStage(stageId) {
 // ── Действия ──
 
 function pvClearAll() {
+  /* Guard (дизайн-аудит G1): гость по share-ссылке не может удалять превью.
+     Кнопка скрыта CSS-ом, но защищаемся и на уровне функции. */
+  if (window._isShareLink) return;
   var proj = getActiveProject();
   if (!proj) return;
-  if (!confirm('Очистить все превью?')) return;
+  if (!confirm('Очистить все превью? Будет удалено: ' + (proj.previews ? proj.previews.length : 0) + ' фото')) return;
   proj.previews = [];
   pvRenderAll();
 }
@@ -3662,6 +3665,8 @@ function ocRemoveItem(idx, e) {
 }
 
 function ocClearAll() {
+  /* Guard (дизайн-аудит G1): гость по share-ссылке не может очищать контент. */
+  if (window._isShareLink) return;
   var proj = getActiveProject();
   if (!proj) return;
   if (!confirm('Очистить весь доп. контент?')) return;

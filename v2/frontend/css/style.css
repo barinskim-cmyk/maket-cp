@@ -9,6 +9,25 @@
 body.is-share-link #nav-articles,
 body.is-share-link #page-articles { display: none !important; }
 
+/* Дизайн-аудит 2026-07 G1: на десктопном share-виде клиенту были доступны
+   инструменты фотографа, включая «Очистить» (удаляет все превью).
+   Скрываем редактор шаблонов, управление слотами и деструктивные кнопки.
+   CSS — не право доступа: в previews.js стоят JS-guard'ы, серверная
+   проверка роли — задача audit0702-share-role-db. */
+body.is-share-link .cp-toolbar .toggle-btn,
+body.is-share-link .cp-tmpl-select,
+body.is-share-link .cp-slot-controls,
+body.is-share-link #pv-toolbar .btn,
+body.is-share-link #oc-toolbar .btn,
+body.is-share-link .pv-dropzone,
+body.is-share-link .cp-add-card-btn,
+body.is-share-link .delete-card-btn { display: none !important; }
+
+/* G2: клиенту не нужна служебная навигация и статус-бар владельца —
+   клиентская шапка (client-action-bar) дублирует всё нужное. */
+body.is-share-link .nav,
+body.is-share-link .status-bar { display: none !important; }
+
 /* Share-link: спрятать auth-gate ДО запуска JS. Класс is-share-link на
    <html> ставится встроенным скриптом в <head> на основе ?share=… в URL,
    так что блок входа не успевает мелькнуть прежде authCheckOnLoad.
