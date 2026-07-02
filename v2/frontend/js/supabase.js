@@ -1156,10 +1156,33 @@ function sbLoadByShareToken(token) {
       _sbDoLoadByToken(token);
     } else if (attempts > 100) {
       clearInterval(interval);
-      alert('Не удалось подключиться к серверу. Попробуйте обновить страницу.');
-      if (typeof _hideShareLoader === 'function') _hideShareLoader();
+      _sbShowShareError('Не удалось подключиться к серверу', 'Проверьте соединение с интернетом и обновите страницу.');
     }
   }, 100);
+}
+
+/**
+ * Полноэкранное сообщение об ошибке share-ссылки (дизайн-аудит, вместо alert).
+ * Прячет интерфейс приложения — гость не должен видеть пустой UI фотографа.
+ */
+function _sbShowShareError(title, hint) {
+  if (typeof _hideShareLoader === 'function') { try { _hideShareLoader(); } catch (e) {} }
+  var appMain = document.getElementById('app-main');
+  if (appMain) appMain.style.display = 'none';
+  var gate = document.getElementById('auth-gate');
+  if (gate) gate.style.display = 'none';
+  var el = document.getElementById('share-error');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'share-error';
+    el.className = 'share-error';
+    document.body.appendChild(el);
+  }
+  el.innerHTML = '<div class="share-error-card">' +
+    '<div class="share-error-title">' + title + '</div>' +
+    '<div class="share-error-hint">' + hint + '</div>' +
+    '<button class="btn btn-primary" onclick="location.reload()">Обновить страницу</button>' +
+    '</div>';
 }
 
 /**
@@ -1171,19 +1194,15 @@ function _sbDoLoadByToken(token) {
       console.error('get_project_by_token error:', res.error.code, res.error.message, res.error);
       /* Показать конкретную ошибку для отладки (в проде заменить на общее сообщение) */
       var errMsg = 'Ссылка недействительна или истекла';
-      if (res.error.code === '42883') errMsg = 'RPC-функция не найдена. Выполните миграцию 015 в Supabase Dashboard.';
-      else if (res.error.code === '42501') errMsg = 'Нет доступа к RPC. Выполните GRANT из миграции 015.';
-      else if (res.error.message) errMsg += '\n(' + res.error.message + ')';
-      alert(errMsg);
-      if (typeof _hideShareLoader === 'function') _hideShareLoader();
+      if (res.error.code === '42883' || res.error.code === '42501') errMsg = 'Сервис временно недоступен';
+      _sbShowShareError(errMsg, 'Запросите новую ссылку у владельца проекта.');
       return;
     }
 
     var data = res.data;
     if (!data || !data.project_id) {
       console.warn('get_project_by_token: пустой ответ, data=', data);
-      alert('Ссылка недействительна или истекла');
-      if (typeof _hideShareLoader === 'function') _hideShareLoader();
+      _sbShowShareError('Ссылка недействительна или истекла', 'Запросите новую ссылку у владельца проекта.');
       return;
     }
 

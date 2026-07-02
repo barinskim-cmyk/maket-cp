@@ -3175,15 +3175,37 @@ function pvAutoAdvanceToStage(stageId) {
 
 // ── Действия ──
 
+/* Backup последней очистки (аудит 02.07 п.1.1, паттерн инцидента 14.04):
+   держим в памяти до перезагрузки страницы, тост даёт «Вернуть». */
+var _pvClearBackup = null;
+
 function pvClearAll() {
   /* Guard (дизайн-аудит G1): гость по share-ссылке не может удалять превью.
      Кнопка скрыта CSS-ом, но защищаемся и на уровне функции. */
   if (window._isShareLink) return;
   var proj = getActiveProject();
   if (!proj) return;
-  if (!confirm('Очистить все превью? Будет удалено: ' + (proj.previews ? proj.previews.length : 0) + ' фото')) return;
+  var count = proj.previews ? proj.previews.length : 0;
+  if (!confirm('Очистить все превью? Будет удалено: ' + count + ' фото')) return;
+  _pvClearBackup = { proj: proj, previews: proj.previews || [] };
   proj.previews = [];
   pvRenderAll();
+  if (typeof toast === 'function') {
+    toast('Превью очищены: ' + count + ' фото', 'warn', {
+      actionLabel: 'Вернуть',
+      duration: 10000,
+      onAction: pvUndoClearAll
+    });
+  }
+}
+
+/* Вернуть превью после случайной очистки (до перезагрузки страницы). */
+function pvUndoClearAll() {
+  if (!_pvClearBackup) return;
+  _pvClearBackup.proj.previews = _pvClearBackup.previews;
+  _pvClearBackup = null;
+  pvRenderAll();
+  if (typeof toast === 'function') toast('Превью восстановлены');
 }
 
 function pvShortName(name) {

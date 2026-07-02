@@ -3843,11 +3843,13 @@ function shClientRequestExtra() {
  * 2. Переводит проект на этап 3 (Цветокоррекция)
  * 3. Обновляет панель (кнопка → "Внести изменения в отбор")
  */
-function shClientApprove() {
+function shClientApprove(skipConfirm) {
   var proj = getActiveProject();
   if (!proj) return;
 
-  if (!confirm('Подтвердить отбор? После согласования начнётся цветокоррекция.')) return;
+  /* skipConfirm=true — подтверждение уже получено (мобильный bottom-sheet,
+     дизайн-аудит B4); десктопный путь по-прежнему спрашивает. */
+  if (!skipConfirm && !confirm('Подтвердить отбор? После согласования начнётся цветокоррекция.')) return;
 
   /* Записать историю */
   if (!proj._stageHistory) proj._stageHistory = {};

@@ -616,3 +616,38 @@ window.addEventListener('DOMContentLoaded', function() {
     }
   }
 });
+
+/* ══════════════════════════════════════════════
+   Toast-уведомления (дизайн-аудит D1: замена системных alert)
+   toast('Сохранено');
+   toast('Ошибка сохранения', 'danger');
+   toast('Превью очищены', 'warn', { actionLabel: 'Вернуть', onAction: fn, duration: 8000 });
+   ══════════════════════════════════════════════ */
+function toast(msg, kind, opts) {
+  opts = opts || {};
+  var t = document.createElement('div');
+  t.className = 'toast toast-' + (kind || 'ok');
+  t.setAttribute('role', 'status');
+  var span = document.createElement('span');
+  span.textContent = msg;
+  t.appendChild(span);
+  if (opts.actionLabel && typeof opts.onAction === 'function') {
+    var btn = document.createElement('button');
+    btn.className = 'toast-action';
+    btn.textContent = opts.actionLabel;
+    btn.onclick = function () {
+      try { opts.onAction(); } catch (e) {}
+      t.remove();
+    };
+    t.appendChild(btn);
+  }
+  /* Один тост на экране: старый убираем */
+  var prev = document.querySelector('.toast');
+  if (prev) prev.remove();
+  document.body.appendChild(t);
+  var ttl = opts.duration || 4000;
+  setTimeout(function () {
+    t.classList.add('toast-out');
+    setTimeout(function () { t.remove(); }, 300);
+  }, ttl);
+}

@@ -2836,6 +2836,9 @@ function cpMobileRender() {
 
   mobWrap.innerHTML = html;
 
+  /* B4: наблюдатель прогресса просмотра карточек */
+  try { cpMobileInitViewObserver(); } catch (eObs) {}
+
   /* Выровнять mob-filter-bar по реальной высоте хедера (чтобы не было зазора) */
   var _hdr = mobWrap.querySelector('.mob-header');
   var _fb  = mobWrap.querySelector('.mob-filter-bar');
@@ -3107,7 +3110,8 @@ function cpMobileRenderFeed() {
 
     /* Разделитель */
     html += '<div class="mob-card-block" data-card-idx="' + ci + '">';
-    html += '<div class="mob-card-divider">Карточка ' + (ci + 1) + ' / ' + proj.cards.length + '</div>';
+    /* Дизайн-аудит B6: клиент мыслит товарами — показываем имя карточки. */
+    html += '<h2 class="mob-card-divider" data-divider-idx="' + ci + '">№ ' + (ci + 1) + ' / ' + proj.cards.length + (card.name ? ' — ' + esc(card.name) : '') + '</h2>';
     html += '<div class="mob-card-slots">';
 
     for (var si = 0; si < card.slots.length; si++) {
@@ -3183,14 +3187,42 @@ function cpMobileRenderFeed() {
   }
 
   /* Кнопки согласования в конце ленты */
-  html += '<div class="mob-approve-block">';
-  html += '<div class="mob-approve-title">Просмотр завершён</div>';
-  html += '<button class="mob-btn-approve" onclick="cpMobileApprove()">Согласовать отбор</button>';
-  html += '<button class="mob-btn-reject" onclick="cpMobileReject()">Вернуть на доработку</button>';
-  html += '</div>';
+  html += _cpMobileApproveBlockHTML();
 
   html += '</div>'; /* mob-feed */
   return html;
+}
+
+/* Дизайн-аудит B4: общий блок согласования с прогрессом просмотра. */
+function _cpMobileApproveBlockHTML() {
+  var html = '<div class="mob-approve-block" id="mob-approve-block">';
+  html += '<div class="mob-approve-progress" id="mob-approve-progress"></div>';
+  html += '<div class="mob-approve-title">Готовы завершить согласование?</div>';
+  html += '<button class="mob-btn-approve" onclick="cpMobileApprove()">Согласовать отбор</button>';
+  html += '<button class="mob-btn-reject" onclick="cpMobileReject()">Вернуть на доработку</button>';
+  html += '</div>';
+  return html;
+}
+
+/* B4: счётчик просмотренных карточек (IntersectionObserver по разделителям). */
+var _mobViewedCards = {};
+function cpMobileInitViewObserver() {
+  if (typeof IntersectionObserver === 'undefined') return;
+  var dividers = document.querySelectorAll('.mob-card-divider[data-divider-idx]');
+  if (!dividers.length) return;
+  var proj = getActiveProject();
+  var total = (proj && proj.cards) ? proj.cards.length : dividers.length;
+  var obs = new IntersectionObserver(function (entries) {
+    for (var i = 0; i < entries.length; i++) {
+      if (entries[i].isIntersecting) {
+        _mobViewedCards[entries[i].target.getAttribute('data-divider-idx')] = true;
+      }
+    }
+    var n = Object.keys(_mobViewedCards).length;
+    var el = document.getElementById('mob-approve-progress');
+    if (el) el.textContent = 'Просмотрено карточек: ' + n + ' из ' + total;
+  }, { threshold: 0.5 });
+  for (var d = 0; d < dividers.length; d++) obs.observe(dividers[d]);
 }
 
 /**
@@ -3513,11 +3545,41 @@ function cpMobileSlotFullscreen(cardIdx, slotIdx, e) {
 
 /**
  * Согласовать отбор (мобильный клиент).
+ * Дизайн-аудит B4: bottom-sheet с объяснением последствий вместо confirm().
  */
 function cpMobileApprove() {
-  if (typeof shClientApprove === 'function') {
-    shClientApprove();
-  }
+  var proj = getActiveProject();
+  if (!proj) return;
+  var total = proj.cards ? proj.cards.length : 0;
+  var viewed = Object.keys(_mobViewedCards).length;
+  var old = document.getElementById('mob-approve-sheet');
+  if (old) old.remove();
+  var sheet = document.createElement('div');
+  sheet.id = 'mob-approve-sheet';
+  sheet.className = 'mob-approve-sheet-overlay';
+  var warn = (viewed < total)
+    ? '<div class="mob-sheet-warn">Вы просмотрели ' + viewed + ' из ' + total + ' карточек</div>'
+    : '';
+  sheet.innerHTML = '<div class="mob-approve-sheet" role="dialog" aria-modal="true">' +
+    '<div class="mob-sheet-title">Согласовать отбор целиком?</div>' +
+    warn +
+    '<div class="mob-sheet-text">' + total + ' карточек будут переданы на цветокоррекцию. Фотограф получит уведомление.</div>' +
+    '<button class="mob-btn-approve" id="mob-sheet-confirm">Согласовать</button>' +
+    '<button class="mob-btn-cancel" onclick="document.getElementById(\'mob-approve-sheet\').remove()">Отмена</button>' +
+    '</div>';
+  document.body.appendChild(sheet);
+  document.getElementById('mob-sheet-confirm').onclick = function () {
+    sheet.remove();
+    if (typeof shClientApprove === 'function') shClientApprove(true);
+    /* B4: вместо alert — зафиксированный статус решения в ленте */
+    var block = document.getElementById('mob-approve-block');
+    if (block) {
+      var now = new Date();
+      var when = now.toLocaleDateString('ru-RU') + ', ' + now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+      var who = (typeof sbUser !== 'undefined' && sbUser && (sbUser.user_metadata && sbUser.user_metadata.name || sbUser.email)) || 'клиент';
+      block.innerHTML = '<div class="mob-approve-done">Отбор согласован · ' + when + ' · ' + who + '</div>';
+    }
+  };
 }
 
 /**
@@ -3674,11 +3736,7 @@ function cpMobileRenderSelect() {
   html += '</div>';
 
   /* Кнопки согласования */
-  html += '<div class="mob-approve-block">';
-  html += '<div class="mob-approve-title">Просмотр завершён</div>';
-  html += '<button class="mob-btn-approve" onclick="cpMobileApprove()">Согласовать отбор</button>';
-  html += '<button class="mob-btn-reject" onclick="cpMobileReject()">Вернуть на доработку</button>';
-  html += '</div>';
+  html += _cpMobileApproveBlockHTML();
 
   return html;
 }

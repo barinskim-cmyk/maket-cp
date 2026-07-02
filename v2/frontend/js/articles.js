@@ -1854,12 +1854,41 @@ function _arApplyLoaded(proj, articles, fileName) {
     return;
   }
 
-  /* Спросить: заменить или добавить */
-  var mode = 'replace';
+  /* Спросить: заменить или добавить.
+     Дизайн-аудит D1: раньше confirm, где «Отмена» ВЫПОЛНЯЛА действие
+     (добавляла артикулы). Теперь модалка с тремя явными кнопками,
+     «Отмена» действительно отменяет загрузку. */
   if (proj.articles && proj.articles.length > 0) {
-    mode = confirm('Уже загружено ' + proj.articles.length + ' артикулов.\nНайдено ' + articles.length + ' новых.\n\nОК = заменить все\nОтмена = добавить к существующим') ? 'replace' : 'append';
+    _arShowMergeModal(proj, articles, fileName);
+    return;
   }
+  _arApplyMode(proj, articles, fileName, 'replace');
+}
 
+/* Модалка выбора режима загрузки: заменить / добавить / отмена. */
+function _arShowMergeModal(proj, articles, fileName) {
+  var old = document.getElementById('ar-merge-overlay');
+  if (old) old.remove();
+  var ov = document.createElement('div');
+  ov.id = 'ar-merge-overlay';
+  ov.className = 'modal-overlay';
+  ov.style.display = 'flex';
+  var html = '<div class="modal" role="dialog" aria-modal="true" style="max-width:440px">';
+  html += '<h3>Загрузка артикулов</h3>';
+  html += '<p style="margin:12px 0;color:var(--text-soft)">Уже загружено: ' + proj.articles.length + '. В файле найдено: ' + articles.length + ' новых.</p>';
+  html += '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">';
+  html += '<button class="btn" onclick="document.getElementById(\'ar-merge-overlay\').remove()">Отмена</button>';
+  html += '<button class="btn" id="ar-merge-append">Добавить к существующим</button>';
+  html += '<button class="btn btn-primary" id="ar-merge-replace">Заменить все</button>';
+  html += '</div></div>';
+  ov.innerHTML = html;
+  document.body.appendChild(ov);
+  document.getElementById('ar-merge-append').onclick = function () { ov.remove(); _arApplyMode(proj, articles, fileName, 'append'); };
+  document.getElementById('ar-merge-replace').onclick = function () { ov.remove(); _arApplyMode(proj, articles, fileName, 'replace'); };
+}
+
+/* Применить артикулы в выбранном режиме (продолжение _arApplyLoaded). */
+function _arApplyMode(proj, articles, fileName, mode) {
   if (mode === 'replace') {
     proj.articles = articles;
   } else {
