@@ -39,7 +39,7 @@ section{scroll-margin-top:0}
   92%,100%{filter:invert(1) grayscale(1) contrast(1.08)}
 }
 @media (prefers-reduced-motion:reduce){
-  .hero-img,.growth-img{animation:none !important}
+  .hero-img,.growth-img,.pulse-chart{animation:none !important}
   html{scroll-behavior:auto}
 }
 
@@ -106,49 +106,59 @@ section{scroll-margin-top:0}
 .stage-info .on{color:#f2f2f1}
 .stage-info.off{color:#6d6d6c}
 
-/* ── 3b. Пульс съёмки (светлая — разбавляет тёмный пайплайн) ── */
-.pulse{background:#eceae6;color:#131313;padding:80px max(24px,5vw) 110px}
+/* ── 3b. Пульс съёмки (тёмная; светлая кардиограмма на всю ширину, мигает инверсией) ── */
+.pulse{background:#131313;color:#f2f2f1;padding:80px 0 110px;border-top:1px solid #232323;overflow:hidden}
+.pulse .wrap{padding:0 max(24px,5vw)}
 .pulse-h{font-weight:200;font-size:clamp(32px,5vw,58px);line-height:1.06;letter-spacing:-.02em;margin:22px 0 0}
-.pulse-lead{font-size:16px;line-height:1.6;color:#57564e;margin:22px 0 0;max-width:520px}
-.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin:54px 0 0;border-top:1px solid #d3d1cb;border-bottom:1px solid #d3d1cb}
-.kpi{padding:26px 24px;border-right:1px solid #d3d1cb}
+.pulse-lead{font-size:16px;line-height:1.6;color:#a3a3a2;margin:22px 0 0;max-width:520px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin:54px 0 0;border-top:1px solid #262626;border-bottom:1px solid #262626}
+.kpi{padding:26px 24px;border-right:1px solid #262626}
 .kpi:first-child{padding-left:0}
 .kpi:last-child{padding-right:0;border-right:none}
 .kpi-num{font-weight:200;font-size:clamp(30px,3.6vw,42px);letter-spacing:-.02em}
-.kpi-num small{font-size:18px;color:#8a897f;font-weight:200}
-.kpi-lbl{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;color:#8a897f;margin-top:6px}
+.kpi-num small{font-size:18px;color:#7a7a79;font-weight:200}
+.kpi-lbl{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;color:#7a7a79;margin-top:6px}
 .pulse-head{display:flex;justify-content:space-between;align-items:baseline;margin:64px 0 20px;gap:12px;flex-wrap:wrap}
-.pulse-head .mono-note{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.2em;color:#8a897f}
-.pulse-head .mono-hint{font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8a897f}
-.pulse-chart{position:relative;background:#f4f3f0;border:1px solid #d3d1cb;padding:24px 20px 14px}
+.pulse-head .mono-note{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.2em;color:#7a7a79}
+.pulse-head .mono-hint{font-family:'IBM Plex Mono',monospace;font-size:11px;color:#7a7a79}
+/* Светлая иллюстрация на весь экран, изредка мигает в инверсию */
+.pulse-chart{position:relative;background:#eceae6;padding:24px max(24px,5vw) 14px;margin-left:calc(50% - 50vw);margin-right:calc(50% - 50vw);animation:fpStrobeRev 9s infinite}
 .pulse-days{display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;color:#9a988e;margin-top:10px;padding:0 4px;gap:8px;flex-wrap:wrap}
-.pulse-minmax{display:flex;gap:22px;flex-wrap:wrap;margin-top:16px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#8a897f}
-.pulse-minmax .dot{color:#c9c7c1}
-.pulse-minmax .hl{color:#131313}
-.peak-detail{margin:26px 0 0;min-height:74px;border-left:2px solid #131313;padding:6px 0 6px 22px;opacity:.5;transition:opacity .2s}
-.pd-kicker{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;color:#8a897f}
+.pulse-minmax{display:flex;gap:22px;flex-wrap:wrap;margin-top:16px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#7a7a79}
+.pulse-minmax .dot{color:#3f3f3e}
+.pulse-minmax .hl{color:#f2f2f1}
+.peak-detail{margin:26px 0 0;min-height:74px;border-left:2px solid #f2f2f1;padding:6px 0 6px 22px;opacity:.5;transition:opacity .2s}
+.pd-kicker{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;color:#7a7a79}
 .pd-row{display:flex;align-items:baseline;gap:16px;margin-top:8px;flex-wrap:wrap}
 .pd-time{font-weight:200;font-size:34px;letter-spacing:-.01em}
-.pd-label{font-size:14px;color:#57564e}
-.top-title{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.2em;color:#8a897f;margin:70px 0 24px}
-.top-list{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:1px solid #d3d1cb}
-.top-card{padding:26px;border-right:1px solid #d3d1cb}
+.pd-label{font-size:14px;color:#a3a3a2}
+.top-title{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.2em;color:#7a7a79;margin:70px 0 24px}
+.top-list{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:1px solid #232323}
+.top-card{padding:26px;border-right:1px solid #232323}
 .top-card:first-child{padding-left:0}
 .top-card:last-child{border-right:none}
-.top-tag{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;color:#8a897f}
+.top-tag{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;color:#7a7a79}
 .top-time{font-weight:200;font-size:46px;letter-spacing:-.02em;margin:14px 0 0}
-.top-code{font-family:'IBM Plex Mono',monospace;font-size:12px;color:#57564e;margin:8px 0 0}
-.top-when{font-family:'IBM Plex Mono',monospace;font-size:10px;color:#9a988e;margin:3px 0 0}
-.pulse-note{font-size:14px;line-height:1.6;color:#57564e;margin:26px 0 0;max-width:640px}
+.top-code{font-family:'IBM Plex Mono',monospace;font-size:12px;color:#a3a3a2;margin:8px 0 0}
+.top-when{font-family:'IBM Plex Mono',monospace;font-size:10px;color:#5c5c5b;margin:3px 0 0}
+.pulse-note{font-size:14px;line-height:1.6;color:#8c8c8b;margin:26px 0 0;max-width:640px}
+/* Обратный строб: обычный вид, изредка вспышка-инверсия */
+@keyframes fpStrobeRev{
+  0%,86%{filter:invert(0)}
+  88%{filter:invert(1)}
+  90%{filter:invert(0)}
+  92.5%{filter:invert(1)}
+  95%,100%{filter:invert(0)}
+}
 @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 
-/* ── 3c. Эволюция процесса (тёмная, марш из трёх, текст между фигурами) ── */
-.growth{background:#131313;color:#f2f2f1;padding:80px 0 60px;overflow:hidden}
+/* ── 3c. Эволюция процесса (светлая, марш из трёх, текст между фигурами) ── */
+.growth{background:#eceae6;color:#131313;padding:80px 0 60px;overflow:hidden}
 .growth-stage{position:relative;max-width:1400px;margin:0 auto}
-.growth-img{width:100%;height:auto;display:block;filter:invert(1) grayscale(1) contrast(1.06);animation:fpStrobe 3.2s infinite;-webkit-mask:linear-gradient(90deg,transparent,#000 10%,#000 90%,transparent);mask:linear-gradient(90deg,transparent,#000 10%,#000 90%,transparent)}
-.growth-veil{position:absolute;inset:0;background:linear-gradient(180deg,#131313 0%,rgba(19,19,19,0) 22%,rgba(19,19,19,0) 78%,#131313 100%);pointer-events:none}
-.growth-cap{position:absolute;text-align:center;transform:translate(-50%,-50%);font-weight:200;font-size:clamp(17px,2.2vw,30px);line-height:1.3;letter-spacing:-.01em;color:#fff;text-shadow:0 0 14px rgba(19,19,19,.6)}
-.growth-cap .mono-sub{display:block;font-family:'IBM Plex Mono',monospace;font-size:clamp(9px,.85vw,11px);letter-spacing:.2em;color:#9a9a99;margin-top:10px}
+.growth-img{width:100%;height:auto;display:block;filter:invert(0) grayscale(1) contrast(1.06);animation:fpStrobeRev 5.5s infinite;-webkit-mask:linear-gradient(90deg,transparent,#000 10%,#000 90%,transparent);mask:linear-gradient(90deg,transparent,#000 10%,#000 90%,transparent)}
+.growth-veil{position:absolute;inset:0;background:linear-gradient(180deg,#eceae6 0%,rgba(236,234,230,0) 22%,rgba(236,234,230,0) 78%,#eceae6 100%);pointer-events:none}
+.growth-cap{position:absolute;text-align:center;transform:translate(-50%,-50%);font-weight:300;font-size:clamp(12px,1.35vw,19px);line-height:1.35;letter-spacing:-.005em;color:#131313;text-shadow:0 0 12px rgba(236,234,230,.8)}
+.growth-cap .mono-sub{display:block;font-family:'IBM Plex Mono',monospace;font-size:clamp(8px,.7vw,10px);letter-spacing:.18em;color:#8a897f;margin-top:8px}
 
 /* ── 4. Согласование ── */
 .approve{background:#eceae6;color:#131313;padding:96px max(24px,5vw)}
@@ -210,10 +220,10 @@ section{scroll-margin-top:0}
   .data-stats{gap:40px}
   .kpis{grid-template-columns:repeat(2,1fr)}
   .kpi:nth-child(2){border-right:none;padding-right:0}
-  .kpi:nth-child(3){padding-left:0;border-top:1px solid #d3d1cb}
-  .kpi:nth-child(4){border-top:1px solid #d3d1cb}
+  .kpi:nth-child(3){padding-left:0;border-top:1px solid #262626}
+  .kpi:nth-child(4){border-top:1px solid #262626}
   .top-list{grid-template-columns:1fr}
-  .top-card{padding-left:0;border-right:none;border-bottom:1px solid #d3d1cb;padding-top:20px;padding-bottom:20px}
+  .top-card{padding-left:0;border-right:none;border-bottom:1px solid #232323;padding-top:20px;padding-bottom:20px}
   .top-card:last-child{border-bottom:none}
 }
 @media (max-width:680px){
@@ -337,7 +347,7 @@ section{scroll-margin-top:0}
 <!-- ═══════════ 3b. PULSE (dark) — «Пульс съёмки» из handoff 2 ═══════════ -->
 <section id="pulse" class="pulse" data-screen-label="Pulse">
   <div class="wrap">
-    <div class="eyebrow light" style="letter-spacing:.24em">▸ 4 835 ФАЙЛОВ .COS · 2 ДНЯ · БЕЗ РУЧНОЙ РАЗМЕТКИ</div>
+    <div class="eyebrow dark" style="letter-spacing:.24em">▸ 4 835 ФАЙЛОВ .COS · 2 ДНЯ · БЕЗ РУЧНОЙ РАЗМЕТКИ</div>
     <h2 class="pulse-h">Реальный пульс<br>вашей съёмки</h2>
     <p class="pulse-lead">Каждый артикул оставляет след во времени. Система собирает данные из сессии и с платформы — и вот уже кардиограмма двух смен: я знаю, где, когда и почему теряется время.</p>
 
