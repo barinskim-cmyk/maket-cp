@@ -1224,7 +1224,7 @@ tr:hover td { background: #fafafa; }
 </tr>
 
 <tr data-row="audit0702-supabase-restore">
-  <td><span class="s-todo">TODO</span></td>
+  <td><span class="s-done">DONE</span></td>
   <td>Инфраструктура</td>
   <td><strong>Supabase INACTIVE: restore + анти-пауза</strong></td>
   <td></td>
@@ -1236,7 +1236,7 @@ tr:hover td { background: #fafafa; }
 </tr>
 
 <tr data-row="audit0702-debug-migrations">
-  <td><span class="s-todo">TODO</span></td>
+  <td><span class="s-done">DONE</span></td>
   <td>Supabase / Безопасность</td>
   <td><strong>Откат debug-миграций 023/024 (GRANT ALL debug_log TO anon)</strong></td>
   <td></td>
@@ -1248,7 +1248,7 @@ tr:hover td { background: #fafafa; }
 </tr>
 
 <tr data-row="audit0702-ci-block">
-  <td><span class="s-todo">TODO</span></td>
+  <td><span class="s-done">DONE</span></td>
   <td>CI / Тесты</td>
   <td><strong>CI: убрать continue-on-error + активировать draft-тесты Rate Setter</strong></td>
   <td></td>
@@ -1320,13 +1320,109 @@ tr:hover td { background: #fafafa; }
 </tr>
 
 <tr data-row="audit0702-monetization-matrix">
-  <td><span class="s-todo">TODO</span></td>
+  <td><span class="s-done">DONE</span></td>
   <td>Бизнес</td>
   <td><strong>Свести монетизацию в одну матрицу + единый headline</strong></td>
   <td></td>
   <td>Четыре несогласованных SKU в разных доках (500р/проект, пакет, anchor 30к, brand-annual). Заполнить monetization-matrix.md: кто платит, за что, upgrade-path. Выбрать один headline лендинга и синхронизировать landing.html / landing_texts.md / strategy-2026.md.</td>
   <td class="files">monetization-matrix.md, landing.html, landing_texts.md</td>
   <td><span class="p-med">P1</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="design0702-toolbar-overflow">
+  <td><span class="s-done">DONE</span></td>
+  <td>Дизайн / Проекты</td>
+  <td><strong>Тулбар проектов: меню «...» вместо 7 кнопок, «Выйти» в статус-бар</strong></td>
+  <td></td>
+  <td>Дизайн-аудит C2. Сделано автономной сессией 02.07, верифицировано локальным прогоном (7 проверок: меню открывается/закрывается, 4 пункта, logout в статус-баре, 0 JS-ошибок).</td>
+  <td class="files">index.html, shootings.js, cloud-ui.js, style.css</td>
+  <td><span class="p-med">P1</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="design0702-share-hardening">
+  <td><span class="s-todo">TODO</span></td>
+  <td>Дизайн / Share</td>
+  <td><strong>Скрыть инструменты фотографа от клиента в share-виде</strong></td>
+  <td></td>
+  <td>Дизайн-аудит G1+G2 (HIGH): на десктопе клиент по ссылке видит редактор шаблонов, +V/+H, удаление карточек и «Очистить» (сносит все превью!). CSS-hardening для body.is-share-link + скрыть .nav и .status-bar. Плюс серверная проверка роли на мутациях.</td>
+  <td class="files">style.css, v2/supabase/</td>
+  <td><span class="p-high">P0</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="design0702-tokens-contrast">
+  <td><span class="s-todo">TODO</span></td>
+  <td>Дизайн / CSS</td>
+  <td><strong>Дизайн-токены + контраст WCAG AA + звёзды + статус-бар</strong></td>
+  <td></td>
+  <td>Дизайн-аудит 0+A1+A3+C3 (квик-вины 1, 8, 10): блок :root токенов, замена #aaa/#bbb на --text-faint и #999/#888 на --text-muted, звёзды #b26a00, padding-bottom 48px под статус-баром. Поглощает старую задачу ux-contrast-fix.</td>
+  <td class="files">style.css</td>
+  <td><span class="p-med">P1</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="design0702-focus-a11y">
+  <td><span class="s-todo">TODO</span></td>
+  <td>Дизайн / Accessibility</td>
+  <td><strong>:focus-visible + alt на img + aria-label на иконки</strong></td>
+  <td></td>
+  <td>Дизайн-аудит A2+A4 (квик-вины 2, 9): глобальный :focus-visible, удалить 11 outline:none, alt из имени файла в 4 местах previews.js, aria-label на кнопки-иконки. Поглощает старую задачу ux-focus-visible.</td>
+  <td class="files">style.css, previews.js, cards.js</td>
+  <td><span class="p-low">P2</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="design0702-client-quickwins">
+  <td><span class="s-todo">TODO</span></td>
+  <td>Дизайн / Мобильный клиент</td>
+  <td><strong>Клиентские квик-вины: русские вкладки, touch-таргеты, индикатор карусели</strong></td>
+  <td></td>
+  <td>Дизайн-аудит B1+B2+B3+B5 (квик-вины 3, 4, 6, 7): Cards/Select/Other/Options на русский, кнопка «OK»-«Отправить» + плейсхолдер, хитбоксы 44px, индикатор карусели постоянно при >1 фото + одноразовая подсказка про свайп. Витрина для брендов — приоритет по новой монетизации.</td>
+  <td class="files">cards.js, style.css</td>
+  <td><span class="p-med">P1</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="design0702-approval-sheet">
+  <td><span class="s-todo">TODO</span></td>
+  <td>Дизайн / Мобильный клиент</td>
+  <td><strong>Согласование: прогресс «просмотрено N из M» + bottom-sheet вместо confirm</strong></td>
+  <td></td>
+  <td>Дизайн-аудит B4 (HIGH): счётчик просмотра по IntersectionObserver, bottom-sheet в стиле .mob-cnt-picker-sheet с объяснением последствий, после успеха статус «Отбор согласован · дата · имя» вместо alert.</td>
+  <td class="files">cards.js, style.css</td>
+  <td><span class="p-med">P1</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="design0702-toasts">
+  <td><span class="s-todo">TODO</span></td>
+  <td>Дизайн / UX</td>
+  <td><strong>Тосты вместо 60+ системных alert()</strong></td>
+  <td></td>
+  <td>Дизайн-аудит D1: общий toast(msg, kind) + модалка подтверждения. Сначала клиентские пути и «Ошибка сохранения». Отдельно починить articles.js:1860 («Отмена = добавить» — Отмена выполняет действие!).</td>
+  <td class="files">state.js, style.css, articles.js</td>
+  <td><span class="p-low">P2</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="design0702-gallery-virtualization">
+  <td><span class="s-todo">TODO</span></td>
+  <td>Дизайн / Производительность</td>
+  <td><strong>Виртуализация галереи превью (5000+ фото) + поиск по имени</strong></td>
+  <td></td>
+  <td>Дизайн-аудит C1 (HIGH): при >300 превью рендерить только видимое окно (justified-layout уже посчитан), поиск по имени файла над галереей, группировка по папкам со сворачиванием.</td>
+  <td class="files">previews.js, style.css</td>
+  <td><span class="p-low">P2</span></td>
   <td class="t-cell"><span class="t-none">--</span></td>
   <td contenteditable="true" class="my-comment"></td>
 </tr>

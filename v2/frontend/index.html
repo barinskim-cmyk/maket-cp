@@ -17,7 +17,7 @@
   } catch (e) {}
 })();
 </script>
-<link rel="stylesheet" href="css/style.css?v=32">
+<link rel="stylesheet" href="css/style.css?v=33">
 </head>
 <body>
 
@@ -89,11 +89,15 @@
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
         <button class="btn btn-primary" onclick="openNewProjectModal()">Новая съёмка</button>
         <button class="btn" onclick="sbOpenShareModal()" title="Поделиться ссылкой">Поделиться</button>
-        <button class="btn" onclick="shOpenTeamModal()" title="Управление командой">Команда</button>
-        <button class="btn" onclick="shExportProject()" title="Экспорт проекта в файл">Экспорт</button>
-        <button class="btn" onclick="shImportProject()" title="Импорт проекта из файла">Импорт</button>
-        <button class="btn" onclick="dgDownloadLog()" title="Скачать лог для диагностики (отправить разработчику)">Скачать лог</button>
-        <button class="btn btn-logout" onclick="authLogout()" title="Выйти из аккаунта" id="btn-logout" style="display:none">Выйти</button>
+        <div class="overflow-wrap">
+          <button class="btn btn-overflow" id="sh-overflow-btn" onclick="shToggleOverflowMenu(event)" title="Ещё действия" aria-haspopup="true" aria-expanded="false">...</button>
+          <div class="overflow-menu" id="sh-overflow-menu" role="menu">
+            <button class="overflow-item" role="menuitem" onclick="shOverflowRun(shOpenTeamModal)" title="Управление командой">Команда</button>
+            <button class="overflow-item" role="menuitem" onclick="shOverflowRun(shExportProject)" title="Экспорт проекта в файл">Экспорт</button>
+            <button class="overflow-item" role="menuitem" onclick="shOverflowRun(shImportProject)" title="Импорт проекта из файла">Импорт</button>
+            <button class="overflow-item" role="menuitem" onclick="shOverflowRun(dgDownloadLog)" title="Скачать лог для диагностики (отправить разработчику)">Скачать лог</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -732,6 +736,7 @@
   <span id="save-status" style="color:#999"></span>
   <span id="cloud-status"></span>
   <span id="user-status" style="margin-left:auto"></span>
+  <button class="btn-logout" onclick="authLogout()" title="Выйти из аккаунта" id="btn-logout" style="display:none">Выйти</button>
   <!-- backend-status hidden, kept for JS compat -->
   <span id="backend-status" style="display:none"></span>
 </div>
@@ -757,7 +762,7 @@
 <script src="js/state.js"></script>
 <script src="js/events.js?v=23"></script>
 <script src="js/nav.js"></script>
-<script src="js/shootings.js?v=24"></script>
+<script src="js/shootings.js?v=25"></script>
 <script src="js/lib/justified-layout.min.js?v=1"></script>
 <script src="js/layout.js?v=2"></script>
 <script src="js/cards.js?v=9"></script>
@@ -766,7 +771,7 @@
 <script src="js/articles.js?v=25"></script>
 <script src="js/sync.js"></script>
 <script src="js/supabase.js?v=29"></script>
-<script src="js/cloud-ui.js?v=2"></script>
+<script src="js/cloud-ui.js?v=3"></script>
 <!-- Post-approval safeguard: блокирует случайный sync после
      «Согласовать отбор». См. docs/agents/dev/post-approval-safeguard.md -->
 <script src="js/post-approval-safeguard.js?v=3"></script>

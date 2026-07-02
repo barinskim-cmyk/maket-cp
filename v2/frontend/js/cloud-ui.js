@@ -323,7 +323,13 @@ function sbUpdateUI() {
   } else {
     cloudEl.textContent = 'Облако: подключено';
     var name = sbUser.user_metadata ? (sbUser.user_metadata.name || sbUser.email) : sbUser.email;
-    userEl.innerHTML = name + ' <a href="#" onclick="sbLogout(sbUpdateUI);return false" style="color:#999;font-size:11px">(выйти)</a>';
+    /* Кнопка "Выйти" (#btn-logout) живёт в статус-баре и управляется
+       authUnlock/authLock. Инлайновая ссылка "(выйти)" нужна только там,
+       где btn-logout скрыт: desktop (pywebview) и share-ссылка. */
+    var hasLogoutBtn = !window._isShareLink && !(window.pywebview && window.pywebview.api);
+    userEl.innerHTML = hasLogoutBtn
+      ? name
+      : name + ' <a href="#" onclick="sbLogout(sbUpdateUI);return false" style="color:#999;font-size:11px">(выйти)</a>';
   }
 }
 

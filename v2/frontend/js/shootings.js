@@ -4569,3 +4569,61 @@ function shRemoveProjectMember(userId) {
     shOpenProjectMembersModal();
   });
 }
+
+
+// ══════════════════════════════════════════════
+//  Overflow-меню шапки "Съёмки" (кнопка "...")
+// ══════════════════════════════════════════════
+
+/**
+ * Открыть/закрыть overflow-меню в шапке экрана "Съёмки".
+ * Закрывается по клику вне меню и по Esc.
+ * @param {Event} e
+ */
+function shToggleOverflowMenu(e) {
+  if (e && e.stopPropagation) e.stopPropagation();
+  var menu = document.getElementById('sh-overflow-menu');
+  var btn = document.getElementById('sh-overflow-btn');
+  if (!menu) return;
+  if (menu.classList.contains('open')) {
+    shCloseOverflowMenu();
+  } else {
+    menu.classList.add('open');
+    if (btn) btn.setAttribute('aria-expanded', 'true');
+    /* Закрытие по клику вне меню и по Esc — вешаем один раз на открытие */
+    setTimeout(function() {
+      document.addEventListener('click', _shOverflowOutside);
+      document.addEventListener('keydown', _shOverflowEsc);
+    }, 0);
+  }
+}
+
+/** Закрыть overflow-меню и снять глобальные обработчики. */
+function shCloseOverflowMenu() {
+  var menu = document.getElementById('sh-overflow-menu');
+  var btn = document.getElementById('sh-overflow-btn');
+  if (menu) menu.classList.remove('open');
+  if (btn) btn.setAttribute('aria-expanded', 'false');
+  document.removeEventListener('click', _shOverflowOutside);
+  document.removeEventListener('keydown', _shOverflowEsc);
+}
+
+/** Обработчик клика вне меню. */
+function _shOverflowOutside(e) {
+  var menu = document.getElementById('sh-overflow-menu');
+  if (menu && !menu.contains(e.target)) shCloseOverflowMenu();
+}
+
+/** Обработчик Esc. */
+function _shOverflowEsc(e) {
+  if (e.key === 'Escape' || e.keyCode === 27) shCloseOverflowMenu();
+}
+
+/**
+ * Выполнить действие пункта overflow-меню: закрыть меню, вызвать функцию.
+ * @param {Function} fn — действие (shOpenTeamModal, shExportProject, ...)
+ */
+function shOverflowRun(fn) {
+  shCloseOverflowMenu();
+  if (typeof fn === 'function') fn();
+}
