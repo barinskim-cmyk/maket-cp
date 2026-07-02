@@ -104,8 +104,45 @@ section{scroll-margin-top:0}
 .stage-info .on{color:#f2f2f1}
 .stage-info.off{color:#6d6d6c}
 
+/* ── 3b. Пульс съёмки (светлая — разбавляет тёмный пайплайн) ── */
+.pulse{background:#eceae6;color:#131313;padding:80px max(24px,5vw) 110px}
+.pulse-h{font-weight:200;font-size:clamp(32px,5vw,58px);line-height:1.06;letter-spacing:-.02em;margin:22px 0 0}
+.pulse-lead{font-size:16px;line-height:1.6;color:#57564e;margin:22px 0 0;max-width:520px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin:54px 0 0;border-top:1px solid #d3d1cb;border-bottom:1px solid #d3d1cb}
+.kpi{padding:26px 24px;border-right:1px solid #d3d1cb}
+.kpi:first-child{padding-left:0}
+.kpi:last-child{padding-right:0;border-right:none}
+.kpi-num{font-weight:200;font-size:clamp(30px,3.6vw,42px);letter-spacing:-.02em}
+.kpi-num small{font-size:18px;color:#8a897f;font-weight:200}
+.kpi-lbl{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;color:#8a897f;margin-top:6px}
+.pulse-head{display:flex;justify-content:space-between;align-items:baseline;margin:64px 0 20px;gap:12px;flex-wrap:wrap}
+.pulse-head .mono-note{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.2em;color:#8a897f}
+.pulse-head .mono-hint{font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8a897f}
+.pulse-chart{position:relative;background:#f4f3f0;border:1px solid #d3d1cb;padding:24px 20px 14px}
+.pulse-days{display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;color:#9a988e;margin-top:10px;padding:0 4px;gap:8px;flex-wrap:wrap}
+.pulse-minmax{display:flex;gap:22px;flex-wrap:wrap;margin-top:16px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#8a897f}
+.pulse-minmax .dot{color:#c9c7c1}
+.pulse-minmax .hl{color:#131313}
+.peak-detail{margin:26px 0 0;min-height:74px;border-left:2px solid #131313;padding:6px 0 6px 22px;opacity:.5;transition:opacity .2s}
+.pd-kicker{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;color:#8a897f}
+.pd-row{display:flex;align-items:baseline;gap:16px;margin-top:8px;flex-wrap:wrap}
+.pd-time{font-weight:200;font-size:34px;letter-spacing:-.01em}
+.pd-label{font-size:14px;color:#57564e}
+.top-title{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.2em;color:#8a897f;margin:70px 0 24px}
+.top-list{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:1px solid #d3d1cb}
+.top-card{padding:26px;border-right:1px solid #d3d1cb}
+.top-card:first-child{padding-left:0}
+.top-card:last-child{border-right:none}
+.top-tag{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;color:#8a897f}
+.top-time{font-weight:200;font-size:46px;letter-spacing:-.02em;margin:14px 0 0}
+.top-code{font-family:'IBM Plex Mono',monospace;font-size:12px;color:#57564e;margin:8px 0 0}
+.top-when{font-family:'IBM Plex Mono',monospace;font-size:10px;color:#9a988e;margin:3px 0 0}
+.pulse-note{font-size:14px;line-height:1.6;color:#57564e;margin:26px 0 0;max-width:640px}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+
 /* ── 4. Согласование ── */
 .approve{background:#eceae6;color:#131313;padding:96px max(24px,5vw)}
+#approve{border-top:1px solid #d3d1cb} /* разделитель: пульс и согласование обе светлые */
 .approve-grid{display:grid;grid-template-columns:1.2fr 1fr;gap:72px;align-items:center}
 .approve-lead{font-size:15px;line-height:1.65;color:#57564e;margin:20px 0 34px;max-width:460px}
 .approve-stats{display:flex;gap:48px;flex-wrap:wrap}
@@ -161,6 +198,13 @@ section{scroll-margin-top:0}
   .pipeline-bg{left:auto;right:-120px}
   .approve-stats{gap:32px}
   .data-stats{gap:40px}
+  .kpis{grid-template-columns:repeat(2,1fr)}
+  .kpi:nth-child(2){border-right:none;padding-right:0}
+  .kpi:nth-child(3){padding-left:0;border-top:1px solid #d3d1cb}
+  .kpi:nth-child(4){border-top:1px solid #d3d1cb}
+  .top-list{grid-template-columns:1fr}
+  .top-card{padding-left:0;border-right:none;border-bottom:1px solid #d3d1cb;padding-top:20px;padding-bottom:20px}
+  .top-card:last-child{border-bottom:none}
 }
 @media (max-width:680px){
   .topnav a:not(.btn-pilot-sm){display:none}
@@ -280,6 +324,55 @@ section{scroll-margin-top:0}
   </div>
 </section>
 
+<!-- ═══════════ 3b. PULSE (dark) — «Пульс съёмки» из handoff 2 ═══════════ -->
+<section id="pulse" class="pulse" data-screen-label="Pulse">
+  <div class="wrap">
+    <div class="eyebrow light" style="letter-spacing:.24em">▸ 4 835 ФАЙЛОВ .COS · 2 ДНЯ · БЕЗ РУЧНОЙ РАЗМЕТКИ</div>
+    <h2 class="pulse-h">Реальный пульс<br>вашей съёмки</h2>
+    <p class="pulse-lead">Каждый артикул оставляет след во времени. Собрали его из таймштампов затвора — вот кардиограмма двух смен: где ритм ровный, а где кадр «съел» 17 минут.</p>
+
+    <!-- KPI row -->
+    <div class="kpis">
+      <div class="kpi"><div class="kpi-num">4 835</div><div class="kpi-lbl">КАДРОВ ЗА 2 ДНЯ</div></div>
+      <div class="kpi"><div class="kpi-num">361<small>/час</small></div><div class="kpi-lbl">1 КАДР В 10 СЕКУНД</div></div>
+      <div class="kpi"><div class="kpi-num">64</div><div class="kpi-lbl">АРТИКУЛА В ФИНАЛЕ</div></div>
+      <div class="kpi"><div class="kpi-num">3:25</div><div class="kpi-lbl">МИН:СЕК / АРТИКУЛ</div></div>
+    </div>
+
+    <!-- Кардиограмма -->
+    <div class="pulse-head">
+      <div class="mono-note">▸ ПИКИ = КАДРЫ АРТИКУЛА · ПЛОСКАЯ ЛИНИЯ = ПАУЗА (НЕТ БИЕНИЯ)</div>
+      <div class="mono-hint"><span id="pulse-hint">наведите на пик</span></div>
+    </div>
+    <div class="pulse-chart">
+      <div id="pulse-wrap" style="position:relative;width:100%"></div>
+      <div class="pulse-days">
+        <span>ДЕНЬ 1 · 38 АРТИКУЛОВ · 7.8 Ч</span>
+        <span>ДЕНЬ 2 · 26 АРТИКУЛОВ · 5.6 Ч</span>
+      </div>
+    </div>
+    <div class="pulse-minmax">
+      <span>MIN 0:47</span><span class="dot">·</span>
+      <span>МЕДИАНА 2:54</span><span class="dot">·</span>
+      <span class="hl">MAX 17:02 — самый ёмкий артикул дня 2</span>
+    </div>
+
+    <!-- Детали пика -->
+    <div id="peak-detail" class="peak-detail">
+      <div class="pd-kicker" id="pd-kicker">САМЫЙ ЁМКИЙ АРТИКУЛ</div>
+      <div class="pd-row">
+        <div class="pd-time" id="pd-time">17:02</div>
+        <div class="pd-label" id="pd-label">день 2 · на 4.4-м часу смены</div>
+      </div>
+    </div>
+
+    <!-- Три характерных артикула -->
+    <div class="top-title">▸ ТРИ ХАРАКТЕРНЫХ АРТИКУЛА</div>
+    <div id="top-list" class="top-list"></div>
+    <p class="pulse-note">Со временем вы всё лучше узнаёте свой ассортимент — и рассчитываете время съёмки точнее: сколько заложить на сложный артикул, а сколько на простой.</p>
+  </div>
+</section>
+
 <!-- ═══════════ 4. APPROVAL (light) ═══════════ -->
 <section id="approve" class="approve" data-screen-label="Approval">
   <div class="wrap approve-grid">
@@ -360,6 +453,169 @@ section{scroll-margin-top:0}
     <span>© 2026 — ВИЗУАЛЬНЫЙ ПРОДАКШЕН</span>
   </div>
 </section>
+
+<script>
+/* ══════════════════════════════════════════════════════════════
+   «Пульс съёмки» — кардиограмма двух смен из таймштампов затвора.
+   Портировано из dc-макета (Пульс съёмки.dc.html) на чистый JS.
+   Префикс pls*. Анимация линии запускается при появлении секции
+   в зоне видимости (IntersectionObserver, есть фолбэк).
+   ══════════════════════════════════════════════════════════════ */
+(function(){
+  function plsRng(seed){ var x = Math.sin(seed*997.13)*10000; return x - Math.floor(x); }
+
+  /* Правдоподобный код артикула (без бренда) */
+  function plsArtCode(day, seed){
+    var cats = ['DRS','TOP','KNT','BLZ','SKR','TRS','COT','JKT','SHR','BAG','SHO','ACC'];
+    var cat = cats[Math.floor(plsRng(seed*3.1)*cats.length)];
+    var num = 100 + Math.floor(plsRng(seed*7.7)*899);
+    var col = ['BLK','WHT','BEI','NVY','GRY','CML','RED','KHK'][Math.floor(plsRng(seed*5.3)*8)];
+    return cat + '-' + num + '_' + col;
+  }
+
+  /* Пики: топ-5 реальных значений на день + синтетика вокруг медианы */
+  function plsBuildPeaks(){
+    var top1 = [[3.0,526],[0.7,470],[0.4,468],[2.5,461],[1.3,405]];
+    var top2 = [[4.4,1022],[4.1,272],[1.5,268],[4.9,245],[0.4,242]];
+    var pausesMin = {1:[65,24,12,9,7,6,5,5,4,4], 2:[44,24,16,8,6,5,5,4,3,3]};
+    function mk(count, dayLen, day, known){
+      var arr = [], sid = day*1000, i, r, sec, h;
+      known.forEach(function(k){ arr.push({h:k[0], sec:k[1], code:plsArtCode(day,sid++), day:day, known:true}); });
+      for(i=0; i<count-known.length; i++){
+        r = plsRng(day*100+i);
+        sec = Math.round(47 + Math.pow(r,1.8)*210);
+        h = +(((i+0.5)/count*dayLen) + (plsRng(day*7+i)-0.5)*0.12).toFixed(2);
+        arr.push({h:Math.max(0,h), sec:sec, code:plsArtCode(day,sid++), day:day, known:false});
+      }
+      arr.sort(function(a,b){ return a.h-b.h; });
+      arr.forEach(function(p,idx){ p.pause = 20 + Math.round(plsRng(day*13+idx)*70); });
+      var big = pausesMin[day].map(function(m){ return m*60; });
+      big.forEach(function(psec,bi){
+        var idx = Math.min(arr.length-1, Math.round((bi+1)/(big.length+1)*arr.length));
+        arr[idx].pause = Math.max(arr[idx].pause, psec);
+      });
+      return arr;
+    }
+    return {d1:mk(38,7.8,1,top1), d2:mk(26,5.6,2,top2)};
+  }
+
+  function plsFmt(s){ var m = Math.floor(s/60); return m + ':' + String(Math.round(s%60)).padStart(2,'0'); }
+
+  function plsRender(){
+    var wrap = document.getElementById('pulse-wrap'); if(!wrap) return;
+    var peaks = plsBuildPeaks(), d1 = peaks.d1, d2 = peaks.d2;
+    var all = d1.concat(d2);
+    var W = 1140, H = 260, mid = H*0.60;
+    var maxSec = 1022, maxPause = 65*60;
+    function up(sec){ return 10 + (sec/maxSec)*(mid-16); }
+    function dnW(psec){ return 4 + Math.pow(psec/maxPause,0.8)*70; }
+    function artW(sec){ return 8 + (sec/maxSec)*20; }
+    var totalUnits = 0;
+    all.forEach(function(p){ totalUnits += artW(p.sec) + dnW(p.pause); });
+    var gap = 44, scale = (W-gap)/totalUnits;
+    var pts = [[0,mid]], markers = [], x = 0;
+    function emitDay(arr){
+      arr.forEach(function(p){
+        var w = artW(p.sec)*scale, ph = up(p.sec), n = 3, seg = w/n, f, bx, isLast, hh, vd;
+        for(f=0; f<n; f++){
+          bx = x + seg*f; isLast = (f===n-1);
+          hh = (f===1) ? ph : ph*(f===0?0.82:0.9);   /* 2-й кадр — самый высокий */
+          pts.push([bx+seg*0.5, mid-hh]);
+          markers.push({cx:bx+seg*0.5, cy:mid-hh, p:p, isPeak:f===1});
+          if(!isLast){ vd = Math.min(mid*0.42, hh*0.5); pts.push([bx+seg, mid+vd]); }
+        }
+        x += w;
+        pts.push([x, mid]);
+        var pw = dnW(p.pause)*scale;                  /* пауза = плоская линия */
+        pts.push([x+pw, mid]);
+        x += pw;
+      });
+    }
+    emitDay(d1);
+    var divX = x + gap*0.5*scale;
+    x += gap*scale;
+    emitDay(d2);
+    pts.push([W,mid]);
+    var d = 'M' + pts.map(function(p){ return p[0].toFixed(1)+','+p[1].toFixed(1); }).join(' L');
+    var svg = '<svg viewBox="0 0 '+W+' '+H+'" width="100%" preserveAspectRatio="xMidYMid meet" style="display:block;overflow:visible">';
+    svg += '<line x1="0" y1="'+mid+'" x2="'+W+'" y2="'+mid+'" stroke="#c9c7c1" stroke-width="1"/>';
+    svg += '<line x1="'+divX.toFixed(1)+'" y1="14" x2="'+divX.toFixed(1)+'" y2="'+(H-6)+'" stroke="#d3d1cb" stroke-width="1" stroke-dasharray="3 4"/>';
+    svg += '<path d="'+d+'" fill="none" stroke="#131313" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>';
+    var pk = markers.filter(function(m){ return m.isPeak; });
+    pk.forEach(function(m,i){
+      var r = m.p.known ? 3.2 : 1.8, col = m.p.known ? '#131313' : '#9a988e';
+      svg += '<circle data-code="'+m.p.code+'" data-sec="'+m.p.sec+'" data-day="'+m.p.day+'" data-h="'+m.p.h+'" data-known="'+(m.p.known?1:0)+'" cx="'+m.cx.toFixed(1)+'" cy="'+m.cy.toFixed(1)+'" r="'+r+'" fill="'+col+'" style="opacity:0;animation:fadeUp .3s ease '+(1.8+i*0.03).toFixed(2)+'s forwards;cursor:pointer"/>';
+    });
+    svg += '</svg>';
+    wrap.innerHTML = svg;
+
+    /* Рисование линии: измеряем длину пути, анимируем dashoffset */
+    var pathEl = wrap.querySelector('path');
+    if(pathEl){
+      var L = Math.ceil(pathEl.getTotalLength()) + 20;
+      pathEl.style.strokeDasharray = L;
+      pathEl.style.strokeDashoffset = L;
+      pathEl.style.transition = 'none';
+      requestAnimationFrame(function(){ requestAnimationFrame(function(){
+        pathEl.style.transition = 'stroke-dashoffset 3.4s cubic-bezier(.4,0,.1,1)';
+        pathEl.style.strokeDashoffset = '0';
+      }); });
+    }
+
+    /* Ховер по пикам -> блок деталей */
+    var pdK = document.getElementById('pd-kicker'),
+        pdT = document.getElementById('pd-time'),
+        pdL = document.getElementById('pd-label'),
+        pdBox = document.getElementById('peak-detail'),
+        hint = document.getElementById('pulse-hint');
+    Array.prototype.forEach.call(wrap.querySelectorAll('circle'), function(c){
+      c.addEventListener('mouseenter', function(){
+        var known = c.dataset.known === '1';
+        pdBox.style.opacity = 1;
+        pdK.textContent = (known ? 'АРТИКУЛ · РЕАЛЬНЫЕ ДАННЫЕ' : 'АРТИКУЛ') + ' · ' + c.dataset.code;
+        pdT.textContent = plsFmt(+c.dataset.sec);
+        pdL.textContent = 'день ' + c.dataset.day + ' · на ' + (+c.dataset.h).toFixed(1) + '-м часу смены';
+        c.setAttribute('r', known ? 5 : 3.5);
+        if(hint) hint.textContent = c.dataset.code + ' · ' + plsFmt(+c.dataset.sec);
+      });
+      c.addEventListener('mouseleave', function(){
+        c.setAttribute('r', c.dataset.known==='1' ? 3.2 : 1.8);
+      });
+    });
+
+    /* Три характерных артикула */
+    var tl = document.getElementById('top-list');
+    var sorted = all.slice().sort(function(a,b){ return a.sec-b.sec; });
+    var longest = sorted[sorted.length-1], fastest = sorted[0];
+    var medSec = 174, median = all[0];
+    all.forEach(function(p){ if(Math.abs(p.sec-medSec) < Math.abs(median.sec-medSec)) median = p; });
+    var cards = [
+      {tag:'САМЫЙ ДОЛГИЙ', p:longest},
+      {tag:'ТОЧНО В МЕДИАНУ', p:median},
+      {tag:'САМЫЙ БЫСТРЫЙ', p:fastest}
+    ];
+    tl.innerHTML = cards.map(function(c){
+      return '<div class="top-card">' +
+        '<div class="top-tag">' + c.tag + '</div>' +
+        '<div class="top-time">' + plsFmt(c.p.sec) + '</div>' +
+        '<div class="top-code">' + c.p.code + '</div>' +
+        '<div class="top-when">день ' + c.p.day + ' · ' + c.p.h.toFixed(1) + '-й час смены</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  /* Запуск при появлении секции в видимости (иначе анимация пройдёт до скролла) */
+  var plsStarted = false;
+  function plsStart(){ if(plsStarted) return; plsStarted = true; plsRender(); }
+  if('IntersectionObserver' in window){
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){ if(e.isIntersecting){ plsStart(); io.disconnect(); } });
+    }, {rootMargin:'0px 0px -20% 0px'});
+    var sec = document.getElementById('pulse');
+    if(sec) io.observe(sec); else plsStart();
+  } else { plsStart(); }
+})();
+</script>
 
 </body>
 </html>
