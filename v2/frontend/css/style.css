@@ -275,6 +275,16 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .connected { color: #4caf50; }
 .disconnected { color: #e57373; }
 
+/* Точка-индикатор сохранения/синка в статус-баре (задача ux-status-bar-contrast) */
+.sb-dot {
+  display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  background: #ccc; margin-right: -4px; flex: none;
+  transition: background .2s;
+}
+.sb-dot.saving { background: #ff9800; }
+.sb-dot.synced { background: #4caf50; }
+.sb-dot.error  { background: #c62828; }
+
 .empty-state { color: #aaa; font-size: 14px; text-align: center; padding: 40px 0; }
 
 /* ══════════════════════════════════════════════

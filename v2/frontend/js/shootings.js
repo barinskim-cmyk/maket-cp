@@ -3477,16 +3477,30 @@ function shLoadAutoSaved() {
  */
 function shSetSaveStatus(status) {
   var el = document.getElementById('save-status');
+  var dot = document.getElementById('save-dot');
   if (!el) return;
+  /* Точка-индикатор: оранжевая = сохранение, зелёная = сохранено, красная = ошибка */
+  if (dot) {
+    dot.className = 'sb-dot ' +
+      (status === 'saved' ? 'synced' : status === 'saving' ? 'saving' : 'error');
+  }
+  /* Контраст поднимается на время изменения, затем приглушается (кроме ошибки) */
   if (status === 'saved') {
     el.textContent = 'Сохранено';
-    el.style.color = '#999';
+    el.style.color = '#555';
   } else if (status === 'saving') {
     el.textContent = 'Сохранение...';
-    el.style.color = '#ff9800';
+    el.style.color = '#e65100';
   } else {
     el.textContent = 'Ошибка сохранения';
     el.style.color = '#c62828';
+  }
+  if (el._dimTimer) clearTimeout(el._dimTimer);
+  if (status !== 'error') {
+    el._dimTimer = setTimeout(function() {
+      el.style.color = '#767676';
+      if (dot && status === 'saved') dot.className = 'sb-dot';
+    }, 2500);
   }
 }
 
