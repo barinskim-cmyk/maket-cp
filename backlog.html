@@ -1223,6 +1223,126 @@ tr:hover td { background: #fafafa; }
   <td contenteditable="true" class="my-comment"></td>
 </tr>
 
+<tr data-row="audit0702-supabase-restore">
+  <td><span class="s-todo">TODO</span></td>
+  <td>Инфраструктура</td>
+  <td><strong>Supabase INACTIVE: restore + анти-пауза</strong></td>
+  <td></td>
+  <td>Аудит 02.07: проект maketcp в паузе — веб-клиент и share-ссылки не работают. Restore, проверить ссылку EKONIKA, наличие таблицы photo_versions, перегнать advisors. Решить: платный тариф или keep-alive пинг. Удалить старый пустой проект. (audits/role-audit-2026-07-02.md, п.0)</td>
+  <td class="files">Supabase Dashboard</td>
+  <td><span class="p-high">P0</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="audit0702-debug-migrations">
+  <td><span class="s-todo">TODO</span></td>
+  <td>Supabase / Безопасность</td>
+  <td><strong>Откат debug-миграций 023/024 (GRANT ALL debug_log TO anon)</strong></td>
+  <td></td>
+  <td>023_storage_auth_diagnostic даёт anon полный доступ к debug_log. Миграция-откат: DROP таблицы и функции, убрать 024 trivial test. Проверить нумерацию: нет 032, all_pending_migrations.sql и proposed-*.sql убрать в archive/.</td>
+  <td class="files">v2/supabase/</td>
+  <td><span class="p-high">P0</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="audit0702-ci-block">
+  <td><span class="s-todo">TODO</span></td>
+  <td>CI / Тесты</td>
+  <td><strong>CI: убрать continue-on-error + активировать draft-тесты Rate Setter</strong></td>
+  <td></td>
+  <td>Красный e2e сейчас ничего не блокирует. Снять флаг, переименовать 3-5 сценариев из tests/e2e/pending/*.draft в .spec.ts и включить в прогон.</td>
+  <td class="files">.github/workflows/e2e.yml, tests/e2e/</td>
+  <td><span class="p-high">P1</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="audit0702-clearall-backup">
+  <td><span class="s-todo">TODO</span></td>
+  <td>Превью / Данные</td>
+  <td><strong>Backup перед pvClearAll + автосейв проекта в браузер-режиме</strong></td>
+  <td></td>
+  <td>Очистка превью без snapshot — паттерн инцидента 14.04. Snapshot в localStorage/IndexedDB перед очисткой, confirm с числом фото. В браузерном фолбэке проект должен переживать перезагрузку (автосейв + quota handling).</td>
+  <td class="files">previews.js, shootings.js, state.js</td>
+  <td><span class="p-high">P1</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="audit0702-mobile-select">
+  <td><span class="s-todo">TODO</span></td>
+  <td>Мобильный клиент</td>
+  <td><strong>Мобильный клиент: выбор фото в слот + комментарии</strong></td>
+  <td></td>
+  <td>По share-ссылке на телефоне клиент не может выбрать фото в слот (только desktop drag-drop), прокомментировать, аннотировать. Tap-выбор в carousel, мобильный UI комментариев и маркеров.</td>
+  <td class="files">cards.js, index.html, style.css</td>
+  <td><span class="p-med">P1</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="audit0702-retoucher-mode">
+  <td><span class="s-todo">TODO</span></td>
+  <td>Роли / Ретушёр</td>
+  <td><strong>Минимальный режим ретушёра</strong></td>
+  <td></td>
+  <td>Роль retoucher сейчас без интерфейса. Минимум: очередь фото на ретуши, загрузка результата, версия в photo_versions, видимость комментариев/аннотаций клиента. Включить compare-view (сейчас за DEBUG-флагом).</td>
+  <td class="files">shootings.js, compare-view.js, supabase.js</td>
+  <td><span class="p-med">P1</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="audit0702-card-versioning">
+  <td><span class="s-todo">TODO</span></td>
+  <td>Синхронизация / Данные</td>
+  <td><strong>Версионирование карточек при конкурентном редактировании</strong></td>
+  <td></td>
+  <td>Фотограф и клиент одновременно: merge без версий может потерять правки. updated_at/_version на карточку, merge по полю. Плюс periodic pull (30-60с) для share-ссылок вместо отключённого auto-pull.</td>
+  <td class="files">supabase.js, v2/supabase/</td>
+  <td><span class="p-med">P2</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="audit0702-share-role-db">
+  <td><span class="s-todo">TODO</span></td>
+  <td>Supabase / Безопасность</td>
+  <td><strong>Роль share-ссылки на уровне БД (view vs edit)</strong></td>
+  <td></td>
+  <td>save_cards_by_token и запись photo_versions доступны anon по токену — любой токен = полный write. В RPC проверять role из share_links; view-ссылки только чтение. UI-гейт _isShareLink подделывается из консоли.</td>
+  <td class="files">v2/supabase/, supabase.js, nav.js</td>
+  <td><span class="p-med">P2</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="audit0702-monetization-matrix">
+  <td><span class="s-todo">TODO</span></td>
+  <td>Бизнес</td>
+  <td><strong>Свести монетизацию в одну матрицу + единый headline</strong></td>
+  <td></td>
+  <td>Четыре несогласованных SKU в разных доках (500р/проект, пакет, anchor 30к, brand-annual). Заполнить monetization-matrix.md: кто платит, за что, upgrade-path. Выбрать один headline лендинга и синхронизировать landing.html / landing_texts.md / strategy-2026.md.</td>
+  <td class="files">monetization-matrix.md, landing.html, landing_texts.md</td>
+  <td><span class="p-med">P1</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="audit0702-usage-metrics">
+  <td><span class="s-todo">TODO</span></td>
+  <td>Метрики</td>
+  <td><strong>Метрики использования: DAU, проекты, топ-ошибки</strong></td>
+  <td></td>
+  <td>Сейчас не видно кто и как пользуется. Счётчики через action_log + еженедельная сводка (DAU, активные проекты, ошибки из client_errors). Нужно для кейса «до/после» с евангелистами.</td>
+  <td class="files">state.js, supabase.js, v2/supabase/</td>
+  <td><span class="p-low">P2</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
 </tbody>
 </table>
 
