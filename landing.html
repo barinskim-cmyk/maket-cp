@@ -228,9 +228,27 @@ section{scroll-margin-top:0}
 }
 @media (max-width:680px){
   .topnav a:not(.btn-pilot-sm){display:none}
-  .hero{padding-bottom:110px}
-  .hero-stats{gap:14px;font-size:10px}
+  .hero{padding-bottom:120px}
+  .hero-stats{gap:10px;font-size:9px;letter-spacing:.08em}
   .astat-num,.dstat-num{font-size:36px}
+  /* Подписи-кластеры на фото: мельче и плотнее */
+  .pcluster{font-size:8px;letter-spacing:.06em;gap:4px}
+  .pcluster span::before{content:"▸ "}
+  /* Кардиограмма: горизонтальный скролл вместо сжатия в полоску */
+  .pulse-chart{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  #pulse-wrap,.pulse-chart .pulse-days{min-width:820px}
+  .pulse-head .mono-hint{display:none}
+  .pulse-head .mono-note{font-size:9.5px;letter-spacing:.1em}
+  .pulse-minmax{font-size:9.5px;gap:10px}
+  .top-time{font-size:36px}
+  /* Эволюция: капсулы над фото, а не поверх фигур */
+  .growth{padding-top:56px}
+  .growth-cap{position:static;transform:none;margin:0 auto 18px;max-width:320px}
+  .growth-cap .mono-sub{margin-top:5px}
+  .growth-img{margin-top:8px}
+  /* Переименование файлов: не переносить строки внутри пары */
+  .rename-panel{font-size:10px}
+  .rename-row{gap:6px}
 }
 </style>
 </head>
