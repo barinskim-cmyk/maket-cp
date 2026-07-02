@@ -233,9 +233,14 @@ section{scroll-margin-top:0}
 @media (max-width:680px){
   .topnav a:not(.btn-pilot-sm){display:none}
   .hero{padding-bottom:120px}
-  /* На мобилке картинка — верхняя полоса, а не гигантский фон под текстом */
-  .hero-img{top:0;left:0;transform:none;width:100%;height:48vh;object-position:50% 12%;-webkit-mask:linear-gradient(180deg,#000 60%,transparent 100%);mask:linear-gradient(180deg,#000 60%,transparent 100%)}
-  .hero-veil{background:linear-gradient(180deg,rgba(19,19,19,.1) 0%,rgba(19,19,19,.25) 34%,#131313 52%)}
+  /* Мобильный hero: лого -> чувак -> текст, без наложений */
+  .hero{display:block;min-height:auto;padding:0 24px 56px;text-align:center}
+  .topbar{position:static;padding:22px 0 14px;max-width:none}
+  .hero-img{position:static;transform:none;width:calc(100% + 48px);margin:0 -24px;height:44vh;object-fit:cover;object-position:50% 12%;-webkit-mask:linear-gradient(180deg,#000 72%,transparent 100%);mask:linear-gradient(180deg,#000 72%,transparent 100%);animation:fpStrobe 6.5s infinite}
+  .hero-veil{display:none}
+  .hero-content{max-width:none;margin-top:-6vh;position:relative}
+  .hero .btn-primary{display:none} /* «Запустить пилот» скрыт на мобилке */
+  .hero-stats{position:static;margin-top:34px}
   .hero-stats{gap:10px;font-size:9px;letter-spacing:.08em}
   .astat-num,.dstat-num{font-size:36px}
   /* Подписи-кластеры на фото: мельче и плотнее */
@@ -278,7 +283,7 @@ section{scroll-margin-top:0}
     <p class="hero-sub">У вас уже есть почти всё, чтобы увидеть свой процесс по-настоящему. Система — это просто.</p>
     <div class="btn-row">
       <a href="#cta" class="btn-primary">Запустить пилот</a>
-      <a href="#pipeline" class="btn-ghost">Узнать больше</a>
+      <a href="#problem" class="btn-ghost">Узнать больше</a>
     </div>
     <div class="hero-tag" style="margin-top:30px">ПЛАТФОРМА ДЛЯ ВИЗУАЛЬНОГО ПРОДАКШЕНА</div>
   </div>
