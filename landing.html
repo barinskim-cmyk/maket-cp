@@ -152,11 +152,10 @@ section{scroll-margin-top:0}
 }
 @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 
-/* ── 3c. Эволюция процесса (светлая, марш из трёх, текст между фигурами) ── */
-.growth{background:#eceae6;color:#131313;padding:80px 0 60px;overflow:hidden}
-.growth-stage{position:relative;max-width:1400px;margin:0 auto}
-.growth-img{width:100%;height:auto;display:block;filter:invert(0) grayscale(1) contrast(1.06);animation:fpStrobeRev 5.5s infinite;-webkit-mask:linear-gradient(90deg,transparent,#000 10%,#000 90%,transparent);mask:linear-gradient(90deg,transparent,#000 10%,#000 90%,transparent)}
-.growth-veil{position:absolute;inset:0;background:linear-gradient(180deg,#eceae6 0%,rgba(236,234,230,0) 22%,rgba(236,234,230,0) 78%,#eceae6 100%);pointer-events:none}
+/* ── 3c. Эволюция процесса (светлая, фото во весь экран без градиентов) ── */
+.growth{background:#eceae6;color:#131313;padding:0;overflow:hidden}
+.growth-stage{position:relative}
+.growth-img{width:100%;height:auto;display:block;filter:invert(0) grayscale(1) contrast(1.06);animation:fpStrobeRev 5.5s infinite}
 .growth-cap{position:absolute;text-align:center;transform:translate(-50%,-50%);font-weight:300;font-size:clamp(12px,1.35vw,19px);line-height:1.35;letter-spacing:-.005em;color:#131313;text-shadow:0 0 12px rgba(236,234,230,.8)}
 .growth-cap .mono-sub{display:block;font-family:'IBM Plex Mono',monospace;font-size:clamp(8px,.7vw,10px);letter-spacing:.18em;color:#8a897f;margin-top:8px}
 
@@ -397,7 +396,6 @@ section{scroll-margin-top:0}
 <section id="growth" class="growth" data-screen-label="Growth">
   <div class="growth-stage">
     <img class="growth-img" src="img/landing/process-march3.webp" alt="Марш прогресса: подросток, молодой человек и взрослый во главе">
-    <div class="growth-veil"></div>
     <div class="growth-cap" style="left:33.5%;top:38%">Устройте эволюцию<br>своему процессу<span class="mono-sub">▸ ЭВОЛЮЦИЯ ПРОЦЕССА</span></div>
     <div class="growth-cap" style="left:69.5%;top:38%">Смотрите на него открыто —<br>и он начнёт расти<span class="mono-sub">▸ ПАРАДОКСАЛЬНО, НО ФАКТ</span></div>
   </div>
