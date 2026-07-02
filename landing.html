@@ -73,19 +73,11 @@ section{scroll-margin-top:0}
 .hero-stats .dot{color:#3f3f3e}
 
 /* ── 2. Проблема ── */
-/* Визуал в стиле гранж-постера: зерно плёнки, размытый портрет,
-   резкая белая полоса-«экспозиция» на глазах, подписи ▸ без плашек */
+/* Портрет без эффектов, подписи ▸ кластерами (решение Маши 02.07) */
 .problem{background:#eceae6;color:#131313;padding:96px max(24px,5vw)}
 .problem-grid{display:grid;grid-template-columns:1fr 1fr;gap:72px;align-items:center}
 .problem-photo{aspect-ratio:1/1;overflow:hidden;background:#b6b4af;position:relative}
-.problem-photo>img{width:100%;height:100%;object-fit:cover;object-position:50% 22%;filter:grayscale(1) contrast(1.02) brightness(1.04) blur(1.5px);transform:scale(1.04)}
-/* Зерно плёнки: SVG-шум поверх всего кадра */
-.problem-grain{position:absolute;inset:0;pointer-events:none;opacity:.62;mix-blend-mode:overlay;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)'/%3E%3C/svg%3E");background-size:240px}
-/* Белая полоса резкости на уровне глаз */
-.sharp-band{position:absolute;top:35%;left:6%;right:6%;height:17%;background:rgba(255,255,255,.94);overflow:hidden;box-shadow:0 0 26px rgba(255,255,255,.5)}
-.sharp-band img{position:absolute;left:-12%;width:124%;top:0;height:auto;transform:translateY(-37%) scaleX(1.18);transform-origin:center;filter:grayscale(1) blur(2.5px) contrast(1.2);mix-blend-mode:multiply}
-/* Тонкая диагональная линия как в постере */
-.problem-line{position:absolute;left:12%;top:60%;width:34%;height:1px;background:rgba(255,255,255,.75);transform:rotate(24deg);transform-origin:left center;pointer-events:none}
+.problem-photo>img{width:100%;height:100%;object-fit:cover;object-position:50% 22%;filter:grayscale(1) contrast(1.05)}
 .problem-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(19,19,19,.22) 0%,rgba(19,19,19,0) 26%,rgba(19,19,19,0) 62%,rgba(19,19,19,.34) 100%)}
 /* Кластеры подписей: стопки строк «▸ ТЕКСТ», как в постере */
 .pcluster{position:absolute;display:flex;flex-direction:column;gap:7px;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;color:#f7f7f6;text-shadow:0 0 6px rgba(19,19,19,.8),0 1px 12px rgba(19,19,19,.6);text-align:left}
@@ -215,9 +207,6 @@ section{scroll-margin-top:0}
     <div>
       <div class="problem-photo">
         <img src="img/landing/problem-portrait.webp" alt="Размытый портрет с полосой резкости">
-        <div class="problem-grain"></div>
-        <div class="sharp-band"><img src="img/landing/problem-portrait.webp" alt="" aria-hidden="true"></div>
-        <div class="problem-line"></div>
         <div class="problem-shade"></div>
         <div class="pcluster" style="top:7%;left:7%">
           <span>#01. ХАОС</span>
