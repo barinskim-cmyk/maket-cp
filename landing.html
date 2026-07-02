@@ -93,18 +93,18 @@ section{scroll-margin-top:0}
 .plist-title{font-weight:500;font-size:15px;margin-bottom:5px}
 .plist-text{font-size:13.5px;line-height:1.6;color:#57564e}
 
-/* ── 3. Пайплайн ── */
-.pipeline{position:relative;overflow:hidden;background:#131313;color:#f2f2f1;padding:96px max(24px,5vw)}
-.pipeline-bg{position:absolute;top:204px;left:597px;transform:translateY(-50%);width:440px;height:369px;filter:invert(1) grayscale(1) contrast(1.1);opacity:.16;-webkit-mask:radial-gradient(ellipse 70% 80% at 60% 50%,#000 30%,transparent 100%);mask:radial-gradient(ellipse 70% 80% at 60% 50%,#000 30%,transparent 100%);pointer-events:none;object-fit:cover}
+/* ── 3. Пайплайн (светлая, чистый портрет справа) ── */
+.pipeline{position:relative;overflow:hidden;background:#eceae6;color:#131313;padding:96px max(24px,5vw);border-top:1px solid #d3d1cb}
+.pipeline-bg{position:absolute;top:0;right:0;height:100%;width:auto;filter:grayscale(1) contrast(1.03);-webkit-mask:linear-gradient(90deg,transparent,#000 26%);mask:linear-gradient(90deg,transparent,#000 26%);pointer-events:none;object-fit:cover}
 .pipeline .wrap{position:relative}
-.pipeline-lead{font-size:15px;line-height:1.65;color:#a3a3a2;margin:20px 0 54px;max-width:480px}
-.stages{display:grid;grid-template-columns:repeat(4,1fr);gap:28px}
-.stage-bar{height:2px;background:#333}
-.stage-bar.done{background:#f2f2f1}
-.stage-bar.part{background:linear-gradient(90deg,#f2f2f1 66%,#333 66%)}
-.stage-info{display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#a3a3a2;margin-top:12px}
-.stage-info .on{color:#f2f2f1}
-.stage-info.off{color:#6d6d6c}
+.pipeline-lead{font-size:15px;line-height:1.65;color:#57564e;margin:20px 0 54px;max-width:480px}
+.stages{display:grid;grid-template-columns:repeat(4,1fr);gap:28px;max-width:900px}
+.stage-bar{height:2px;background:#d3d1cb}
+.stage-bar.done{background:#131313}
+.stage-bar.part{background:linear-gradient(90deg,#131313 66%,#d3d1cb 66%)}
+.stage-info{display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8a897f;margin-top:12px}
+.stage-info .on{color:#131313}
+.stage-info.off{color:#9a988e}
 
 /* ── 3b. Пульс съёмки (тёмная; светлая кардиограмма на всю ширину, мигает инверсией) ── */
 .pulse{background:#131313;color:#f2f2f1;padding:80px 0 110px;border-top:1px solid #232323;overflow:hidden}
@@ -315,12 +315,12 @@ section{scroll-margin-top:0}
 
 <!-- ═══════════ 3. PIPELINE (dark) ═══════════ -->
 <section id="pipeline" class="pipeline" data-screen-label="Pipeline">
-  <img class="pipeline-bg" src="img/landing/pipeline-fingerprint.webp" alt="" aria-hidden="true">
+  <img class="pipeline-bg" src="img/landing/pipeline-portrait.webp" alt="" aria-hidden="true">
 
   <div class="wrap">
-    <div class="eyebrow dark">▸ ПАЙПЛАЙН / CATALOG_2026-04-12</div>
-    <h2 class="h-sec" style="max-width:620px">Как это происходит у меня — и может происходить у вас</h2>
-    <p class="pipeline-lead">Съёмка → отбор → согласование → ретушь → сдача. Статусы считают себя сами — вместо ручных апдейтов в чате. Вам не нужно следовать шаблону — вы можете задать свою рамку.</p>
+    <div class="eyebrow light">▸ ПАЙПЛАЙН / CATALOG_2026-04-12</div>
+    <h2 class="h-sec" style="max-width:620px">С Content Pulse все статусы по всем съёмкам известны</h2>
+    <p class="pipeline-lead">Отобрать карточку товара или любой другой контент можно с телефона, а синхронизировать с Capture One — за минуту. Потому что Content Pulse работает не с файлами, а с данными.</p>
 
     <div class="stages">
       <div>
