@@ -63,7 +63,7 @@ section{scroll-margin-top:0}
 
 /* ── 1. Hero ── */
 .hero{position:relative;min-height:94vh;overflow:hidden;background:#131313;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;text-align:center;padding:0 24px 96px}
-.hero-img{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);width:min(760px,92vw);height:min(760px,92vw);object-fit:cover;object-position:44% 34%;filter:invert(1) grayscale(1) contrast(1.08);animation:fpStrobe 6.5s infinite;-webkit-mask:radial-gradient(ellipse 72% 76% at 50% 42%,#000 14%,transparent 80%);mask:radial-gradient(ellipse 72% 76% at 50% 42%,#000 14%,transparent 80%)}
+.hero-img{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);width:min(760px,92vw);height:min(760px,92vw);object-fit:cover;object-position:46% 22%;filter:invert(1) grayscale(1) contrast(1.08);animation:fpStrobe 6.5s infinite;-webkit-mask:radial-gradient(ellipse 72% 76% at 50% 42%,#000 14%,transparent 80%);mask:radial-gradient(ellipse 72% 76% at 50% 42%,#000 14%,transparent 80%)}
 .hero-veil{position:absolute;inset:0;background:radial-gradient(ellipse 66% 58% at 50% 44%,rgba(19,19,19,.28) 0%,rgba(19,19,19,.7) 60%,#131313 100%)}
 .hero-content{position:relative;max-width:640px}
 .hero-tag{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.26em;color:#9a9a99}
@@ -226,16 +226,16 @@ section{scroll-margin-top:0}
     </nav>
   </div>
 
-  <img class="hero-img" src="img/landing/hero-profile.webp" alt="Профиль с отпечатком, инверсия">
+  <img class="hero-img" src="img/landing/hero-data-profile.webp" alt="Профиль с отпечатком из данных, инверсия">
   <div class="hero-veil"></div>
 
   <div class="hero-content">
     <div class="hero-tag">ПЛАТФОРМА ДЛЯ ВИЗУАЛЬНОГО ПРОДАКШЕНА</div>
-    <h1>Каждый кадр — это данные,<br>уникальный отпечаток процесса</h1>
-    <p class="hero-sub">Съёмка, отбор, согласование, комментирование — все кусочки пазла в одном месте.</p>
+    <h1>Каждый кадр —<br>уникальный отпечаток процесса</h1>
+    <p class="hero-sub">У вас уже есть почти всё, чтобы увидеть свой процесс по-настоящему. Система — это просто.</p>
     <div class="btn-row">
       <a href="#cta" class="btn-primary">Запустить пилот</a>
-      <a href="#pipeline" class="btn-ghost">Открыть демо</a>
+      <a href="#pipeline" class="btn-ghost">Узнать больше</a>
     </div>
   </div>
 
@@ -267,22 +267,19 @@ section{scroll-margin-top:0}
           <span>ЗА ОПОЗДАНИЯ ОТВЕЧАЮТ ВСЕ — И НИКТО</span>
         </div>
       </div>
-      <div class="problem-caption">
-        <span>IMG_4201.jpg → размыто</span><b>7 узлов потери времени</b>
-      </div>
     </div>
 
     <div>
-      <div class="eyebrow light">▸ ПРОБЛЕМА</div>
-      <h2 class="h-sec">30–50% времени постпродакшена уходит не на съёмку, а на сборку реальности</h2>
+      <div class="eyebrow light">▸ КАК ЧАСТО ОБСТОЯТ ДЕЛА</div>
+      <h2 class="h-sec">30–50% времени постпродакшена уходит на сборку реальности</h2>
       <div class="plist">
         <div class="plist-row">
           <div class="plist-num">01</div>
-          <div><div class="plist-title">Статусы живут в чатах</div><div class="plist-text">«А что с моими фото?» — вопрос, который команда слышит каждый день.</div></div>
+          <div><div class="plist-title">Статусы живут в чатах или в таск-трекерах</div><div class="plist-text">Реальных метрик нет</div></div>
         </div>
         <div class="plist-row">
           <div class="plist-num">02</div>
-          <div><div class="plist-title">Правки теряются</div><div class="plist-text">Клиент просит холоднее, стилист — теплее. Ретушёр узнаёт после работы.</div></div>
+          <div><div class="plist-title">История изменений, комментарии, фотографии, а иногда и целые артикулы теряются</div><div class="plist-text">Клиент просит холоднее, стилист — теплее. Ретушёр узнаёт после работы.</div></div>
         </div>
         <div class="plist-row">
           <div class="plist-num">03</div>
@@ -300,8 +297,8 @@ section{scroll-margin-top:0}
 
   <div class="wrap">
     <div class="eyebrow dark">▸ ПАЙПЛАЙН / CATALOG_2026-04-12</div>
-    <h2 class="h-sec" style="max-width:620px">Видно, на каком этапе каждый из 4 957 кадров</h2>
-    <p class="pipeline-lead">Съёмка → отбор → согласование → ретушь → сдача. Статусы считают себя сами — вместо ручных апдейтов в чате.</p>
+    <h2 class="h-sec" style="max-width:620px">Как это происходит у меня — и может происходить у вас</h2>
+    <p class="pipeline-lead">Съёмка → отбор → согласование → ретушь → сдача. Статусы считают себя сами — вместо ручных апдейтов в чате. Вам не нужно следовать шаблону — вы можете задать свою рамку.</p>
 
     <div class="stages">
       <div>
@@ -341,7 +338,7 @@ section{scroll-margin-top:0}
 
     <!-- Кардиограмма -->
     <div class="pulse-head">
-      <div class="mono-note">▸ ПИКИ = КАДРЫ АРТИКУЛА · ПЛОСКАЯ ЛИНИЯ = ПАУЗА (НЕТ БИЕНИЯ)</div>
+      <div class="mono-note">▸ ПИКИ = КАДРЫ АРТИКУЛА · ПЛОСКАЯ ЛИНИЯ = ПАУЗА</div>
       <div class="mono-hint"><span id="pulse-hint">наведите на пик</span></div>
     </div>
     <div class="pulse-chart">
@@ -377,8 +374,8 @@ section{scroll-margin-top:0}
 <section id="approve" class="approve" data-screen-label="Approval">
   <div class="wrap approve-grid">
     <div>
-      <div class="eyebrow light">▸ СОГЛАСОВАНИЕ / КЛИЕНТ С ТЕЛЕФОНА</div>
-      <h2 class="h-sec" style="max-width:520px">Клиент открывает ссылку — и согласовывает за вечер, а не за неделю</h2>
+      <div class="eyebrow light">▸ СОГЛАСОВАНИЕ С ТЕЛЕФОНА</div>
+      <h2 class="h-sec" style="max-width:520px">Можно редактировать отбор и оставлять комментарии с телефона</h2>
       <p class="approve-lead">Лента карточек, варианты свайпом, комментарий сразу ко всей карточке. Решение фиксируется с именем и временем — без пересылки файлов.</p>
       <div class="approve-stats">
         <div><div class="astat-num">−40%</div><div class="astat-lbl">ВРЕМЯ СОГЛАСОВАНИЯ</div></div>
