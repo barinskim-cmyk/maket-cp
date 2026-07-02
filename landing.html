@@ -63,8 +63,8 @@ section{scroll-margin-top:0}
 
 /* ── 1. Hero ── */
 .hero{position:relative;min-height:94vh;overflow:hidden;background:#131313;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;text-align:center;padding:0 24px 96px}
-.hero-img{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);width:min(760px,92vw);height:min(760px,92vw);object-fit:cover;object-position:46% 22%;filter:invert(1) grayscale(1) contrast(1.08);animation:fpStrobe 6.5s infinite;-webkit-mask:radial-gradient(ellipse 72% 76% at 50% 42%,#000 14%,transparent 80%);mask:radial-gradient(ellipse 72% 76% at 50% 42%,#000 14%,transparent 80%)}
-.hero-veil{position:absolute;inset:0;background:radial-gradient(ellipse 66% 58% at 50% 44%,rgba(19,19,19,.28) 0%,rgba(19,19,19,.7) 60%,#131313 100%)}
+.hero-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 18%;filter:invert(1) grayscale(1) contrast(1.08);animation:fpStrobe 6.5s infinite}
+.hero-veil{position:absolute;inset:0;background:linear-gradient(180deg,rgba(19,19,19,.18) 0%,rgba(19,19,19,.12) 40%,rgba(19,19,19,.62) 78%,#131313 100%)}
 .hero-content{position:relative;max-width:640px}
 .hero-tag{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.26em;color:#9a9a99}
 .hero-content h1{font-weight:200;font-size:clamp(30px,4.6vw,50px);line-height:1.12;letter-spacing:-.015em;color:#fff;margin:22px 0 0}
