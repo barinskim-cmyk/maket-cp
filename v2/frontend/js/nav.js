@@ -70,18 +70,77 @@ function showSubpage(name) {
 
 // ── Модалки ──
 
+/* Элемент, имевший фокус до открытия модалки — вернуть фокус при закрытии (a11y) */
+var navModalPrevFocus = null;
+
+/* Селектор фокусируемых элементов внутри модалки (для focus-trap) */
+var NAV_FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+
 function openModal(id) {
-  document.getElementById(id).classList.add('open');
+  var overlay = document.getElementById(id);
+  overlay.classList.add('open');
+  /* a11y: роль диалога и aria-modal на контейнере модалки */
+  var modal = overlay.querySelector('.modal');
+  if (modal) {
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+  }
+  /* Фокус внутрь модалки: первый видимый фокусируемый элемент */
+  navModalPrevFocus = document.activeElement;
+  var f = navVisibleFocusable(overlay);
+  if (f.length) { try { f[0].focus(); } catch (e) {} }
+}
+
+/* Видимые фокусируемые элементы внутри контейнера.
+   offsetParent не работает для position:fixed — используем getClientRects(). */
+function navVisibleFocusable(root) {
+  var all = root.querySelectorAll(NAV_FOCUSABLE);
+  var vis = [];
+  for (var i = 0; i < all.length; i++) {
+    if (!all[i].disabled && all[i].getClientRects().length) vis.push(all[i]);
+  }
+  return vis;
 }
 
 function closeModal(id) {
   document.getElementById(id).classList.remove('open');
+  if (navModalPrevFocus && navModalPrevFocus.focus) {
+    try { navModalPrevFocus.focus(); } catch (e) {}
+    navModalPrevFocus = null;
+  }
+}
+
+/* Открытая модалка (верхняя, если несколько) */
+function navOpenOverlay() {
+  var open = document.querySelectorAll('.modal-overlay.open');
+  return open.length ? open[open.length - 1] : null;
 }
 
 // Закрытие по клику вне модалки
 document.addEventListener('click', function(e) {
   if (e.target.classList.contains('modal-overlay')) {
     e.target.classList.remove('open');
+  }
+});
+
+// Escape закрывает верхнюю открытую модалку; Tab не выходит за её пределы (focus-trap)
+document.addEventListener('keydown', function(e) {
+  var overlay = navOpenOverlay();
+  if (!overlay) return;
+  if (e.key === 'Escape' || e.key === 'Esc') {
+    e.preventDefault();
+    closeModal(overlay.id);
+    return;
+  }
+  if (e.key === 'Tab') {
+    var vis = navVisibleFocusable(overlay);
+    if (!vis.length) return;
+    var first = vis[0], last = vis[vis.length - 1];
+    var active = document.activeElement;
+    /* Если фокус вне модалки — затянуть внутрь */
+    if (!overlay.contains(active)) { e.preventDefault(); first.focus(); return; }
+    if (e.shiftKey && active === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && active === last) { e.preventDefault(); first.focus(); }
   }
 });
 
