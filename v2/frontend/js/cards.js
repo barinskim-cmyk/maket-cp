@@ -2802,10 +2802,11 @@ function cpMobileRender() {
   html += '<div class="mob-header-title">' + (brandName || 'Просмотр') + '</div>';
   html += '</div>';
   html += '<div class="mob-header-tabs">';
-  html += '<button class="mob-tab-btn' + (_mobViewMode === 'cards' ? ' mob-tab-active' : '') + '" onclick="cpMobileSetView(\'cards\')">Cards</button>';
-  html += '<button class="mob-tab-btn' + (_mobViewMode === 'select' ? ' mob-tab-active' : '') + '" onclick="cpMobileSetView(\'select\')">Select</button>';
-  html += '<button class="mob-tab-btn' + (_mobViewMode === 'other' ? ' mob-tab-active' : '') + '" onclick="cpMobileSetView(\'other\')">Other</button>';
-  html += '<button class="mob-tab-btn' + (_mobViewMode === 'options' ? ' mob-tab-active' : '') + '" onclick="cpMobileSetView(\'options\')">Options</button>';
+  /* Дизайн-аудит B1: вкладки по-русски — клиент видит интерфейс впервые. */
+  html += '<button class="mob-tab-btn' + (_mobViewMode === 'cards' ? ' mob-tab-active' : '') + '" onclick="cpMobileSetView(\'cards\')">Карточки</button>';
+  html += '<button class="mob-tab-btn' + (_mobViewMode === 'select' ? ' mob-tab-active' : '') + '" onclick="cpMobileSetView(\'select\')">Отбор</button>';
+  html += '<button class="mob-tab-btn' + (_mobViewMode === 'other' ? ' mob-tab-active' : '') + '" onclick="cpMobileSetView(\'other\')">Другое</button>';
+  html += '<button class="mob-tab-btn' + (_mobViewMode === 'options' ? ' mob-tab-active' : '') + '" onclick="cpMobileSetView(\'options\')">Варианты</button>';
   html += '</div>';
   html += '</div>';
 
@@ -2813,6 +2814,15 @@ function cpMobileRender() {
   html += _cpMobileCardMenuHTML(proj);
 
   if (_mobViewMode === 'cards') {
+    /* Дизайн-аудит B2: одноразовая подсказка про карусель в слотах. */
+    var _tipSeen = false;
+    try { _tipSeen = localStorage.getItem('mobSwipeTipSeen') === '1'; } catch (e2) {}
+    if (!_tipSeen) {
+      html += '<div class="mob-swipe-tip" id="mob-swipe-tip">';
+      html += '<span>В каждом слоте несколько вариантов — листайте фото свайпом или стрелками</span>';
+      html += '<button class="mob-swipe-tip-ok" onclick="cpMobileDismissSwipeTip()">Понятно</button>';
+      html += '</div>';
+    }
     html += cpMobileRenderFeed();
   } else if (_mobViewMode === 'select') {
     html += cpMobileRenderSelect();
@@ -3129,15 +3139,25 @@ function cpMobileRenderFeed() {
       if (hasFoto) {
         var src = slot.dataUrl || slot.thumbUrl || slot.thumb || '';
         html += '<div class="' + slotClass + ' mob-carousel-wrap"' + slotStyle + ' data-card="' + ci + '" data-slot="' + si + '">';
-        html += '<img src="' + src + '" loading="lazy">';
+        html += '<img src="' + src + '" alt="' + (slot.file || 'Фото в слоте') + '" loading="lazy">';
+        /* Дизайн-аудит B2: постоянный индикатор — клиент должен видеть,
+           что в слоте есть альтернативы (карусель не обнаруживалась). */
+        var _nb = cpGetNearbyPreviews(slot.file || '', slot.orient || 'v', 15);
+        if (_nb.length > 1) {
+          var _cur = 0;
+          for (var _k = 0; _k < _nb.length; _k++) {
+            if (_nb[_k].name === slot.file || _nb[_k].stem === slot.file) { _cur = _k; break; }
+          }
+          html += '<div class="mob-pos-indicator" data-ind="' + ci + '-' + si + '">' + (_cur + 1) + ' / ' + _nb.length + '</div>';
+        }
         /* Стрелки и удаление — скрыты, появляются по тапу на этот слот */
         html += '<div class="mob-carousel-controls mob-controls-hidden" data-controls="' + ci + '-' + si + '">';
         html += '<div class="mob-carousel-arrows">';
-        html += '<button class="mob-carousel-arrow" onclick="cpMobileCarousel(' + ci + ',' + si + ',-1,event)">&lsaquo;</button>';
-        html += '<button class="mob-carousel-arrow" onclick="cpMobileCarousel(' + ci + ',' + si + ',1,event)">&rsaquo;</button>';
+        html += '<button class="mob-carousel-arrow" aria-label="Предыдущее фото" onclick="cpMobileCarousel(' + ci + ',' + si + ',-1,event)">&lsaquo;</button>';
+        html += '<button class="mob-carousel-arrow" aria-label="Следующее фото" onclick="cpMobileCarousel(' + ci + ',' + si + ',1,event)">&rsaquo;</button>';
         html += '</div>';
         html += '<button class="mob-slot-zoom" onclick="cpMobileSlotFullscreen(' + ci + ',' + si + ',event)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>';
-        html += '<button class="mob-slot-remove" onclick="cpMobileClearSlot(' + ci + ',' + si + ')">&times;</button>';
+        html += '<button class="mob-slot-remove" aria-label="Убрать фото из слота" onclick="cpMobileClearSlot(' + ci + ',' + si + ')">&times;</button>';
         html += '</div>';
         html += '</div>';
       } else {
@@ -3226,6 +3246,13 @@ function cpGetNearbyPreviews(currentFile, orient, range) {
  * @param {number} dir - направление (-1 = назад, 1 = вперёд)
  * @param {Event} [e] - событие клика (останавливаем всплытие)
  */
+/* Дизайн-аудит B2: скрыть одноразовую подсказку про свайп. */
+function cpMobileDismissSwipeTip() {
+  try { localStorage.setItem('mobSwipeTipSeen', '1'); } catch (e) {}
+  var tip = document.getElementById('mob-swipe-tip');
+  if (tip) tip.remove();
+}
+
 function cpMobileCarousel(cardIdx, slotIdx, dir, e) {
   if (e) e.stopPropagation();
   var proj = getActiveProject();
@@ -3271,7 +3298,10 @@ function cpMobileCarousel(cardIdx, slotIdx, dir, e) {
   var wrap = document.querySelector('.mob-carousel-wrap[data-card="' + cardIdx + '"][data-slot="' + slotIdx + '"]');
   if (wrap) {
     var img = wrap.querySelector('img');
-    if (img) img.src = slot.dataUrl;
+    if (img) { img.src = slot.dataUrl; img.alt = slot.file || 'Фото в слоте'; }
+    /* Дизайн-аудит B2: обновить индикатор позиции */
+    var ind = wrap.querySelector('.mob-pos-indicator');
+    if (ind) ind.textContent = (newIdx + 1) + ' / ' + nearby.length;
   }
 
   /* Авто-синхронизация (тихо, без UI перерисовки) */
@@ -4457,9 +4487,9 @@ function _cpMobileCommentsInnerHTML(cardIdx, card) {
   /* Поле ввода + кнопка "OK". Отправка — через обработчик onkeydown (Enter)
      и onclick кнопки, оба вызывают cpMobileSendComment(cardIdx). */
   html += '<div class="mob-comment-add">';
-  html += '<input type="text" class="mob-comment-input" id="mob-cmt-input-' + cardIdx + '" placeholder="Комментарий..." ';
+  html += '<input type="text" class="mob-comment-input" id="mob-cmt-input-' + cardIdx + '" placeholder="Замечание ко всей карточке..." ';
   html += 'onkeydown="if(event.key===\'Enter\'){cpMobileSendComment(' + cardIdx + ');event.preventDefault();}">';
-  html += '<button class="mob-comment-send" onclick="cpMobileSendComment(' + cardIdx + ')">OK</button>';
+  html += '<button class="mob-comment-send" onclick="cpMobileSendComment(' + cardIdx + ')">Отправить</button>';
   html += '</div>';
 
   return html;

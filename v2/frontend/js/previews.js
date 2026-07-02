@@ -2090,7 +2090,7 @@ function pvBuildHTML(store, used, from, to) {
     var noVersion = (PV_ACTIVE_VERSION && !pvHasVersion(pv, PV_ACTIVE_VERSION));
 
     html += '<div class="pv-thumb' + orientCls + (inCard ? ' pv-in-card' : '') + '" draggable="true" data-pv-name="' + esc(pv.name) + '" data-pv-idx="' + i + '" title="' + esc(pv.name) + (noVersion ? ' [нет версии ' + PV_ACTIVE_VERSION + ']' : '') + '" onclick="pvShowFullscreen(' + i + ',event)">';
-    html += '<img src="' + thumbSrc + '" loading="lazy">';
+    html += '<img src="' + thumbSrc + '" alt="' + esc(pv.name) + '" loading="lazy">';
     if (noVersion) html += '<span class="pv-no-version"></span>';
     /* Две разные штуки для фото-в-карточке:
        1. pv-check (слева сверху) — индикатор статуса, visible всегда
@@ -2103,7 +2103,7 @@ function pvBuildHTML(store, used, from, to) {
     var aCount = rtAnnotCount(pv.name);
     if (aCount > 0) html += '<span class="pv-annot-badge">' + aCount + '</span>';
     html += '<button class="pv-zoom" onclick="pvShowFullscreen(' + i + ',event)" title="На весь экран"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>';
-    html += '<button class="pv-remove" onclick="pvRemoveByName(\'' + esc(pv.name).replace(/'/g, "\\'") + '\',event)">&times;</button>';
+    html += '<button class="pv-remove" aria-label="Убрать фото" onclick="pvRemoveByName(\'' + esc(pv.name).replace(/'/g, "\\'") + '\',event)">&times;</button>';
     html += '<span class="pv-name">' + esc(pvShortName(pv.name)) + '</span>';
     html += '</div>';
   }
@@ -3554,9 +3554,9 @@ function ocRenderField() {
       var cSel = _ocSelected['cnt:' + c + ':' + i] ? ' oc-selected' : '';
       var cSrc = (_ocPvMap[item.name] && typeof pvGetPreview === 'function') ? (pvGetPreview(_ocPvMap[item.name]) || item.preview || item.thumb) : (item.preview || item.thumb);
       html += '<div class="oc-item' + cSel + '" data-oc-idx="' + i + '" title="' + esc(item.name) + '" onclick="ocItemClick(\'cnt\',' + c + ',' + i + ',event)">';
-      html += '<img src="' + cSrc + '" loading="lazy">';
+      html += '<img src="' + cSrc + '" alt="' + esc(item.name) + '" loading="lazy">';
       html += '<button class="oc-zoom" onclick="ocOpenContainerLightbox(' + c + ',' + i + ',event)" title="На весь экран">' + zoomSvg + '</button>';
-      html += '<button class="pv-remove" onclick="ocRemoveFromContainer(' + c + ',' + i + ',event)">&times;</button>';
+      html += '<button class="pv-remove" aria-label="Убрать фото" onclick="ocRemoveFromContainer(' + c + ',' + i + ',event)">&times;</button>';
       if (item._addedBy) html += '<span class="oc-added-by">' + esc(item._addedBy) + '</span>';
       html += '<span class="pv-name">' + esc(pvShortName(item.name)) + '</span>';
       html += '</div>';
@@ -3579,9 +3579,9 @@ function ocRenderField() {
     var fSel = _ocSelected['free:' + f] ? ' oc-selected' : '';
     var fSrc = (_ocPvMap[fItem.name] && typeof pvGetPreview === 'function') ? (pvGetPreview(_ocPvMap[fItem.name]) || fItem.preview || fItem.thumb) : (fItem.preview || fItem.thumb);
     html += '<div class="oc-item' + fSel + '" data-oc-idx="' + f + '" title="' + esc(fItem.name) + '" onclick="ocItemClick(\'free\',-1,' + f + ',event)">';
-    html += '<img src="' + fSrc + '" loading="lazy">';
+    html += '<img src="' + fSrc + '" alt="' + esc(fItem.name) + '" loading="lazy">';
     html += '<button class="oc-zoom" onclick="ocOpenLightbox(' + f + ',event)" title="На весь экран">' + zoomSvg + '</button>';
-    html += '<button class="pv-remove" onclick="ocRemoveItem(' + f + ',event)">&times;</button>';
+    html += '<button class="pv-remove" aria-label="Убрать фото" onclick="ocRemoveItem(' + f + ',event)">&times;</button>';
     if (fItem._addedBy) html += '<span class="oc-added-by">' + esc(fItem._addedBy) + '</span>';
     html += '<span class="pv-name">' + esc(pvShortName(fItem.name)) + '</span>';
     html += '</div>';
@@ -4028,7 +4028,7 @@ function acRenderField() {
     /* Версионно-зависимый src из pv-объекта */
     var acSrc = (_acPvMap[it.name] && typeof pvGetPreview === 'function') ? (pvGetPreview(_acPvMap[it.name]) || it.preview || it.thumb) : (it.preview || it.thumb);
     html += '<div class="ac-tile' + (isH ? ' ac-tile-h' : '') + '"' + spanStyle + ' title="' + esc(it.name) + '" onclick="acViewFrom(\'' + esc(it.name).replace(/'/g, "\\'") + '\',event)">';
-    html += '<img src="' + acSrc + '" loading="lazy">';
+    html += '<img src="' + acSrc + '" alt="' + esc(it.name) + '" loading="lazy">';
 
     if (it.source === 'card') {
       /* Фото из карточки — крестик (убрать из карточки) */
