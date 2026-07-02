@@ -547,8 +547,9 @@ section{scroll-margin-top:0}
     wrap.innerHTML = svg;
 
     /* Рисование линии: измеряем длину пути, анимируем dashoffset */
+    var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var pathEl = wrap.querySelector('path');
-    if(pathEl){
+    if(pathEl && !reduceMotion){
       var L = Math.ceil(pathEl.getTotalLength()) + 20;
       pathEl.style.strokeDasharray = L;
       pathEl.style.strokeDashoffset = L;
@@ -557,6 +558,42 @@ section{scroll-margin-top:0}
         pathEl.style.transition = 'stroke-dashoffset 3.4s cubic-bezier(.4,0,.1,1)';
         pathEl.style.strokeDashoffset = '0';
       }); });
+    }
+
+    /* Бегущая точка по кардиограмме (бесконечный цикл, как монитор ЭКГ).
+       Стартует после отрисовки линии; при reduce-motion не запускается. */
+    if(pathEl && !reduceMotion){
+      var svgEl = wrap.querySelector('svg');
+      var totalLen = pathEl.getTotalLength();
+      var dot = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      dot.setAttribute('r','4.5');
+      dot.setAttribute('fill','#131313');
+      dot.setAttribute('stroke','#f4f3f0');
+      dot.setAttribute('stroke-width','2.5');
+      dot.style.opacity = '0';
+      svgEl.appendChild(dot);
+      var trail = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      trail.setAttribute('r','7');
+      trail.setAttribute('fill','none');
+      trail.setAttribute('stroke','#131313');
+      trail.setAttribute('stroke-width','1');
+      trail.style.opacity = '0';
+      svgEl.appendChild(trail);
+      var SWEEP_MS = 14000, startT = null;
+      function sweep(ts){
+        if(startT === null) startT = ts;
+        var prog = ((ts - startT) % SWEEP_MS) / SWEEP_MS;
+        var pt = pathEl.getPointAtLength(prog * totalLen);
+        dot.setAttribute('cx', pt.x); dot.setAttribute('cy', pt.y);
+        trail.setAttribute('cx', pt.x); trail.setAttribute('cy', pt.y);
+        /* пульсация кольца вокруг точки */
+        var beat = 0.5 + 0.5 * Math.sin(ts / 180);
+        trail.setAttribute('r', 7 + beat * 6);
+        trail.style.opacity = (0.5 - beat * 0.35).toFixed(2);
+        dot.style.opacity = '1';
+        requestAnimationFrame(sweep);
+      }
+      setTimeout(function(){ requestAnimationFrame(sweep); }, 3600); /* после отрисовки линии */
     }
 
     /* Ховер по пикам -> блок деталей */
