@@ -1,8 +1,8 @@
 name: E2E Tests
 
-# Пока тесты не стабилизировались, continue-on-error на run-шаге —
-# красный e2e не блочит merge. Снять флаг после 2-х зелёных прогонов
-# подряд (см. tests/e2e/README.md — "Activation policy").
+# 2026-07-02: continue-on-error снят (аудит audit0702-ci-block) —
+# красный e2e теперь блокирует merge. Продуктовые smoke-тесты
+# добавлены (tests/e2e/active/product-smoke.spec.ts).
 
 on:
   push:
@@ -30,8 +30,9 @@ jobs:
       - name: Run Playwright tests
         env:
           MAKET_LANDING_URL: https://barinskim-cmyk.github.io/maket-landing/
+          MAKET_PRODUCT_URL: https://barinskim-cmyk.github.io/maket-cp/
+          MAKET_SHARE_TOKEN: ${{ secrets.MAKET_SHARE_TOKEN }}
         run: npx playwright test
-        continue-on-error: true
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4

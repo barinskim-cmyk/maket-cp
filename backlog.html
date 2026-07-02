@@ -1331,6 +1331,54 @@ tr:hover td { background: #fafafa; }
   <td contenteditable="true" class="my-comment"></td>
 </tr>
 
+<tr data-row="feat0702-invalid-token-msg">
+  <td><span class="s-todo">TODO</span></td>
+  <td>Share / UX</td>
+  <td><strong>Сообщение «Ссылка недействительна» при невалидном токене</strong></td>
+  <td></td>
+  <td>Найдено smoke-тестом 02.07: невалидный/отключённый share-токен молча показывает пустой интерфейс фотографа. Показать понятное сообщение + контакт владельца. Мелкая задача.</td>
+  <td class="files">supabase.js, cloud-ui.js</td>
+  <td><span class="p-med">P1</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="feat0702-notifications">
+  <td><span class="s-todo">TODO</span></td>
+  <td>Уведомления</td>
+  <td><strong>Уведомления фотографу: аппрув / возврат / комментарий клиента</strong></td>
+  <td></td>
+  <td>Сейчас фотограф узнаёт о действиях клиента, только открыв приложение. Email через Supabase edge function (или telegram-бот) на события: selection_approved, cc_returned, comment_added. Главный кандидат на retention.</td>
+  <td class="files">v2/supabase/functions/, events.js</td>
+  <td><span class="p-med">P1</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="feat0702-native-rename">
+  <td><span class="s-todo">TODO</span></td>
+  <td>Переименование</td>
+  <td><strong>Нативное переименование файлов (rename_in_folder)</strong></td>
+  <td></td>
+  <td>Сейчас заглушка: фотограф скачивает CSV и запускает отдельный maket_rename.exe. Реализовать переименование прямо из desktop-приложения (Python уже есть). Убирает самый неуклюжий шаг workflow.</td>
+  <td class="files">v2/backend/core/api/app_api.py, rename.js</td>
+  <td><span class="p-low">P2</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="feat0702-demo-project">
+  <td><span class="s-todo">TODO</span></td>
+  <td>Онбординг</td>
+  <td><strong>Демо-проект при первой регистрации</strong></td>
+  <td></td>
+  <td>Новый пользователь после регистрации видит пустоту. Автоматически создавать демо-проект с карточками и фото — ценность видна в браузере без установки desktop-приложения. Снижает главный friction онбординга.</td>
+  <td class="files">supabase.js, cloud-ui.js, v2/supabase/</td>
+  <td><span class="p-low">P2</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
 <tr data-row="audit0702-usage-metrics">
   <td><span class="s-todo">TODO</span></td>
   <td>Метрики</td>

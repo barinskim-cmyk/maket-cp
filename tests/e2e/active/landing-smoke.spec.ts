@@ -23,11 +23,13 @@ test('landing has Version A hero', async ({ page }) => {
 
 test('landing has no deprecated claims', async ({ page }) => {
   await page.goto('/');
-  const content = await page.content();
-  // Негативные проверки: эти формулировки больше не должны всплывать.
-  expect(content).not.toContain('EU серверы');
-  expect(content).not.toContain('PIM');
-  expect(content).not.toContain('Все ждет');
+  // Проверяем ВИДИМЫЙ текст, не raw HTML: в HTML-комментарии шапки
+  // легитимно упоминается «Removed PIM claim» (changelog деплоя),
+  // из-за чего page.content() давал ложный красный (fix 2026-07-02).
+  const visibleText = await page.locator('body').innerText();
+  expect(visibleText).not.toContain('EU серверы');
+  expect(visibleText).not.toContain('PIM');
+  expect(visibleText).not.toContain('Все ждет');
 });
 
 test('landing has hybrid routing form', async ({ page }) => {
