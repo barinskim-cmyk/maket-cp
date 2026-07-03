@@ -30,14 +30,16 @@
   --font-mono:'IBM Plex Mono',ui-monospace,monospace;
 }
 [data-theme="light"] {
-  --photo-bg:#ffffff; /* фон для фото — абсолютно белый (Маша 03.07) */
-  --bg:#dcdad4; --surface:#eceae6; --panel:#f4f3f0; --panel-2:#e7e5e0;
-  --line:#d3d1cb; --line-soft:#e0ded8;
-  --text:#131313; --text-2:#57564e; --text-3:#8a897f; --meta:#8a897f;
-  --invert-bg:#131313; --invert-fg:#f2f2f1;
-  --field-bg:#ffffff; --field-border:#cdcbc4;
-  --ok:#3f7a4f; --warn:#a56a3a; --danger:#b5453f; --accent:#a56a3a;
-  --shot:#a56a3a;
+  /* Нейтральная светлая: самые светлые поверхности 253/253/253,
+     всё нейтральное, задник темнее (Маша 03.07) */
+  --photo-bg:#ffffff; /* фон для фото — абсолютно белый */
+  --bg:#e3e3e3; --surface:#fdfdfd; --panel:#fdfdfd; --panel-2:#f5f5f5;
+  --line:#dcdcdc; --line-soft:#e8e8e8;
+  --text:#141414; --text-2:#555555; --text-3:#8a8a8a; --meta:#909090;
+  --invert-bg:#141414; --invert-fg:#fdfdfd;
+  --field-bg:#fdfdfd; --field-border:#d0d0d0;
+  --ok:#3f7a4f; --warn:#a5701e; --danger:#b5453f; --accent:#a5701e;
+  --shot:#a5701e;
 }
 
 /* ── Share-link (guest) hardening: скрыть админские панели ──
@@ -74,7 +76,7 @@ body.is-share-link .status-bar { display: none !important; }
 html.is-share-link #auth-gate { display: none !important; }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--panel-2); color: var(--text); }
+body { font-family: var(--font-main); background: var(--panel-2); color: var(--text); }
 
 /* ── Auth Gate ── */
 .auth-gate {
@@ -3379,3 +3381,21 @@ input:focus, textarea:focus, select:focus { border-color: var(--text-3); outline
 .hero-gallery, .cd-select-grid, .lightbox-img-wrap, .pv-lightbox,
 .select-grid, .cp-layout { background: var(--photo-bg); }
 .photo-slot img, .pv-item img { background: var(--photo-bg); }
+
+
+/* ── Типографика UI-спеки «Тёмная плёнка» (Маша 03.07: размеры и веса) ── */
+body { font-size: 13.5px; }
+.section-title {
+  font-family: var(--font-main);
+  font-weight: 200; font-size: 26px; letter-spacing: -.01em;
+}
+.pipeline-panel .section-title { font-size: 20px; }
+.sync-panel .section-title { font-size: 20px; }
+h1, h2, h3, .modal h3, .modal-title { font-family: var(--font-main); font-weight: 300; }
+.nav-tabs .nav-tab, .app-nav-tab, .nav button, .top-nav a { font-size: 13.5px; font-weight: 400; }
+/* Моно-подписи: технические лейблы капсом */
+.lbl-mono, .pv-count, .oc-cnt-count, .cd-pv-count, .step-count,
+.pipeline-sync-bar, #save-status, #cloud-status, #user-status {
+  font-family: var(--font-mono);
+  font-size: 10.5px; letter-spacing: .08em;
+}
