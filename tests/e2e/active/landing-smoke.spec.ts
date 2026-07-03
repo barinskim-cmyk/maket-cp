@@ -16,7 +16,7 @@
 import { test, expect } from '@playwright/test';
 
 test('landing has Content Pulse hero', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('./');
   await expect(page.locator('h1')).toContainText('уникальный отпечаток процесса');
   const visibleText = await page.locator('body').innerText();
   expect(visibleText).toContain('CONTENT');
@@ -24,7 +24,7 @@ test('landing has Content Pulse hero', async ({ page }) => {
 });
 
 test('landing has no deprecated claims or old brand', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('./');
   const visibleText = await page.locator('body').innerText();
   expect(visibleText).not.toContain('EU серверы');
   expect(visibleText).not.toContain('PIM');
@@ -33,7 +33,7 @@ test('landing has no deprecated claims or old brand', async ({ page }) => {
 });
 
 test('landing CTA is mailto pilot button', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('./');
   const cta = page.locator('#cta a.btn-primary');
   await expect(cta).toBeVisible();
   const href = await cta.getAttribute('href');
@@ -41,7 +41,7 @@ test('landing CTA is mailto pilot button', async ({ page }) => {
 });
 
 test('landing key sections render', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('./');
   await expect(page.locator('#pulse')).toBeVisible();
   await expect(page.locator('#growth')).toBeVisible();
   await expect(page.locator('#approve')).toBeVisible();

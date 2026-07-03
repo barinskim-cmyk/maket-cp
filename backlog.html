@@ -1499,6 +1499,30 @@ tr:hover td { background: #fafafa; }
   <td contenteditable="true" class="my-comment"></td>
 </tr>
 
+<tr data-row="rebrand-content-pulse">
+  <td><span class="s-done">DONE</span></td>
+  <td>Ребрендинг</td>
+  <td><strong>Ребрендинг приложения: Maket CP → Content Pulse</strong></td>
+  <td>82b204b</td>
+  <td>Все видимые строки UI (title, auth-логотип, тексты, алерты), окно десктопа, Rate Setter (приложение теперь «Content Pulse Rate Setter», новая инструкция instruction.html в стиле лендинга), keyword source в .cos MaketCP→ContentPulse (дедуп по имени слова — старые записи валидны), rename-инструмент → content_pulse_rename.exe. Внутренние ключи хранения (maketcp_* в localStorage, папки MaketCP) сознательно НЕ тронуты — иначе слетают сессии и настройки пользователей.</td>
+  <td class="files">index.html, main.py, shootings.js, shooting.js, compare-view.html, cos_repository.py, rate-setter-standalone/*</td>
+  <td><span class="p-high">P0</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="build-desktop-packages">
+  <td><span class="s-wip">WIP</span></td>
+  <td>Релиз</td>
+  <td><strong>Сборки: Content Pulse desktop (Mac+Win) + Rate Setter (Mac+Win)</strong></td>
+  <td>fa62a3a</td>
+  <td>Новый CI-workflow build-desktop.yml: 4 пакета через PyInstaller (macos-14 + windows-latest), релиз с тегом desktop-latest. main.py подготовлен к frozen-сборке (пропуск pip, поиск фронтенда в _MEIPASS). Статус: первый прогон CI, ожидаемы итерации по pywebview на Windows.</td>
+  <td class="files">.github/workflows/build-desktop.yml, main.py</td>
+  <td><span class="p-high">P0</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
 <tr data-row="redesign0703-screens">
   <td><span class="s-todo">TODO</span></td>
   <td>Редизайн / UI-спека</td>
