@@ -144,6 +144,27 @@ document.addEventListener('keydown', function(e) {
   }
 });
 
+// ── Тема интерфейса (UI-спека 2026-07: тёмная по умолчанию) ──
+
+/**
+ * Установить тему интерфейса и запомнить выбор.
+ * @param {string} t — 'dark' | 'light'
+ */
+function navSetTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  try { localStorage.setItem('mcp_theme', t); } catch (e) {}
+  var bd = document.getElementById('theme-btn-dark');
+  var bl = document.getElementById('theme-btn-light');
+  if (bd) bd.classList.toggle('active', t === 'dark');
+  if (bl) bl.classList.toggle('active', t === 'light');
+}
+
+/* Синхронизировать состояние кнопок с темой, применённой до отрисовки */
+document.addEventListener('DOMContentLoaded', function() {
+  var t = document.documentElement.getAttribute('data-theme') || 'dark';
+  navSetTheme(t);
+});
+
 // ── Скрытие вкладок для web-версии (beta cleanup c10, c11) ──
 
 /**

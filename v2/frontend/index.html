@@ -15,9 +15,18 @@
       document.documentElement.classList.add('is-share-link');
     }
   } catch (e) {}
+  /* Тема до первой отрисовки, чтобы не мигало. Тёмная по умолчанию (UI-спека 2026-07). */
+  try {
+    document.documentElement.setAttribute('data-theme', localStorage.getItem('mcp_theme') || 'dark');
+  } catch (e) {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  }
 })();
 </script>
-<link rel="stylesheet" href="css/style.css?v=36">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css?v=37">
 </head>
 <body>
 
@@ -97,6 +106,10 @@
             <button class="overflow-item" role="menuitem" onclick="shOverflowRun(shImportProject)" title="Импорт проекта из файла">Импорт</button>
             <button class="overflow-item" role="menuitem" onclick="shOverflowRun(dgDownloadLog)" title="Скачать лог для диагностики (отправить разработчику)">Скачать лог</button>
           </div>
+        </div>
+        <div class="theme-toggle" role="group" aria-label="Тема интерфейса">
+          <button id="theme-btn-dark" class="active" onclick="navSetTheme('dark')">Тёмная</button>
+          <button id="theme-btn-light" onclick="navSetTheme('light')">Светлая</button>
         </div>
       </div>
     </div>
