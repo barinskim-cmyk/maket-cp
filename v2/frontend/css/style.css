@@ -6,13 +6,15 @@
    Тёмная тема по умолчанию, светлая через [data-theme="light"].
    Легаси-алиасы (--text-soft и пр.) смаплены на новые токены. */
 :root, [data-theme="dark"] {
-  --bg:#0d0d0d; --surface:#131313; --panel:#1d1d1b; --panel-2:#191917;
-  --line:#262626; --line-soft:#1f1f1f;
-  --text:#f2f2f1; --text-2:#b2b2b1; --text-3:#8c8c8b; --meta:#6d6d6c;
-  --invert-bg:#f2f2f1; --invert-fg:#131313;
-  --field-bg:#1a1a18; --field-border:#2a2a28;
+  /* Нейтральные серые без тёплого оттенка, приподнято от чёрного (Маша 03.07) */
+  --bg:#191919; --surface:#1e1e1e; --panel:#282828; --panel-2:#232323;
+  --line:#333333; --line-soft:#2c2c2c;
+  --text:#f2f2f2; --text-2:#b5b5b5; --text-3:#8f8f8f; --meta:#707070;
+  --invert-bg:#f2f2f2; --invert-fg:#1a1a1a;
+  --field-bg:#242424; --field-border:#383838;
   --ok:#7fae7f; --warn:#c9956b; --danger:#c96b6b; --accent:#c9956b;
   --shot:#c9956b;
+  --photo-bg:#141414; /* подложка под фото */
   /* Легаси-алиасы */
   --text-soft:var(--text-2); --text-muted:var(--text-3); --text-faint:var(--text-3);
   --surface-2:var(--panel-2);
@@ -28,6 +30,7 @@
   --font-mono:'IBM Plex Mono',ui-monospace,monospace;
 }
 [data-theme="light"] {
+  --photo-bg:#ffffff; /* фон для фото — абсолютно белый (Маша 03.07) */
   --bg:#dcdad4; --surface:#eceae6; --panel:#f4f3f0; --panel-2:#e7e5e0;
   --line:#d3d1cb; --line-soft:#e0ded8;
   --text:#131313; --text-2:#57564e; --text-3:#8a897f; --meta:#8a897f;
@@ -3364,3 +3367,11 @@ input:focus, textarea:focus, select:focus { border-color: var(--text-3); outline
   background: transparent; color: var(--text-3); font-family: inherit;
 }
 .theme-toggle button.active { background: var(--invert-bg); color: var(--invert-fg); font-weight: 500; }
+
+
+/* Подложки под фотографии: в светлой теме чисто-белые, в тёмной нейтральные
+   (доработка тем, Маша 03.07) */
+.pv-gallery, .photo-slot, .photo-slot.empty, .cd-pv-gallery,
+.hero-gallery, .cd-select-grid, .lightbox-img-wrap, .pv-lightbox,
+.select-grid, .cp-layout { background: var(--photo-bg); }
+.photo-slot img, .pv-item img { background: var(--photo-bg); }
