@@ -23,7 +23,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='C1 Rate Setter',
+    name='Content Pulse Rate Setter',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -42,13 +42,13 @@ coll = COLLECT(
     strip=False,
     upx=False,
     upx_exclude=[],
-    name='C1 Rate Setter',
+    name='Content Pulse Rate Setter',
 )
 app = BUNDLE(
     coll,
-    name='C1 Rate Setter.app',
+    name='Content Pulse Rate Setter.app',
     icon='icon.icns',
-    bundle_identifier='cp.maket.ratesetter',
+    bundle_identifier='pulse.content.ratesetter',
     info_plist={
         'CFBundleName': 'C1 Rate Setter',
         'CFBundleDisplayName': 'C1 Rate Setter',

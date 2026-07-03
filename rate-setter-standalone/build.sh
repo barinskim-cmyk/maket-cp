@@ -1,5 +1,5 @@
 #!/bin/bash
-# Сборка C1 Rate Setter.app под macOS.
+# Сборка Content Pulse Rate Setter.app под macOS.
 # Запуск из этой папки:  ./build.sh
 #
 # ВАЖНО: собирать нужно Python-ом с Tk 8.6. Системный Python 3.9 идёт с
@@ -42,8 +42,8 @@ rm -rf build dist
 echo "==> Собираю .app…"
 "$PY" -m PyInstaller --noconfirm "C1 Rate Setter.spec"
 
-xattr -dr com.apple.quarantine "dist/C1 Rate Setter.app" 2>/dev/null || true
+xattr -dr com.apple.quarantine "dist/Content Pulse Rate Setter.app" 2>/dev/null || true
 
 echo ""
-echo "==> Готово. Приложение: dist/C1 Rate Setter.app"
+echo "==> Готово. Приложение: dist/Content Pulse Rate Setter.app"
 echo "    Для коллег: запакуйте его в ZIP и отправьте."

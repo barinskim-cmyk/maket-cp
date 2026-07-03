@@ -36,7 +36,7 @@ from tkinter import filedialog, messagebox
 
 RATING_VALUE = "5"          # рейтинг, который проставляется
 KEYWORD_VALUE = "SELECTED"  # ключевое слово, которое добавляется
-KEYWORD_SOURCE = "MaketCP"  # атрибут источника ключевого слова в C1
+KEYWORD_SOURCE = "ContentPulse"  # атрибут источника ключевого слова в C1
 
 # Известные фото/RAW-расширения — убираются из имени всегда, если есть.
 KNOWN_EXTENSIONS = {
@@ -441,7 +441,7 @@ class App(tk.Tk):
 
     def __init__(self):
         super().__init__()
-        self.title("Capture One Rate Setter — 5* + SELECTED")
+        self.title("Content Pulse · Rate Setter — 5* + SELECTED")
         self.geometry("760x660")
         self.minsize(660, 580)
 

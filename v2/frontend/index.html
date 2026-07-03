@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Maket CP</title>
+<title>Content Pulse</title>
 <!-- Share-link bootstrap: помечаем <html> ДО рендера auth-gate, чтобы CSS
      сразу его скрыл. authCheckOnLoad срабатывает только через 500мс после
      DOMContentLoaded, и в это время гость по share-ссылке успевал увидеть
@@ -34,7 +34,7 @@
 <!-- ══════════════ Auth Gate: экран входа ══════════════ -->
 <div id="auth-gate" class="auth-gate">
   <div class="auth-card">
-    <div class="auth-logo">Maket CP</div>
+    <div class="auth-logo">Content Pulse</div>
     <div class="auth-subtitle">Управление съёмкой</div>
 
     <div id="auth-login-form">
@@ -148,7 +148,7 @@
     <div id="sm-idle">
       <p style="color:#666;max-width:560px">
         Запусти Capture One и нажми «Начать съёмку», чтобы выбрать активную сессию.
-        Maket CP будет логировать события (новые кадры, рейтинги, выбор) в фоне.
+        Content Pulse будет логировать события (новые кадры, рейтинги, выбор) в фоне.
       </p>
       <p style="font-size:12px;color:#999;max-width:560px">
         Watcher Capture One и hotkey «Add to Card» подключим следующим релизом —
@@ -225,7 +225,7 @@
   <div class="modal" style="width:520px">
     <h3>Доступ к macOS для съёмки</h3>
     <p style="color:#666;font-size:13px;margin:0 0 12px 0">
-      Чтобы Maket CP мог отслеживать кадры и слушать горячие клавиши,
+      Чтобы Content Pulse мог отслеживать кадры и слушать горячие клавиши,
       нужно выдать три разрешения системы. Один раз — потом не спросит.
     </p>
 
@@ -430,11 +430,11 @@
         <h3>Переименование файлов</h3>
         <div class="ar-rename-info">
           <p>После верификации артикулов сформируйте CSV-список для переименования фотографий.</p>
-          <p>Скачайте скрипт <strong>maket_rename.exe</strong>, положите его в папку с фотографиями вместе с CSV-файлом и запустите.</p>
+          <p>Скачайте скрипт <strong>content_pulse_rename.exe</strong>, положите его в папку с фотографиями вместе с CSV-файлом и запустите.</p>
         </div>
         <div class="ar-rename-actions">
           <button class="btn btn-primary" onclick="arGenerateRenameList()">Скачать список (CSV)</button>
-          <a class="btn" href="https://github.com/barinskim-cmyk/maket-cp/releases/download/rename-tool/maket_rename.exe" download>Скачать maket_rename.exe</a>
+          <a class="btn" href="https://github.com/barinskim-cmyk/maket-cp/releases/download/rename-tool/content_pulse_rename.exe" download>Скачать content_pulse_rename.exe</a>
           <span id="ar-rename-status2" style="font-size:12px;color:#888;margin-left:8px"></span>
         </div>
       </div>

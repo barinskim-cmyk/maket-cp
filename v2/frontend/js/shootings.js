@@ -3958,7 +3958,7 @@ function _mobShowProjectPicker() {
 
   /* Шапка */
   html += '<div class="mob-picker-header">';
-  html += '<div class="mob-picker-title">Maket CP</div>';
+  html += '<div class="mob-picker-title">Content Pulse</div>';
   if (typeof sbUser !== 'undefined' && sbUser && sbUser.email) {
     html += '<div class="mob-picker-user">' + esc(sbUser.email) + '</div>';
   }
@@ -4316,7 +4316,7 @@ function shClientApprove(skipConfirm) {
     var actorName = (typeof window._shareUserName === 'string') ? window._shareUserName : '';
     sbClient.rpc('client_approve_by_token', {
       p_share_token: window._shareToken,
-      p_note: 'Согласовано в Maket CP ' + timeStr,
+      p_note: 'Согласовано в Content Pulse ' + timeStr,
       p_actor_name: actorName
     }).then(function(res) {
       if (res && res.error) {

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rate Setter — инструкция · Content Pulse</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#191919;color:#f2f2f2;font-family:'Manrope',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.mono{font-family:'IBM Plex Mono',monospace}
+.wrap{max-width:760px;margin:0 auto;padding:64px 24px 96px}
+.logo{display:inline-block;line-height:1.25;color:#f2f2f2}
+.logo .lg1{display:block;font-weight:400;font-size:15px;letter-spacing:.18em;margin-right:-.18em}
+.logo .cp{display:block;font-family:'IBM Plex Mono',monospace;font-size:9px;color:#8f8f8f;text-align-last:justify}
+.eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.24em;color:#8f8f8f;margin-top:44px}
+h1{font-weight:200;font-size:clamp(30px,5vw,44px);line-height:1.1;letter-spacing:-.015em;margin:18px 0 0}
+.lead{font-size:15px;line-height:1.65;color:#b5b5b5;margin:18px 0 0;max-width:560px}
+.step{display:grid;grid-template-columns:auto 1fr;gap:20px;padding:22px 0;border-bottom:1px solid #333}
+.steps{margin-top:40px;border-top:1px solid #333}
+.step-num{font-family:'IBM Plex Mono',monospace;font-size:11px;color:#707070;padding-top:3px}
+.step-title{font-weight:500;font-size:15px}
+.step-text{font-size:13.5px;line-height:1.65;color:#b5b5b5;margin-top:5px}
+.step-text .k{font-family:'IBM Plex Mono',monospace;font-size:12px;color:#f2f2f2;background:#282828;padding:1px 7px}
+.callout{border:1px solid #333;padding:16px 18px;margin-top:36px}
+.callout .t{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;color:#c9956b}
+.callout .b{font-size:13.5px;line-height:1.6;color:#b5b5b5;margin-top:8px}
+.footer{margin-top:72px;padding-top:24px;border-top:1px solid #333;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.footer .m{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;color:#707070}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <span class="logo"><span class="lg1">CONTENT</span><span class="cp">P U L S E</span></span>
+
+  <div class="eyebrow">▸ RATE SETTER · ИНСТРУМЕНТ ОТБОРА</div>
+  <h1>Отбор попадает в Capture One за минуту</h1>
+  <p class="lead">Rate Setter ставит рейтинг 5★ и ключевое слово SELECTED в .cos-файлы Capture One для отобранных кадров. Список имён — из Content Pulse, из текстового файла или из папки с отобранными фото.</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num mono">01</div>
+      <div>
+        <div class="step-title">Откройте приложение</div>
+        <div class="step-text">Запустите <span class="k">Content Pulse Rate Setter</span>. При первом запуске macOS спросит подтверждение — «Открыть». Если система блокирует: правый клик по приложению → Открыть.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num mono">02</div>
+      <div>
+        <div class="step-title">Дайте список отобранных кадров</div>
+        <div class="step-text">Любым из способов: вставьте имена списком (по одному на строку — так отдаёт Content Pulse при экспорте отбора), выберите текстовый файл или укажите папку с отобранными фотографиями — имена соберутся сами. Суффиксы вроде <span class="k">_preview</span> убираются автоматически.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num mono">03</div>
+      <div>
+        <div class="step-title">Укажите папку сессии Capture One</div>
+        <div class="step-text">Корневую папку сессии — ту, где живут Capture и CaptureOne. Rate Setter сам найдёт .cos-файлы кадров, в том числе во вложенных папках.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num mono">04</div>
+      <div>
+        <div class="step-title">Запустите</div>
+        <div class="step-text"><span class="k">Пробный запуск</span> покажет, что будет сделано, ничего не меняя. <span class="k">Запустить</span> — проставит рейтинги и ключевые слова. В логе справа: сколько найдено, сколько проставлено и какие имена не нашлись.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num mono">05</div>
+      <div>
+        <div class="step-title">Обновите Capture One</div>
+        <div class="step-text">Если сессия открыта — переключитесь на другую папку и обратно, чтобы C1 перечитал .cos. Отобранные кадры получат 5★ и слово SELECTED — фильтруйте и работайте.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="t">▸ ВАЖНО</div>
+    <div class="b">Закройте Capture One или не трогайте сессию во время записи — C1 иногда перезаписывает .cos поверх. Rate Setter меняет только рейтинг и ключевые слова, настройки обработки не трогает.</div>
+  </div>
+
+  <div class="callout">
+    <div class="t">▸ ЕСЛИ ЧТО-ТО НЕ НАШЛОСЬ</div>
+    <div class="b">Блок «Не найдено» в логе перечислит имена без пары. Обычно это переименованные файлы или кадры из другой сессии — проверьте, ту ли папку сессии вы указали.</div>
+  </div>
+
+  <div class="footer">
+    <span class="logo"><span class="lg1">CONTENT</span><span class="cp">P U L S E</span></span>
+    <span class="m">RATE SETTER · ЧАСТЬ CONTENT PULSE · 2026</span>
+  </div>
+</div>
+</body>
+</html>

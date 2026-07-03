@@ -141,7 +141,7 @@ class CosRepository:
         changed = False
         for kw in keywords:
             if kw and kw not in existing:
-                ET.SubElement(container, "K", {"N": kw, "S": "MaketCP"})
+                ET.SubElement(container, "K", {"N": kw, "S": "ContentPulse"})
                 existing.add(kw)
                 changed = True
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Maket CP v2 — Entry Point.
+Content Pulse (Maket CP v2) — Entry Point.
 
 Запуск: python main.py
 Требует: pip install pywebview
@@ -34,14 +34,15 @@ def _ensure_deps() -> None:
             missing.append(pip_name)
 
     if missing:
-        print(f"[Maket CP] Устанавливаю зависимости: {', '.join(missing)} ...")
+        print(f"[Content Pulse] Устанавливаю зависимости: {', '.join(missing)} ...")
         subprocess.check_call(
             [sys.executable, "-m", "pip", "install", "--quiet"] + missing
         )
-        print("[Maket CP] Зависимости установлены.")
+        print("[Content Pulse] Зависимости установлены.")
 
 
-_ensure_deps()
+if not getattr(sys, "frozen", False):
+    _ensure_deps()
 
 import webview
 
@@ -167,6 +168,8 @@ def find_frontend(filename: str) -> Path | None:
     """Найти HTML-файл фронтенда."""
     candidates = [
         FRONTEND_DIR / filename,
+        BASE_DIR / "frontend" / filename,   # frozen: --add-data "v2/frontend:frontend"
+        BASE_DIR / filename,
         APP_DIR / filename,
         APP_DIR.parent / filename,
     ]
@@ -186,7 +189,7 @@ def main():
         url = None
 
     window = webview.create_window(
-        title="Maket CP",
+        title="Content Pulse",
         url=url,
         js_api=api,  # стабильнее в PyInstaller чем window.expose()
         width=1440,

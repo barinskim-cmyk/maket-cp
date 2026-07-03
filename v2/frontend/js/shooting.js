@@ -34,7 +34,7 @@ function smHasDesktop() {
 
 function smStartFlow() {
   if (!smHasDesktop()) {
-    alert('Shoot mode доступен только в десктоп-версии Maket CP.');
+    alert('Shoot mode доступен только в десктоп-версии Content Pulse.');
     return;
   }
   // Step 0: ALWAYS ask the user where to write the session — current project,
@@ -143,7 +143,7 @@ function smPickExistingProject(idx) {
 function smStartFromProjectParams(params) {
   if (typeof showPage === 'function') showPage('shoot');
   if (!smHasDesktop()) {
-    alert('Live shoot mode доступен только в десктоп-версии Maket CP.');
+    alert('Live shoot mode доступен только в десктоп-версии Content Pulse.');
     return;
   }
   // Same gating as manual start: perms first, then pick + start.
@@ -202,7 +202,7 @@ function smPickAndStart() {
 
 function smExportPreviews() {
   if (!smHasDesktop()) {
-    alert('Экспорт превью доступен только в десктоп-версии Maket CP.');
+    alert('Экспорт превью доступен только в десктоп-версии Content Pulse.');
     return;
   }
   if (!window.pywebview.api.shoot_export_previews) {

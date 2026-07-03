@@ -1,6 +1,6 @@
-# C1 Rate Setter — standalone
+# Content Pulse Rate Setter — standalone
 
-Отдельная утилита Rate Setter, вынесенная из Maket CP, чтобы делиться с коллегами.
+Отдельная утилита Rate Setter, часть платформы Content Pulse, чтобы делиться с коллегами.
 Ставит рейтинг 5★ и ключевое слово `SELECTED` в `.cos`-файлы Capture One для отобранных кадров.
 
 ## Состав папки
@@ -34,9 +34,9 @@ cd rate-setter-standalone
 ./build.sh
 ```
 
-Готовое приложение: `dist/C1 Rate Setter.app`.
+Готовое приложение: `dist/Content Pulse Rate Setter.app`.
 Для раздачи коллегам: запаковать `.app` в ZIP вместе с `Инструкция для коллег.txt`
-(готовый архив — `share/C1 Rate Setter.zip`).
+(готовый архив — `share/Content Pulse Rate Setter.zip`).
 
 > Сборка возможна только на Mac (PyInstaller собирает под текущую ОС).
 > `.app` не подписан — у коллег первый запуск через правый клик → «Открыть»
