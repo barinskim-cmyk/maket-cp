@@ -212,6 +212,12 @@ section{scroll-margin-top:0}
 .cta-tag{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.24em;color:#9a9a99}
 .cta h2{font-weight:200;font-size:clamp(30px,4.4vw,48px);line-height:1.1;letter-spacing:-.02em;margin:22px 0 0}
 .cta-lead{font-size:15.5px;line-height:1.65;color:#b2b2b1;margin:22px auto 34px;max-width:440px}
+/* CTA: два блока аудиторий (правка Маши 03.07, строка 66 таблицы) */
+.cta-audiences{display:grid;grid-template-columns:1fr 1fr;gap:28px;max-width:640px;margin:0 auto 38px;text-align:left}
+.cta-aud{border:1px solid #262626;padding:20px 22px}
+.cta-aud-tag{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.16em;color:#9a9a99}
+.cta-aud-text{font-size:13.5px;line-height:1.65;color:#b2b2b1;margin-top:12px}
+@media (max-width:680px){.cta-audiences{grid-template-columns:1fr;gap:12px}}
 .pilot-terms{display:flex;justify-content:center;gap:14px 32px;flex-wrap:wrap;margin-top:44px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.12em;color:#7a7a79}
 .pilot-terms .dot{color:#3f3f3e}
 .footer{max-width:1180px;margin:96px auto 0;padding-top:28px;border-top:1px solid #262626;display:flex;justify-content:space-between;align-items:center;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.12em;color:#6d6d6c;gap:12px;flex-wrap:wrap}
@@ -289,16 +295,15 @@ section{scroll-margin-top:0}
 
   <div class="hero-content">
     <h1>Каждый кадр —<br>уникальный отпечаток процесса</h1>
-    <p class="hero-sub">У вас уже есть почти всё, чтобы увидеть свой процесс по-настоящему. Система — это просто.</p>
+    <p class="hero-sub">У вас есть всё, чтобы увидеть свой процесс по-настоящему. Система — это просто.</p>
     <div class="btn-row">
-      <a href="#cta" class="btn-primary">Запустить пилот</a>
       <a href="#problem" class="btn-ghost">Узнать больше</a>
     </div>
     <div class="hero-tag" style="margin-top:30px">ПЛАТФОРМА ДЛЯ ВИЗУАЛЬНОГО ПРОДАКШЕНА</div>
   </div>
 
   <div class="hero-stats">
-    <span>ДЛЯ ФОТОГРАФОВ</span><span class="dot">·</span><span>ДЛЯ КОМАНД</span><span class="dot">·</span><span>ДЛЯ БИЗНЕСА</span>
+    <span>ДЛЯ ФОТОГРАФОВ</span><span class="dot">·</span><span>ДЛЯ КРЕАТИВНЫХ КОМАНД</span><span class="dot">·</span><span>ДЛЯ БИЗНЕСА</span>
   </div>
 </section>
 
@@ -329,23 +334,23 @@ section{scroll-margin-top:0}
 
     <div>
       <div class="eyebrow light">▸ ЩУПАЕМ КОНТЕНТ-ПУЛЬС</div>
-      <h2 class="h-sec">30–50% времени постпродакшена уходит на сборку реальности</h2>
+      <h2 class="h-sec">30–50% времени после съёмки уходит на поиск правды в чатах и синхронизацию</h2>
       <div class="plist">
         <div class="plist-row">
           <div class="plist-num">01</div>
-          <div><div class="plist-title">Статусы живут в чатах или в таск-трекерах</div><div class="plist-text">Реальных метрик нет</div></div>
+          <div><div class="plist-title">Реальных метрик нет</div></div>
         </div>
         <div class="plist-row">
           <div class="plist-num">02</div>
-          <div><div class="plist-title">История изменений, комментарии, фотографии, а иногда и целые артикулы теряются</div><div class="plist-text">Клиент просит холоднее, стилист — теплее. Ретушёр узнаёт после работы.</div></div>
+          <div><div class="plist-title">Контент теряется</div></div>
         </div>
         <div class="plist-row">
           <div class="plist-num">03</div>
-          <div><div class="plist-title">Папки вместо данных</div><div class="plist-text">Переименовали файл — потеряли историю. Связи между кадрами нет.</div></div>
+          <div><div class="plist-title">Видение участников теряется</div></div>
         </div>
         <div class="plist-row">
           <div class="plist-num">04</div>
-          <div><div class="plist-title">Чтобы найти кадры из отбора в сессии, уходит два часа</div><div class="plist-text">Чаты и скрины почему-то не синхронизируются с другими инструментами.</div></div>
+          <div><div class="plist-title">Чтобы найти кадры из отбора в сессии, уходит два часа</div></div>
         </div>
       </div>
     </div>
@@ -359,15 +364,15 @@ section{scroll-margin-top:0}
 
     <div>
       <div class="eyebrow light">▸ ПАЙПЛАЙН / CATALOG_2026-04-12</div>
-      <h2 class="h-sec">С Content Pulse все статусы по всем съёмкам известны</h2>
+      <h2 class="h-sec">Content Pulse — отражает состояние проекта в настоящем времени</h2>
       <div class="plist">
         <div class="plist-row">
           <div class="plist-num">01</div>
-          <div><div class="plist-title">Статусы считают себя сами</div></div>
+          <div><div class="plist-title">Отчёты собирают себя сами</div></div>
         </div>
         <div class="plist-row">
           <div class="plist-num">02</div>
-          <div><div class="plist-title">Отбор с телефона</div></div>
+          <div><div class="plist-title">Ничего не теряется</div></div>
         </div>
         <div class="plist-row">
           <div class="plist-num">03</div>
@@ -375,7 +380,7 @@ section{scroll-margin-top:0}
         </div>
         <div class="plist-row">
           <div class="plist-num">04</div>
-          <div><div class="plist-title">Данные, а не файлы</div></div>
+          <div><div class="plist-title">Работать с проектом можно с телефона</div></div>
         </div>
       </div>
     </div>
@@ -423,7 +428,7 @@ section{scroll-margin-top:0}
   <div class="wrap">
     <div class="eyebrow dark" style="letter-spacing:.24em">▸ 4 835 ФАЙЛОВ .COS · 2 ДНЯ · БЕЗ РУЧНОЙ РАЗМЕТКИ</div>
     <h2 class="pulse-h">Реальный пульс<br>вашей съёмки</h2>
-    <p class="pulse-lead">Каждый артикул оставляет след во времени. Система собирает данные из сессии и с платформы — и вот уже кардиограмма двух смен: я знаю, где, когда и почему теряется время.</p>
+    <p class="pulse-lead">Каждый артикул оставляет след во времени. Система собирает данные из сессии и с платформы — и вот уже кардиограмма съёмки: я знаю, где, когда и почему теряется время.</p>
 
     <!-- KPI row -->
     <div class="kpis">
@@ -484,16 +489,35 @@ section{scroll-margin-top:0}
   <img src="img/landing/creative-data-love.webp" alt="creative + DATA = сердце, рукописная надпись">
 </section>
 
+<!-- ═══════════ 6. ARTICLES + AI (light, из прежнего лендинга — сокращено) ═══════════ -->
+<section id="articles" class="articles" data-screen-label="Articles">
+  <div class="wrap articles-grid">
+    <div>
+      <div class="eyebrow light">▸ АРТИКУЛЫ / AI</div>
+      <h2 class="h-sec" style="max-width:520px">Загрузите чек-лист — AI расставит артикулы</h2>
+      <p class="articles-lead">Система сопоставляет артикулы с карточками по визуальному сходству: загружаете PDF-каталог бренда с референсами, нажимаете «Расставить» — готово. После подтверждения все файлы переименовываются за секунды.</p>
+    </div>
+
+    <div class="rename-panel">
+      <div class="rename-title">ПЕРЕИМЕНОВАНИЕ ФАЙЛОВ</div>
+      <div class="rename-row"><span>IMG_4201.jpg</span><span class="to">→</span><span class="new">ALX-T201_front_01.jpg</span></div>
+      <div class="rename-row"><span>IMG_4207.jpg</span><span class="to">→</span><span class="new">ALX-T201_back_02.jpg</span></div>
+      <div class="rename-row"><span>IMG_4213.jpg</span><span class="to">→</span><span class="new">ALX-B114_side_01.jpg</span></div>
+      <div class="rename-row"><span>IMG_4218.jpg</span><span class="to">→</span><span class="new">ALX-B114_detail_03.jpg</span></div>
+    </div>
+  </div>
+</section>
+
 <!-- ═══════════ 4. APPROVAL (light) ═══════════ -->
 <section id="approve" class="approve" data-screen-label="Approval">
   <div class="wrap approve-grid">
     <div>
       <div class="eyebrow light">▸ СОГЛАСОВАНИЕ С ТЕЛЕФОНА</div>
       <h2 class="h-sec" style="max-width:520px">Можно редактировать отбор и оставлять комментарии с телефона</h2>
-      <p class="approve-lead">Лента карточек, варианты свайпом, комментарий сразу ко всей карточке. Решение фиксируется с именем и временем — без пересылки файлов.</p>
+      <p class="approve-lead">Лента карточек, варианты свайпом, комментарий сразу ко всей карточке. Решение фиксируется с именем и временем — без пересылки файлов. Отбирайте луками / карточками товара / постами для SMM — настраиваемые шаблоны и несколько вкладок помогут сделать видимой вашу структуру.</p>
       <div class="approve-stats">
         <div><div class="astat-num">−40%</div><div class="astat-lbl">ВРЕМЯ СОГЛАСОВАНИЯ</div></div>
-        <div><div class="astat-num">−60%</div><div class="astat-lbl">РУЧНЫХ СТАТУСОВ</div></div>
+        <div><div class="astat-num">−90%</div><div class="astat-lbl">РУЧНЫХ СТАТУСОВ</div></div>
       </div>
     </div>
 
@@ -524,24 +548,6 @@ section{scroll-margin-top:0}
   </div>
 </section>
 
-<!-- ═══════════ 6. ARTICLES + AI (light, из прежнего лендинга — сокращено) ═══════════ -->
-<section id="articles" class="articles" data-screen-label="Articles">
-  <div class="wrap articles-grid">
-    <div>
-      <div class="eyebrow light">▸ АРТИКУЛЫ / AI</div>
-      <h2 class="h-sec" style="max-width:520px">Загрузите чек-лист — AI расставит артикулы</h2>
-      <p class="articles-lead">Система сопоставляет артикулы с карточками по визуальному сходству: загружаете PDF-каталог бренда с референсами, нажимаете «Расставить» — готово. После подтверждения все файлы переименовываются за секунды.</p>
-    </div>
-
-    <div class="rename-panel">
-      <div class="rename-title">ПЕРЕИМЕНОВАНИЕ ФАЙЛОВ</div>
-      <div class="rename-row"><span>IMG_4201.jpg</span><span class="to">→</span><span class="new">ALX-T201_front_01.jpg</span></div>
-      <div class="rename-row"><span>IMG_4207.jpg</span><span class="to">→</span><span class="new">ALX-T201_back_02.jpg</span></div>
-      <div class="rename-row"><span>IMG_4213.jpg</span><span class="to">→</span><span class="new">ALX-B114_side_01.jpg</span></div>
-      <div class="rename-row"><span>IMG_4218.jpg</span><span class="to">→</span><span class="new">ALX-B114_detail_03.jpg</span></div>
-    </div>
-  </div>
-</section>
 
 <!-- ═══════════ 7. CTA (dark) ═══════════ -->
 <section id="cta" class="cta" data-screen-label="CTA">
@@ -549,6 +555,16 @@ section{scroll-margin-top:0}
     <div class="cta-tag">PILOT / ОТКРЫТО 3 МЕСТА</div>
     <h2>Запустите Content Pulse на своей съёмке</h2>
     <p class="cta-lead">Загрузите реальный каталог — увидите весь процесс в одном месте уже на первом проекте.</p>
+    <div class="cta-audiences">
+      <div class="cta-aud">
+        <div class="cta-aud-tag">▸ ДЛЯ ФОТОГРАФОВ</div>
+        <div class="cta-aud-text">Синхронизация с Capture One, отбор карточек товара, красивая презентация для клиента — просто и быстро.</div>
+      </div>
+      <div class="cta-aud">
+        <div class="cta-aud-tag">▸ ДЛЯ БИЗНЕСА</div>
+        <div class="cta-aud-text">Реальные метрики процесса и скорость: согласование быстрее, статусы считаются сами, съёмка сдаётся раньше.</div>
+      </div>
+    </div>
     <div class="btn-row">
       <a href="mailto:barinski.m@gmail.com?subject=%D0%9F%D0%B8%D0%BB%D0%BE%D1%82%20Content%20Pulse" class="btn-primary" style="padding:15px 34px;font-size:15px">Запустить пилот</a>
       <a href="#pipeline" class="btn-ghost" style="padding:15px 30px;font-size:15px">Открыть демо</a>
