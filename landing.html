@@ -206,21 +206,26 @@ section{scroll-margin-top:0}
 .love-strip{background:#000;padding:26px 24px;display:flex;justify-content:center}
 .love-strip img{height:clamp(64px,8vw,110px);width:auto;max-width:100%;object-fit:contain;display:block;filter:invert(1) contrast(1.5)}
 
-/* ── 7. CTA ── */
-.cta{background:#131313;color:#f2f2f1;padding:110px max(24px,5vw);text-align:center}
+/* ── 7. CTA (светлая — правка Маши 03.07) ── */
+.cta{background:#eceae6;color:#131313;padding:110px max(24px,5vw);text-align:center;border-top:1px solid #d3d1cb}
 .cta-inner{max-width:640px;margin:0 auto}
-.cta-tag{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.24em;color:#9a9a99}
+.cta-tag{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.24em;color:#8a897f}
 .cta h2{font-weight:200;font-size:clamp(30px,4.4vw,48px);line-height:1.1;letter-spacing:-.02em;margin:22px 0 0}
-.cta-lead{font-size:15.5px;line-height:1.65;color:#b2b2b1;margin:22px auto 34px;max-width:440px}
+.cta-lead{font-size:15.5px;line-height:1.65;color:#57564e;margin:22px auto 34px;max-width:440px}
+/* Кнопки CTA на светлом: инверсия */
+.cta .btn-primary{background:#131313;color:#f2f2f1}
+.cta .btn-ghost{color:#131313;border-color:#b5b3ad}
 /* CTA: два блока аудиторий (правка Маши 03.07, строка 66 таблицы) */
 .cta-audiences{display:grid;grid-template-columns:1fr 1fr;gap:28px;max-width:640px;margin:0 auto 38px;text-align:left}
-.cta-aud{border:1px solid #262626;padding:20px 22px}
-.cta-aud-tag{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.16em;color:#9a9a99}
-.cta-aud-text{font-size:13.5px;line-height:1.65;color:#b2b2b1;margin-top:12px}
+.cta-aud{border:1px solid #d3d1cb;padding:20px 22px}
+.cta-aud-tag{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.16em;color:#8a897f}
+.cta-aud-text{font-size:13.5px;line-height:1.65;color:#57564e;margin-top:12px}
 @media (max-width:680px){.cta-audiences{grid-template-columns:1fr;gap:12px}}
-.pilot-terms{display:flex;justify-content:center;gap:14px 32px;flex-wrap:wrap;margin-top:44px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.12em;color:#7a7a79}
-.pilot-terms .dot{color:#3f3f3e}
-.footer{max-width:1180px;margin:96px auto 0;padding-top:28px;border-top:1px solid #262626;display:flex;justify-content:space-between;align-items:center;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.12em;color:#6d6d6c;gap:12px;flex-wrap:wrap}
+.pilot-terms{display:flex;justify-content:center;gap:14px 32px;flex-wrap:wrap;margin-top:44px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.12em;color:#8a897f}
+.pilot-terms .dot{color:#c9c7c1}
+.footer{max-width:1180px;margin:96px auto 0;padding-top:28px;border-top:1px solid #d3d1cb;display:flex;justify-content:space-between;align-items:center;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.12em;color:#8a897f;gap:12px;flex-wrap:wrap}
+.footer .logo{color:#131313}
+.footer .logo .cp{color:#8a897f}
 .footer .logo .lg1{font-size:15px}
 
 /* ── Адаптив ── */
