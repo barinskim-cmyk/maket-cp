@@ -1523,6 +1523,18 @@ tr:hover td { background: #fafafa; }
   <td contenteditable="true" class="my-comment"></td>
 </tr>
 
+<tr data-row="ratesetter-dark-redesign">
+  <td><span class="s-done">DONE</span></td>
+  <td>Rate Setter</td>
+  <td><strong>Rate Setter: тёмный дизайн Content Pulse + фикс Cmd+V</strong></td>
+  <td></td>
+  <td>UI переведён на палитру дизайн-системы (тёмная плёнка: #191919, моно-заголовки секций 01/02/03, волосяные разделители, инверт-кнопка Старт, кастомные кнопки/чекбокс — нативные tk.Button на macOS игнорируют bg). Cmd+V/C/X/A: у frozen-app не было меню «Правка», а class-биндинги Tk ломаются на русской раскладке — добавлено меню с акселераторами (macOS обрабатывает их независимо от раскладки) + фолбэк по физическим keycode для кириллицы, без двойной вставки на латинице. Проверено программным тестом на Маке Маши: вставка в Text/Entry, selectall/cut/copy, кириллический фолбэк, палитра — всё OK.</td>
+  <td class="files">rate-setter-standalone/C1_RateSetter.py</td>
+  <td><span class="p-med">P1</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
 <tr data-row="redesign0703-screens">
   <td><span class="s-todo">TODO</span></td>
   <td>Редизайн / UI-спека</td>

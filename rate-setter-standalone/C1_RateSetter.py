@@ -14,17 +14,22 @@
 
 Зависимостей нет — только стандартная библиотека Python (tkinter).
 
-Замечание про оформление на macOS: используются классические tk-виджеты
-(не ttk) — именно они корректно отрисовываются в собранном .app. У полей
-ввода задана явная рамка (highlightbackground), иначе на светлом фоне
-белое поле сливается и его не видно. Приложение принудительно работает в
-светлой теме (NSRequiresAquaSystemAppearance в Info.plist), чтобы поля не
-становились тёмными по тёмному в Dark Mode.
+Оформление: тёмная тема «Content Pulse» (палитра дизайн-системы,
+style.css :root). Используются классические tk-виджеты (не ttk) — именно
+они корректно отрисовываются в собранном .app. Все цвета задаются явно
+на каждом виджете, поэтому системная светлая/тёмная тема не влияет.
+Кнопки — кастомные (tk.Label): нативные tk.Button на macOS игнорируют bg.
+
+Cmd+V/C/X/A: у frozen-приложения нет меню «Правка», поэтому системные
+шорткаты не доходили до Tk (особенно на русской раскладке). Решение:
+меню «Правка» с акселераторами (macOS обрабатывает их на уровне
+приложения, независимо от раскладки) + фолбэк по физическим keycode.
 """
 from __future__ import annotations
 
 import re
 import shutil
+import sys
 import sqlite3
 import threading
 import xml.etree.ElementTree as ET
@@ -52,14 +57,28 @@ KNOWN_SUFFIXES = ["_preview", "_prev", "_web", "_small", "_thumb", "_lowres", "_
 # "IMG_0001.jpg (2)". Снимается всегда, до разбора расширения.
 FINDER_DUP_RE = re.compile(r"\s*\(\d+\)$")
 
-# Палитра. Рамки и заливка полей — то, что реально honor-ится классическим
-# tk на macOS. Фон окна/подписей оставляем системным (светлым).
-FIELD_BG = "#FFFFFF"     # заливка полей ввода
-FIELD_FG = "#111111"     # текст в полях
-FIELD_BORDER = "#8A8F98"  # рамка полей (видна на белом)
-FIELD_FOCUS = "#2563EB"  # рамка при фокусе
-FONT = ("Helvetica", 13)
-FONT_BOLD = ("Helvetica", 13, "bold")
+# Палитра «тёмная плёнка» — токены дизайн-системы Content Pulse
+# (v2/frontend/css/style.css :root, тёмная тема).
+BG           = "#191919"  # фон окна
+FIELD_BG     = "#242424"  # заливка полей ввода
+FIELD_FG     = "#f2f2f2"  # текст в полях
+FIELD_BORDER = "#383838"  # рамка полей
+FIELD_FOCUS  = "#c9956b"  # рамка при фокусе (акцент)
+LOG_BG       = "#141414"  # фон лога (--photo-bg)
+ACCENT       = "#c9956b"
+TEXT         = "#f2f2f2"
+TEXT_2       = "#b5b5b5"
+TEXT_3       = "#8f8f8f"
+META         = "#707070"
+LINE         = "#333333"
+INVERT_BG    = "#f2f2f2"  # инверт-кнопка (как .btn-primary)
+INVERT_FG    = "#1a1a1a"
+DANGER       = "#c96b6b"
+
+FONT      = ("Helvetica Neue", 13)
+FONT_BOLD = ("Helvetica Neue", 13, "bold")
+MONO      = ("Menlo", 12)
+MONO_S    = ("Menlo", 10)
 
 
 # ── Очистка имён ──
@@ -428,29 +447,33 @@ def update_session_db(session_root: Path, stems: set[str], rating: str, keywords
 
 # ── GUI ──
 
-class App(tk.Tk):
-    """Окно утилиты на классическом tkinter.
 
-    Раскладка на grid с одной растягивающейся колонкой: поля занимают всю
-    ширину, кнопки выбора закреплены в фиксированной правой колонке вплотную
-    к полю — поэтому не «ездят» при изменении размера окна. Поля ввода имеют
-    явную серую рамку, чтобы быть видимыми на светлом фоне.
+class App(tk.Tk):
+    """Окно утилиты в стиле дизайн-системы Content Pulse («тёмная плёнка»).
+
+    Раскладка на grid с одной растягивающейся колонкой. Секции разделены
+    волосяными линиями (как на лендинге), заголовки секций — моноширинные
+    капс-подписи с акцентной стрелкой. Кнопки — кастомные tk.Label:
+    нативные tk.Button на macOS игнорируют цвет фона и остались бы белыми.
     """
 
-    PAD = 16
+    PAD = 20
 
     def __init__(self):
         super().__init__()
         self.title("Content Pulse · Rate Setter — 5* + SELECTED")
-        self.geometry("760x660")
-        self.minsize(660, 580)
+        self.geometry("780x700")
+        self.minsize(680, 600)
+        self.configure(bg=BG)
 
         self.source_dir: Path | None = None
         self.session_root: Path | None = None
         self._stems: set[str] = set()
         self._keywords: list[str] = [KEYWORD_VALUE]
+        self._running = False
 
         self._build_ui()
+        self._install_edit_shortcuts()
         self.toggle_mode()
         self.names_text.focus_set()
 
@@ -458,153 +481,332 @@ class App(tk.Tk):
 
     def _entry(self, parent) -> tk.Entry:
         return tk.Entry(parent, bg=FIELD_BG, fg=FIELD_FG, insertbackground=FIELD_FG,
-                        relief="solid", bd=1, font=FONT,
-                        highlightthickness=2, highlightbackground=FIELD_BORDER,
-                        highlightcolor=FIELD_FOCUS)
+                        relief="flat", bd=0, font=MONO,
+                        highlightthickness=1, highlightbackground=FIELD_BORDER,
+                        highlightcolor=FIELD_FOCUS,
+                        selectbackground="#3a3a3a", selectforeground=TEXT)
 
-    def _text(self, parent, height: int, wrap: str = "word") -> tk.Text:
+    def _text(self, parent, height: int, wrap: str = "word", bg: str = FIELD_BG) -> tk.Text:
         return tk.Text(parent, height=height, wrap=wrap,
-                       bg=FIELD_BG, fg=FIELD_FG, insertbackground=FIELD_FG,
-                       relief="solid", bd=1, font=FONT, padx=6, pady=6,
-                       highlightthickness=2, highlightbackground=FIELD_BORDER,
-                       highlightcolor=FIELD_FOCUS)
+                       bg=bg, fg=FIELD_FG, insertbackground=FIELD_FG,
+                       relief="flat", bd=0, font=MONO, padx=10, pady=8,
+                       highlightthickness=1, highlightbackground=FIELD_BORDER,
+                       highlightcolor=FIELD_FOCUS,
+                       selectbackground="#3a3a3a", selectforeground=TEXT)
 
     @staticmethod
-    def _label(parent, text: str, bold: bool = False) -> tk.Label:
-        # Без переопределения цветов — дефолтный (чёрный в светлой теме) виден.
-        return tk.Label(parent, text=text, font=(FONT_BOLD if bold else FONT), anchor="w")
+    def _label(parent, text: str, fg: str = TEXT_2, font=FONT) -> tk.Label:
+        return tk.Label(parent, text=text, font=font, anchor="w", bg=BG, fg=fg)
+
+    def _hairline(self, parent, row: int, pady=(18, 14)):
+        """Волосяная линия-разделитель секций (как .cp-hairline на лендинге)."""
+        line = tk.Frame(parent, bg=LINE, height=1)
+        line.grid(row=row, column=0, sticky="ew", pady=pady)
+
+    def _section_head(self, parent, num: str, text: str) -> tk.Frame:
+        """Моно-заголовок секции: акцентная стрелка + номер + капс."""
+        head = tk.Frame(parent, bg=BG)
+        tk.Label(head, text="▸", font=MONO_S, bg=BG, fg=ACCENT).pack(side="left")
+        tk.Label(head, text=f" {num} · {text}", font=MONO_S, bg=BG, fg=TEXT_3
+                 ).pack(side="left")
+        return head
+
+    def _btn(self, parent, text: str, command, primary: bool = False) -> tk.Label:
+        """Кастомная кнопка. primary — инверт (как .btn-primary),
+        иначе — моно-аутлайн (как .ds-btn-mono)."""
+        if primary:
+            b = tk.Label(parent, text=text, bg=INVERT_BG, fg=INVERT_FG,
+                         font=("Helvetica Neue", 13, "bold"), padx=18, pady=8, cursor="hand2")
+            normal = (INVERT_BG, INVERT_FG)
+            hover = ("#ffffff", "#000000")
+        else:
+            b = tk.Label(parent, text=text.upper(), bg=BG, fg=TEXT_2,
+                         font=MONO_S, padx=12, pady=6, cursor="hand2",
+                         highlightthickness=1, highlightbackground=FIELD_BORDER)
+            normal = (BG, TEXT_2)
+            hover = (BG, TEXT)
+        b._enabled = True
+
+        def on_click(_e):
+            if b._enabled:
+                command()
+
+        def on_enter(_e):
+            if b._enabled:
+                b.configure(bg=hover[0], fg=hover[1])
+
+        def on_leave(_e):
+            if b._enabled:
+                b.configure(bg=normal[0], fg=normal[1])
+
+        b.bind("<Button-1>", on_click)
+        b.bind("<Enter>", on_enter)
+        b.bind("<Leave>", on_leave)
+        b._colors = (normal, hover)
+        return b
+
+    def _btn_set_enabled(self, b: tk.Label, enabled: bool, primary: bool = False):
+        b._enabled = enabled
+        if enabled:
+            b.configure(bg=b._colors[0][0], fg=b._colors[0][1], cursor="hand2")
+        else:
+            if primary:
+                b.configure(bg="#4a4a4a", fg="#8a8a8a", cursor="arrow")
+            else:
+                b.configure(fg=META, cursor="arrow")
 
     # ── Построение интерфейса ──
 
     def _build_ui(self):
-        outer = tk.Frame(self, padx=self.PAD, pady=self.PAD)
+        outer = tk.Frame(self, padx=self.PAD, pady=self.PAD, bg=BG)
         outer.pack(fill="both", expand=True)
         outer.columnconfigure(0, weight=1)
-        outer.rowconfigure(5, weight=1)   # растягивается только лог
+        outer.rowconfigure(10, weight=1)   # растягивается только лог
+
+        # 0) Шапка-логотип
+        head = tk.Frame(outer, bg=BG)
+        head.grid(row=0, column=0, sticky="ew")
+        tk.Label(head, text="C O N T E N T   P U L S E", font=("Helvetica Neue", 14),
+                 bg=BG, fg=TEXT).pack(side="left")
+        tk.Label(head, text="   RATE SETTER · 5* + SELECTED", font=MONO_S,
+                 bg=BG, fg=META).pack(side="left", pady=(3, 0))
+
+        self._hairline(outer, 1, pady=(14, 14))
 
         # 1) Источник имён
-        src = tk.LabelFrame(outer, text=" 1. Источник имён отобранных фото ",
-                            font=FONT_BOLD, padx=12, pady=12)
-        src.grid(row=0, column=0, sticky="ew")
+        src = tk.Frame(outer, bg=BG)
+        src.grid(row=2, column=0, sticky="ew")
         src.columnconfigure(0, weight=1)
 
-        radios = tk.Frame(src)
-        radios.grid(row=0, column=0, sticky="w")
-        self.mode_var = tk.StringVar(value="list")
-        tk.Radiobutton(radios, text="Из списка (текст)", variable=self.mode_var,
-                       value="list", font=FONT, command=self.toggle_mode).pack(side="left")
-        tk.Radiobutton(radios, text="Из папки", variable=self.mode_var,
-                       value="folder", font=FONT, command=self.toggle_mode).pack(side="left", padx=(18, 0))
+        top = tk.Frame(src, bg=BG)
+        top.grid(row=0, column=0, sticky="ew")
+        self._section_head(top, "01", "ИСТОЧНИК ИМЁН ОТОБРАННЫХ ФОТО").pack(side="left")
 
+        # режим: список / папка — моно-переключатель
+        self.mode_var = tk.StringVar(value="list")
+        tabs = tk.Frame(top, bg=BG)
+        tabs.pack(side="right")
+        self.tab_list = tk.Label(tabs, text="СПИСОК", font=MONO_S, bg=BG, fg=META,
+                                 cursor="hand2", padx=8)
+        self.tab_folder = tk.Label(tabs, text="ПАПКА", font=MONO_S, bg=BG, fg=META,
+                                   cursor="hand2", padx=8)
+        self.tab_list.pack(side="left")
+        tk.Label(tabs, text="/", font=MONO_S, bg=BG, fg=LINE).pack(side="left")
+        self.tab_folder.pack(side="left")
+        self.tab_list.bind("<Button-1>", lambda e: self._set_mode("list"))
+        self.tab_folder.bind("<Button-1>", lambda e: self._set_mode("folder"))
+
+        # чекбокс «убрать хвостики» — кастомный, моно
         self.strip_var = tk.BooleanVar(value=False)
-        tk.Checkbutton(src, text="Убрать хвостики (_preview, _web, _copy и т.п.)",
-                       variable=self.strip_var, font=FONT
-                       ).grid(row=1, column=0, sticky="w", pady=(8, 10))
+        self.strip_check = tk.Label(
+            src, text="", font=MONO_S, bg=BG, fg=TEXT_2, cursor="hand2", anchor="w")
+        self.strip_check.grid(row=1, column=0, sticky="w", pady=(10, 10))
+        self.strip_check.bind("<Button-1>", self._toggle_strip)
+        self._refresh_strip()
 
         # Контейнер-переключатель: список / папка
-        self.swap = tk.Frame(src)
+        self.swap = tk.Frame(src, bg=BG)
         self.swap.grid(row=2, column=0, sticky="nsew")
         self.swap.columnconfigure(0, weight=1)
 
         # режим «список»
-        self.list_frame = tk.Frame(self.swap)
+        self.list_frame = tk.Frame(self.swap, bg=BG)
         self.list_frame.columnconfigure(0, weight=1)
         self._label(self.list_frame,
-                    "Вставьте имена файлов — по одному на строку (можно с .jpg и без):"
-                    ).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 4))
+                    "Вставьте имена файлов — по одному на строку (можно с .jpg и без):",
+                    fg=TEXT_2).grid(row=0, column=0, sticky="w", pady=(0, 6))
         self.names_text = self._text(self.list_frame, height=8)
         self.names_text.grid(row=1, column=0, sticky="nsew")
-        nsb = tk.Scrollbar(self.list_frame, orient="vertical", command=self.names_text.yview)
-        nsb.grid(row=1, column=1, sticky="ns")
-        self.names_text.configure(yscrollcommand=nsb.set)
-        tbtns = tk.Frame(self.list_frame)
-        tbtns.grid(row=2, column=0, columnspan=2, sticky="w", pady=(8, 0))
-        tk.Button(tbtns, text="Вставить из буфера", command=self._paste_text).pack(side="left")
-        tk.Button(tbtns, text="Загрузить .txt…", command=self._load_txt).pack(side="left", padx=(8, 0))
-        tk.Button(tbtns, text="Очистить", command=lambda: self.names_text.delete("1.0", "end")).pack(side="left", padx=(8, 0))
-        # Cmd+V: виртуальное событие <<Paste>> не зависит от раскладки (в т.ч.
-        # русской), в отличие от <Command-v>. Это и чинит вставку списка.
-        self.names_text.bind("<<Paste>>", self._paste_text)
-        self.names_text.bind("<<SelectAll>>", self._select_all)
-        for seq in ("<Command-v>", "<Command-V>", "<Control-v>"):
-            self.names_text.bind(seq, self._paste_text)
-        self.names_text.bind("<Command-a>", self._select_all)
-        self.names_text.bind("<Control-a>", self._select_all)
+        tbtns = tk.Frame(self.list_frame, bg=BG)
+        tbtns.grid(row=2, column=0, sticky="w", pady=(10, 0))
+        self._btn(tbtns, "Вставить из буфера", self._paste_text).pack(side="left")
+        self._btn(tbtns, "Загрузить .txt…", self._load_txt).pack(side="left", padx=(8, 0))
+        self._btn(tbtns, "Очистить",
+                  lambda: self.names_text.delete("1.0", "end")).pack(side="left", padx=(8, 0))
 
         # режим «папка»
-        self.folder_frame = tk.Frame(self.swap)
+        self.folder_frame = tk.Frame(self.swap, bg=BG)
         self.folder_frame.columnconfigure(0, weight=1)
-        self._label(self.folder_frame, "Папка с отобранными фотографиями:"
-                    ).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 4))
+        self._label(self.folder_frame, "Папка с отобранными фотографиями:",
+                    fg=TEXT_2).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 6))
         self.src_entry = self._entry(self.folder_frame)
-        self.src_entry.grid(row=1, column=0, sticky="ew", ipady=3)
-        tk.Button(self.folder_frame, text="Выбрать…", command=self.pick_source
+        self.src_entry.grid(row=1, column=0, sticky="ew", ipady=5)
+        self._btn(self.folder_frame, "Выбрать…", self.pick_source
                   ).grid(row=1, column=1, padx=(8, 0))
 
-        # Доп. кодовое слово (присваивается вместе с SELECTED)
-        kwrow = tk.Frame(src)
-        kwrow.grid(row=3, column=0, sticky="ew", pady=(12, 0))
+        # Доп. кодовое слово
+        kwrow = tk.Frame(src, bg=BG)
+        kwrow.grid(row=3, column=0, sticky="ew", pady=(14, 0))
         kwrow.columnconfigure(1, weight=1)
-        self._label(kwrow, "Доп. кодовое слово (к SELECTED, необязательно):"
-                    ).grid(row=0, column=0, sticky="w")
+        self._label(kwrow, "Доп. кодовое слово (к SELECTED, необязательно):",
+                    fg=TEXT_2).grid(row=0, column=0, sticky="w")
         self.extra_kw_entry = self._entry(kwrow)
-        self.extra_kw_entry.grid(row=0, column=1, sticky="ew", padx=(8, 0), ipady=2)
+        self.extra_kw_entry.grid(row=0, column=1, sticky="ew", padx=(10, 0), ipady=4)
+
+        self._hairline(outer, 3)
 
         # 2) Папка сессии
-        self._label(outer, "2. Папка сессии Capture One — где искать *.cos по подпапкам:"
-                    ).grid(row=1, column=0, sticky="w", pady=(16, 4))
-        sess = tk.Frame(outer)
-        sess.grid(row=2, column=0, sticky="ew")
+        self._section_head(outer, "02", "ПАПКА СЕССИИ CAPTURE ONE").grid(
+            row=4, column=0, sticky="w")
+        self._label(outer, "Корень сессии — *.cos ищутся по всем подпапкам:",
+                    fg=TEXT_2).grid(row=5, column=0, sticky="w", pady=(8, 6))
+        sess = tk.Frame(outer, bg=BG)
+        sess.grid(row=6, column=0, sticky="ew")
         sess.columnconfigure(0, weight=1)
         self.dst_entry = self._entry(sess)
-        self.dst_entry.grid(row=0, column=0, sticky="ew", ipady=3)
-        tk.Button(sess, text="Выбрать…", command=self.pick_target).grid(row=0, column=1, padx=(8, 0))
+        self.dst_entry.grid(row=0, column=0, sticky="ew", ipady=5)
+        self._btn(sess, "Выбрать…", self.pick_target).grid(row=0, column=1, padx=(8, 0))
+
+        self._hairline(outer, 7)
 
         # 3) Действия
-        actions = tk.Frame(outer)
-        actions.grid(row=3, column=0, sticky="ew", pady=(16, 12))
+        actions = tk.Frame(outer, bg=BG)
+        actions.grid(row=8, column=0, sticky="ew", pady=(0, 14))
         actions.columnconfigure(2, weight=1)  # распорка перед «Выход»
-        self.start_btn = tk.Button(actions, text="Старт: 5* + SELECTED",
-                                   font=FONT_BOLD, command=self.start)
+        self.start_btn = self._btn(actions, "Старт — 5* + SELECTED", self.start, primary=True)
         self.start_btn.grid(row=0, column=0, sticky="w")
-        tk.Button(actions, text="Очистить лог", command=self.clear_log
-                  ).grid(row=0, column=1, sticky="w", padx=(8, 0))
-        tk.Button(actions, text="Выход", command=self.destroy
-                  ).grid(row=0, column=3, sticky="e")
+        self._btn(actions, "Очистить лог", self.clear_log
+                  ).grid(row=0, column=1, sticky="w", padx=(10, 0))
+        self._btn(actions, "Выход", self.destroy).grid(row=0, column=3, sticky="e")
 
         # 4) Лог
-        self._label(outer, "Лог:").grid(row=4, column=0, sticky="w")
-        logwrap = tk.Frame(outer)
-        logwrap.grid(row=5, column=0, sticky="nsew", pady=(4, 0))
+        self._section_head(outer, "03", "ЛОГ").grid(row=9, column=0, sticky="w", pady=(0, 6))
+        logwrap = tk.Frame(outer, bg=BG)
+        logwrap.grid(row=10, column=0, sticky="nsew")
         logwrap.columnconfigure(0, weight=1)
         logwrap.rowconfigure(0, weight=1)
-        self.log = self._text(logwrap, height=10, wrap="none")
+        self.log = self._text(logwrap, height=10, wrap="none", bg=LOG_BG)
+        self.log.configure(font=("Menlo", 11), fg=TEXT_2)
         self.log.grid(row=0, column=0, sticky="nsew")
-        lsb = tk.Scrollbar(logwrap, orient="vertical", command=self.log.yview)
-        lsb.grid(row=0, column=1, sticky="ns")
-        self.log.configure(yscrollcommand=lsb.set, state="disabled")
+        self.log.configure(state="disabled")
+        # подсветка статусов в логе
+        self.log.tag_configure("err", foreground=DANGER)
+        self.log.tag_configure("miss", foreground=ACCENT)
+        self.log.tag_configure("ok", foreground=TEXT)
 
-        self.status = self._label(outer, "Готово.")
-        self.status.grid(row=6, column=0, sticky="ew", pady=(8, 0))
+        self.status = tk.Label(outer, text="● ГОТОВО", font=MONO_S,
+                               bg=BG, fg=META, anchor="w")
+        self.status.grid(row=11, column=0, sticky="ew", pady=(10, 0))
 
-    def _select_all(self, event=None):
-        self.names_text.tag_add("sel", "1.0", "end-1c")
-        return "break"
+    # ── Шорткаты Cmd+V/C/X/A ──
+    #
+    # У frozen-приложения нет меню «Правка», поэтому Cmd+V не работал:
+    # Tk-шные class-биндинги ищут keysym «v», а на русской раскладке
+    # приходит «Cyrillic_em». Меню с акселераторами обрабатывается самим
+    # macOS независимо от раскладки — это основной фикс. Фолбэк по
+    # физическим keycode ловит случаи, когда меню не перехватило.
 
-    # ── Переключение режима ──
+    def _install_edit_shortcuts(self):
+        acc = "Command" if sys.platform == "darwin" else "Ctrl"
+        menubar = tk.Menu(self)
+        edit = tk.Menu(menubar, tearoff=0)
+        edit.add_command(label="Вырезать", accelerator=f"{acc}+X",
+                         command=lambda: self._edit_action("cut"))
+        edit.add_command(label="Копировать", accelerator=f"{acc}+C",
+                         command=lambda: self._edit_action("copy"))
+        edit.add_command(label="Вставить", accelerator=f"{acc}+V",
+                         command=lambda: self._edit_action("paste"))
+        edit.add_separator()
+        edit.add_command(label="Выделить всё", accelerator=f"{acc}+A",
+                         command=lambda: self._edit_action("selectall"))
+        menubar.add_cascade(label="Правка", menu=edit)
+        self.config(menu=menubar)
+
+        if sys.platform == "darwin":
+            # Фолбэк: физические keycode клавиш V/C/X/A на macOS
+            # (не зависят от раскладки). Латинские keysym пропускаем —
+            # их обрабатывает меню или родной биндинг (иначе двойная вставка).
+            self.bind_all("<Command-KeyPress>", self._on_cmd_key, add="+")
+
+    _MAC_KEYCODES = {9: "paste", 8: "copy", 7: "cut", 0: "selectall"}
+
+    def _on_cmd_key(self, event):
+        if event.keysym.lower() in ("v", "c", "x", "a"):
+            return None  # латиница — обработает меню/класс-биндинг
+        action = self._MAC_KEYCODES.get(event.keycode)
+        if action:
+            self._edit_action(action)
+            return "break"
+        return None
+
+    def _edit_action(self, action: str):
+        w = self.focus_get()
+        if w is None:
+            return
+        is_text = isinstance(w, tk.Text)
+        is_entry = isinstance(w, tk.Entry)
+        if not (is_text or is_entry):
+            return
+        try:
+            if action == "paste":
+                try:
+                    txt = self.clipboard_get()
+                except tk.TclError:
+                    return
+                if is_text and str(w.cget("state")) == "disabled":
+                    return
+                try:
+                    w.delete("sel.first", "sel.last")
+                except tk.TclError:
+                    pass
+                w.insert("insert", txt)
+                if is_text:
+                    w.see("insert")
+            elif action in ("copy", "cut"):
+                try:
+                    if is_text:
+                        sel = w.get("sel.first", "sel.last")
+                    else:
+                        sel = w.get()[w.index("sel.first"):w.index("sel.last")]
+                except tk.TclError:
+                    return
+                self.clipboard_clear()
+                self.clipboard_append(sel)
+                if action == "cut" and not (is_text and str(w.cget("state")) == "disabled"):
+                    try:
+                        w.delete("sel.first", "sel.last")
+                    except tk.TclError:
+                        pass
+            elif action == "selectall":
+                if is_text:
+                    w.tag_add("sel", "1.0", "end-1c")
+                else:
+                    w.select_range(0, "end")
+        except tk.TclError:
+            pass
+
+    # ── Переключение режима и чекбокс ──
+
+    def _set_mode(self, value: str):
+        self.mode_var.set(value)
+        self.toggle_mode()
 
     def toggle_mode(self):
         if self.mode_var.get() == "list":
             self.folder_frame.grid_remove()
             self.list_frame.grid(row=0, column=0, sticky="nsew")
+            self.tab_list.configure(fg=TEXT, font=("Menlo", 10, "underline"))
+            self.tab_folder.configure(fg=META, font=MONO_S)
         else:
             self.list_frame.grid_remove()
             self.folder_frame.grid(row=0, column=0, sticky="ew")
+            self.tab_folder.configure(fg=TEXT, font=("Menlo", 10, "underline"))
+            self.tab_list.configure(fg=META, font=MONO_S)
+
+    def _toggle_strip(self, _event=None):
+        self.strip_var.set(not self.strip_var.get())
+        self._refresh_strip()
+
+    def _refresh_strip(self):
+        mark = "x" if self.strip_var.get() else " "
+        self.strip_check.configure(
+            text=f"[{mark}] УБРАТЬ ХВОСТИКИ (_PREVIEW, _WEB, _COPY И Т.П.)",
+            fg=(TEXT if self.strip_var.get() else TEXT_2))
 
     # ── Текстовое поле ──
 
     def _paste_text(self, event=None):
-        """Вставка из буфера — работает и внутри собранного .app на macOS."""
+        """Вставка из буфера в поле списка (кнопка «Вставить из буфера»)."""
         try:
             text = self.clipboard_get()
             try:
@@ -612,6 +814,7 @@ class App(tk.Tk):
             except tk.TclError:
                 pass
             self.names_text.insert("insert", text)
+            self.names_text.see("insert")
         except tk.TclError:
             pass
         return "break"
@@ -651,13 +854,21 @@ class App(tk.Tk):
         self.log.configure(state="disabled")
 
     def append_log(self, s: str):
+        tag = ()
+        if s.startswith("ОШИБ") or s.startswith("=== Ошибка"):
+            tag = ("err",)
+        elif s.startswith("НЕТ"):
+            tag = ("miss",)
+        elif s.startswith("OK"):
+            tag = ("ok",)
         self.log.configure(state="normal")
-        self.log.insert("end", s + "\n")
+        self.log.insert("end", s + "\n", tag)
         self.log.see("end")
         self.log.configure(state="disabled")
 
     def set_running(self, running: bool):
-        self.start_btn.configure(state=("disabled" if running else "normal"))
+        self._running = running
+        self._btn_set_enabled(self.start_btn, not running, primary=True)
 
     # ── Запуск обработки ──
 
@@ -665,7 +876,7 @@ class App(tk.Tk):
         strip_tails = self.strip_var.get()
         if self.mode_var.get() == "folder":
             if not self.source_dir or not self.source_dir.exists():
-                messagebox.showerror("Ошибка", "Не выбрана папка с отобранными фото (шаг 1).")
+                messagebox.showerror("Ошибка", "Не выбрана папка с отобранными фото (шаг 01).")
                 return None
             stems = collect_source_stems(self.source_dir, strip_tails=strip_tails)
             self.append_log(f"Режим: папка — найдено {len(stems)} имён в {self.source_dir}")
@@ -685,7 +896,7 @@ class App(tk.Tk):
         if stems is None:
             return
         if not self.session_root or not self.session_root.exists():
-            messagebox.showerror("Ошибка", "Не выбрана папка сессии Capture One (шаг 2).")
+            messagebox.showerror("Ошибка", "Не выбрана папка сессии Capture One (шаг 02).")
             return
 
         # ключевые слова: SELECTED всегда + доп. слово, если введено
@@ -698,7 +909,7 @@ class App(tk.Tk):
         self.append_log("=== Старт ===")
         self.append_log(f"Ключевые слова: {', '.join(keywords)}")
         self.append_log("ВАЖНО: Capture One должен быть ЗАКРЫТ (пишем в базу сессии).\n")
-        self.status.configure(text="Выполняется…")
+        self.status.configure(text="● ВЫПОЛНЯЕТСЯ…", fg=ACCENT)
         self.set_running(True)
 
         self._stems = stems
@@ -730,7 +941,7 @@ class App(tk.Tk):
             self.append_log(f"База сессии          : пропущена ({res['db_skipped']})")
         else:
             self.append_log(f"База сессии (.cosessiondb): обновлено {res.get('db_updated', 0)}")
-        self.status.configure(text="Готово.")
+        self.status.configure(text="● ГОТОВО", fg=META)
         self.set_running(False)
         db_line = (f"\nБаза сессии: пропущена ({res['db_skipped']})"
                    if res.get("db_skipped")
@@ -746,7 +957,7 @@ class App(tk.Tk):
 
     def fail(self, msg: str):
         self.append_log("\n=== Ошибка ===\n" + msg)
-        self.status.configure(text="Ошибка.")
+        self.status.configure(text="● ОШИБКА", fg=DANGER)
         self.set_running(False)
         messagebox.showerror("Ошибка", msg)
 
