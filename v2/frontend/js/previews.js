@@ -3615,6 +3615,11 @@ function ocRenderField() {
 
   /* Привязать drop-зоны */
   ocInitField();
+
+  /* Masonry: row-span по фактической высоте, после layout pass */
+  if (typeof ocApplyMasonryLayout === 'function') {
+    setTimeout(ocApplyMasonryLayout, 0);
+  }
 }
 
 /**
@@ -4098,12 +4103,28 @@ function acRenderField() {
  * сколько нужно под актуальную высоту.
  */
 function acApplyMasonryLayout() {
-  var gallery = document.getElementById('ac-gallery');
+  pvApplyMasonryTo(document.getElementById('ac-gallery'));
+}
+
+/**
+ * Masonry для галерей «Другого»: контейнеры + свободная зона.
+ * Вызывается после ocRenderField() и при ресайзе.
+ */
+function ocApplyMasonryLayout() {
+  var lists = document.querySelectorAll('.oc-cnt-gallery, .oc-gallery');
+  for (var i = 0; i < lists.length; i++) pvApplyMasonryTo(lists[i]);
+}
+
+/**
+ * Общий masonry-расчёт row-span для grid-галереи.
+ * @param {HTMLElement} gallery — grid-контейнер с тайлами (.ac-tile | .oc-item)
+ */
+function pvApplyMasonryTo(gallery) {
   if (!gallery) return;
   var styles = getComputedStyle(gallery);
   var rowH = parseFloat(styles.gridAutoRows) || 4;
   var gap = parseFloat(styles.rowGap || styles.gap || 6);
-  var tiles = gallery.querySelectorAll('.ac-tile');
+  var tiles = gallery.querySelectorAll('.ac-tile, .oc-item');
 
   function applyOne(tile) {
     /* Сбросим старый span чтобы offsetHeight отдал natural высоту */
@@ -4737,6 +4758,15 @@ function ocOnPageShow() {
   ocRenderField();  /* Рендерит контейнеры + свободные, затем биндит drop-зоны */
   pvRenderAll();
 }
+
+/* Masonry «Другого»: пересчёт при ресайзе окна (debounced) */
+var _ocMasonryResizeTimer = null;
+window.addEventListener('resize', function() {
+  if (_ocMasonryResizeTimer) clearTimeout(_ocMasonryResizeTimer);
+  _ocMasonryResizeTimer = setTimeout(function() {
+    if (typeof ocApplyMasonryLayout === 'function') ocApplyMasonryLayout();
+  }, 150);
+});
 
 // ══════════════════════════════════════════════
 //  Drag-to-resize preview panel

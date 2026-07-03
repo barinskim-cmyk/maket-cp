@@ -291,6 +291,32 @@ loadUserTemplates();
  * В будущем каждый этап получит trigger.check(proj) для автоперехода.
  * @type {Array<{id: string, name: string}>}
  */
+/* ── Диагностика бага «перескакивает проект» (Маша 03.07) ──
+   Каждая смена App.selectedProject пишется в консоль и в _selProjTrace
+   со стеком вызова. Попадает в «Скачать лог» (diag.js). Убрать после фикса. */
+(function () {
+  try {
+    var _selVal = App.selectedProject;
+    window._selProjTrace = [];
+    Object.defineProperty(App, 'selectedProject', {
+      get: function () { return _selVal; },
+      set: function (v) {
+        if (v !== _selVal) {
+          var rec = {
+            ts: new Date().toISOString(),
+            from: _selVal, to: v,
+            stack: (new Error().stack || '').split('\n').slice(2, 6).join(' | ')
+          };
+          window._selProjTrace.push(rec);
+          if (window._selProjTrace.length > 50) window._selProjTrace.shift();
+          console.warn('[selectedProject]', rec.from, '->', rec.to, rec.stack);
+        }
+        _selVal = v;
+      }
+    });
+  } catch (e) { /* старые браузеры — молча пропускаем */ }
+})();
+
 var PIPELINE_STAGES = [
   { id: 'preselect',    name: 'Превью (преотбор)',      beta: true },
   { id: 'selection',    name: 'Отбор команды',          beta: true },

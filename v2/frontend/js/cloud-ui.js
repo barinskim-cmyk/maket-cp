@@ -513,8 +513,24 @@ function sbLoadAllFromCloud() {
               projects[ci]._cloudClean = true;
             }
 
+            /* Стабильный порядок: как в списке облака (loaded-порядок случаен из-за
+               параллельных загрузок) + сохранить текущий выбор по _cloudId
+               (фикс «перескакивает на другой проект», Маша 03.07) */
+            var orderById = {};
+            for (var oi = 0; oi < list.length; oi++) orderById[list[oi].id] = oi;
+            projects.sort(function(a, b) {
+              return (orderById[a._cloudId] || 0) - (orderById[b._cloudId] || 0);
+            });
+            var prevSelected = (App.selectedProject >= 0 && App.projects[App.selectedProject])
+              ? App.projects[App.selectedProject]._cloudId : null;
             App.projects = projects;
-            if (projects.length > 0) App.selectedProject = 0;
+            App.selectedProject = 0;
+            if (prevSelected) {
+              for (var si = 0; si < projects.length; si++) {
+                if (projects[si]._cloudId === prevSelected) { App.selectedProject = si; break; }
+              }
+            }
+            if (projects.length === 0) App.selectedProject = -1;
             /* Облачная загрузка завершена — убрать заглушку "Загружаю..." */
             if (typeof _shCloudLoadDone !== 'undefined') _shCloudLoadDone = true;
 

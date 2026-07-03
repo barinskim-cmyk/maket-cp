@@ -1463,6 +1463,18 @@ tr:hover td { background: #fafafa; }
   <td contenteditable="true" class="my-comment"></td>
 </tr>
 
+<tr data-row="bug0703-project-jump">
+  <td><span class="s-prog">WIP</span></td>
+  <td>Баг / Проекты</td>
+  <td><strong>Иногда перескакивает на другой проект при просмотре карточек</strong></td>
+  <td></td>
+  <td>От Маши 03.07. Сделано: (1) облачная загрузка списка больше не сбрасывает выбор — сохраняем по _cloudId + стабильный порядок; (2) ловушка-диагностика: каждая смена App.selectedProject логируется со стеком (window._selProjTrace, попадает в «Скачать лог»). При повторении бага — скачать лог, стек покажет виновника точно.</td>
+  <td class="files">cloud-ui.js, state.js</td>
+  <td><span class="p-high">P0</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
 <tr data-row="pipeline-rendering-fix">
   <td><span class="s-todo">TODO</span></td>
   <td>Пайплайн</td>
