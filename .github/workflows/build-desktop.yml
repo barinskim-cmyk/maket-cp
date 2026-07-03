@@ -127,10 +127,13 @@ jobs:
         with:
           path: art
           merge-multiple: true
-      - name: Rename win exe (без пробелов для release)
+      - name: Flatten artifacts (mac-артефакт сохраняет подпапки) + rename win exe
         run: |
           ls -R art
+          # zip'ы из подпапок (dist/, rate-setter-standalone/dist/) — в корень art/
+          find art -mindepth 2 -type f \( -name "*.zip" -o -name "*.exe" \) -exec mv -f {} art/ \;
           mv "art/Content Pulse Rate Setter.exe" "art/Content-Pulse-Rate-Setter-Windows.exe"
+          ls art
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: desktop-latest
