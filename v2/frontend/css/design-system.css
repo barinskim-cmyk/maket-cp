@@ -1,0 +1,183 @@
+/* ══════════════════════════════════════════════
+   Content Pulse — дизайн-система «Тёмная плёнка»
+   Примитивы из Claude Design (handoff 3 «Экраны» + handoff 4 «Пайплайн»).
+   Токены тем живут в style.css (:root / [data-theme]).
+   Этот файл — переиспользуемые элементы: узлы, коннекторы,
+   моно-подписи, волосяные прогрессы, пульс-анимации.
+   ══════════════════════════════════════════════ */
+
+/* ── Анимации ── */
+@keyframes cp-pulse {
+  0%   { transform: scale(1); opacity: .55; }
+  70%  { transform: scale(2.4); opacity: 0; }
+  100% { opacity: 0; }
+}
+@keyframes cp-beat {
+  0%, 100% { opacity: .35; }
+  50%      { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cp-dot-ring, .cp-beat { animation: none !important; }
+}
+
+/* ── Моно-подписи ── */
+.ds-lbl {
+  font-family: var(--font-mono);
+  font-size: 11px; letter-spacing: .16em; color: var(--meta);
+}
+.ds-meta {
+  font-family: var(--font-mono);
+  font-size: 9.5px; color: var(--meta);
+}
+.ds-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Узлы (точки состояний) ── */
+.cp-dot {
+  width: 11px; height: 11px; border-radius: 50%;
+  background: var(--text); flex: none; display: inline-block;
+}
+.cp-dot.sm { width: 8px; height: 8px; }
+.cp-dot.xs { width: 7px; height: 7px; }
+.cp-dot.branch { background: var(--surface); border: 1px solid var(--field-border); }
+.cp-dot.ok     { background: var(--ok); }
+.cp-dot.warn   { background: var(--warn); }
+.cp-dot.danger { background: var(--danger); }
+.cp-dot.accent { background: var(--accent); }
+
+/* Пульсирующий узел (текущий этап / открытая ветка) */
+.cp-dot-live { position: relative; width: 11px; height: 11px; flex: none; display: inline-block; }
+.cp-dot-live.sm { width: 8px; height: 8px; }
+.cp-dot-live .cp-dot-core { position: absolute; inset: 0; border-radius: 50%; background: var(--accent); }
+.cp-dot-live .cp-dot-ring {
+  position: absolute; inset: 0; border-radius: 50%;
+  border: 1px solid var(--accent);
+  animation: cp-pulse 2s ease-out infinite;
+}
+.cp-dot-live.danger .cp-dot-core { background: var(--danger); }
+.cp-dot-live.danger .cp-dot-ring { border-color: var(--danger); }
+
+/* ── Ствол пайплайна: ряд = рельса + контент ── */
+.cp-trunk-row { display: flex; gap: 14px; align-items: stretch; }
+.cp-rail {
+  width: 14px; display: flex; flex-direction: column;
+  align-items: center; flex: none;
+}
+.cp-rail-line { flex: 1; width: 1px; background: var(--line); margin-top: 3px; }
+.cp-stage-body { flex: 1; padding-bottom: 20px; min-width: 0; }
+.cp-stage-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.cp-stage-name { font-size: 13.5px; font-weight: 500; }
+.cp-stage-name.current { font-weight: 600; color: var(--accent); }
+.cp-stage-count { font-family: var(--font-mono); font-size: 11px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.cp-stage-count.current { font-size: 10px; color: var(--accent); }
+
+/* Волосяной прогресс 2px */
+.cp-hairline { height: 2px; background: var(--line); margin-top: 8px; position: relative; }
+.cp-hairline .fill { position: absolute; left: 0; top: 0; height: 2px; background: var(--text); }
+.cp-hairline.done { background: var(--text); }
+.cp-hairline .fill.accent { background: var(--accent); }
+
+/* ── Параллельная активность (не двигает этап) ── */
+.cp-parallel {
+  display: flex; align-items: center; gap: 7px; margin-top: 8px; min-width: 0;
+}
+.cp-parallel .dash { width: 12px; height: 0; border-top: 1px dashed var(--field-border); flex: none; }
+.cp-parallel .txt {
+  font-family: var(--font-mono);
+  font-size: 9px; letter-spacing: .04em; color: var(--text-3);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* ── Развилка ── */
+.cp-fork { margin-top: 12px; border-left: 1px solid var(--line); }
+.cp-fork.current { border-left-color: var(--accent); }
+.cp-fork-lbl {
+  font-family: var(--font-mono);
+  font-size: 9px; letter-spacing: .08em; color: var(--meta);
+  padding: 2px 0 8px 12px;
+}
+.cp-branch { display: flex; align-items: flex-start; }
+.cp-branch-elbow { width: 16px; height: 12px; border-bottom: 1px solid var(--line); flex: none; }
+.cp-branch-body { flex: 1; padding: 0 0 12px 10px; margin-top: 5px; min-width: 0; }
+.cp-branch-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.cp-branch-name { display: flex; align-items: center; gap: 7px; font-size: 12.5px; min-width: 0; }
+.cp-branch-count { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.cp-branch-note { font-family: var(--font-mono); font-size: 9px; color: var(--text-3); margin-top: 4px; margin-left: 14px; }
+.cp-branch-note.ok { color: var(--ok); }
+/* Под-цепочка внутри ветки */
+.cp-subchain {
+  margin-top: 8px; margin-left: 14px;
+  border-left: 1px solid var(--line-soft, var(--line));
+  padding-left: 12px; display: flex; flex-direction: column; gap: 8px;
+}
+.cp-subchain-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.cp-subchain-name { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--text-2); }
+
+/* ── Футер сходимости ── */
+.cp-reconcile {
+  margin-top: 24px; padding-top: 14px; border-top: 1px solid var(--line);
+  display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.cp-reconcile span { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .06em; }
+.cp-reconcile .sum { color: var(--meta); }
+.cp-reconcile .hidden-note { color: var(--text-3); }
+
+/* ── Бейдж расхождения (локальное ≠ облако) ── */
+.cp-conflict-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--warn); padding: 4px 8px;
+}
+.cp-conflict-badge .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--warn); }
+.cp-conflict-badge .txt { font-family: var(--font-mono); font-size: 9px; letter-spacing: .06em; color: var(--warn); }
+
+/* ── Пустое состояние панели ── */
+.cp-empty {
+  border: 1px dashed var(--field-border);
+  padding: 28px 16px; text-align: center; margin-top: 8px;
+}
+.cp-empty .t1 { font-family: var(--font-mono); font-size: 11px; letter-spacing: .08em; color: var(--text-3); }
+.cp-empty .t2 { font-size: 12px; color: var(--text-3); margin-top: 8px; line-height: 1.5; }
+.cp-empty .act {
+  background: var(--invert-bg); color: var(--invert-fg);
+  padding: 9px; font-size: 12px; font-weight: 500; margin-top: 14px; cursor: pointer;
+}
+
+/* ── Live-пульс (встраиваемый) ── */
+.cp-live { border: 1px solid var(--line); padding: 12px 14px; }
+.cp-live-row { display: flex; align-items: center; gap: 12px; }
+.cp-live-tag { display: flex; align-items: center; gap: 7px; flex: none; }
+.cp-live-tag .txt { font-family: var(--font-mono); font-size: 10px; letter-spacing: .08em; color: var(--accent); }
+.cp-live svg { flex: 1; height: 32px; }
+.cp-live-count { font-family: var(--font-mono); font-size: 10px; color: var(--text-2); flex: none; font-variant-numeric: tabular-nums; }
+
+/* ── Кнопка-действие в панели (моно-аутлайн) ── */
+.ds-btn-mono {
+  font-family: var(--font-mono);
+  font-size: 9.5px; letter-spacing: .08em; padding: 5px 10px;
+  border: 1px solid var(--field-border); background: transparent;
+  color: var(--text-2); cursor: pointer;
+}
+.ds-btn-mono:hover { border-color: var(--text-3); color: var(--text); }
+
+/* ── Дерево событий (вертикальный вид, модалка) ── */
+.evt-tree { display: flex; flex-direction: column; }
+.evt-row { display: flex; gap: 14px; align-items: stretch; }
+.evt-rail { width: 14px; display: flex; flex-direction: column; align-items: center; flex: none; }
+.evt-rail .cp-rail-line { margin-top: 3px; }
+.evt-body { flex: 1; padding-bottom: 16px; min-width: 0; }
+.evt-title { font-size: 13px; }
+.evt-title .cnt { font-family: var(--font-mono); color: var(--text-2); }
+.evt-meta { font-family: var(--font-mono); font-size: 9px; color: var(--meta); margin-top: 3px; }
+.evt-collapsed { font-family: var(--font-mono); font-size: 11px; color: var(--text-3); }
+.evt-collapsed .exp { color: var(--accent); cursor: pointer; }
+.evt-fork-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  border-left: 1px solid var(--line);
+}
+.evt-fork-grid.current { border-left-color: var(--accent); }
+.evt-fork-grid > div:first-child { border-right: 1px solid var(--line); }
+
+/* V2-панель несёт свой моно-заголовок — крупный дублирующий скрываем */
+.pipeline-panel > .section-title { display: none; }

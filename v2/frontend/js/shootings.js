@@ -854,7 +854,392 @@ function shProjectFront(proj) {
   return (proj.previews && proj.previews.length > 0) ? counts.length : 0;
 }
 
+/* ══════════════════════════════════════════════
+   Пайплайн V2 — «Тёмная плёнка» (handoff 4, 03.07.2026)
+   Потоковая раскладка: ствол этапов + ветки-развилки, без SVG-оверлея
+   и координатной магии. Старый рендер сохранён (PIPELINE_V2 = false).
+   ══════════════════════════════════════════════ */
+var PIPELINE_V2 = true;
+
+/**
+ * Группы развилок из журнала событий: этап → [{label, count, color, note}].
+ * Пока журнал неполный (до Ф1/Ф2 спеки) — показываем что выводимо.
+ */
+function _shV2Forks(proj) {
+  var MAP = {
+    'selection_approved': { stage: 'client',     color: 'ok',     label: 'Согласовано' },
+    'client_approved':    { stage: 'client',     color: 'ok',     label: 'Согласовано' },
+    'selection_returned': { stage: 'client',     color: 'warn',   label: 'Возвращено' },
+    'cc_returned':        { stage: 'client',     color: 'warn',   label: 'Возвращено' },
+    'retouch_approved':   { stage: 'retouch_ok', color: 'ok',     label: 'Ретушь согласована' },
+    'retouch_returned':   { stage: 'retouch_ok', color: 'danger', label: 'На доработку' }
+  };
+  var stageIdx = {};
+  for (var s = 0; s < PIPELINE_STAGES.length; s++) stageIdx[PIPELINE_STAGES[s].id] = s;
+  var forks = {};
+  var evs = proj._events || [];
+  for (var i = 0; i < evs.length; i++) {
+    var t = evs[i].type || evs[i].trigger || '';
+    var m = MAP[t];
+    if (!m) continue;
+    var n = (evs[i].photos || []).length;
+    if (!n) continue;
+    var idx = stageIdx[m.stage];
+    if (!forks[idx]) forks[idx] = {};
+    /* последнее событие каждого вида побеждает */
+    forks[idx][m.color] = {
+      label: m.label, count: n, color: m.color,
+      note: (evs[i].meta && (evs[i].meta.comment || evs[i].meta.note)) || evs[i].note || ''
+    };
+  }
+  return forks;
+}
+
+function renderPipelineV2() {
+  var container = document.getElementById('pipeline-container');
+  if (!container) return;
+  if (App.selectedProject < 0 || App.selectedProject >= App.projects.length) {
+    container.innerHTML = '<div class="empty-state">Выберите съёмку</div>';
+    return;
+  }
+  var proj = App.projects[App.selectedProject];
+  shEnsurePhotoStages(proj);
+  var photoCounts = shPhotosPerStage(proj);
+  var totalPhotos = proj.previews ? proj.previews.length : 0;
+  var metrics = shCumulativeMetrics(proj, photoCounts);
+  var stage = proj._stage || 0;
+
+  var html = '';
+  /* Заголовок панели */
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;gap:8px;flex-wrap:wrap">';
+  html += '<span class="ds-lbl">ПАЙПЛАЙН' + (proj.brand ? ' · ' + esc(String(proj.brand).toUpperCase()) : '') + '</span>';
+  html += '<span style="display:flex;gap:8px;align-items:center">';
+  if (proj._cloudId) {
+    html += '<span id="pipeline-sync-status" class="ds-meta">облако</span>';
+    html += '<button class="ds-btn-mono" onclick="shOpenProjectMembersModal()">УЧАСТНИКИ</button>';
+  }
+  html += '<button class="ds-btn-mono" onclick="shOpenEventTree()">ДЕРЕВО СОБЫТИЙ ↗</button>';
+  html += '</span></div>';
+
+  /* 4A · Пустой проект */
+  if (totalPhotos === 0) {
+    html += '<div class="cp-empty">';
+    html += '<div class="t1">ФОТО ЕЩЁ НЕТ</div>';
+    html += '<div class="t2">Этапы появятся, когда пойдут события. Начните съёмку или загрузите готовое.</div>';
+    html += '<div class="act" onclick="showPage(\'shoot\')">Начать съёмку</div>';
+    html += '</div>';
+    container.innerHTML = html;
+    return;
+  }
+
+  /* Состояния этапов — правила V1 */
+  var stageStates = [];
+  for (var i = 0; i < PIPELINE_STAGES.length; i++) {
+    var cnt = photoCounts[i];
+    var cls = '';
+    var hasAfter = false;
+    for (var j = i + 1; j < PIPELINE_STAGES.length; j++) {
+      if (photoCounts[j] > 0) { hasAfter = true; break; }
+    }
+    if (cnt === 0 && hasAfter) cls = 'done';
+    else if (cnt > 0) cls = 'active';
+    if (totalPhotos === 0) {
+      if (i < stage) cls = 'done';
+      else if (i === stage) cls = 'active';
+    }
+    stageStates.push({ cls: cls, cnt: cnt, cum: metrics.cumulative[i] });
+  }
+  var visible = [];
+  var lastActive = -1;
+  for (var vi = 0; vi < stageStates.length; vi++) {
+    if (stageStates[vi].cls) visible.push(vi);
+    if (stageStates[vi].cls === 'active') lastActive = vi;
+  }
+  var lastVis = visible.length ? visible[visible.length - 1] : -1;
+
+  /* Параллельные активности (комменты, переименование) — компактная деривация V1 */
+  var cmtCount = 0, annotCount = 0;
+  if (proj.cards) {
+    for (var ci = 0; ci < proj.cards.length; ci++) {
+      if (proj.cards[ci]._comments) cmtCount += proj.cards[ci]._comments.length;
+    }
+  }
+  if (proj._annotations) {
+    for (var ak in proj._annotations) {
+      if (proj._annotations.hasOwnProperty(ak)) annotCount += proj._annotations[ak].length;
+    }
+  }
+  var cmtStage = -1;
+  if (proj._commentingStarted && (cmtCount > 0 || annotCount > 0)) {
+    cmtStage = (typeof proj._commentingStartedStageIdx === 'number')
+      ? proj._commentingStartedStageIdx : stage;
+  }
+  var renTotal = proj.articles ? proj.articles.length : 0;
+  var renVerified = 0;
+  if (proj.articles) {
+    for (var ari = 0; ari < proj.articles.length; ari++) {
+      if (proj.articles[ari].status === 'verified') renVerified++;
+    }
+  }
+  var renStage = -1;
+  if (renVerified > 0) {
+    renStage = stage;
+    if (proj._renameLog && proj._renameLog.length > 0 && proj._stageDates) {
+      var firstRenTs = new Date(proj._renameLog[0].renamed_at).getTime();
+      for (var sdi = PIPELINE_STAGES.length - 1; sdi >= 0; sdi--) {
+        var sdE = proj._stageDates[sdi];
+        if (sdE && sdE.firstEnter && new Date(sdE.firstEnter).getTime() <= firstRenTs) {
+          renStage = sdi; break;
+        }
+      }
+    }
+  }
+
+  var forks = _shV2Forks(proj);
+  /* Развилка на скрытом этапе — перевесить на ближайший видимый выше/последний */
+  for (var fkIdx in forks) {
+    if (!forks.hasOwnProperty(fkIdx)) continue;
+    var fi = parseInt(fkIdx, 10);
+    if (stageStates[fi] && stageStates[fi].cls) continue;
+    var target = -1;
+    for (var bk = fi - 1; bk >= 0; bk--) {
+      if (stageStates[bk] && stageStates[bk].cls) { target = bk; break; }
+    }
+    if (target < 0) target = lastVis;
+    if (target >= 0 && target !== fi) {
+      if (!forks[target]) forks[target] = {};
+      for (var col in forks[fkIdx]) {
+        if (forks[fkIdx].hasOwnProperty(col) && !forks[target][col]) forks[target][col] = forks[fkIdx][col];
+      }
+      delete forks[fkIdx];
+    }
+  }
+
+  /* ── Ствол ── */
+  for (var i2 = 0; i2 < PIPELINE_STAGES.length; i2++) {
+    var s2 = PIPELINE_STAGES[i2];
+    var ss = stageStates[i2];
+    if (!ss.cls) continue; /* пустые этапы не существуют на экране */
+
+    var isActive = (ss.cls === 'active');
+    var isCurrent = (i2 === lastActive); /* акцент — только последний активный */
+    var isLastRow = (i2 === lastVis);
+    var clickable = (ss.cls === 'done' && proj._cloudId);
+
+    html += '<div class="cp-trunk-row">';
+    /* рельса */
+    html += '<div class="cp-rail">';
+    if (isCurrent) {
+      html += '<span class="cp-dot-live"><span class="cp-dot-ring"></span><span class="cp-dot-core"></span></span>';
+    } else {
+      html += '<span class="cp-dot"' + (isActive ? ' style="background:var(--text-2)"' : '') + '></span>';
+    }
+    if (!isLastRow) html += '<span class="cp-rail-line"></span>';
+    html += '</div>';
+
+    /* контент этапа */
+    html += '<div class="cp-stage-body"' + (isLastRow ? ' style="padding-bottom:0"' : '') + '>';
+    html += '<div class="cp-stage-head">';
+    html += '<span class="cp-stage-name' + (isCurrent ? ' current' : '') + '"' +
+      (clickable ? ' style="cursor:pointer" onclick="shLoadStageSnapshot(\'' + s2.id + '\')" title="Состояние на этом этапе"' : '') +
+      '>' + esc(s2.name) + '</span>';
+
+    /* Счётчик N/M — правила V1 */
+    var num = ss.cum, denom = 0;
+    if (i2 === 0) denom = metrics.potential;
+    else if (i2 === metrics.teamStageIndex) denom = metrics.passedPreselect || metrics.potential;
+    else if (i2 === metrics.clientStageIndex) {
+      denom = metrics.passedTeam || metrics.passedPreselect || metrics.potential;
+      if (ss.cls === 'done' && metrics.clientStageDone && metrics.selectedCount > 0) num = metrics.selectedCount;
+    } else {
+      denom = metrics.clientStageDone
+        ? (metrics.scale || metrics.passedPreselect || metrics.potential)
+        : (metrics.passedPreselect || metrics.potential);
+    }
+    if (ss.cls === 'done' && denom > 0) {
+      html += '<span class="cp-stage-count">' + num + ' / ' + denom + '</span>';
+    } else if (isActive) {
+      var displayCnt = ss.cnt;
+      if (i2 > metrics.clientStageIndex && metrics.clientStageDone &&
+          metrics.scale > 0 && ss.cnt > metrics.scale) displayCnt = metrics.scale;
+      if (isCurrent) {
+        html += '<span class="cp-stage-count current">● ТЕКУЩИЙ · ' + displayCnt + ' на этапе</span>';
+      } else {
+        html += '<span class="cp-stage-count">' + displayCnt + ' на этапе</span>';
+      }
+    }
+    html += '</div>';
+
+    /* Волосяной прогресс */
+    if (ss.cls === 'done') {
+      html += '<div class="cp-hairline done"></div>';
+    } else {
+      var pct = denom > 0 ? Math.min(100, Math.round((ss.cnt / denom) * 100)) : 0;
+      html += '<div class="cp-hairline"><span class="fill' + (isCurrent ? ' accent' : '') + '" style="width:' + pct + '%"></span></div>';
+    }
+
+    /* Мета: даты как в V1 */
+    var metaNote = '';
+    var sd2 = proj._stageDates && proj._stageDates[i2];
+    if (ss.cls === 'done') {
+      if (sd2 && sd2.firstEnter) {
+        var dE = new Date(sd2.firstEnter).toLocaleDateString('ru-RU');
+        var dL = sd2.lastLeave ? new Date(sd2.lastLeave).toLocaleDateString('ru-RU') : '';
+        metaNote = (dL && dL !== dE) ? dE + ' — ' + dL : dE;
+      } else if (proj._stageHistory && proj._stageHistory[i2]) {
+        metaNote = proj._stageHistory[i2];
+      }
+    } else if (sd2 && sd2.firstEnter) {
+      metaNote = 'с ' + new Date(sd2.firstEnter).toLocaleDateString('ru-RU');
+    }
+    if (metaNote) html += '<div class="ds-meta" style="margin-top:6px">' + esc(metaNote) + '</div>';
+
+    /* Параллельные активности */
+    if (i2 === cmtStage) {
+      var cmtParts = [];
+      if (cmtCount > 0) cmtParts.push(cmtCount + ' комм.');
+      if (annotCount > 0) cmtParts.push(annotCount + ' аннот.');
+      html += '<div class="cp-parallel"><span class="dash"></span><span class="txt">КОММЕНТИРОВАНИЕ · ' +
+        esc(cmtParts.join(', ')) + ' · не двигает этап</span></div>';
+    }
+    if (i2 === renStage) {
+      html += '<div class="cp-parallel"><span class="dash"></span><span class="txt">ПАРАЛЛЕЛЬНО · Переименование · ' +
+        renVerified + '/' + renTotal + ' артикулов</span></div>';
+    }
+
+    /* Развилка из журнала */
+    var fk = forks[i2];
+    if (fk && (fk.ok || fk.warn || fk.danger)) {
+      var groups = [];
+      if (fk.ok) groups.push(fk.ok);
+      if (fk.warn) groups.push(fk.warn);
+      if (fk.danger) groups.push(fk.danger);
+      var sum = 0;
+      for (var g = 0; g < groups.length; g++) sum += groups[g].count;
+      if (groups.length > 1) {
+        var parts = [];
+        for (var g2 = 0; g2 < groups.length; g2++) parts.push(groups[g2].count);
+        html += '<div class="cp-fork' + (isCurrent ? ' current' : '') + '">';
+        html += '<div class="cp-fork-lbl">РАЗВИЛКА · ' + sum + ' = ' + parts.join(' + ') + '</div>';
+        for (var g3 = 0; g3 < groups.length; g3++) {
+          var gr = groups[g3];
+          html += '<div class="cp-branch"><span class="cp-branch-elbow"></span><div class="cp-branch-body">';
+          html += '<div class="cp-branch-head"><span class="cp-branch-name">';
+          if (gr.color === 'danger') {
+            html += '<span class="cp-dot-live sm danger"><span class="cp-dot-ring"></span><span class="cp-dot-core"></span></span>';
+          } else {
+            html += '<span class="cp-dot sm ' + gr.color + '"></span>';
+          }
+          html += '<span>' + esc(gr.label) + '</span></span>';
+          html += '<span class="cp-branch-count">' + gr.count + '</span></div>';
+          if (gr.note) html += '<div class="cp-branch-note">' + esc('«' + gr.note + '»') + '</div>';
+          if (gr.color === 'ok' && !isCurrent) html += '<div class="cp-branch-note ok">↳ вернулось в ствол</div>';
+          html += '</div></div>';
+        }
+        html += '</div>';
+      } else if (isCurrent && groups.length === 1) {
+        var gOne = groups[0];
+        html += '<div style="display:flex;gap:16px;margin-top:10px">';
+        html += '<span style="display:flex;align-items:center;gap:7px"><span class="cp-dot xs ' + gOne.color + '"></span>' +
+          '<span class="ds-meta" style="font-size:10.5px;color:var(--text-2)">' + gOne.count + ' · ' + esc(gOne.label.toLowerCase()) + '</span></span>';
+        html += '</div>';
+      }
+    }
+
+    /* Действия на активном этапе (стиль ds-btn-mono) */
+    if (isActive) {
+      html += '<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">';
+      html += '<button class="ds-btn-mono" onclick="shShowJumpMenu(' + i2 + ', this)">Завершить этап</button>';
+      if (s2.id === 'selection') html += '<button class="ds-btn-mono" onclick="shSendClientLink()">Ссылка на преотбор</button>';
+      if (s2.id === 'color') html += '<button class="ds-btn-mono" onclick="pvOnLoadVersionSelect({value:\'color\'})">Загрузить ЦК</button>';
+      if (s2.id === 'retouch') html += '<button class="ds-btn-mono" onclick="pvOnLoadVersionSelect({value:\'retouch\'})">Загрузить ретушь</button>';
+      if (s2.id === 'retouch_ok' || s2.id === 'adaptation' || s2.id === 'retouch') {
+        html += '<button class="ds-btn-mono" style="border-color:var(--ok);color:var(--ok)" onclick="shDeliverProject()">Сдано клиенту</button>';
+      }
+      html += '</div>';
+    }
+
+    html += '</div></div>'; /* /body /row */
+  }
+
+  /* ── Футер сходимости ── */
+  var sumAll = 0;
+  for (var sc = 0; sc < photoCounts.length; sc++) sumAll += photoCounts[sc];
+  var hiddenCount = PIPELINE_STAGES.length - visible.length;
+  html += '<div class="cp-reconcile">';
+  html += '<span class="sum">СХОДИМОСТЬ · ' + sumAll + ' = ' + totalPhotos + (sumAll === totalPhotos ? ' ✓' : ' ✕') + '</span>';
+  if (hiddenCount > 0) html += '<span class="hidden-note">' + hiddenCount + ' пустых этапов не показано</span>';
+  html += '</div>';
+
+  container.innerHTML = html;
+}
+
+/**
+ * Дерево событий (модалка): вертикальный хронологический вид журнала,
+ * рутинные цепочки (кадры, рейтинги) свёрнуты.
+ */
+function shOpenEventTree() {
+  var proj = getActiveProject();
+  var body = document.getElementById('event-tree-body');
+  if (!proj || !body) return;
+  var evs = (proj._events || []).slice();
+  var html = '';
+  if (evs.length === 0) {
+    html = '<div class="cp-empty"><div class="t1">СОБЫТИЙ ЕЩЁ НЕТ</div>' +
+      '<div class="t2">Журнал наполнится по мере работы: загрузка превью, отбор, согласование.</div></div>';
+  } else {
+    html += '<div class="evt-tree">';
+    var i = 0;
+    var ROUTINE = { 'frame_captured': 1, 'rating_set': 1, 'selection_added': 1, 'selection_removed': 1 };
+    while (i < evs.length) {
+      var ev = evs[i];
+      var t = ev.type || ev.trigger || '';
+      /* Свёртка рутинных серий одного типа */
+      var runEnd = i;
+      while (runEnd + 1 < evs.length && (evs[runEnd + 1].type || evs[runEnd + 1].trigger) === t && ROUTINE[t]) runEnd++;
+      var isLast = (runEnd === evs.length - 1);
+      html += '<div class="evt-row"><div class="evt-rail">';
+      html += '<span class="cp-dot xs' + (isLast ? ' accent' : '') + '"></span>';
+      if (!isLast) html += '<span class="cp-rail-line"></span>';
+      html += '</div><div class="evt-body">';
+      var evName = _shCpEventName(ev);
+      /* Дозаполняем подписи типов, которых нет в базовой карте */
+      var EXTRA = {
+        'selection_formed': 'Отбор сформирован',
+        'selection_returned': 'Возвращено клиентом',
+        'preselect_passed': 'Преотбор пройден',
+        'session_attached': 'Сессия привязана',
+        'frame_captured': 'Кадр',
+        'rating_set': 'Рейтинг'
+      };
+      if (EXTRA[t] && (evName === t || !evName)) evName = EXTRA[t];
+      if (runEnd > i) {
+        html += '<div class="evt-collapsed">' + esc(evName) + ' · серия из ' + (runEnd - i + 1) + ' событий</div>';
+      } else {
+        var cnt2 = (ev.photos || []).length;
+        html += '<div class="evt-title">' + esc(evName) +
+          (cnt2 ? ' · <span class="cnt">' + cnt2 + '</span>' : '') + '</div>';
+      }
+      var metaBits = [];
+      if (ev.actor && ev.actor.name) metaBits.push(ev.actor.name);
+      var ts = ev.ts || ev.date || ev.created_at;
+      if (ts) {
+        try { metaBits.push(new Date(ts).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })); } catch (e) {}
+      }
+      var noteTxt = (ev.meta && (ev.meta.comment || ev.meta.note)) || ev.note;
+      if (noteTxt) metaBits.push('«' + noteTxt + '»');
+      if (metaBits.length) html += '<div class="evt-meta">' + esc(metaBits.join(' · ')) + '</div>';
+      html += '</div></div>';
+      i = runEnd + 1;
+    }
+    html += '</div>';
+  }
+  body.innerHTML = html;
+  openModal('modal-event-tree');
+}
+
 function renderPipeline() {
+  if (typeof PIPELINE_V2 !== 'undefined' && PIPELINE_V2) { renderPipelineV2(); return; }
   var container = document.getElementById('pipeline-container');
   if (App.selectedProject < 0 || App.selectedProject >= App.projects.length) {
     container.innerHTML = '<div class="empty-state">Выберите съёмку</div>';
@@ -1037,7 +1422,7 @@ function renderPipeline() {
 
     var clickable = (cls === 'done' && proj._cloudId);
 
-    html += '<div class="pipeline-step ' + cls + (clickable ? ' step-clickable' : '') + '"' +
+    html += '<div class="pipeline-step ' + cls + (clickable ? ' step-clickable' : '') + '" data-stage-idx="' + i + '"' +
       (clickable ? ' onclick="shLoadStageSnapshot(\'' + s.id + '\')" title="Посмотреть состояние на этом этапе"' : '') + '>';
     html += '<div class="step-dot">' + (cls === 'done' ? '&#10003;' : (i + 1)) + '</div>';
     html += '<div class="step-info">';
@@ -1232,28 +1617,36 @@ function _shLayoutSideBranches(container) {
   var rootW = rootRect.width || 320;
   var rootH = rootRect.height || 0;
 
-  /* Map stageIdx -> y центра step-dot (относительно stepsRoot). */
+  /* Map stageIdx -> y центра step-dot (относительно stepsRoot). Stage idx у нас
+     НЕ совпадает с порядком в DOM, потому что неактивные стадии скипаются.
+     Раньше сопоставление шло через текст dot'а (cls === 'done' → '✓', иначе
+     номер) — но ВСЕ done-стадии показывают одинаковый '✓', так что при 2+
+     done-стадиях они схлопывались в одну запись и side-branch, привязанная
+     к любой done-стадии кроме последней, рисовалась в неверном месте (баг
+     из аудита 03.07 — "проблема с отрисовкой пайплайна"). Вместо label
+     читаем явный data-stage-idx, который проставляется при рендере. */
   var stepRows = stepsRoot.querySelectorAll('.pipeline-step');
-  /* Каждый step-dot — первый ребёнок step-row. Stage idx у нас НЕ совпадает
-     с порядком в DOM, потому что неактивные стадии скипаются. Поэтому
-     сопоставим через текст dot'а: cls === 'done' → '✓', иначе — (i+1). */
-  var dotYByLabel = {};
+  var dotYByIdx = {};
   for (var ri = 0; ri < stepRows.length; ri++) {
+    var idxAttr = stepRows[ri].getAttribute('data-stage-idx');
+    if (idxAttr === null) continue;
     var dot = stepRows[ri].querySelector('.step-dot');
     if (!dot) continue;
-    var label = (dot.textContent || '').trim();
     var dotRect = dot.getBoundingClientRect();
     var cy = dotRect.top - rootRect.top + dotRect.height / 2;
-    dotYByLabel[label] = { y: cy, row: stepRows[ri] };
+    dotYByIdx[parseInt(idxAttr, 10)] = cy;
   }
   function _yForStageIdx(stageIdx) {
-    var lbl = '' + (stageIdx + 1);
-    if (dotYByLabel[lbl]) return dotYByLabel[lbl].y;
-    if (dotYByLabel['✓']) return dotYByLabel['✓'].y; /* fallback */
-    /* fallback: если этап скипнут (нет в DOM) — используем последний доступный */
-    var keys = Object.keys(dotYByLabel);
-    if (keys.length > 0) return dotYByLabel[keys[keys.length - 1]].y;
-    return 0;
+    if (dotYByIdx.hasOwnProperty(stageIdx)) return dotYByIdx[stageIdx];
+    /* Стадия не отрендерена (скипнута как future) — берём ближайшую
+       отрендеренную стадию с индексом <= stageIdx, иначе первую доступную. */
+    var keys = Object.keys(dotYByIdx).map(Number).sort(function(a, b) { return a - b; });
+    if (keys.length === 0) return 0;
+    var best = keys[0];
+    for (var ki = 0; ki < keys.length; ki++) {
+      if (keys[ki] <= stageIdx) best = keys[ki]; else break;
+    }
+    return dotYByIdx[best];
   }
 
   /* Spine x (col container_padding + step-dot half = 13px от стейта pipeline-steps).
@@ -1288,7 +1681,7 @@ function _shLayoutSideBranches(container) {
       /* Открытая ветка — пунктир вниз до текущего низа последнего active step,
          либо +60px от topY если ниже нет. */
       var lastY = topY + 70;
-      var allYs = Object.keys(dotYByLabel).map(function(k){ return dotYByLabel[k].y; });
+      var allYs = Object.keys(dotYByIdx).map(function(k){ return dotYByIdx[k]; });
       var maxY = allYs.length ? Math.max.apply(null, allYs) : topY;
       lastY = Math.max(lastY, maxY - 8);
       bottomY = lastY;

@@ -26,7 +26,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=37">
+<link rel="stylesheet" href="css/style.css?v=38">
+<link rel="stylesheet" href="css/design-system.css?v=1">
 </head>
 <body>
 
@@ -516,6 +517,17 @@
 </div>
 
 <!-- ══════════════ Модалка: новая съёмка ══════════════ -->
+<!-- Дерево событий пайплайна (V2, handoff 4) -->
+<div class="modal-overlay" id="modal-event-tree">
+  <div class="modal" style="width:520px;max-height:80vh;display:flex;flex-direction:column">
+    <h3 style="font-weight:300">Дерево событий</h3>
+    <div id="event-tree-body" style="overflow-y:auto;margin-top:14px;flex:1"></div>
+    <div class="modal-buttons" style="margin-top:14px">
+      <button class="btn" onclick="closeModal('modal-event-tree')">Закрыть</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-new-project">
   <div class="modal">
     <h3>Новая съёмка</h3>

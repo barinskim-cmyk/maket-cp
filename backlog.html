@@ -1488,12 +1488,12 @@ tr:hover td { background: #fafafa; }
 </tr>
 
 <tr data-row="pipeline-rendering-fix">
-  <td><span class="s-todo">TODO</span></td>
+  <td><span class="s-done">DONE</span></td>
   <td>Пайплайн</td>
   <td><strong>Проблема с отрисовкой пайплайна: аудит + варианты решения</strong></td>
-  <td></td>
-  <td>От Маши 03.07: «большая проблема с отрисовкой пайплайна — посмотреть что есть сейчас и предложить варианты решения». Приоритет сразу после фундамента редизайна.</td>
-  <td class="files">shootings.js, style.css</td>
+  <td>047961f</td>
+  <td>От Маши 03.07: «большая проблема с отрисовкой пайплайна — посмотреть что есть сейчас и предложить варианты решения». Найден корневой баг: renderPipeline() рисует ОДИНАКОВЫЙ значок ✓ для всех «done»-этапов; _shLayoutSideBranches() сопоставлял side-branch с этапом по тексту dot'а, поэтому при 2+ done-этапах все схлопывались в одну запись, и ветка (комментирование/переименование), привязанная к любому done-этапу кроме последнего, рисовалась не на своей Y-координате. Фикс: пометил каждый .pipeline-step через data-stage-idx и переписал lookup на explicit-индекс. Проверено jsdom-тестом на реальном коде (старая версия vs новая — расхождение в позиции ветки подтверждено). Другие открытые вопросы по пайплайну (ux-pipeline-width — фикс. 380px, ux-onboarding-hints) остаются отдельными P2/P3 задачами.</td>
+  <td class="files">shootings.js</td>
   <td><span class="p-high">P0</span></td>
   <td class="t-cell"><span class="t-none">--</span></td>
   <td contenteditable="true" class="my-comment"></td>
