@@ -26,8 +26,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=38">
-<link rel="stylesheet" href="css/design-system.css?v=1">
+<link rel="stylesheet" href="css/style.css?v=39">
+<link rel="stylesheet" href="css/design-system.css?v=2">
 </head>
 <body>
 
@@ -519,9 +519,8 @@
 <!-- ══════════════ Модалка: новая съёмка ══════════════ -->
 <!-- Дерево событий пайплайна (V2, handoff 4) -->
 <div class="modal-overlay" id="modal-event-tree">
-  <div class="modal" style="width:520px;max-height:80vh;display:flex;flex-direction:column">
-    <h3 style="font-weight:300">Дерево событий</h3>
-    <div id="event-tree-body" style="overflow-y:auto;margin-top:14px;flex:1"></div>
+  <div class="modal" style="width:min(1500px,96vw);max-height:92vh;display:flex;flex-direction:column;padding:28px 32px">
+    <div id="event-tree-body" style="overflow:auto;flex:1"></div>
     <div class="modal-buttons" style="margin-top:14px">
       <button class="btn" onclick="closeModal('modal-event-tree')">Закрыть</button>
     </div>
@@ -785,10 +784,10 @@
 
 <!-- diag.js должен быть ПЕРВЫМ — иначе ранние console не попадут в буфер -->
 <script src="js/diag.js"></script>
-<script src="js/state.js"></script>
+<script src="js/state.js?v=2"></script>
 <script src="js/events.js?v=23"></script>
 <script src="js/nav.js"></script>
-<script src="js/shootings.js?v=26"></script>
+<script src="js/shootings.js?v=27"></script>
 <script src="js/lib/justified-layout.min.js?v=1"></script>
 <script src="js/layout.js?v=2"></script>
 <script src="js/cards.js?v=11"></script>

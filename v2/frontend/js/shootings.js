@@ -579,15 +579,41 @@ function renderProjects() {
     var sel = entry.originalIndex === App.selectedProject ? ' selected' : '';
     var isDeleted = !!p._deletedAt;
     var cardsCount = p.cards ? p.cards.length : 0;
+    /* Статус проекта: текущий этап (акцент) или «СДАНО» (ok) — как в handoff 4 */
+    var stIdx = shProjectFront(p);
+    var stDelivered = (stIdx >= PIPELINE_STAGES.length) || p._delivered;
+    var stLbl = stDelivered ? 'СДАНО' :
+      (PIPELINE_STAGES[stIdx] ? PIPELINE_STAGES[stIdx].name.toUpperCase() : '');
+    var photosCount = p.previews ? p.previews.length : 0;
+    var dateLbl = '';
+    var dSrc = p.date || p._createdAt || (p._stageDates && p._stageDates[0] && p._stageDates[0].firstEnter);
+    if (dSrc) {
+      try {
+        dateLbl = new Date(dSrc).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })
+          .replace(/\./g, '').toUpperCase().replace(/\s*Г$/, '');
+      } catch (e) {}
+    }
+    var metaBits = [];
+    if (dateLbl) metaBits.push(dateLbl);
+    metaBits.push(cardsCount + ' ' + plural(cardsCount, 'КАРТОЧКА', 'КАРТОЧКИ', 'КАРТОЧЕК'));
+    if (photosCount > 0) metaBits.push(photosCount + ' ФОТО');
+
     html += '<div class="project-item' + sel + (isDeleted ? ' project-deleted' : '') + '" onclick="selectProject(' + entry.originalIndex + ')">';
-    html += '<span class="project-brand">' + esc(shProjectDisplayName(p)) + '</span>';
-    if (p._shared) html += '<span class="project-shared-tag">общий</span>';
-    html += '<span class="project-stats">' + cardsCount + ' карт.</span>';
+    html += '<div class="pi-top">';
+    html += '<span class="pi-name">' + esc(shProjectDisplayName(p)) +
+      (p._shared ? ' <span class="project-shared-tag">общий</span>' : '') + '</span>';
+    html += '<span style="display:inline-flex;align-items:center">';
+    if (stLbl) {
+      html += '<span class="pi-status"><span class="dot' + (stDelivered ? ' ok' : '') + '"></span><span class="lbl">' + esc(stLbl) + '</span></span>';
+    }
+    html += '<span class="pi-actions">';
     if (isDeleted) {
       html += '<button class="btn btn-sm project-restore-btn" onclick="event.stopPropagation(); shRestoreProject(' + entry.originalIndex + ')" title="Восстановить">Восстановить</button>';
     } else {
       html += '<button class="btn btn-sm project-delete-btn" onclick="event.stopPropagation(); shDeleteProject(' + entry.originalIndex + ')" title="Скрыть проект">X</button>';
     }
+    html += '</span></span></div>';
+    html += '<div class="pi-meta">' + esc(metaBits.join(' · ')) + '</div>';
     html += '</div>';
   }
   list.innerHTML = html;
@@ -1178,10 +1204,319 @@ function renderPipelineV2() {
  * Дерево событий (модалка): вертикальный хронологический вид журнала,
  * рутинные цепочки (кадры, рейтинги) свёрнуты.
  */
+/* ══════════════════════════════════════════════
+   Дерево событий — развёрнутый вид (handoff 4, экран 02):
+   горизонтальный поток фото слева направо. Время — по оси X,
+   толщина потока ∝ числу фото, развилки вверх (ok) / вниз
+   (warn/danger), слияния возвращают ветку в ствол.
+   Второй вид — «СПИСОК»: вертикальный журнал (рутина свёрнута).
+   ══════════════════════════════════════════════ */
+
+/** Формат даты для осей/меток: «12 АПР». */
+function _shTreeDate(ts) {
+  if (!ts) return '';
+  try {
+    return new Date(ts).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
+      .replace(/\./g, '').toUpperCase();
+  } catch (e) { return ''; }
+}
+
+/**
+ * Построить SVG-поток по журналу и состоянию проекта.
+ * Раскладка колонками: этап ствола = колонка; закрытая развилка добавляет
+ * колонки ветвей и слияния; открытая — хвосты веток справа.
+ * @param {Object} proj
+ * @returns {string} html (легенда + svg)
+ */
+function _shTreeStreamSVG(proj) {
+  var photoCounts = shPhotosPerStage(proj);
+  var totalPhotos = proj.previews ? proj.previews.length : 0;
+  var metrics = shCumulativeMetrics(proj, photoCounts);
+
+  /* Состояния этапов — та же логика, что в панели V2 */
+  var states = [];
+  var lastActive = -1;
+  for (var i = 0; i < PIPELINE_STAGES.length; i++) {
+    var cnt = photoCounts[i], cls = '';
+    var hasAfter = false;
+    for (var j = i + 1; j < PIPELINE_STAGES.length; j++) if (photoCounts[j] > 0) { hasAfter = true; break; }
+    if (cnt === 0 && hasAfter) cls = 'done';
+    else if (cnt > 0) cls = 'active';
+    states.push(cls);
+    if (cls === 'active') lastActive = i;
+  }
+
+  var forks = _shV2Forks(proj);
+  /* Развилку со скрытого этапа перевесить на ближайший видимый (как в панели) */
+  var lastVis = -1;
+  for (var v = 0; v < states.length; v++) if (states[v]) lastVis = v;
+  for (var fkIdx in forks) {
+    if (!forks.hasOwnProperty(fkIdx)) continue;
+    var fi = parseInt(fkIdx, 10);
+    if (states[fi]) continue;
+    var target = -1;
+    for (var bk = fi - 1; bk >= 0; bk--) if (states[bk]) { target = bk; break; }
+    if (target < 0) target = lastVis;
+    if (target >= 0 && target !== fi) {
+      if (!forks[target]) forks[target] = {};
+      for (var col in forks[fkIdx]) if (forks[fkIdx].hasOwnProperty(col) && !forks[target][col]) forks[target][col] = forks[fkIdx][col];
+      delete forks[fkIdx];
+    }
+  }
+
+  /* ── Геометрия ── */
+  var TY = 210, UP = 118, DOWN = 300;         /* оси: ствол / верхняя ветка / нижняя */
+  var STEP = 175;                              /* шаг между узлами ствола */
+  var X0 = 70;
+  var scaleW = function (n) {
+    if (!totalPhotos) return 3;
+    return Math.max(3, Math.min(36, 36 * n / totalPhotos));
+  };
+
+  /* Числа узлов ствола: cumulative (как num в панели) */
+  var nodeCount = function (idx) {
+    var c = metrics.cumulative[idx];
+    if (states[idx] === 'active') c = photoCounts[idx];
+    return c || 0;
+  };
+
+  /* Колонки */
+  var cols = [];
+  for (var st = 0; st < PIPELINE_STAGES.length; st++) {
+    if (!states[st]) continue;
+    cols.push({ type: 'stage', idx: st });
+    var fk = forks[st];
+    var isOpenFork = (st === lastActive);
+    if (fk && (fk.ok || fk.warn || fk.danger) && !isOpenFork && (fk.ok && (fk.warn || fk.danger))) {
+      cols.push({ type: 'branch', idx: st, fork: fk });
+      cols.push({ type: 'merge', idx: st, fork: fk });
+    }
+  }
+  var openFork = null;
+  if (lastActive >= 0 && forks[lastActive] &&
+      (forks[lastActive].ok || forks[lastActive].warn || forks[lastActive].danger)) {
+    openFork = forks[lastActive];
+  }
+
+  /* X-координаты колонок */
+  var x = X0;
+  for (var c2 = 0; c2 < cols.length; c2++) {
+    cols[c2].x = x;
+    x += (cols[c2].type === 'branch') ? STEP + 40 : STEP;
+  }
+  var lastX = cols.length ? cols[cols.length - 1].x : X0;
+  var W = lastX + (openFork ? 240 : 150);
+  if (W < 900) W = 900;
+  var H = 400;
+
+  var axis = '', streams = '', nodes = '';
+
+  /* ── Потоки ствола: сегменты между соседними колонками ──
+     stage→stage / merge→stage — полный сегмент;
+     stage→branch — «пенёк» до точки развилки (дальше рисуют ветки). */
+  var stageCols = [];
+  for (var sc = 0; sc < cols.length; sc++) if (cols[sc].type === 'stage') stageCols.push(cols[sc]);
+  for (var t = 0; t < cols.length - 1; t++) {
+    var colA = cols[t];
+    var next = cols[t + 1];
+    if (colA.type === 'branch') continue; /* между branch и merge рисуют ветки */
+    var flow;
+    if (next.type === 'stage') flow = nodeCount(next.idx);
+    else if (next.type === 'branch') flow = nodeCount(colA.idx);
+    else flow = nodeCount(colA.idx);
+    if (colA.type === 'merge') {
+      var mfk = colA.fork;
+      flow = (mfk.ok ? mfk.ok.count : 0) + ((mfk.warn || mfk.danger) ? (mfk.warn || mfk.danger).count : 0);
+      var nflow = (next.type === 'stage') ? nodeCount(next.idx) : 0;
+      if (nflow) flow = Math.min(flow, Math.max(nflow, 1));
+    }
+    if (!flow) continue;
+    var w2 = scaleW(flow);
+    var wide = (totalPhotos > 0 && flow / totalPhotos >= 0.5);
+    var stroke = wide ? 'var(--text-3)' : 'var(--text-2)';
+    var op = wide ? '0.42' : '1';
+    var endX = (next.type === 'branch') ? colA.x + Math.round(STEP * 0.55) : next.x;
+    streams += '<path d="M' + colA.x + ',' + TY + ' H' + endX + '" stroke="' + stroke + '" stroke-opacity="' + op + '" stroke-width="' + w2.toFixed(1) + '"/>';
+
+    /* Отсев потока: −N (не в отборе) — только между этапами ствола */
+    if (colA.type === 'stage' && next.type === 'stage') {
+      var prevFlow = nodeCount(colA.idx);
+      var nextFlow = nodeCount(next.idx);
+      if (prevFlow > nextFlow && nextFlow > 0) {
+        var dropped = prevFlow - nextFlow;
+        var dx = next.x;
+        streams += '<path d="M' + dx + ',' + TY + ' C' + (dx - 70) + ',' + (TY + 26) + ' ' + (dx - 130) + ',' + (DOWN - 14) + ' ' + (dx - 210) + ',' + DOWN + '" stroke="var(--text-3)" stroke-opacity="0.3" stroke-width="' + scaleW(dropped).toFixed(1) + '"/>';
+        nodes += '<text x="' + (dx - 160) + '" y="' + (DOWN + 22) + '" style="font-size:9.5px;fill:var(--text-3)" text-anchor="middle">−' + dropped + ' не в отборе</text>';
+      }
+    }
+  }
+
+  /* ── Узлы и подписи ствола ── */
+  for (var t2 = 0; t2 < stageCols.length; t2++) {
+    var cst = stageCols[t2];
+    var stg = PIPELINE_STAGES[cst.idx];
+    var isCur = (cst.idx === lastActive);
+    var cnum = nodeCount(cst.idx);
+    var sd = proj._stageDates && proj._stageDates[cst.idx];
+    var meta = sd && sd.firstEnter ? _shTreeDate(sd.firstEnter) : '';
+
+    axis += '<text x="' + cst.x + '" y="30" style="fill:' + (isCur ? 'var(--accent)' : 'var(--text-3)') + '" text-anchor="middle">' + esc(stg.name.toUpperCase()) + '</text>';
+
+    if (isCur && !openFork) {
+      nodes += '<circle cx="' + cst.x + '" cy="' + TY + '" r="5.5" style="fill:var(--accent);stroke:var(--surface);stroke-width:1.5"/>' +
+               '<circle cx="' + cst.x + '" cy="' + TY + '" r="9" style="fill:none;stroke:var(--accent);stroke-width:1;opacity:.5"><animate attributeName="r" values="6;12" dur="2s" repeatCount="indefinite"/><animate attributeName="opacity" values=".55;0" dur="2s" repeatCount="indefinite"/></circle>';
+    } else {
+      nodes += '<circle cx="' + cst.x + '" cy="' + TY + '" r="5" style="fill:var(--surface);stroke:var(--text);stroke-width:1.5"/>';
+    }
+    nodes += '<text x="' + cst.x + '" y="182" style="fill:var(--text);font-size:12px" text-anchor="middle">' + esc(stg.name) + '</text>';
+    if (cnum) nodes += '<text x="' + cst.x + '" y="248" style="font-size:14px;fill:' + (isCur ? 'var(--accent)' : 'var(--text-2)') + ';font-weight:600" text-anchor="middle">' + cnum + '</text>';
+    if (meta) nodes += '<text x="' + cst.x + '" y="266" style="font-size:9px;fill:var(--meta)" text-anchor="middle">' + esc(meta) + '</text>';
+  }
+
+  /* ── Закрытые развилки ── */
+  for (var c3 = 0; c3 < cols.length; c3++) {
+    if (cols[c3].type !== 'branch') continue;
+    var bc = cols[c3];
+    var mc = cols[c3 + 1]; /* merge — следующая колонка */
+    var stageCol = null;
+    for (var f2 = c3 - 1; f2 >= 0; f2--) if (cols[f2].type === 'stage') { stageCol = cols[f2]; break; }
+    if (!stageCol || !mc) continue;
+    var fkX = stageCol.x + Math.round(STEP * 0.55);
+    var ok = bc.fork.ok, wr = bc.fork.warn || bc.fork.danger;
+    var okN = ok ? ok.count : 0, wrN = wr ? wr.count : 0;
+    var sum = okN + wrN;
+    nodes += '<text x="' + fkX + '" y="' + (TY - 10) + '" style="font-size:9px;fill:var(--meta)" text-anchor="middle">' + sum + '=' + okN + '+' + wrN + '</text>';
+    if (ok) {
+      streams += '<path d="M' + fkX + ',' + TY + ' C' + (fkX + 45) + ',' + (TY - 20) + ' ' + (fkX + 90) + ',' + UP + ' ' + bc.x + ',' + UP + ' H' + (mc.x - 40) + ' C' + (mc.x - 15) + ',' + UP + ' ' + mc.x + ',' + (TY - 50) + ' ' + mc.x + ',' + TY + '" stroke="var(--ok)" stroke-width="' + scaleW(okN).toFixed(1) + '"/>';
+      nodes += '<circle cx="' + bc.x + '" cy="' + UP + '" r="5" style="fill:var(--ok);stroke:var(--surface);stroke-width:1.5"/>' +
+        '<text x="' + bc.x + '" y="' + (UP - 20) + '" style="fill:var(--text);font-size:12px" text-anchor="middle">' + esc(ok.label) + '</text>' +
+        '<text x="' + (bc.x + 60) + '" y="' + (UP + 4) + '" style="font-size:14px;fill:var(--ok);font-weight:600" text-anchor="start">' + okN + '</text>';
+    }
+    if (wr) {
+      var wrColor = (bc.fork.danger && !bc.fork.warn) ? 'var(--danger)' : 'var(--warn)';
+      streams += '<path d="M' + fkX + ',' + TY + ' C' + (fkX + 45) + ',' + (TY + 20) + ' ' + (fkX + 90) + ',' + DOWN + ' ' + bc.x + ',' + DOWN + ' H' + (mc.x - 40) + ' C' + (mc.x - 15) + ',' + DOWN + ' ' + mc.x + ',' + (TY + 50) + ' ' + mc.x + ',' + TY + '" stroke="' + wrColor + '" stroke-width="' + scaleW(wrN).toFixed(1) + '"/>';
+      nodes += '<circle cx="' + bc.x + '" cy="' + DOWN + '" r="5" style="fill:' + wrColor + ';stroke:var(--surface);stroke-width:1.5"/>' +
+        '<text x="' + bc.x + '" y="' + (DOWN + 32) + '" style="fill:var(--text);font-size:12px" text-anchor="middle">' + esc(wr.label) + '</text>' +
+        '<text x="' + (bc.x + 60) + '" y="' + (DOWN + 4) + '" style="font-size:13px;fill:' + wrColor + ';font-weight:600" text-anchor="start">' + wrN + '</text>';
+      if (wr.note) nodes += '<text x="' + bc.x + '" y="' + (DOWN + 48) + '" style="font-size:9px;fill:var(--meta)" text-anchor="middle">' + esc('«' + wr.note + '»') + '</text>';
+    }
+    /* Узел слияния */
+    nodes += '<circle cx="' + mc.x + '" cy="' + TY + '" r="5.5" style="fill:var(--text);stroke:var(--surface);stroke-width:1.5"/>' +
+      '<text x="' + mc.x + '" y="182" style="fill:var(--text);font-size:12px" text-anchor="middle">Слияние</text>' +
+      '<text x="' + mc.x + '" y="248" style="font-size:13px;fill:var(--ok);font-weight:600" text-anchor="middle">' + sum + '</text>';
+    axis += '<text x="' + bc.x + '" y="30" style="fill:var(--warn)" text-anchor="middle">↻ ВЕТКИ</text>';
+  }
+
+  /* ── Открытая развилка (текущий фронт) ── */
+  if (openFork && stageCols.length) {
+    var lastCol = stageCols[stageCols.length - 1];
+    var ofX = lastCol.x;
+    var groups2 = [];
+    if (openFork.ok) groups2.push({ g: openFork.ok, y: UP + 40, color: 'var(--ok)' });
+    var wr2 = openFork.danger || openFork.warn;
+    if (wr2) groups2.push({ g: wr2, y: DOWN - 38, color: openFork.danger ? 'var(--danger)' : 'var(--warn)', open: true });
+    var sum2 = 0;
+    for (var g4 = 0; g4 < groups2.length; g4++) sum2 += groups2[g4].g.count;
+    if (groups2.length > 1) {
+      var parts2 = [];
+      for (var g5 = 0; g5 < groups2.length; g5++) parts2.push(groups2[g5].g.count);
+      nodes += '<text x="' + ofX + '" y="' + (TY - 14) + '" style="font-size:9px;fill:var(--meta)" text-anchor="middle">' + sum2 + '=' + parts2.join('+') + '</text>';
+    }
+    for (var g6 = 0; g6 < groups2.length; g6++) {
+      var gg = groups2[g6];
+      var gy = gg.y, ex = ofX + 88;
+      streams += '<path d="M' + ofX + ',' + TY + ' C' + (ofX + 40) + ',' + (gy < TY ? TY - 17 : TY + 17) + ' ' + (ofX + 50) + ',' + gy + ' ' + ex + ',' + gy + '" stroke="' + gg.color + '" stroke-width="' + scaleW(gg.g.count).toFixed(1) + '"' + (gg.open ? ' class="cp-beat-path"' : '') + '/>';
+      nodes += '<circle cx="' + ex + '" cy="' + gy + '" r="5" style="fill:' + gg.color + ';stroke:var(--surface);stroke-width:1.5"/>' +
+        '<text x="' + (ex + 12) + '" y="' + (gy - 8) + '" style="fill:var(--text);font-size:12px" text-anchor="start">' + esc(gg.g.label) + '</text>' +
+        '<text x="' + (ex + 12) + '" y="' + (gy + 10) + '" style="font-size:14px;fill:' + gg.color + ';font-weight:600" text-anchor="start">' + gg.g.count + '</text>';
+      if (gg.g.note) nodes += '<text x="' + (ex + 12) + '" y="' + (gy + 26) + '" style="font-size:9px;fill:var(--text-3)" text-anchor="start">' + esc('«' + gg.g.note + '» · открыт') + '</text>';
+    }
+  }
+
+  /* ── Ось времени ── */
+  var evs2 = proj._events || [];
+  var firstTs = evs2.length ? (evs2[0].ts || evs2[0].date) : null;
+  var lastTs = evs2.length ? (evs2[evs2.length - 1].ts || evs2[evs2.length - 1].date) : null;
+  var timeAxis = '<line x1="60" y1="378" x2="' + (W - 40) + '" y2="378" style="stroke:var(--line);stroke-width:1"/>' +
+    '<path d="M' + (W - 40) + ',378 l-10,-4 v8 z" style="fill:var(--text-3)"/>' +
+    '<text x="60" y="394" style="font-size:9px;fill:var(--meta)" text-anchor="start">' + esc(firstTs ? _shTreeDate(firstTs) + ' · НАЧАЛО' : 'НАЧАЛО') + '</text>' +
+    '<text x="' + (W - 60) + '" y="394" style="font-size:9px;fill:var(--accent)" text-anchor="end">' + esc(lastTs ? _shTreeDate(lastTs) + ' · СЕЙЧАС' : 'СЕЙЧАС') + '</text>' +
+    '<text x="' + Math.round(W / 2) + '" y="394" style="font-size:9px;fill:var(--text-3);letter-spacing:.2em" text-anchor="middle">ВРЕМЯ ▸</text>';
+
+  var html = '';
+  /* Легенда потоков */
+  html += '<div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:10px">';
+  html += '<span style="display:flex;align-items:center;gap:7px"><span style="width:20px;height:8px;background:var(--text-2)"></span><span class="ds-meta" style="font-size:9.5px">ОСНОВНОЙ ПОТОК</span></span>';
+  html += '<span style="display:flex;align-items:center;gap:7px"><span style="width:20px;height:8px;background:var(--ok)"></span><span class="ds-meta" style="font-size:9.5px">СОГЛАСОВАНО</span></span>';
+  html += '<span style="display:flex;align-items:center;gap:7px"><span style="width:20px;height:6px;background:var(--warn)"></span><span class="ds-meta" style="font-size:9.5px">ВОЗВРАЩЕНО</span></span>';
+  html += '<span style="display:flex;align-items:center;gap:7px"><span style="width:20px;height:6px;background:var(--danger)"></span><span class="ds-meta" style="font-size:9.5px">НА ДОРАБОТКУ (ОТКРЫТ)</span></span>';
+  html += '<span style="display:flex;align-items:center;gap:7px"><span style="width:20px;height:8px;background:var(--text-3);opacity:.35"></span><span class="ds-meta" style="font-size:9.5px">НЕ В ОТБОРЕ</span></span>';
+  html += '</div>';
+
+  html += '<div style="overflow-x:auto"><svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;min-width:900px;height:auto;display:block;font-family:var(--font-mono)">' +
+    '<g style="font-size:10px;letter-spacing:.12em">' + axis + '</g>' +
+    '<g fill="none" stroke-linecap="butt">' + streams + '</g>' +
+    '<g>' + nodes + '</g>' +
+    '<g>' + timeAxis + '</g>' +
+    '</svg></div>';
+  return html;
+}
+
+/** Переключить вид дерева: 'flow' | 'list'. */
+function shTreeSetView(view) {
+  var flow = document.getElementById('evt-view-flow');
+  var list = document.getElementById('evt-view-list');
+  var bF = document.getElementById('evt-btn-flow');
+  var bL = document.getElementById('evt-btn-list');
+  if (!flow || !list) return;
+  var isFlow = (view === 'flow');
+  flow.style.display = isFlow ? '' : 'none';
+  list.style.display = isFlow ? 'none' : '';
+  if (bF) { bF.style.color = isFlow ? 'var(--text)' : 'var(--text-3)'; bF.style.borderColor = isFlow ? 'var(--text-3)' : 'var(--field-border)'; }
+  if (bL) { bL.style.color = !isFlow ? 'var(--text)' : 'var(--text-3)'; bL.style.borderColor = !isFlow ? 'var(--text-3)' : 'var(--field-border)'; }
+}
+
 function shOpenEventTree() {
   var proj = getActiveProject();
   var body = document.getElementById('event-tree-body');
   if (!proj || !body) return;
+  var evs = (proj._events || []).slice();
+  var totalPhotos = proj.previews ? proj.previews.length : 0;
+
+  var html = '';
+  /* Шапка — как в handoff 4: имя, счётчики, переключатель вида */
+  var range = '';
+  if (evs.length) {
+    var d1 = _shTreeDate(evs[0].ts || evs[0].date);
+    var d2 = _shTreeDate(evs[evs.length - 1].ts || evs[evs.length - 1].date);
+    range = d1 && d2 ? (d1 === d2 ? d1 : d1 + '–' + d2) : '';
+  }
+  html += '<div style="display:flex;align-items:center;gap:14px;margin-bottom:18px;flex-wrap:wrap">';
+  html += '<span style="font-weight:300;font-size:18px">' + esc(shProjectDisplayName(proj)) + '</span>';
+  html += '<span class="ds-meta" style="font-size:10px">' + evs.length + ' ' + plural(evs.length, 'СОБЫТИЕ', 'СОБЫТИЯ', 'СОБЫТИЙ') + ' · ' + totalPhotos + ' ФОТО' + (range ? ' · ' + range : '') + '</span>';
+  html += '<span style="margin-left:auto;display:flex;gap:8px;align-items:center">';
+  html += '<span class="ds-meta" style="font-size:9px;letter-spacing:.06em">ТОЛЩИНА ПОТОКА ∝ ЧИСЛУ ФОТО</span>';
+  html += '<button id="evt-btn-flow" class="ds-btn-mono" onclick="shTreeSetView(\'flow\')">ПОТОК</button>';
+  html += '<button id="evt-btn-list" class="ds-btn-mono" onclick="shTreeSetView(\'list\')">СПИСОК</button>';
+  html += '</span></div>';
+
+  if (evs.length === 0 && totalPhotos === 0) {
+    html += '<div class="cp-empty"><div class="t1">СОБЫТИЙ ЕЩЁ НЕТ</div>' +
+      '<div class="t2">Журнал наполнится по мере работы: загрузка превью, отбор, согласование.</div></div>';
+    body.innerHTML = html;
+    openModal('modal-event-tree');
+    return;
+  }
+
+  html += '<div id="evt-view-flow">' + _shTreeStreamSVG(proj) + '</div>';
+  html += '<div id="evt-view-list" style="display:none">' + _shTreeListHTML(proj) + '</div>';
+  body.innerHTML = html;
+  shTreeSetView('flow');
+  openModal('modal-event-tree');
+}
+
+function _shTreeListHTML(proj) {
+  if (!proj) return '';
   var evs = (proj._events || []).slice();
   var html = '';
   if (evs.length === 0) {
@@ -1234,9 +1569,9 @@ function shOpenEventTree() {
     }
     html += '</div>';
   }
-  body.innerHTML = html;
-  openModal('modal-event-tree');
+  return html;
 }
+
 
 function renderPipeline() {
   if (typeof PIPELINE_V2 !== 'undefined' && PIPELINE_V2) { renderPipelineV2(); return; }

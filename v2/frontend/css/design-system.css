@@ -181,3 +181,6 @@
 
 /* V2-панель несёт свой моно-заголовок — крупный дублирующий скрываем */
 .pipeline-panel > .section-title { display: none; }
+
+/* ── Дерево событий: поток фото (SVG) ── */
+.cp-beat-path { animation: cp-beat 1.6s ease-in-out infinite; }

@@ -1547,6 +1547,18 @@ tr:hover td { background: #fafafa; }
   <td contenteditable="true" class="my-comment"></td>
 </tr>
 
+<tr data-row="pipeline-design-fidelity">
+  <td><span class="s-done">DONE</span></td>
+  <td>Пайплайн / Редизайн</td>
+  <td><strong>Точное соответствие handoff 4: экран Проекты + горизонтальное дерево событий</strong></td>
+  <td></td>
+  <td>По замечанию Маши (04.07): экраны «плыли» и дерево событий не соответствовало дизайну. Сделано: (1) экран Проекты — сетка 1.3fr/1fr вместо фикс. 380px панели, контейнер 1400px, список проектов с 1px-зазорами, карточка = имя + статус-чип (точка+моно-капс) + моно-мета «дата · карточки · фото», панель без скруглений с рамкой; (2) дерево событий — развёрнутый вид теперь горизонтальный SVG-поток фото слева направо (как экран 02 handoff 4): ось этапов сверху, толщина потока ∝ числу фото, развилки вверх (ok)/вниз (warn/danger), слияния, отсев «−N не в отборе», ось времени с НАЧАЛО/СЕЙЧАС, легенда, переключатель ПОТОК/СПИСОК (вертикальный журнал сохранён вторым видом); модалка 1500px. Проверено Playwright-скриншотами на сценарии BrandX (развилка 40+12 закрытая со слиянием + открытая 49+3).</td>
+  <td class="files">style.css, design-system.css, shootings.js, state.js, index.html</td>
+  <td><span class="p-high">P0</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
 <tr data-row="redesign0703-screens">
   <td><span class="s-todo">TODO</span></td>
   <td>Редизайн / UI-спека</td>

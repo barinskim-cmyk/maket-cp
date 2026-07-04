@@ -541,6 +541,21 @@ function cpkCalcDelta() {
  * @param {string} str
  * @returns {string}
  */
+/**
+ * Русское склонение по числу: plural(3, 'КАРТОЧКА', 'КАРТОЧКИ', 'КАРТОЧЕК').
+ * @param {number} n
+ * @param {string} one  1, 21, 31...
+ * @param {string} few  2-4, 22-24...
+ * @param {string} many 0, 5-20, 25-30...
+ * @returns {string}
+ */
+function plural(n, one, few, many) {
+  var m10 = n % 10, m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return one;
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+  return many;
+}
+
 function esc(str) {
   if (!str) return '';
   var d = document.createElement('div');
