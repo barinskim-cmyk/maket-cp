@@ -554,7 +554,7 @@ function renderProjects() {
   }
   var hiddenLabel = document.getElementById('sh-hidden-label');
   if (hiddenLabel) {
-    hiddenLabel.textContent = 'Показать скрытые (' + hiddenCount + ')';
+    hiddenLabel.textContent = 'ПОКАЗАТЬ СКРЫТЫЕ (' + hiddenCount + ')';
     var hiddenWrap = document.getElementById('sh-hidden-wrap');
     if (hiddenWrap) hiddenWrap.style.display = hiddenCount > 0 ? '' : 'none';
   }
