@@ -2,8 +2,8 @@
 # Сборка десктопных пакетов Content Pulse:
 #   1. Content Pulse.app        (macOS, pywebview + backend)
 #   2. Content Pulse (win)      (Windows, onedir zip)
-#   3. Rate Setter.app          (macOS, tkinter standalone)
-#   4. Rate Setter .exe         (Windows, onefile)
+# Rate Setter собирается в отдельном репо:
+#   https://github.com/barinskim-cmyk/content-pulse-rate-setter
 # Все артефакты — в release с тегом desktop-latest.
 # Запуск: вручную (workflow_dispatch) через gh workflow run build-desktop.yml
 # ─────────────────────────────────────────────────────────────
@@ -44,27 +44,16 @@ jobs:
           codesign --force --deep -s - "dist/Content Pulse.app" || true
           cd dist && ditto -c -k --keepParent "Content Pulse.app" "Content-Pulse-macOS.zip"
 
-      - name: Build Rate Setter.app
-        run: |
-          cd rate-setter-standalone
-          pyinstaller --noconfirm "C1 Rate Setter.spec"
-          codesign --force --deep -s - "dist/Content Pulse Rate Setter.app" || true
-          cp instruction.html dist/
-          cd dist && ditto -c -k --keepParent "Content Pulse Rate Setter.app" "Content-Pulse-Rate-Setter-macOS.zip"
-
       - name: Smoke check bundles
         run: |
           test -d "dist/Content Pulse.app/Contents/MacOS"
           # фронтенд должен быть внутри сборки
           find "dist/Content Pulse.app" -name index.html | grep -q frontend
-          test -d "rate-setter-standalone/dist/Content Pulse Rate Setter.app/Contents/MacOS"
 
       - uses: actions/upload-artifact@v4
         with:
           name: mac-builds
-          path: |
-            dist/Content-Pulse-macOS.zip
-            rate-setter-standalone/dist/Content-Pulse-Rate-Setter-macOS.zip
+          path: dist/Content-Pulse-macOS.zip
 
   windows:
     runs-on: windows-latest
@@ -95,28 +84,17 @@ jobs:
             v2/backend/main.py
           Compress-Archive -Path "dist/Content Pulse" -DestinationPath "dist/Content-Pulse-Windows.zip"
 
-      - name: Build Rate Setter .exe
-        shell: pwsh
-        run: |
-          pyinstaller --noconfirm --onefile --windowed `
-            --name "Content Pulse Rate Setter" `
-            rate-setter-standalone/C1_RateSetter.py
-          Copy-Item "rate-setter-standalone/instruction.html" "dist/"
-
       - name: Smoke check
         shell: pwsh
         run: |
           if (!(Test-Path "dist/Content Pulse/Content Pulse.exe")) { Write-Error "no app exe"; exit 1 }
-          if (!(Test-Path "dist/Content Pulse Rate Setter.exe")) { Write-Error "no rate setter exe"; exit 1 }
           $idx = Get-ChildItem -Recurse "dist/Content Pulse" -Filter index.html
           if (!$idx) { Write-Error "frontend not bundled"; exit 1 }
 
       - uses: actions/upload-artifact@v4
         with:
           name: win-builds
-          path: |
-            dist/Content-Pulse-Windows.zip
-            dist/Content Pulse Rate Setter.exe
+          path: dist/Content-Pulse-Windows.zip
 
   release:
     needs: [mac, windows]
@@ -127,12 +105,10 @@ jobs:
         with:
           path: art
           merge-multiple: true
-      - name: Flatten artifacts (mac-артефакт сохраняет подпапки) + rename win exe
+      - name: Flatten artifacts (артефакты могут сохранять подпапки)
         run: |
           ls -R art
-          # zip'ы из подпапок (dist/, rate-setter-standalone/dist/) — в корень art/
-          find art -mindepth 2 -type f \( -name "*.zip" -o -name "*.exe" \) -exec mv -f {} art/ \;
-          mv "art/Content Pulse Rate Setter.exe" "art/Content-Pulse-Rate-Setter-Windows.exe"
+          find art -mindepth 2 -type f -name "*.zip" -exec mv -f {} art/ \;
           ls art
       - uses: softprops/action-gh-release@v2
         with:
@@ -142,13 +118,10 @@ jobs:
             Автосборка десктопных пакетов Content Pulse.
             - Content-Pulse-macOS.zip — приложение для Mac
             - Content-Pulse-Windows.zip — приложение для Windows (распаковать, запустить Content Pulse.exe)
-            - Content-Pulse-Rate-Setter-macOS.zip — Rate Setter для Mac
-            - Content-Pulse-Rate-Setter-Windows.exe — Rate Setter для Windows
-            Инструкция к Rate Setter: rate-setter-standalone/instruction.html
+            Rate Setter — отдельный релиз:
+            https://github.com/barinskim-cmyk/content-pulse-rate-setter/releases/tag/latest
           files: |
             art/Content-Pulse-macOS.zip
             art/Content-Pulse-Windows.zip
-            art/Content-Pulse-Rate-Setter-macOS.zip
-            art/Content-Pulse-Rate-Setter-Windows.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

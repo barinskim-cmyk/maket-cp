@@ -105,3 +105,8 @@ contacts.md
 !**/tester-a*
 !**/surname-hidden*
 # --- end PII safeguard ---
+
+# Rate Setter вынесен в отдельный репо (content-pulse-rate-setter);
+# локальная папка остаётся для ручных сборок, в git — только README.
+rate-setter-standalone/*
+!rate-setter-standalone/README.md

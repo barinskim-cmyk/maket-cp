@@ -27,7 +27,8 @@ Desktop-first web app (pywebview + Python) + веб-клиент для зака
 
 - Всё устаревшее — в `OLD/`: не использовать как источник правды, не удалять (история).
 - `strategy-2026.md` — единственный источник правды по стратегии (создан 02.07.2026).
-- Актуальное ядро: v2/, backlog.html, audits/, tests/, bugs/, docs/, rate-setter-standalone/, landing.html, monetization-matrix.md, project-log.md, maket_cp_overview.md.
+- Актуальное ядро: v2/, backlog.html, audits/, tests/, bugs/, docs/, landing.html, monetization-matrix.md, project-log.md, maket_cp_overview.md.
+- Rate Setter — отдельный репо barinskim-cmyk/content-pulse-rate-setter (вынесен 04.07.2026, чтобы отдавать коллегам отдельно); локальная папка rate-setter-standalone/ не отслеживается git, кроме README-указателя.
 - Статус (июль 2026): активных клиентов нет, все данные в системе тестовые (EKONIKA — завершённый пилот). Тестировать на текущей базе можно свободно.
 
 ## Git: обязательные правила
