@@ -1815,6 +1815,33 @@ function cbTeDistribute() {
   rest.forEach(function (s, i) { s.row = Math.min(t.rows - 1, Math.floor(i / per)); });
 }
 
+/* Перераспределение под канвас (Маша 05.07): при смене Г<->В ряды
+   пересобираются — перебираем число рядов, равномерно раскладываем
+   слоты, берём вариант с максимальным заполнением нового листа. */
+function cbTeReflow(t) {
+  var start = t.hasHero ? 1 : 0;
+  var rest = t.slots.slice(start);
+  if (!rest.length) return;
+  var best = null;
+  var maxRows = Math.min(5, rest.length);
+  for (var n = 1; n <= maxRows; n++) {
+    var per = Math.ceil(rest.length / n);
+    var trial = JSON.parse(JSON.stringify(t));
+    trial.rows = n;
+    trial.slots.slice(start).forEach(function (s, i) {
+      s.row = Math.min(n - 1, Math.floor(i / per));
+    });
+    var geom = cbManualBoxes(trial);
+    var used = 0;
+    geom.boxes.forEach(function (b) { used += b.w * b.h; });
+    if (!best || used > best.used) best = { used: used, rows: n, per: per };
+  }
+  if (best) {
+    t.rows = best.rows;
+    rest.forEach(function (s, i) { s.row = Math.min(best.rows - 1, Math.floor(i / best.per)); });
+  }
+}
+
 function cbTeAddSlot(orient) {
   cbTeCollectNames();
   TE.cur.slots.push({ orient: orient, row: TE.cur.rows - 1, name: '' });
@@ -1828,8 +1855,12 @@ function cbTeRemoveSlot(orient) {
   }
 }
 
-document.getElementById('cbTeCanvasH').onclick = function () { cbTeCollectNames(); TE.cur.canvas = 'h'; cbTeRender(); };
-document.getElementById('cbTeCanvasV').onclick = function () { cbTeCollectNames(); TE.cur.canvas = 'v'; cbTeRender(); };
+document.getElementById('cbTeCanvasH').onclick = function () {
+  cbTeCollectNames(); TE.cur.canvas = 'h'; cbTeReflow(TE.cur); cbTeRender();
+};
+document.getElementById('cbTeCanvasV').onclick = function () {
+  cbTeCollectNames(); TE.cur.canvas = 'v'; cbTeReflow(TE.cur); cbTeRender();
+};
 document.getElementById('cbTeModeManual').onclick = function () { cbTeCollectNames(); TE.cur.mode = 'manual'; cbTeRender(); };
 document.getElementById('cbTeModeAuto').onclick = function () { cbTeCollectNames(); TE.cur.mode = 'auto'; cbTeRender(); };
 document.getElementById('cbTeHero').onchange = function () { cbTeCollectNames(); TE.cur.hasHero = this.checked; cbTeRender(); };
