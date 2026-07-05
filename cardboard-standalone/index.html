@@ -10,10 +10,9 @@
 <style>
 /* ============================================================
    Cardboard — standalone инструмент вёрстки карточек товара.
-   Айдентика CARDBOARD · CONTENT PULSE (хендофф 05.07.2026):
-   палитра «тёмная плёнка», Manrope + IBM Plex Mono,
-   медь #C9956B — единственный акцент (≤5% экрана).
-   Плоский CSS без переменных (стиль проекта).
+   Айдентика CARDBOARD · CONTENT PULSE: «тёмная плёнка»,
+   Manrope + IBM Plex Mono, медь #C9956B — единственный акцент.
+   Канвас карточки = пропорции A4 (печать PDF один в один).
    ============================================================ */
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -28,9 +27,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-.cb-mono {
-  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
-}
+.cb-mono { font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; }
 
 button {
   font-family: inherit;
@@ -41,7 +38,7 @@ button {
   color: #f2f2f1;
   cursor: pointer;
   border-radius: 3px;
-  white-space: nowrap;   /* кнопки не ломаются на несколько строк */
+  white-space: nowrap;
   flex-shrink: 0;
 }
 button:hover { background: #262624; border-color: #3a3a38; }
@@ -61,78 +58,74 @@ input[type="text"], select, textarea {
 input[type="text"]::placeholder, textarea::placeholder { color: #6d6d6c; }
 input[type="text"]:focus, textarea:focus { outline: none; border-color: #f2f2f1; }
 
-/* ---------- Верхняя панель ---------- */
+/* ---------- Меню-бар ---------- */
 .cb-topbar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   height: 52px;
   padding: 0 14px;
   background: #191917;
   border-bottom: 1px solid #262626;
   flex-wrap: nowrap;
-  overflow-x: auto;      /* узкое окно: панель скроллится, не расползается */
-  overflow-y: hidden;
 }
-.cb-topbar .cb-logo, .cb-topbar .cb-grid-ctl, .cb-topbar span { white-space: nowrap; flex-shrink: 0; }
-.cb-topbar input, .cb-topbar select { flex-shrink: 0; }
-
-.cb-logo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-right: 6px;
-}
+.cb-logo { display: flex; align-items: center; gap: 10px; margin-right: 10px; flex-shrink: 0; }
 .cb-logo img { height: 24px; display: block; }
-.cb-logo-word {
-  font-weight: 400;
-  font-size: 14px;
-  letter-spacing: 0.06em;
-  line-height: 1.1;
-}
+.cb-logo-word { font-weight: 400; font-size: 14px; letter-spacing: 0.06em; line-height: 1.1; white-space: nowrap; }
 .cb-logo-sub {
   font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
-  font-size: 8px;
-  letter-spacing: 0.2em;
-  color: #7a7a79;
-  margin-top: 2px;
+  font-size: 8px; letter-spacing: 0.2em; color: #7a7a79; margin-top: 2px; white-space: nowrap;
 }
-#cbProjectName { width: 180px; font-weight: 600; }
-.cb-topbar .cb-sep { width: 1px; height: 24px; background: #262626; margin: 0 4px; }
+#cbProjectName { width: 170px; font-weight: 600; flex-shrink: 0; }
 .cb-topbar .cb-spacer { flex: 1; }
-#cbMode { font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 9px; letter-spacing: 0.14em; color: #6d6d6c; }
+#cbMode {
+  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  font-size: 9px; letter-spacing: 0.14em; color: #6d6d6c; white-space: nowrap;
+}
 
-/* ---------- Попапы «Импорт» / «Экспорт» ---------- */
-.cb-share-wrap { position: relative; flex-shrink: 0; }
+.cb-menu-wrap { position: relative; flex-shrink: 0; }
+.cb-menu-btn {
+  border: none;
+  background: none;
+  padding: 8px 12px;
+  font-size: 12.5px;
+  color: #b2b2b1;
+  border-radius: 3px;
+}
+.cb-menu-btn:hover, .cb-menu-btn.cb-open-btn { background: #262624; color: #f2f2f1; border: none; }
 .cb-pop {
   display: none;
   position: absolute;
   top: 38px;
-  right: 0;
+  left: 0;
   background: #1d1d1b;
   border: 1px solid #2a2a28;
   border-radius: 4px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.5);
   padding: 6px;
   z-index: 80;
-  min-width: 200px;
+  min-width: 230px;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 .cb-pop.cb-open { display: flex; }
-.cb-pop button { border: none; background: none; text-align: left; width: 100%; padding: 8px 10px; }
+.cb-pop button {
+  border: none; background: none; text-align: left; width: 100%;
+  padding: 8px 10px; display: flex; justify-content: space-between; gap: 18px;
+}
 .cb-pop button:hover { background: #262624; }
-.cb-pop-left { left: 0; right: auto; }
-.cb-share-sep { height: 1px; background: #262626; margin: 2px 0; }
-.cb-share-mode { padding: 2px 10px 4px; text-align: right; }
+.cb-pop button .cb-hotkey {
+  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  font-size: 10px; color: #6d6d6c;
+}
+.cb-pop-sep { height: 1px; background: #262626; margin: 3px 0; }
+.cb-pop-note { padding: 2px 10px 4px; text-align: right; }
+.cb-pop-right { left: auto; right: 0; }
 
 /* ---------- Основной лейаут ---------- */
-.cb-main {
-  display: flex;
-  height: calc(100vh - 52px);
-}
+.cb-main { display: flex; height: calc(100vh - 52px); }
 
-/* ---------- Левая панель: фото ---------- */
+/* ---------- Левая панель: фото и референсы ---------- */
 .cb-tray {
   width: 300px;
   min-width: 180px;
@@ -142,51 +135,44 @@ input[type="text"]:focus, textarea:focus { outline: none; border-color: #f2f2f1;
   flex-direction: column;
   flex-shrink: 0;
 }
+.cb-tray-tabs { display: flex; border-bottom: 1px solid #262626; }
+.cb-tray-tab {
+  flex: 1;
+  border: none; background: none; border-radius: 0;
+  padding: 9px 6px 10px;
+  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  font-size: 9.5px; font-weight: 500;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: #8c8c8b;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.cb-tray-tab:hover { background: none; border-color: transparent transparent #3a3a38; color: #f2f2f1; }
+.cb-tray-tab.cb-tab-active { color: #f2f2f1; border-bottom-color: #c9956b; }
 
-/* Ресайзер: граница галереи тянется мышью, ширина запоминается */
 .cb-resizer {
-  width: 5px;
-  cursor: col-resize;
-  background: #262626;
-  flex-shrink: 0;
-  transition: background 0.15s;
+  width: 5px; cursor: col-resize; background: #262626;
+  flex-shrink: 0; transition: background 0.15s;
 }
 .cb-resizer:hover, .cb-resizer.cb-dragging { background: #c9956b; }
-body.cb-resizing { cursor: col-resize; user-select: -webkit-user-select; }
+body.cb-resizing { cursor: col-resize; }
 body.cb-resizing * { pointer-events: none; }
 
-.cb-tray-head {
-  padding: 10px 12px 8px;
-  border-bottom: 1px solid #262626;
-}
-.cb-tray-head .cb-row { display: flex; gap: 6px; margin-bottom: 6px; }
-.cb-tray-head .cb-row:last-child { margin-bottom: 0; }
+.cb-tray-head { padding: 10px 12px 8px; border-bottom: 1px solid #262626; }
+.cb-tray-head .cb-row { display: flex; gap: 6px; }
 #cbFilter { flex: 1; }
 .cb-tray-stats {
   font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
-  font-size: 9.5px;
-  letter-spacing: 0.1em;
-  color: #6d6d6c;
-  padding: 7px 12px;
-  border-bottom: 1px solid #262626;
+  font-size: 9.5px; letter-spacing: 0.1em; color: #6d6d6c;
+  padding: 7px 12px; border-bottom: 1px solid #262626;
 }
 #cbWatchStatus {
   font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
-  font-size: 9.5px;
-  letter-spacing: 0.08em;
-  color: #7fae7f;
-  padding: 7px 12px;
-  display: none;
-  border-bottom: 1px solid #262626;
+  font-size: 9.5px; letter-spacing: 0.08em; color: #7fae7f;
+  padding: 7px 12px; display: none; border-bottom: 1px solid #262626;
 }
 
-/* Библиотека превью — justified-раскладка (движок из layout.js основной
-   проги): натуральные пропорции, ряды впритык, масштабируется чистым CSS */
-.cb-tray-grid {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px;
-}
+.cb-tray-grid { flex: 1; overflow-y: auto; padding: 8px; }
 .cb-just-box .cb-thumb { width: 100%; height: 100%; }
 .cb-thumb {
   cursor: grab;
@@ -199,51 +185,42 @@ body.cb-resizing * { pointer-events: none; }
 .cb-thumb:hover { border-color: #f2f2f1; }
 .cb-thumb:active { cursor: grabbing; }
 .cb-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  pointer-events: none;
+  width: 100%; height: 100%;
+  object-fit: cover; display: block; pointer-events: none;
 }
 .cb-thumb.cb-used { opacity: 0.35; }
 .cb-thumb.cb-used::after {
   content: "в макете";
-  position: absolute;
-  top: 4px; left: 4px;
+  position: absolute; top: 4px; left: 4px;
   font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
-  font-size: 8px;
-  letter-spacing: 0.08em;
-  background: #f2f2f1;
-  color: #131313;
-  padding: 1px 5px;
-  border-radius: 2px;
+  font-size: 8px; letter-spacing: 0.08em;
+  background: #f2f2f1; color: #131313;
+  padding: 1px 5px; border-radius: 2px;
+}
+.cb-ref-chip {
+  position: absolute; bottom: 4px; left: 4px;
+  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  font-size: 8px; letter-spacing: 0.1em;
+  background: #c9956b; color: #131313;
+  padding: 1px 5px; border-radius: 2px;
+  pointer-events: none;
 }
 .cb-just-box .cb-missing-box { height: 100%; }
 .cb-missing-box {
-  width: 100%;
-  height: 110px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 10px;
-  color: #c96b6b;
-  background: #211816;
+  width: 100%; height: 110px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; color: #c96b6b; background: #211816;
 }
 .cb-tray-empty {
   width: 100%;
-  color: #8c8c8b;
-  font-size: 12px;
-  text-align: center;
-  padding: 40px 16px;
-  line-height: 1.6;
-  border: 1px dashed #2a2a28;
-  border-radius: 4px;
+  color: #8c8c8b; font-size: 12px; text-align: center;
+  padding: 40px 16px; line-height: 1.6;
+  border: 1px dashed #2a2a28; border-radius: 4px;
 }
 
 /* ---------- Рабочая область ---------- */
 .cb-work {
-  flex: 1;
-  min-width: 0;
+  flex: 1; min-width: 0;
   overflow-y: auto;
   padding: 18px 22px 80px;
   border-left: 1px solid #262626;
@@ -251,23 +228,13 @@ body.cb-resizing * { pointer-events: none; }
   background: #131313;
 }
 
-/* ---------- Вкладки: Карточки / Доп. контент ---------- */
-.cb-tabs {
-  display: flex;
-  gap: 0;
-  margin-bottom: 16px;
-  border-bottom: 1px solid #262626;
-}
+.cb-tabs { display: flex; gap: 0; margin-bottom: 16px; border-bottom: 1px solid #262626; }
 .cb-tab {
-  border: none;
-  background: none;
-  border-radius: 0;
+  border: none; background: none; border-radius: 0;
   padding: 8px 16px 10px;
   font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
-  font-size: 10.5px;
-  font-weight: 500;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font-size: 10.5px; font-weight: 500;
+  letter-spacing: 0.14em; text-transform: uppercase;
   color: #8c8c8b;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
@@ -276,116 +243,89 @@ body.cb-resizing * { pointer-events: none; }
 .cb-tab.cb-tab-active { color: #f2f2f1; border-bottom-color: #c9956b; }
 
 .cb-empty-hint {
-  color: #8c8c8b;
-  font-size: 12px;
-  padding: 14px;
-  border: 1px dashed #2a2a28;
-  border-radius: 4px;
-  margin-bottom: 10px;
+  color: #8c8c8b; font-size: 12px; padding: 14px;
+  border: 1px dashed #2a2a28; border-radius: 4px; margin-bottom: 10px;
 }
 
-/* ---------- Карточка ---------- */
+/* ---------- Карточка-страница (канвас A4) ---------- */
 .cb-card, .cb-container {
   background: #1d1d1b;
   border: 1px solid #2a2a28;
   border-radius: 4px;
   margin: 0 auto 16px;
-  max-width: 780px;         /* как lay-container в основной проге */
+  max-width: 820px;
   padding: 12px 14px 14px;
 }
-.cb-card-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
-  flex-wrap: wrap;
-}
+.cb-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
 .cb-card-head .cb-num {
   font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
-  font-weight: 500;
-  font-size: 11px;
-  color: #6d6d6c;
-  min-width: 24px;
+  font-weight: 500; font-size: 11px; color: #6d6d6c; min-width: 24px;
 }
 .cb-card-head input.cb-title { width: 220px; font-weight: 600; }
-.cb-card-head input.cb-cat { width: 140px; }
+.cb-card-head input.cb-cat { width: 130px; }
 .cb-card-head .cb-spacer { flex: 1; }
-.cb-card-head .cb-grid-ctl { display: flex; align-items: center; gap: 4px; font-size: 11px; color: #8c8c8b; }
-.cb-card-head .cb-grid-ctl button { padding: 2px 8px; }
+.cb-card-head .cb-tpl-badge {
+  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  font-size: 9px; letter-spacing: 0.1em; color: #6d6d6c;
+}
 .cb-mini { padding: 3px 8px; font-size: 11px; }
 
-/* Слоты по аналогии с layout основной проги: ячейка с фиксированной
-   пропорцией (3:4, вертикальный продуктовый кадр), фото заполняет ячейку
-   целиком (cover) — никаких «окошек непонятного размера». */
-.cb-slots { display: flex; flex-direction: column; gap: 4px; }
-.cb-slot-row { display: flex; gap: 4px; align-items: stretch; }
-.cb-slot {
-  flex: 1;
-  min-width: 0;
-  aspect-ratio: 3 / 4;
-  border: 1px dashed #2f2f2d;
-  background: #1a1a18;
+/* Страница: белый лист A4 (в тёмном интерфейсе лист остаётся светлым —
+   как реальный макет), боксы слотов абсолютные в процентах */
+.cb-page {
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
-.cb-slot.cb-filled { border-style: solid; border-color: #2f2f2d; background: #131313; }
-.cb-slot.cb-over { border-color: #f2f2f1; background: #262624; }
-.cb-slot img {
-  position: absolute;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  object-fit: cover;
-  display: block;
-  pointer-events: none;
-}
-.cb-slot .cb-slot-hint { color: #6d6d6c; font-size: 11px; text-align: center; padding: 0 6px; }
-.cb-slot .cb-slot-tag {
-  position: absolute;
-  top: 4px; left: 4px;
-  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
-  font-size: 8.5px;
-  letter-spacing: 0.08em;
-  background: rgba(19,19,19,0.85);
+  width: 100%;
+  background: #f7f6f4;
   border: 1px solid #2f2f2d;
-  color: #f2f2f1;
-  padding: 1px 5px;
-  border-radius: 2px;
-  max-width: 70%;
-  white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
-.cb-slot .cb-slot-name {
-  position: absolute;
-  left: 0; right: 0; bottom: 0;
-  font-size: 9px;
-  background: rgba(19,19,19,0.85);
-  color: #b2b2b1;
-  padding: 2px 5px;
-  white-space: nowrap;
+.cb-page.cb-page-h { aspect-ratio: 1.41429; }  /* A4 горизонтальный 297x210 */
+.cb-page.cb-page-v { aspect-ratio: 0.70707; }  /* A4 вертикальный 210x297 */
+.cb-box { position: absolute; }
+.cb-slot {
+  width: 100%; height: 100%;
+  border: 1px dashed #c4c1bb;
+  background: #efedea;
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
   overflow: hidden;
-  text-overflow: ellipsis;
-  display: none;
 }
-.cb-slot.cb-filled:hover .cb-slot-name { display: block; }
+.cb-slot.cb-filled { border: none; background: #e6e4e0; }
+.cb-slot.cb-over { border: 2px solid #131313; background: #dddbd7; }
+.cb-slot img {
+  position: absolute; top: 0; left: 0;
+  width: 100%; height: 100%;
+  object-fit: cover; display: block; pointer-events: none;
+}
+.cb-slot .cb-slot-hint {
+  color: #a3a09a; font-size: 11px; text-align: center; padding: 0 6px;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.cb-slot .cb-slot-tag {
+  position: absolute; top: 4px; left: 4px;
+  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  font-size: 8.5px; letter-spacing: 0.08em;
+  background: rgba(19,19,19,0.75); color: #f2f2f1;
+  padding: 1px 5px; border-radius: 2px;
+  max-width: 75%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cb-slot .cb-slot-ref {
+  position: absolute; bottom: 4px; left: 4px;
+  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  font-size: 8px; letter-spacing: 0.1em;
+  background: #c9956b; color: #131313;
+  padding: 1px 5px; border-radius: 2px;
+}
 .cb-slot .cb-slot-x {
-  position: absolute;
-  top: 4px; right: 4px;
-  width: 18px; height: 18px;
-  line-height: 16px;
+  position: absolute; top: 4px; right: 4px;
+  width: 18px; height: 18px; line-height: 16px;
   text-align: center;
-  border: 1px solid #2a2a28;
-  border-radius: 2px;
-  background: #1d1d1b;
-  cursor: pointer;
-  font-size: 11px;
-  display: none;
-  padding: 0;
+  border: 1px solid #2a2a28; border-radius: 2px;
+  background: #1d1d1b; color: #f2f2f1;
+  cursor: pointer; font-size: 11px; display: none; padding: 0;
 }
 .cb-slot.cb-filled:hover .cb-slot-x { display: block; }
+.cb-page.cb-over-page { outline: 2px solid #c9956b; }
 
 /* ---------- Контейнер (доп. контент) ---------- */
 .cb-container-body {
@@ -394,10 +334,7 @@ body.cb-resizing * { pointer-events: none; }
   border-radius: 3px;
   background: #1a1a18;
   padding: 8px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-content: flex-start;
+  display: flex; flex-wrap: wrap; gap: 8px; align-content: flex-start;
 }
 .cb-container-body.cb-over { border-color: #f2f2f1; background: #262624; }
 .cb-container-body .cb-cont-hint { color: #6d6d6c; font-size: 11px; width: 100%; text-align: center; padding: 24px 0; }
@@ -409,17 +346,11 @@ body.cb-resizing * { pointer-events: none; }
 .cb-cont-item .cb-slot-x { display: none; }
 .cb-cont-item:hover .cb-slot-x { display: block; }
 .cb-cont-item.cb-over { outline: 2px solid #f2f2f1; }
-.cb-container textarea {
-  width: 100%;
-  margin-top: 8px;
-  min-height: 40px;
-  resize: vertical;
-}
+.cb-container textarea { width: 100%; margin-top: 8px; min-height: 40px; resize: vertical; }
 
-/* ---------- Навигация по карточкам/контейнерам (правая панель) ---------- */
+/* ---------- Навигация (правая панель) ---------- */
 .cb-outline {
-  width: 190px;
-  min-width: 150px;
+  width: 190px; min-width: 150px;
   background: #191917;
   overflow-y: auto;
   padding: 12px 0;
@@ -427,95 +358,173 @@ body.cb-resizing * { pointer-events: none; }
 }
 .cb-outline-title {
   font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
-  font-size: 9.5px;
-  font-weight: 500;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font-size: 9.5px; font-weight: 500;
+  letter-spacing: 0.14em; text-transform: uppercase;
   color: #6d6d6c;
   padding: 0 14px 8px;
 }
 .cb-outline-item {
-  display: block;
-  width: 100%;
-  border: none;
-  background: none;
-  border-radius: 0;
+  display: block; width: 100%;
+  border: none; background: none; border-radius: 0;
   text-align: left;
   padding: 7px 14px;
-  font-size: 12px;
-  color: #f2f2f1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: 12px; color: #f2f2f1;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   border-left: 2px solid transparent;
 }
 .cb-outline-item:hover { background: #1f1f1d; border-left-color: #c9956b; }
 .cb-outline-item .cb-outline-num { color: #6d6d6c; margin-right: 6px; }
 .cb-outline-item .cb-outline-count {
   font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
-  color: #6d6d6c;
-  font-size: 9.5px;
-  margin-left: 4px;
+  color: #6d6d6c; font-size: 9.5px; margin-left: 4px;
 }
 .cb-outline-empty { font-size: 11px; color: #6d6d6c; padding: 4px 14px; }
 
-/* ---------- Модалка шаблонов ---------- */
-#cbTplModal {
-  position: fixed;
-  inset: 0;
+/* ---------- Модалки (общий каркас) ---------- */
+.cb-modal {
+  position: fixed; inset: 0;
   background: rgba(13,13,13,0.65);
   display: none;
-  align-items: flex-start;
-  justify-content: center;
+  align-items: flex-start; justify-content: center;
   z-index: 90;
-  padding-top: 60px;
+  padding-top: 48px;
 }
-#cbTplModal.cb-open { display: flex; }
-.cb-tpl-panel {
+.cb-modal.cb-open { display: flex; }
+.cb-panel {
   background: #1d1d1b;
   border: 1px solid #2a2a28;
   border-radius: 6px;
-  width: 560px;
-  max-height: 80vh;
+  max-height: 86vh;
   overflow-y: auto;
   padding: 18px 20px;
   box-shadow: 0 12px 40px rgba(0,0,0,0.6);
 }
-.cb-tpl-panel h2 { font-size: 14px; font-weight: 500; margin-bottom: 12px; }
-.cb-tpl-row { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
-.cb-tpl-row label { font-size: 11px; color: #8c8c8b; }
-#cbTplName { width: 200px; font-weight: 600; }
-#cbTplGridLabel {
+.cb-panel h2 { font-size: 15px; font-weight: 500; margin-bottom: 4px; }
+.cb-panel .cb-eyebrow {
+  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase;
+  color: #6d6d6c; margin-bottom: 12px;
+}
+.cb-lbl {
+  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  font-size: 9.5px; font-weight: 500;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: #6d6d6c;
+  margin: 14px 0 6px;
+}
+
+/* ---------- Редактор шаблона v2 ---------- */
+#cbTplPanel { width: 880px; display: flex; gap: 22px; }
+.cb-te-left { width: 340px; flex-shrink: 0; }
+.cb-te-right { flex: 1; min-width: 0; }
+#cbTplName { width: 100%; font-weight: 600; }
+.cb-canvas-pick { display: flex; gap: 8px; }
+.cb-canvas-btn {
+  flex: 1;
+  padding: 12px 8px;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  border: 1px solid #2a2a28; border-radius: 5px;
+  background: #1a1a18;
+}
+.cb-canvas-btn .cb-canvas-ico { background: #3a3a38; }
+.cb-canvas-btn.cb-active { border-color: #c9956b; }
+.cb-canvas-btn.cb-active .cb-canvas-ico { background: #c9956b; }
+.cb-canvas-ico.cb-ico-h { width: 34px; height: 24px; }
+.cb-canvas-ico.cb-ico-v { width: 24px; height: 34px; }
+.cb-mode-pick { display: flex; gap: 8px; }
+.cb-mode-btn { flex: 1; padding: 8px; background: #1a1a18; }
+.cb-mode-btn.cb-active { border-color: #c9956b; color: #f2f2f1; }
+.cb-te-row { display: flex; align-items: center; gap: 8px; }
+.cb-te-row .cb-count {
+  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  font-size: 11px; color: #b2b2b1; min-width: 60px;
+}
+.cb-check { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12.5px; }
+.cb-check input { accent-color: #c9956b; width: 15px; height: 15px; }
+.cb-check .cb-check-note { color: #6d6d6c; font-size: 11px; }
+.cb-chip-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.cb-chip {
+  padding: 4px 10px;
   font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
   font-size: 11px;
-  color: #b2b2b1;
-}
-.cb-tpl-slots { display: flex; flex-direction: column; gap: 4px; margin: 10px 0; max-width: 400px; }
-.cb-tpl-slot-row { display: flex; gap: 4px; }
-.cb-tpl-slot-row input {
-  flex: 1;
-  min-width: 0;
-  aspect-ratio: 3 / 4;      /* те же пропорции, что у слотов карточки */
-  text-align: center;
   background: #1a1a18;
-  border-style: dashed;
-  border-radius: 0;
 }
-.cb-tpl-hint { font-size: 11px; color: #8c8c8b; margin-bottom: 4px; }
-.cb-tpl-foot { display: flex; gap: 8px; margin-top: 14px; }
-.cb-tpl-foot .cb-spacer { flex: 1; }
+.cb-chip.cb-active { background: #c9956b; color: #131313; border-color: #c9956b; }
+.cb-te-note { font-size: 11.5px; line-height: 1.55; color: #8c8c8b; margin-top: 14px; border-top: 1px solid #262626; padding-top: 12px; }
 
-/* ---------- Дроп файлов на всё окно ---------- */
+/* Превью шаблона: страница + чипы слотов */
+.cb-te-preview-wrap { background: #191917; border: 1px solid #262626; border-radius: 5px; padding: 14px; }
+.cb-te-preview-wrap .cb-page { margin: 0 auto; max-width: 100%; }
+#cbTePreview .cb-slot { cursor: grab; }
+.cb-te-badge {
+  position: absolute; top: 4px; left: 4px;
+  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  font-size: 9px; letter-spacing: 0.06em;
+  background: #c9956b; color: #131313;
+  padding: 1px 6px; border-radius: 2px;
+  cursor: pointer;
+  border: none;
+}
+.cb-te-badge:hover { background: #f2f2f1; border: none; }
+.cb-te-name-in {
+  position: absolute; left: 4px; bottom: 4px; right: 4px;
+  font-size: 9px !important; padding: 2px 4px !important;
+  background: rgba(255,255,255,0.85) !important;
+  border: 1px solid #c4c1bb !important;
+  color: #131313 !important;
+}
+.cb-te-slot-dragover { outline: 2px solid #c9956b; }
+.cb-te-foot { display: flex; gap: 8px; margin-top: 16px; }
+.cb-te-foot .cb-spacer { flex: 1; }
+
+/* ---------- Галерея шаблонов ---------- */
+#cbGalPanel { width: 760px; }
+.cb-gal-grid { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; }
+.cb-gal-item {
+  width: calc(33.33% - 10px);
+  background: #1a1a18;
+  border: 1px solid #2a2a28;
+  border-radius: 5px;
+  padding: 10px;
+}
+.cb-gal-item .cb-page { pointer-events: none; }
+.cb-gal-name { font-size: 12px; font-weight: 600; margin: 8px 0 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cb-gal-meta {
+  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  font-size: 9px; letter-spacing: 0.08em; color: #6d6d6c; margin-bottom: 8px;
+}
+.cb-gal-actions { display: flex; gap: 4px; flex-wrap: wrap; }
+.cb-gal-actions button { padding: 3px 7px; font-size: 10.5px; }
+.cb-gal-check { margin: 8px 0; font-size: 11.5px; }
+.cb-gal-foot { display: flex; gap: 8px; margin-top: 16px; }
+.cb-gal-foot .cb-spacer { flex: 1; }
+
+/* ---------- Пикер шаблона при создании карточки ---------- */
+#cbPickerPop { min-width: 260px; max-height: 60vh; overflow-y: auto; }
+.cb-picker-item { align-items: center; }
+.cb-picker-item .cb-picker-mini { width: 54px; flex-shrink: 0; pointer-events: none; }
+.cb-picker-item .cb-picker-info { flex: 1; text-align: left; }
+.cb-picker-item .cb-picker-info small {
+  display: block;
+  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  font-size: 9px; color: #6d6d6c; margin-top: 2px;
+}
+
+/* ---------- Справка ---------- */
+#cbInfoPanel { width: 560px; }
+#cbInfoBody { font-size: 12.5px; line-height: 1.65; color: #b2b2b1; }
+#cbInfoBody h3 { font-size: 12.5px; color: #f2f2f1; margin: 14px 0 4px; }
+#cbInfoBody a { color: #c9956b; }
+#cbInfoBody ol, #cbInfoBody ul { margin: 6px 0 6px 18px; }
+
+/* ---------- Дроп файлов ---------- */
 #cbDropOverlay {
-  position: fixed;
-  inset: 0;
+  position: fixed; inset: 0;
   background: rgba(13,13,13,0.82);
   color: #f2f2f1;
   display: none;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  font-weight: 300;
+  align-items: center; justify-content: center;
+  font-size: 18px; font-weight: 300;
   z-index: 100;
   pointer-events: none;
 }
@@ -523,37 +532,33 @@ body.cb-file-drag #cbDropOverlay { display: flex; }
 
 /* ---------- Тост ---------- */
 #cbToast {
-  position: fixed;
-  bottom: 20px;
-  left: 50%;
+  position: fixed; bottom: 20px; left: 50%;
   transform: translateX(-50%);
-  background: #f2f2f1;
-  color: #131313;
-  padding: 8px 16px;
-  border-radius: 4px;
-  font-size: 12px;
-  display: none;
-  z-index: 110;
-  max-width: 80%;
+  background: #f2f2f1; color: #131313;
+  padding: 8px 16px; border-radius: 4px;
+  font-size: 12px; display: none; z-index: 110; max-width: 80%;
 }
 
-/* ---------- Печать (экспорт PDF): остаётся светлой ---------- */
+/* ---------- Печать: A4, карточка = страница ---------- */
 #cbPrint { display: none; }
 @media print {
+  @page { size: A4 portrait; margin: 10mm; }
   body { height: auto; overflow: visible; background: #fff; color: #131313; }
-  .cb-topbar, .cb-main, #cbToast, #cbDropOverlay, #cbTplModal { display: none !important; }
+  .cb-topbar, .cb-main, #cbToast, #cbDropOverlay, .cb-modal { display: none !important; }
   #cbPrint { display: block; font-size: 12px; font-family: 'Manrope', -apple-system, sans-serif; }
-  #cbPrint .cbp-head { margin-bottom: 18px; }
+  #cbPrint .cbp-head { margin-bottom: 14px; }
   #cbPrint .cbp-head h1 { font-size: 20px; font-weight: 500; margin-bottom: 4px; }
   #cbPrint .cbp-head .cbp-meta { color: #666; font-size: 11px; }
+  #cbPrint .cbp-card { page-break-inside: avoid; margin-bottom: 12px; }
+  #cbPrint .cbp-card h2 { font-size: 13px; margin-bottom: 6px; }
+  #cbPrint .cbp-card h2 .cbp-cat { color: #666; font-weight: 400; font-size: 11px; margin-left: 8px; }
+  #cbPrint .cb-page { border: 1px solid #ddd; background: #fff; }
+  #cbPrint .cb-slot { border-color: #ddd; background: #fafafa; }
+  #cbPrint .cb-slot.cb-filled { background: #fff; }
+  #cbPrint .cb-slot .cb-slot-hint { color: #bbb; }
+  #cbPrint .cb-slot .cb-slot-tag { background: rgba(255,255,255,0.85); color: #333; border: 1px solid #ddd; }
   #cbPrint .cbp-block { page-break-inside: avoid; border: 1px solid #ccc; border-radius: 4px; padding: 10px 12px; margin-bottom: 14px; }
   #cbPrint .cbp-block h2 { font-size: 13px; margin-bottom: 8px; }
-  #cbPrint .cbp-block h2 .cbp-cat { color: #666; font-weight: 400; font-size: 11px; margin-left: 8px; }
-  #cbPrint .cbp-row { display: flex; gap: 6px; margin-bottom: 6px; }
-  #cbPrint .cbp-cell { flex: 1; border: 1px solid #e0e0e0; min-height: 40px; overflow: hidden; }
-  #cbPrint .cbp-cell-in { display: flex; align-items: center; justify-content: center; min-height: 40px; }
-  #cbPrint .cbp-cell img { max-width: 100%; max-height: 170px; display: block; }
-  #cbPrint .cbp-slotname { font-size: 9px; color: #888; text-align: center; padding: 1px 3px; border-top: 1px solid #eee; }
   #cbPrint .cbp-flow { display: flex; flex-wrap: wrap; gap: 6px; }
   #cbPrint .cbp-flow img { border: 1px solid #e0e0e0; object-fit: contain; }
   #cbPrint .cbp-text { margin-top: 8px; color: #333; white-space: pre-wrap; }
@@ -566,38 +571,56 @@ body.cb-file-drag #cbDropOverlay { display: flex; }
 <div class="cb-topbar">
   <div class="cb-logo"><img src="data:image/png;base64,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" alt=""><div><div class="cb-logo-word">CARDBOARD</div><div class="cb-logo-sub">▸ CONTENT PULSE</div></div></div>
   <input type="text" id="cbProjectName" value="Новый проект" title="Название проекта">
-  <div class="cb-sep"></div>
-  <div class="cb-share-wrap">
-    <button id="cbBtnImport" class="cb-primary">Импорт</button>
-    <div id="cbImportPop" class="cb-pop cb-pop-left">
-      <button id="cbBtnPick">Добавить фото</button>
+
+  <div class="cb-menu-wrap">
+    <button class="cb-menu-btn" id="cbMenuFileBtn">Файл</button>
+    <div id="cbMenuFile" class="cb-pop">
+      <button id="cbMenuNew">Новый проект<span class="cb-hotkey">⌘N</span></button>
+      <button id="cbBtnOpen">Открыть проект<span class="cb-hotkey">⌘O</span></button>
+      <button id="cbBtnSave">Сохранить<span class="cb-hotkey">⌘S</span></button>
+      <div class="cb-pop-sep"></div>
+      <button id="cbBtnPick">Импорт фото<span class="cb-hotkey">⌘I</span></button>
+      <button id="cbBtnPickRef">Импорт референсов</button>
       <button id="cbBtnFolder" style="display:none">Импорт папки целиком</button>
-      <div class="cb-share-sep"></div>
       <button id="cbBtnWatch" title="Хоткей в Capture One кладёт фото в папку — Cardboard подхватывает">Следить за папкой</button>
+      <div class="cb-pop-sep"></div>
+      <button id="cbBtnPdf">Экспорт PDF<span class="cb-hotkey">⌘E</span></button>
+      <button id="cbBtnList">Экспорт списка (CSV + TXT)</button>
+      <div class="cb-pop-note"><span id="cbMode"></span></div>
     </div>
   </div>
-  <div class="cb-sep"></div>
-  <button id="cbBtnAdd">+ Контейнер</button>
-  <span class="cb-grid-ctl" style="font-size:11px;color:#8a8680;">Шаблон:
-    <select id="cbTplSelect" title="Шаблон для новых карточек"></select>
-  </span>
-  <button id="cbBtnTpl" class="cb-mini" title="Редактор шаблонов">Шаблоны...</button>
-  <div class="cb-spacer"></div>
-  <div class="cb-share-wrap">
-    <button id="cbBtnShare">Экспорт</button>
-    <div id="cbSharePop" class="cb-pop">
-      <button id="cbBtnPdf">Экспорт PDF</button>
-      <button id="cbBtnList">Список (CSV + TXT)</button>
-      <div class="cb-share-sep"></div>
-      <button id="cbBtnSave">Сохранить проект</button>
-      <button id="cbBtnOpen">Открыть проект</button>
-      <div class="cb-share-mode"><span id="cbMode"></span></div>
+
+  <div class="cb-menu-wrap">
+    <button class="cb-menu-btn" id="cbMenuTplBtn">Шаблон</button>
+    <div id="cbMenuTpl" class="cb-pop">
+      <button id="cbMenuTplNew">Создать шаблон</button>
+      <button id="cbMenuTplGallery">Галерея шаблонов</button>
     </div>
+  </div>
+
+  <div class="cb-menu-wrap">
+    <button class="cb-menu-btn" id="cbMenuHelpBtn">Справка</button>
+    <div id="cbMenuHelp" class="cb-pop">
+      <button id="cbMenuHelpGuide">Инструкция</button>
+      <button id="cbMenuHelpSync">Синхронизация с Capture One</button>
+      <button id="cbMenuHelpProducts">Другие продукты</button>
+    </div>
+  </div>
+
+  <div class="cb-spacer"></div>
+
+  <div class="cb-menu-wrap">
+    <button id="cbBtnAdd" class="cb-primary">+ Карточка</button>
+    <div id="cbPickerPop" class="cb-pop cb-pop-right"></div>
   </div>
 </div>
 
 <div class="cb-main">
   <div class="cb-tray">
+    <div class="cb-tray-tabs">
+      <button class="cb-tray-tab cb-tab-active" id="cbTrayTabPhoto">Фото</button>
+      <button class="cb-tray-tab" id="cbTrayTabRef">Референсы</button>
+    </div>
     <div class="cb-tray-head">
       <div class="cb-row">
         <input type="text" id="cbFilter" placeholder="Фильтр по имени файла">
@@ -619,38 +642,99 @@ body.cb-file-drag #cbDropOverlay { display: flex; }
   <div class="cb-outline" id="cbOutline"></div>
 </div>
 
-<!-- Редактор шаблонов карточек -->
-<div id="cbTplModal">
-  <div class="cb-tpl-panel">
-    <h2>Шаблоны карточек</h2>
-    <div class="cb-tpl-row">
-      <label>Шаблон:</label>
-      <select id="cbTplEditSelect"></select>
-      <button id="cbTplNew" class="cb-mini">+ Новый</button>
-      <span class="cb-spacer"></span>
-      <button id="cbTplDelete" class="cb-mini cb-danger">Удалить шаблон</button>
+<!-- Редактор шаблона v2 -->
+<div id="cbTplModal" class="cb-modal">
+  <div class="cb-panel" id="cbTplPanel">
+    <div class="cb-te-left">
+      <h2>Шаблон карточки</h2>
+      <div class="cb-eyebrow" id="cbTeEyebrow">НОВЫЙ</div>
+
+      <div class="cb-lbl">Название шаблона</div>
+      <input type="text" id="cbTplName" placeholder="Например: ALX-T201 · Куртка">
+
+      <div class="cb-lbl">Канвас · A4</div>
+      <div class="cb-canvas-pick">
+        <button class="cb-canvas-btn" data-canvas="h" id="cbTeCanvasH"><span class="cb-canvas-ico cb-ico-h"></span>Горизонтальный</button>
+        <button class="cb-canvas-btn" data-canvas="v" id="cbTeCanvasV"><span class="cb-canvas-ico cb-ico-v"></span>Вертикальный</button>
+      </div>
+
+      <div class="cb-lbl">Раскладка</div>
+      <div class="cb-mode-pick">
+        <button class="cb-mode-btn" data-mode="manual" id="cbTeModeManual">Ручная</button>
+        <button class="cb-mode-btn" data-mode="auto" id="cbTeModeAuto">Авто · по фото</button>
+      </div>
+
+      <div class="cb-lbl">&nbsp;</div>
+      <label class="cb-check"><input type="checkbox" id="cbTeHero"> Заглавное фото <span class="cb-check-note">(герой = 1-й слот)</span></label>
+
+      <div id="cbTeManualCtl">
+        <div class="cb-lbl">Ряды · <span id="cbTeRowCount">2</span></div>
+        <div class="cb-te-row">
+          <button class="cb-mini" id="cbTeRowMinus">−</button>
+          <button class="cb-mini" id="cbTeRowPlus">+</button>
+          <button class="cb-mini" id="cbTeEven">Ровно</button>
+        </div>
+        <div class="cb-lbl">Слоты</div>
+        <div class="cb-te-row">
+          <span class="cb-count">ВЕРТ · <span id="cbTeVCount">0</span></span>
+          <button class="cb-mini" id="cbTeVMinus">−</button>
+          <button class="cb-mini" id="cbTeVPlus">+</button>
+          <span class="cb-count" style="margin-left:12px">ГОР · <span id="cbTeHCount">0</span></span>
+          <button class="cb-mini" id="cbTeHMinus">−</button>
+          <button class="cb-mini" id="cbTeHPlus">+</button>
+        </div>
+      </div>
+
+      <div class="cb-lbl">Пропорции (глобально)</div>
+      <div class="cb-chip-row" style="margin-bottom:6px">
+        <span class="cb-count" style="min-width:70px">ГОРИЗОНТ</span>
+        <span id="cbTeHAspects"></span>
+      </div>
+      <div class="cb-chip-row">
+        <span class="cb-count" style="min-width:70px">ВЕРТИКАЛЬ</span>
+        <span id="cbTeVAspects"></span>
+      </div>
+
+      <div class="cb-te-note" id="cbTeNote">Выберите канвас Г/В и число рядов — слоты раскладываются ровно на всю площадь A4. Тяните слот, чтобы переставить его в другой ряд; клик по бейджу H/V меняет ориентацию; имя слота вписывается прямо на слоте.</div>
+
+      <div class="cb-te-foot">
+        <button class="cb-primary" id="cbTplSave">Сохранить шаблон</button>
+        <span class="cb-spacer"></span>
+        <button id="cbTplClose">Закрыть</button>
+      </div>
     </div>
-    <div class="cb-tpl-row">
-      <label>Название:</label>
-      <input type="text" id="cbTplName" placeholder="Например: Обувь стандарт">
-      <label>Сетка:</label>
-      <button id="cbTplRowMinus" class="cb-mini">−ряд</button>
-      <span id="cbTplGridLabel">3×2</span>
-      <button id="cbTplRowPlus" class="cb-mini">+ряд</button>
-      <button id="cbTplColMinus" class="cb-mini">−кол</button>
-      <button id="cbTplColPlus" class="cb-mini">+кол</button>
-    </div>
-    <div style="font-size:11px;color:#8a8680;margin-bottom:4px;">Имена слотов (видны в пустых слотах, в PDF и в списке):</div>
-    <div class="cb-tpl-slots" id="cbTplSlots"></div>
-    <div class="cb-tpl-foot">
-      <button id="cbTplSave" class="cb-primary">Сохранить шаблон</button>
-      <span class="cb-spacer"></span>
-      <button id="cbTplClose">Закрыть</button>
+    <div class="cb-te-right">
+      <div class="cb-lbl" style="margin-top:0">Живое превью · <span id="cbTeModeLabel">LANDSCAPE</span></div>
+      <div class="cb-te-preview-wrap"><div id="cbTePreview"></div></div>
     </div>
   </div>
 </div>
 
-<div id="cbDropOverlay">Отпустите, чтобы добавить фото</div>
+<!-- Галерея шаблонов -->
+<div id="cbGalModal" class="cb-modal">
+  <div class="cb-panel" id="cbGalPanel">
+    <h2>Галерея шаблонов</h2>
+    <div class="cb-eyebrow">ОТМЕЧЕННЫЕ ПРЕДЛАГАЮТСЯ ПРИ СОЗДАНИИ КАРТОЧКИ</div>
+    <div class="cb-gal-grid" id="cbGalGrid"></div>
+    <div class="cb-gal-foot">
+      <button class="cb-primary" id="cbGalNew">+ Новый шаблон</button>
+      <span class="cb-spacer"></span>
+      <button id="cbGalClose">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+<!-- Справка -->
+<div id="cbInfoModal" class="cb-modal">
+  <div class="cb-panel" id="cbInfoPanel">
+    <h2 id="cbInfoTitle"></h2>
+    <div class="cb-eyebrow">CARDBOARD · CONTENT PULSE</div>
+    <div id="cbInfoBody"></div>
+    <div class="cb-te-foot"><span class="cb-spacer"></span><button id="cbInfoClose">Закрыть</button></div>
+  </div>
+</div>
+
+<div id="cbDropOverlay">Отпустите, чтобы добавить в активную вкладку галереи</div>
 <div id="cbToast"></div>
 <div id="cbPrint"></div>
 
@@ -661,19 +745,21 @@ body.cb-file-drag #cbDropOverlay { display: flex; }
 /* ============================================================
    Cardboard — логика приложения. Чистый JS, префикс cb*.
 
-   Dual-mode:
-     desktop (pywebview) — фото по абсолютным путям, миниатюры
-       генерирует Python в памяти, проект = пути + структура,
-       никаких копий файлов;
-     browser (фолбэк)    — фото встраиваются в проект (dataURL).
+   Dual-mode: desktop (pywebview, фото по путям) / browser (встраивание).
 
-   Модель данных:
-     App.photos[]     — {id, name, path|null, dataUrl|null, w, h, missing}
-     App.cards[]      — {id, title, category, rows, cols,
-                         slots: [photoId|null], slotNames: [str]}
-     App.containers[] — {id, title, size ('s'|'m'|'l'), photoIds: [], text}
-     App.templates[]  — {id, name, rows, cols, slotNames: [str]}
-                        (библиотека хранится в localStorage и в проекте)
+   Модель данных v3:
+     App.photos[]     — {id, name, path|null, dataUrl|null, w, h, missing,
+                         kind: 'photo'|'ref'}
+     App.cards[]      — {id, title, category, tplName,
+                         canvas: 'h'|'v', mode: 'manual'|'auto',
+                         hasHero, rows, hAspect, vAspect,
+                         slots: [{orient, row, name, pid}],   (manual)
+                         pids: [photoId]}                     (auto)
+     App.containers[] — {id, title, size, photoIds: [], text}
+     App.templates[]  — {id, name, canvas, mode, hasHero, rows,
+                         hAspect, vAspect, active,
+                         slots: [{orient, row, name}]}
+   Канвас = A4: горизонтальный 297x210, вертикальный 210x297.
    ============================================================ */
 
 var App = {
@@ -683,30 +769,27 @@ var App = {
   templates: [],
   nextId: 1,
   dirty: false,
-  projectPath: null,          /* путь к .cardboard (desktop) */
-  activeTab: 'cards',         /* активная вкладка: cards | conts */
+  projectPath: null,
+  activeTab: 'cards',
+  trayTab: 'photo',           /* активная вкладка галереи: photo | ref */
   watch: { handle: null, timer: null, seen: {} }
 };
 
-var MAX_SIDE = 1400;          /* макс. сторона фото при импорте (браузер), px */
+var MAX_SIDE = 1400;
 var JPEG_Q = 0.85;
 var IMG_EXT = /\.(jpe?g|png|gif|webp|tiff?|bmp)$/i;
-var TPL_STORE = 'cardboard_templates';
-/* Встроенные быстрые сетки (без имён слотов) */
-var BUILTIN_GRIDS = [
-  { key: '2x2', label: '2×2' },
-  { key: '3x2', label: '3 ряда × 2' },
-  { key: '3x3', label: '3×3' },
-  { key: '1x2', label: '1 ряд × 2' },
-  { key: '1x3', label: '1 ряд × 3' }
-];
+var TPL_STORE_V1 = 'cardboard_templates';
+var TPL_STORE = 'cardboard_templates_v2';
+var H_ASPECTS = ['3/2', '4/3', '16/9', '5/4'];
+var V_ASPECTS = ['2/3', '3/4', '4/5', '9/16'];
+var ASPECT_LABELS = { '3/2': '3:2', '4/3': '4:3', '16/9': '16:9', '5/4': '5:4',
+                      '2/3': '2:3', '3/4': '3:4', '4/5': '4:5', '9/16': '9:16' };
+/* Канвас A4 */
+var CANVAS_AR = { h: 297 / 210, v: 210 / 297 };
 
 /* ---------- Режим работы ---------- */
 
-function cbDesktop() {
-  return !!(window.pywebview && window.pywebview.api);
-}
-
+function cbDesktop() { return !!(window.pywebview && window.pywebview.api); }
 function cbApi() { return window.pywebview.api; }
 
 /* ---------- Утилиты ---------- */
@@ -727,6 +810,11 @@ function cbToast(msg) {
   t._timer = setTimeout(function () { t.style.display = 'none'; }, 2800);
 }
 
+function cbAspectNum(s) {
+  var p = String(s || '3/2').split('/');
+  return (parseFloat(p[0]) / parseFloat(p[1])) || 1.5;
+}
+
 function cbPhotoById(id) {
   for (var i = 0; i < App.photos.length; i++)
     if (App.photos[i].id === id) return App.photos[i];
@@ -736,7 +824,8 @@ function cbPhotoById(id) {
 function cbUsedIds() {
   var used = {};
   App.cards.forEach(function (c) {
-    c.slots.forEach(function (pid) { if (pid) used[pid] = true; });
+    (c.slots || []).forEach(function (s) { if (s.pid) used[s.pid] = true; });
+    (c.pids || []).forEach(function (pid) { used[pid] = true; });
   });
   App.containers.forEach(function (c) {
     c.photoIds.forEach(function (pid) { used[pid] = true; });
@@ -754,355 +843,19 @@ function cbClearDirty() {
 }
 
 window.addEventListener('beforeunload', function (e) {
-  /* в desktop-режиме закрытие обрабатывает Python (диалоги при выходе) */
   if (App.dirty && !cbDesktop()) { e.preventDefault(); e.returnValue = ''; }
 });
 
-/* Разметка фото: миниатюра или заглушка «файл не найден» */
-function cbImgHtml(photo, cls) {
-  if (photo.dataUrl) return '<img class="' + (cls || '') + '" src="' + photo.dataUrl + '" alt="">';
+function cbImgHtml(photo) {
+  if (photo.dataUrl) return '<img src="' + photo.dataUrl + '" alt="">';
   return '<div class="cb-missing-box" title="' + cbEsc(photo.path || photo.name) + '">файл не найден</div>';
 }
 
-/* ---------- Добавление фото в панель (общее для всех источников) ---------- */
+/* ============================================================
+   Justified-движок (порт layout.js основной проги)
+   ============================================================ */
 
-function cbAddPhotos(list) {
-  /* list: [{name, path?, dataUrl?, w, h}] */
-  var added = 0;
-  list.forEach(function (item) {
-    var dup = App.photos.some(function (p) {
-      return (item.path && p.path === item.path) || (!item.path && p.name === item.name);
-    });
-    if (dup) return;
-    App.photos.push({
-      id: cbId(), name: item.name, path: item.path || null,
-      dataUrl: item.dataUrl || null, w: item.w || 0, h: item.h || 0,
-      missing: false
-    });
-    added++;
-  });
-  if (added) { cbMarkDirty(); cbRenderTray(); }
-  return added;
-}
-
-/* ---------- Импорт фото: браузерный путь (встраивание) ---------- */
-
-function cbImportFileEmbedded(file, done) {
-  if (!IMG_EXT.test(file.name)) { done(null); return; }
-  var url = URL.createObjectURL(file);
-  var img = new Image();
-  img.onload = function () {
-    var w = img.naturalWidth, h = img.naturalHeight;
-    var scale = Math.min(1, MAX_SIDE / Math.max(w, h));
-    var cw = Math.round(w * scale), ch = Math.round(h * scale);
-    var cnv = document.createElement('canvas');
-    cnv.width = cw; cnv.height = ch;
-    var ctx = cnv.getContext('2d');
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, cw, ch);
-    ctx.drawImage(img, 0, 0, cw, ch);
-    URL.revokeObjectURL(url);
-    done({ name: file.name, dataUrl: cnv.toDataURL('image/jpeg', JPEG_Q), w: cw, h: ch });
-  };
-  img.onerror = function () { URL.revokeObjectURL(url); done(null); };
-  img.src = url;
-}
-
-function cbImportFilesEmbedded(files) {
-  var list = Array.prototype.slice.call(files);
-  var items = [], idx = 0;
-  function next() {
-    if (idx >= list.length) {
-      var added = cbAddPhotos(items);
-      cbToast(added ? 'Добавлено фото: ' + added : 'Новых фото нет');
-      return;
-    }
-    cbImportFileEmbedded(list[idx++], function (item) { if (item) items.push(item); next(); });
-  }
-  next();
-}
-
-/* ---------- Импорт фото: кнопки ---------- */
-
-document.getElementById('cbBtnPick').onclick = function () {
-  if (cbDesktop()) {
-    cbApi().pick_photos().then(function (list) {
-      var added = cbAddPhotos(list || []);
-      if (list && list.length) cbToast(added ? 'Добавлено фото: ' + added : 'Эти фото уже добавлены');
-    });
-  } else {
-    document.getElementById('cbFileInput').click();
-  }
-};
-document.getElementById('cbFileInput').onchange = function () {
-  if (this.files.length) cbImportFilesEmbedded(this.files);
-  this.value = '';
-};
-document.getElementById('cbBtnFolder').onclick = function () {
-  cbApi().pick_folder().then(function (list) {
-    var added = cbAddPhotos(list || []);
-    if (list && list.length) cbToast('Из папки добавлено: ' + added);
-  });
-};
-
-/* ---------- Drag-and-drop файлов на окно ---------- */
-
-var dragDepth = 0;
-document.addEventListener('dragenter', function (e) {
-  if (e.dataTransfer && e.dataTransfer.types.indexOf('Files') !== -1) {
-    dragDepth++;
-    document.body.classList.add('cb-file-drag');
-  }
-});
-document.addEventListener('dragleave', function () {
-  if (dragDepth > 0 && --dragDepth === 0) document.body.classList.remove('cb-file-drag');
-});
-document.addEventListener('dragover', function (e) { e.preventDefault(); });
-document.addEventListener('drop', function (e) {
-  e.preventDefault();
-  dragDepth = 0;
-  document.body.classList.remove('cb-file-drag');
-  if (!e.dataTransfer || !e.dataTransfer.files.length) return;
-  if (cbDesktop()) {
-    /* pywebview прописывает полный путь в File.pywebviewFullPath */
-    var paths = [];
-    for (var i = 0; i < e.dataTransfer.files.length; i++) {
-      var fp = e.dataTransfer.files[i].pywebviewFullPath;
-      if (fp) paths.push(fp);
-    }
-    if (paths.length) {
-      cbApi().import_dropped(paths).then(function (list) {
-        var added = cbAddPhotos(list || []);
-        cbToast(added ? 'Добавлено фото: ' + added : 'Новых фото нет');
-      });
-      return;
-    }
-    /* пути недоступны — фолбэк на встраивание */
-  }
-  cbImportFilesEmbedded(e.dataTransfer.files);
-});
-
-/* ---------- Слежение за папкой (Capture One hot key) ----------
-   В Capture One на хоткей вешается экспорт-рецепт в папку; Cardboard
-   раз в 2 секунды подхватывает новые файлы из неё.
-   Desktop: сканирует Python (по пути). Браузер: File System Access API. */
-
-function cbWatchUi(on, label) {
-  var st = document.getElementById('cbWatchStatus');
-  st.style.display = on ? 'block' : 'none';
-  if (label) st.textContent = 'Слежу за папкой: ' + label;
-  document.getElementById('cbBtnWatch').textContent = on ? 'Остановить слежение' : 'Следить за папкой';
-}
-
-function cbWatchStart() {
-  if (cbDesktop()) {
-    cbApi().watch_pick().then(function (dir) {
-      if (!dir) return;
-      App.watch.timer = setInterval(function () {
-        cbApi().watch_scan().then(function (list) {
-          if (list && list.length) {
-            var added = cbAddPhotos(list);
-            if (added) cbToast('Из папки: +' + added + ' фото');
-          }
-        });
-      }, 2000);
-      cbWatchUi(true, dir);
-      cbToast('Слежение включено');
-    });
-    return;
-  }
-  if (!window.showDirectoryPicker) {
-    cbToast('В браузере слежение работает в Chrome/Edge. Либо запустите desktop-версию: python3 main.py');
-    return;
-  }
-  window.showDirectoryPicker().then(function (handle) {
-    App.watch.handle = handle;
-    App.watch.seen = {};
-    cbWatchScanBrowser();
-    App.watch.timer = setInterval(cbWatchScanBrowser, 2000);
-    cbWatchUi(true, handle.name);
-    cbToast('Слежение включено: ' + handle.name);
-  }).catch(function () { /* пользователь отменил выбор */ });
-}
-
-function cbWatchStop() {
-  clearInterval(App.watch.timer);
-  App.watch.timer = null;
-  App.watch.handle = null;
-  if (cbDesktop()) cbApi().watch_stop();
-  cbWatchUi(false);
-  cbToast('Слежение остановлено');
-}
-
-function cbWatchScanBrowser() {
-  var h = App.watch.handle;
-  if (!h) return;
-  var fresh = [];
-  var it = h.values();
-  function step() {
-    it.next().then(function (r) {
-      if (r.done) {
-        if (!fresh.length) return;
-        var items = [], idx = 0;
-        (function next() {
-          if (idx >= fresh.length) {
-            var added = cbAddPhotos(items);
-            if (added) cbToast('Из папки: +' + added + ' фото');
-            return;
-          }
-          cbImportFileEmbedded(fresh[idx++], function (item) { if (item) items.push(item); next(); });
-        })();
-        return;
-      }
-      var entry = r.value;
-      if (entry.kind === 'file' && IMG_EXT.test(entry.name) && !App.watch.seen[entry.name]) {
-        App.watch.seen[entry.name] = true;
-        entry.getFile().then(function (f) { fresh.push(f); step(); });
-        return;
-      }
-      step();
-    }).catch(function () { cbWatchStop(); });
-  }
-  step();
-}
-
-document.getElementById('cbBtnWatch').onclick = function () {
-  if (App.watch.timer) cbWatchStop(); else cbWatchStart();
-};
-
-/* ---------- Вкладки: Карточки / Доп. контент ---------- */
-
-function cbSwitchTab(name) {
-  App.activeTab = name;
-  document.getElementById('cbTabCards').style.display = (name === 'cards') ? '' : 'none';
-  document.getElementById('cbTabConts').style.display = (name === 'conts') ? '' : 'none';
-  document.getElementById('cbTabBtnCards').classList.toggle('cb-tab-active', name === 'cards');
-  document.getElementById('cbTabBtnConts').classList.toggle('cb-tab-active', name === 'conts');
-  /* одна кнопка добавления — контекст зависит от вкладки */
-  document.getElementById('cbBtnAdd').textContent = (name === 'cards') ? '+ Карточка' : '+ Контейнер';
-  cbRenderOutline();
-}
-
-function cbUpdateTabLabels() {
-  document.getElementById('cbTabBtnCards').textContent =
-    'Карточки' + (App.cards.length ? ' · ' + App.cards.length : '');
-  document.getElementById('cbTabBtnConts').textContent =
-    'Доп. контент' + (App.containers.length ? ' · ' + App.containers.length : '');
-  cbRenderOutline();
-}
-
-document.getElementById('cbTabBtnCards').onclick = function () { cbSwitchTab('cards'); };
-document.getElementById('cbTabBtnConts').onclick = function () { cbSwitchTab('conts'); };
-
-/* Контекстное добавление: вкладка «Карточки» -> карточка по шаблону,
-   вкладка «Доп. контент» -> контейнер без шаблона */
-document.getElementById('cbBtnAdd').onclick = function () {
-  if (App.activeTab === 'conts') cbAddCont(); else cbAddCard();
-};
-
-/* ---------- Навигация по карточкам/контейнерам (правая панель) ---------- */
-
-function cbRenderOutline() {
-  var host = document.getElementById('cbOutline');
-  var isCards = App.activeTab !== 'conts';
-  var list = isCards ? App.cards : App.containers;
-  var html = '<div class="cb-outline-title">' + (isCards ? 'Карточки' : 'Контейнеры') + '</div>';
-  if (!list.length) {
-    html += '<div class="cb-outline-empty">пока пусто</div>';
-  }
-  list.forEach(function (item, i) {
-    var count = isCards
-      ? item.slots.filter(function (x) { return x; }).length + '/' + item.slots.length
-      : item.photoIds.length;
-    html += '<button class="cb-outline-item" data-target="' + item.id + '" title="' + cbEsc(item.title) + '">';
-    html += '<span class="cb-outline-num">' + (i + 1) + '.</span>' + cbEsc(item.title);
-    html += '<span class="cb-outline-count">' + count + '</span>';
-    html += '</button>';
-  });
-  host.innerHTML = html;
-}
-
-document.getElementById('cbOutline').addEventListener('click', function (e) {
-  var btn = e.target.closest('.cb-outline-item');
-  if (!btn) return;
-  var id = btn.getAttribute('data-target');
-  var el = document.querySelector('[data-cid="' + id + '"], [data-kid="' + id + '"]');
-  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-});
-
-/* ---------- Ресайз галереи перетаскиванием границы ---------- */
-
-var TRAY_W_KEY = 'cardboard_tray_width';
-
-function cbInitResizer() {
-  var tray = document.querySelector('.cb-tray');
-  var rz = document.getElementById('cbResizer');
-  try {
-    var saved = parseInt(localStorage.getItem(TRAY_W_KEY), 10);
-    if (saved) tray.style.width = Math.max(160, Math.min(720, saved)) + 'px';
-  } catch (e) { /* приватный режим */ }
-  rz.addEventListener('mousedown', function (e) {
-    e.preventDefault();
-    rz.classList.add('cb-dragging');
-    document.body.classList.add('cb-resizing');
-    function onMove(ev) {
-      var w = Math.max(160, Math.min(720, ev.clientX - tray.getBoundingClientRect().left));
-      tray.style.width = w + 'px';
-    }
-    function onUp() {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-      rz.classList.remove('cb-dragging');
-      document.body.classList.remove('cb-resizing');
-      try { localStorage.setItem(TRAY_W_KEY, parseInt(tray.style.width, 10)); } catch (e) { }
-    }
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-  });
-}
-
-cbInitResizer();
-
-/* ---------- Попапы «Импорт» / «Экспорт» ---------- */
-
-function cbPop(id, open) {
-  var pop = document.getElementById(id);
-  pop.classList.toggle('cb-open', open === undefined ? !pop.classList.contains('cb-open') : open);
-}
-function cbSharePop(open) { cbPop('cbSharePop', open); }   /* совместимость со старыми вызовами */
-
-document.getElementById('cbBtnShare').onclick = function (e) {
-  e.stopPropagation();
-  cbPop('cbImportPop', false);
-  cbPop('cbSharePop');
-};
-document.getElementById('cbBtnImport').onclick = function (e) {
-  e.stopPropagation();
-  cbPop('cbSharePop', false);
-  cbPop('cbImportPop');
-};
-/* после выбора действия попап закрывается */
-document.getElementById('cbSharePop').addEventListener('click', function (e) {
-  if (e.target.closest('button')) cbPop('cbSharePop', false);
-});
-document.getElementById('cbImportPop').addEventListener('click', function (e) {
-  if (e.target.closest('button')) cbPop('cbImportPop', false);
-});
-document.addEventListener('click', function (e) {
-  if (!e.target.closest('.cb-share-wrap')) {
-    cbPop('cbSharePop', false);
-    cbPop('cbImportPop', false);
-  }
-});
-
-/* ---------- Justified-движок раскладки (порт из layout.js основной проги) ----------
-   Раскладка в стиле Flickr/Яндекс.Диска: фото сохраняют натуральные
-   пропорции, БЕЗ кропа рядов, каждый ряд заполнен по ширине впритык.
-   Боксы считаются в эталонной ширине и раскладываются в процентах —
-   контейнер масштабируется чистым CSS (важно для ресайзабельной галереи).
-   Используется для превью-галереи; позже — для раскладки карточек. */
-
-var CB_JUST_REF_WIDTH = 1060;   /* эталонная ширина расчёта */
+var CB_JUST_REF_WIDTH = 1060;
 
 function cbSimpleJustified(aspects, opts) {
   var cw = opts.containerWidth || CB_JUST_REF_WIDTH;
@@ -1126,17 +879,12 @@ function cbSimpleJustified(aspects, opts) {
       var trialHeight = availableWidth / trialSum;
 
       if (rowAspects.length === 0) {
-        rowAspects.push(ar);
-        sumAspect = trialSum;
-        i++;
+        rowAspects.push(ar); sumAspect = trialSum; i++;
         if (trialHeight <= trh) break;
         continue;
       }
       if (trialHeight < minRowHeight) break;
-
-      rowAspects.push(ar);
-      sumAspect = trialSum;
-      i++;
+      rowAspects.push(ar); sumAspect = trialSum; i++;
       if (trialHeight <= trh) break;
     }
 
@@ -1144,8 +892,7 @@ function cbSimpleJustified(aspects, opts) {
 
     var rowAvailableWidth = cw - (rowAspects.length - 1) * spacing;
     var rowHeight = rowAvailableWidth / sumAspect;
-    var isLastRow = (i >= aspects.length);
-    if (isLastRow && rowHeight > trh * 1.3) rowHeight = trh;
+    if (i >= aspects.length && rowHeight > trh * 1.3) rowHeight = trh;
 
     var x = 0;
     for (var j = 0; j < rowAspects.length; j++) {
@@ -1159,7 +906,6 @@ function cbSimpleJustified(aspects, opts) {
   return { containerHeight: (top > 0) ? top - spacing : 0, boxes: boxes };
 }
 
-/* items -> HTML: абсолютные боксы в процентах + padding-top trick */
 function cbJustifiedHTML(count, itemHTMLFn, aspectFn, opts) {
   opts = opts || {};
   var aspects = [];
@@ -1191,31 +937,581 @@ function cbJustifiedHTML(count, itemHTMLFn, aspectFn, opts) {
   return html;
 }
 
-/* ---------- Панель фото ---------- */
+/* ============================================================
+   Канвас-движок: боксы слотов на странице A4
+   ------------------------------------------------------------
+   Работает в юнитах: W=1000, H=W/AR канваса. Возвращает
+   [{x,y,w,h, slotIdx}] в юнитах + размеры канваса. Один код
+   для превью редактора, карточек и PDF.
+   ============================================================ */
+
+var CB_GAP = 12; /* юниты */
+
+/* Ручной шаблон: hero + ряды. layout = {canvas, hasHero, rows, hAspect, vAspect, slots} */
+function cbManualBoxes(layout) {
+  var W = 1000;
+  var H = W / CANVAS_AR[layout.canvas || 'h'];
+  var hAR = cbAspectNum(layout.hAspect);
+  var vAR = cbAspectNum(layout.vAspect);
+  var slots = layout.slots || [];
+  var boxes = [];
+  var zone = { x: 0, y: 0, w: W, h: H };
+  var rest = slots.map(function (s, i) { return { s: s, idx: i }; });
+
+  if (layout.hasHero && slots.length > 0) {
+    var hero = slots[0];
+    rest = rest.slice(1);
+    if (hero.orient === 'h') {
+      /* герой-горизонт: полоса сверху на всю ширину */
+      var heroH = Math.min(W / hAR, H * (rest.length ? 0.55 : 1));
+      boxes.push({ x: 0, y: 0, w: W, h: heroH, slotIdx: 0 });
+      zone = { x: 0, y: heroH + CB_GAP, w: W, h: Math.max(0, H - heroH - CB_GAP) };
+    } else {
+      /* герой-вертикаль: колонка слева на всю высоту */
+      var heroW = Math.max(W * 0.3, Math.min(H * vAR, W * 0.6));
+      if (!rest.length) heroW = W;
+      boxes.push({ x: 0, y: 0, w: heroW, h: H, slotIdx: 0 });
+      zone = { x: heroW + CB_GAP, y: 0, w: Math.max(0, W - heroW - CB_GAP), h: H };
+    }
+  }
+
+  if (rest.length) {
+    var nRows = Math.max(1, layout.rows || 1);
+    /* сгруппировать по row (кламп в границы) */
+    var byRow = [];
+    for (var r = 0; r < nRows; r++) byRow.push([]);
+    rest.forEach(function (item) {
+      var r = Math.min(nRows - 1, Math.max(0, item.s.row || 0));
+      byRow[r].push(item);
+    });
+    var rowH = (zone.h - (nRows - 1) * CB_GAP) / nRows;
+    for (var ri = 0; ri < nRows; ri++) {
+      var row = byRow[ri];
+      var y = zone.y + ri * (rowH + CB_GAP);
+      if (!row.length) continue;
+      var sum = 0;
+      row.forEach(function (item) { sum += (item.s.orient === 'h') ? hAR : vAR; });
+      var availW = zone.w - (row.length - 1) * CB_GAP;
+      var x = zone.x;
+      row.forEach(function (item) {
+        var ar = (item.s.orient === 'h') ? hAR : vAR;
+        var w = availW * ar / sum;
+        boxes.push({ x: x, y: y, w: w, h: rowH, slotIdx: item.idx });
+        x += w + CB_GAP;
+      });
+    }
+  }
+  return { W: W, H: H, boxes: boxes };
+}
+
+/* Авто-карточка: боксы из фактических пропорций фото */
+function cbAutoBoxes(layout, aspects) {
+  var W = 1000;
+  var H = W / CANVAS_AR[layout.canvas || 'h'];
+  var boxes = [];
+  if (!aspects.length) return { W: W, H: H, boxes: boxes };
+  var zone = { x: 0, y: 0, w: W, h: H };
+  var idx0 = 0;
+
+  if (layout.hasHero && aspects.length > 0) {
+    var heroAR = aspects[0];
+    idx0 = 1;
+    if (aspects.length === 1) {
+      boxes.push({ x: 0, y: 0, w: W, h: H, slotIdx: 0 });
+      return { W: W, H: H, boxes: boxes };
+    }
+    if (heroAR >= 1) {
+      var heroH = Math.min(W / heroAR, H * 0.55);
+      boxes.push({ x: 0, y: 0, w: W, h: heroH, slotIdx: 0 });
+      zone = { x: 0, y: heroH + CB_GAP, w: W, h: H - heroH - CB_GAP };
+    } else {
+      var heroW = Math.max(W * 0.3, Math.min(H * heroAR, W * 0.6));
+      boxes.push({ x: 0, y: 0, w: heroW, h: H, slotIdx: 0 });
+      zone = { x: heroW + CB_GAP, y: 0, w: W - heroW - CB_GAP, h: H };
+    }
+  }
+
+  var rest = aspects.slice(idx0);
+  if (rest.length) {
+    var perRow = (zone.w > zone.h) ? 3 : 2;
+    var nRows = Math.max(1, Math.ceil(rest.length / perRow));
+    var rowH = (zone.h - (nRows - 1) * CB_GAP) / nRows;
+    var i = 0;
+    for (var r = 0; r < nRows; r++) {
+      var count = Math.min(rest.length - i, Math.ceil((rest.length - i) / (nRows - r)));
+      var sum = 0;
+      for (var k = 0; k < count; k++) sum += rest[i + k];
+      var availW = zone.w - (count - 1) * CB_GAP;
+      var x = zone.x;
+      var y = zone.y + r * (rowH + CB_GAP);
+      for (var k2 = 0; k2 < count; k2++) {
+        var w = availW * rest[i + k2] / sum;
+        boxes.push({ x: x, y: y, w: w, h: rowH, slotIdx: idx0 + i + k2 });
+        x += w + CB_GAP;
+      }
+      i += count;
+    }
+  }
+  return { W: W, H: H, boxes: boxes };
+}
+
+/* Общий рендер страницы: geom -> HTML. slotHTMLFn(slotIdx) — содержимое бокса */
+function cbPageHTML(canvas, geom, slotHTMLFn, extraAttrs) {
+  var html = '<div class="cb-page cb-page-' + (canvas || 'h') + '"' + (extraAttrs || '') + '>';
+  geom.boxes.forEach(function (b) {
+    html += '<div class="cb-box" style="left:' + (b.x / geom.W * 100).toFixed(3)
+      + '%;top:' + (b.y / geom.H * 100).toFixed(3)
+      + '%;width:' + (b.w / geom.W * 100).toFixed(3)
+      + '%;height:' + (b.h / geom.H * 100).toFixed(3) + '%;">';
+    html += slotHTMLFn(b.slotIdx);
+    html += '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+/* ============================================================
+   Импорт фото и референсов
+   ============================================================ */
+
+function cbAddPhotos(list, kind) {
+  var added = 0;
+  list.forEach(function (item) {
+    var dup = App.photos.some(function (p) {
+      return p.kind === kind && ((item.path && p.path === item.path) || (!item.path && p.name === item.name));
+    });
+    if (dup) return;
+    App.photos.push({
+      id: cbId(), name: item.name, path: item.path || null,
+      dataUrl: item.dataUrl || null, w: item.w || 0, h: item.h || 0,
+      missing: false, kind: kind || 'photo'
+    });
+    added++;
+  });
+  if (added) { cbMarkDirty(); cbRenderTray(); }
+  return added;
+}
+
+function cbImportFileEmbedded(file, done) {
+  if (!IMG_EXT.test(file.name)) { done(null); return; }
+  var url = URL.createObjectURL(file);
+  var img = new Image();
+  img.onload = function () {
+    var w = img.naturalWidth, h = img.naturalHeight;
+    var scale = Math.min(1, MAX_SIDE / Math.max(w, h));
+    var cw = Math.round(w * scale), ch = Math.round(h * scale);
+    var cnv = document.createElement('canvas');
+    cnv.width = cw; cnv.height = ch;
+    var ctx = cnv.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, cw, ch);
+    ctx.drawImage(img, 0, 0, cw, ch);
+    URL.revokeObjectURL(url);
+    done({ name: file.name, dataUrl: cnv.toDataURL('image/jpeg', JPEG_Q), w: cw, h: ch });
+  };
+  img.onerror = function () { URL.revokeObjectURL(url); done(null); };
+  img.src = url;
+}
+
+function cbImportFilesEmbedded(files, kind) {
+  var list = Array.prototype.slice.call(files);
+  var items = [], idx = 0;
+  function next() {
+    if (idx >= list.length) {
+      var added = cbAddPhotos(items, kind);
+      cbToast(added ? (kind === 'ref' ? 'Добавлено референсов: ' : 'Добавлено фото: ') + added : 'Новых файлов нет');
+      return;
+    }
+    cbImportFileEmbedded(list[idx++], function (item) { if (item) items.push(item); next(); });
+  }
+  next();
+}
+
+var _pendingImportKind = 'photo';
+
+function cbImportPick(kind) {
+  _pendingImportKind = kind;
+  if (cbDesktop()) {
+    cbApi().pick_photos().then(function (list) {
+      var added = cbAddPhotos(list || [], kind);
+      if (list && list.length) cbToast(added ? 'Добавлено: ' + added : 'Эти файлы уже добавлены');
+      if (kind === 'ref') cbTraySwitch('ref');
+    });
+  } else {
+    document.getElementById('cbFileInput').click();
+  }
+}
+
+document.getElementById('cbBtnPick').onclick = function () { cbImportPick('photo'); };
+document.getElementById('cbBtnPickRef').onclick = function () { cbImportPick('ref'); };
+document.getElementById('cbFileInput').onchange = function () {
+  if (this.files.length) cbImportFilesEmbedded(this.files, _pendingImportKind);
+  this.value = '';
+};
+document.getElementById('cbBtnFolder').onclick = function () {
+  var kind = App.trayTab === 'ref' ? 'ref' : 'photo';
+  cbApi().pick_folder().then(function (list) {
+    var added = cbAddPhotos(list || [], kind);
+    if (list && list.length) cbToast('Из папки добавлено: ' + added);
+  });
+};
+
+/* Drag-and-drop файлов: в активную вкладку галереи */
+var dragDepth = 0;
+document.addEventListener('dragenter', function (e) {
+  if (e.dataTransfer && e.dataTransfer.types.indexOf('Files') !== -1) {
+    dragDepth++;
+    document.body.classList.add('cb-file-drag');
+  }
+});
+document.addEventListener('dragleave', function () {
+  if (dragDepth > 0 && --dragDepth === 0) document.body.classList.remove('cb-file-drag');
+});
+document.addEventListener('dragover', function (e) { e.preventDefault(); });
+document.addEventListener('drop', function (e) {
+  e.preventDefault();
+  dragDepth = 0;
+  document.body.classList.remove('cb-file-drag');
+  if (!e.dataTransfer || !e.dataTransfer.files.length) return;
+  var kind = App.trayTab === 'ref' ? 'ref' : 'photo';
+  if (cbDesktop()) {
+    var paths = [];
+    for (var i = 0; i < e.dataTransfer.files.length; i++) {
+      var fp = e.dataTransfer.files[i].pywebviewFullPath;
+      if (fp) paths.push(fp);
+    }
+    if (paths.length) {
+      cbApi().import_dropped(paths).then(function (list) {
+        var added = cbAddPhotos(list || [], kind);
+        cbToast(added ? 'Добавлено: ' + added : 'Новых файлов нет');
+      });
+      return;
+    }
+  }
+  cbImportFilesEmbedded(e.dataTransfer.files, kind);
+});
+
+/* ---------- Слежение за папкой (Capture One hot key) ---------- */
+
+function cbWatchUi(on, label) {
+  var st = document.getElementById('cbWatchStatus');
+  st.style.display = on ? 'block' : 'none';
+  if (label) st.textContent = 'Слежу за папкой: ' + label;
+  document.getElementById('cbBtnWatch').textContent = on ? 'Остановить слежение' : 'Следить за папкой';
+}
+
+function cbWatchStart() {
+  if (cbDesktop()) {
+    cbApi().watch_pick().then(function (dir) {
+      if (!dir) return;
+      App.watch.timer = setInterval(function () {
+        cbApi().watch_scan().then(function (list) {
+          if (list && list.length) {
+            var added = cbAddPhotos(list, 'photo');
+            if (added) cbToast('Из папки: +' + added + ' фото');
+          }
+        });
+      }, 2000);
+      cbWatchUi(true, dir);
+      cbToast('Слежение включено');
+    });
+    return;
+  }
+  if (!window.showDirectoryPicker) {
+    cbToast('В браузере слежение работает в Chrome/Edge. Либо запустите desktop-версию');
+    return;
+  }
+  window.showDirectoryPicker().then(function (handle) {
+    App.watch.handle = handle;
+    App.watch.seen = {};
+    cbWatchScanBrowser();
+    App.watch.timer = setInterval(cbWatchScanBrowser, 2000);
+    cbWatchUi(true, handle.name);
+    cbToast('Слежение включено: ' + handle.name);
+  }).catch(function () { /* отменено */ });
+}
+
+function cbWatchStop() {
+  clearInterval(App.watch.timer);
+  App.watch.timer = null;
+  App.watch.handle = null;
+  if (cbDesktop()) cbApi().watch_stop();
+  cbWatchUi(false);
+  cbToast('Слежение остановлено');
+}
+
+function cbWatchScanBrowser() {
+  var h = App.watch.handle;
+  if (!h) return;
+  var fresh = [];
+  var it = h.values();
+  function step() {
+    it.next().then(function (r) {
+      if (r.done) {
+        if (!fresh.length) return;
+        var items = [], idx = 0;
+        (function next() {
+          if (idx >= fresh.length) {
+            var added = cbAddPhotos(items, 'photo');
+            if (added) cbToast('Из папки: +' + added + ' фото');
+            return;
+          }
+          cbImportFileEmbedded(fresh[idx++], function (item) { if (item) items.push(item); next(); });
+        })();
+        return;
+      }
+      var entry = r.value;
+      if (entry.kind === 'file' && IMG_EXT.test(entry.name) && !App.watch.seen[entry.name]) {
+        App.watch.seen[entry.name] = true;
+        entry.getFile().then(function (f) { fresh.push(f); step(); });
+        return;
+      }
+      step();
+    }).catch(function () { cbWatchStop(); });
+  }
+  step();
+}
+
+document.getElementById('cbBtnWatch').onclick = function () {
+  if (App.watch.timer) cbWatchStop(); else cbWatchStart();
+};
+
+/* ============================================================
+   Меню-бар и попапы
+   ============================================================ */
+
+var CB_POPS = ['cbMenuFile', 'cbMenuTpl', 'cbMenuHelp', 'cbPickerPop'];
+
+function cbPop(id, open) {
+  var pop = document.getElementById(id);
+  var willOpen = (open === undefined) ? !pop.classList.contains('cb-open') : open;
+  if (willOpen) {
+    CB_POPS.forEach(function (other) {
+      if (other !== id) document.getElementById(other).classList.remove('cb-open');
+    });
+  }
+  pop.classList.toggle('cb-open', willOpen);
+}
+
+function cbCloseAllPops() {
+  CB_POPS.forEach(function (id) { document.getElementById(id).classList.remove('cb-open'); });
+}
+
+[['cbMenuFileBtn', 'cbMenuFile'], ['cbMenuTplBtn', 'cbMenuTpl'], ['cbMenuHelpBtn', 'cbMenuHelp']].forEach(function (pair) {
+  document.getElementById(pair[0]).onclick = function (e) {
+    e.stopPropagation();
+    cbPop(pair[1]);
+  };
+});
+CB_POPS.forEach(function (id) {
+  document.getElementById(id).addEventListener('click', function (e) {
+    if (e.target.closest('button')) cbCloseAllPops();
+  });
+});
+document.addEventListener('click', function (e) {
+  if (!e.target.closest('.cb-menu-wrap')) cbCloseAllPops();
+});
+
+/* Хоткеи */
+document.addEventListener('keydown', function (e) {
+  var mod = e.metaKey || e.ctrlKey;
+  if (!mod) return;
+  var k = e.key.toLowerCase();
+  if (k === 'n') { e.preventDefault(); cbNewProject(); }
+  else if (k === 'o') { e.preventDefault(); document.getElementById('cbBtnOpen').click(); }
+  else if (k === 's') { e.preventDefault(); cbSaveProject(); }
+  else if (k === 'i') { e.preventDefault(); cbImportPick('photo'); }
+  else if (k === 'e') { e.preventDefault(); cbExportPdf(); }
+});
+
+function cbNewProject() {
+  if (App.dirty && !confirm('Есть несохранённые изменения. Начать новый проект?')) return;
+  App.photos = [];
+  App.cards = [];
+  App.containers = [];
+  App.projectPath = null;
+  document.getElementById('cbProjectName').value = 'Новый проект';
+  cbClearDirty();
+  cbRenderTray(); cbRenderCards(); cbRenderConts();
+  cbToast('Новый проект');
+}
+document.getElementById('cbMenuNew').onclick = cbNewProject;
+
+/* ---------- Справка ---------- */
+
+var CB_HELP = {
+  guide: {
+    title: 'Инструкция',
+    body: '<h3>1. Импорт</h3>Файл → Импорт фото (⌘I) — или просто перетащите файлы в окно: они попадут в активную вкладку галереи (Фото или Референсы). Фото не копируются: Cardboard запоминает только пути.'
+      + '<h3>2. Шаблон</h3>Шаблон → Создать шаблон: канвас A4 (горизонтальный/вертикальный), ручная раскладка (ряды + слоты В/Г) или авто по фото, заглавное фото, имена слотов. В Галерее шаблонов отметьте те, что предлагать при вёрстке.'
+      + '<h3>3. Вёрстка</h3>«+ Карточка» → выберите шаблон → перетаскивайте фото из галереи в слоты. Слоты меняются местами перетаскиванием. Референсы можно ставить в слоты как ТЗ — на них метка REF.'
+      + '<h3>4. Экспорт</h3>Файл → Экспорт PDF (⌘E): карточки печатаются страницами A4 один в один. Экспорт списка — CSV/TXT: карточка → слот → файл → полный путь.'
+      + '<h3>5. Проект</h3>Один файл .cardboard: пути, структура, шаблоны. При закрытии приложение спросит про несохранённое и предложит удалить файл проекта, если он больше не нужен.',
+    links: []
+  },
+  sync: {
+    title: 'Синхронизация с Capture One',
+    body: '<ol><li>В Capture One создайте экспорт-рецепт: JPEG, любая папка, например <b>~/Pictures/cardboard-inbox</b>.</li>'
+      + '<li>Назначьте хоткей на «Export with recipe» (Edit → Edit Keyboard Shortcuts).</li>'
+      + '<li>В Cardboard: Файл → Следить за папкой — выберите эту папку.</li>'
+      + '<li>Дальше: выделили фото в Capture One → хоткей → через пару секунд они в галерее Cardboard.</li></ol>'
+      + 'Слежение опрашивает папку раз в 2 секунды и подхватывает только новые файлы.',
+    links: []
+  },
+  products: {
+    title: 'Другие продукты',
+    body: '<h3>Content Pulse</h3>Платформа для визуального продакшена: пайплайн съёмки, согласование с клиентом, ретушь — карточка товара в центре. Cardboard — её standalone-инструмент вёрстки.'
+      + '<h3>Rate Setter</h3>Быстрый отбор фото для Capture One: рейтинг и ключевые слова одним хоткеем, прямо в сессию.<br><br>'
+      + '<a href="https://github.com/barinskim-cmyk/content-pulse-rate-setter/releases" target="_blank">Rate Setter — скачать</a>',
+    links: []
+  }
+};
+
+function cbShowInfo(key) {
+  var info = CB_HELP[key];
+  document.getElementById('cbInfoTitle').textContent = info.title;
+  document.getElementById('cbInfoBody').innerHTML = info.body;
+  document.getElementById('cbInfoModal').classList.add('cb-open');
+}
+document.getElementById('cbMenuHelpGuide').onclick = function () { cbShowInfo('guide'); };
+document.getElementById('cbMenuHelpSync').onclick = function () { cbShowInfo('sync'); };
+document.getElementById('cbMenuHelpProducts').onclick = function () { cbShowInfo('products'); };
+document.getElementById('cbInfoClose').onclick = function () {
+  document.getElementById('cbInfoModal').classList.remove('cb-open');
+};
+
+/* ============================================================
+   Вкладки: Карточки / Доп. контент + навигация
+   ============================================================ */
+
+function cbSwitchTab(name) {
+  App.activeTab = name;
+  document.getElementById('cbTabCards').style.display = (name === 'cards') ? '' : 'none';
+  document.getElementById('cbTabConts').style.display = (name === 'conts') ? '' : 'none';
+  document.getElementById('cbTabBtnCards').classList.toggle('cb-tab-active', name === 'cards');
+  document.getElementById('cbTabBtnConts').classList.toggle('cb-tab-active', name === 'conts');
+  document.getElementById('cbBtnAdd').textContent = (name === 'cards') ? '+ Карточка' : '+ Контейнер';
+  cbRenderOutline();
+}
+
+function cbUpdateTabLabels() {
+  document.getElementById('cbTabBtnCards').textContent =
+    'Карточки' + (App.cards.length ? ' · ' + App.cards.length : '');
+  document.getElementById('cbTabBtnConts').textContent =
+    'Доп. контент' + (App.containers.length ? ' · ' + App.containers.length : '');
+  cbRenderOutline();
+}
+
+document.getElementById('cbTabBtnCards').onclick = function () { cbSwitchTab('cards'); };
+document.getElementById('cbTabBtnConts').onclick = function () { cbSwitchTab('conts'); };
+
+function cbRenderOutline() {
+  var host = document.getElementById('cbOutline');
+  var isCards = App.activeTab !== 'conts';
+  var list = isCards ? App.cards : App.containers;
+  var html = '<div class="cb-outline-title">' + (isCards ? 'Карточки' : 'Контейнеры') + '</div>';
+  if (!list.length) html += '<div class="cb-outline-empty">пока пусто</div>';
+  list.forEach(function (item, i) {
+    var count;
+    if (isCards) {
+      count = (item.mode === 'auto')
+        ? (item.pids || []).length
+        : item.slots.filter(function (s) { return s.pid; }).length + '/' + item.slots.length;
+    } else {
+      count = item.photoIds.length;
+    }
+    html += '<button class="cb-outline-item" data-target="' + item.id + '" title="' + cbEsc(item.title) + '">';
+    html += '<span class="cb-outline-num">' + (i + 1) + '.</span>' + cbEsc(item.title);
+    html += '<span class="cb-outline-count">' + count + '</span>';
+    html += '</button>';
+  });
+  host.innerHTML = html;
+}
+
+document.getElementById('cbOutline').addEventListener('click', function (e) {
+  var btn = e.target.closest('.cb-outline-item');
+  if (!btn) return;
+  var id = btn.getAttribute('data-target');
+  var el = document.querySelector('[data-cid="' + id + '"], [data-kid="' + id + '"]');
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
+/* ---------- Ресайз галереи ---------- */
+
+var TRAY_W_KEY = 'cardboard_tray_width';
+
+(function cbInitResizer() {
+  var tray = document.querySelector('.cb-tray');
+  var rz = document.getElementById('cbResizer');
+  try {
+    var saved = parseInt(localStorage.getItem(TRAY_W_KEY), 10);
+    if (saved) tray.style.width = Math.max(180, Math.min(620, saved)) + 'px';
+  } catch (e) { /* приватный режим */ }
+  rz.addEventListener('mousedown', function (e) {
+    e.preventDefault();
+    rz.classList.add('cb-dragging');
+    document.body.classList.add('cb-resizing');
+    function onMove(ev) {
+      var w = Math.max(180, Math.min(620, ev.clientX - tray.getBoundingClientRect().left));
+      tray.style.width = w + 'px';
+    }
+    function onUp() {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      rz.classList.remove('cb-dragging');
+      document.body.classList.remove('cb-resizing');
+      try { localStorage.setItem(TRAY_W_KEY, parseInt(tray.style.width, 10)); } catch (e2) { }
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+})();
+
+/* ============================================================
+   Галерея превью: вкладки Фото / Референсы, justified
+   ============================================================ */
+
+function cbTraySwitch(tab) {
+  App.trayTab = tab;
+  document.getElementById('cbTrayTabPhoto').classList.toggle('cb-tab-active', tab === 'photo');
+  document.getElementById('cbTrayTabRef').classList.toggle('cb-tab-active', tab === 'ref');
+  cbRenderTray();
+}
+document.getElementById('cbTrayTabPhoto').onclick = function () { cbTraySwitch('photo'); };
+document.getElementById('cbTrayTabRef').onclick = function () { cbTraySwitch('ref'); };
 
 function cbRenderTray() {
   var grid = document.getElementById('cbTrayGrid');
   var filter = document.getElementById('cbFilter').value.toLowerCase();
   var used = cbUsedIds();
+  var kind = App.trayTab === 'ref' ? 'ref' : 'photo';
 
-  /* Натуральная числовая сортировка имён (как в previews.js основной проги):
-     иначе "_0001 10.jpg" встаёт раньше "_0001 2.jpg" */
-  var list = App.photos.slice().sort(function (a, b) {
+  var all = App.photos.filter(function (p) { return (p.kind || 'photo') === kind; });
+  var list = all.slice().sort(function (a, b) {
     return String(a.name).localeCompare(String(b.name), undefined, { numeric: true, sensitivity: 'base' });
   });
   if (filter) {
     list = list.filter(function (p) { return p.name.toLowerCase().indexOf(filter) !== -1; });
   }
 
-  if (!App.photos.length) {
-    grid.innerHTML = '<div class="cb-tray-empty">Перетащите фото сюда,<br>нажмите «Импорт»<br>или включите слежение за папкой<br>экспорта Capture One</div>';
+  /* счётчики вкладок галереи */
+  var nPhoto = 0, nRef = 0;
+  App.photos.forEach(function (p) { if ((p.kind || 'photo') === 'ref') nRef++; else nPhoto++; });
+  document.getElementById('cbTrayTabPhoto').textContent = 'Фото' + (nPhoto ? ' · ' + nPhoto : '');
+  document.getElementById('cbTrayTabRef').textContent = 'Референсы' + (nRef ? ' · ' + nRef : '');
+
+  if (!all.length) {
+    grid.innerHTML = '<div class="cb-tray-empty">' + (kind === 'ref'
+      ? 'Соберите ракурсы-референсы:<br>Файл → Импорт референсов<br>или перетащите картинки сюда.<br>Рефами можно заполнить шаблон<br>как ТЗ на съёмку'
+      : 'Перетащите фото сюда,<br>Файл → Импорт фото (⌘I)<br>или включите слежение за папкой<br>экспорта Capture One') + '</div>';
   } else {
     grid.innerHTML = cbJustifiedHTML(
       list.length,
       function (i) {
         var p = list[i];
         return '<div class="cb-thumb' + (used[p.id] ? ' cb-used' : '') + '" draggable="true" data-pid="' + p.id
-          + '" title="' + cbEsc(p.name) + (p.path ? '\n' + cbEsc(p.path) : '') + '">' + cbImgHtml(p) + '</div>';
+          + '" title="' + cbEsc(p.name) + (p.path ? '\n' + cbEsc(p.path) : '') + '">' + cbImgHtml(p)
+          + (p.kind === 'ref' ? '<span class="cb-ref-chip">REF</span>' : '') + '</div>';
       },
       function (i) {
         var p = list[i];
@@ -1227,7 +1523,8 @@ function cbRenderTray() {
 
   var usedCount = Object.keys(used).length;
   document.getElementById('cbTrayStats').textContent =
-    'Фото: ' + App.photos.length + (filter ? ' (показано ' + list.length + ')' : '') + ' · в макете: ' + usedCount;
+    (kind === 'ref' ? 'Рефов: ' + nRef : 'Фото: ' + nPhoto)
+    + (filter ? ' (показано ' + list.length + ')' : '') + ' · в макете: ' + usedCount;
 }
 
 document.getElementById('cbFilter').oninput = function () { cbRenderTray(); };
@@ -1237,18 +1534,9 @@ document.getElementById('cbTrayGrid').addEventListener('dragstart', function (e)
   if (t) e.dataTransfer.setData('text/plain', 'photo:' + t.getAttribute('data-pid'));
 });
 
-/* ---------- Шаблоны карточек ---------- */
-
-function cbLoadTemplates() {
-  try {
-    var raw = localStorage.getItem(TPL_STORE);
-    if (raw) App.templates = JSON.parse(raw) || [];
-  } catch (e) { App.templates = []; }
-}
-
-function cbStoreTemplates() {
-  try { localStorage.setItem(TPL_STORE, JSON.stringify(App.templates)); } catch (e) { /* квота */ }
-}
+/* ============================================================
+   Шаблоны v2: хранение, миграция, сиды
+   ============================================================ */
 
 function cbTplById(id) {
   for (var i = 0; i < App.templates.length; i++)
@@ -1256,156 +1544,407 @@ function cbTplById(id) {
   return null;
 }
 
-/* Выпадающий список шаблонов в топбаре: встроенные сетки + свои шаблоны */
-function cbRenderTplSelect(keepValue) {
-  var sel = document.getElementById('cbTplSelect');
-  var cur = keepValue || sel.value || 'g:3x2';
-  var html = '';
-  BUILTIN_GRIDS.forEach(function (g) {
-    html += '<option value="g:' + g.key + '">' + g.label + '</option>';
+function cbStoreTemplates() {
+  try { localStorage.setItem(TPL_STORE, JSON.stringify(App.templates)); } catch (e) { /* квота */ }
+}
+
+/* Конвертация шаблона/карточки v1 (rows x cols сетка) в раскладку v2 */
+function cbMigrateV1Slots(rows, cols, slotNames) {
+  var slots = [];
+  for (var i = 0; i < rows * cols; i++) {
+    slots.push({ orient: 'v', row: Math.floor(i / cols), name: (slotNames && slotNames[i]) || '' });
+  }
+  return slots;
+}
+
+function cbLoadTemplates() {
+  try {
+    var raw = localStorage.getItem(TPL_STORE);
+    if (raw) {
+      App.templates = JSON.parse(raw) || [];
+      if (App.templates.length) return;
+    }
+  } catch (e) { App.templates = []; }
+
+  /* миграция v1 -> v2 */
+  try {
+    var v1raw = localStorage.getItem(TPL_STORE_V1);
+    if (v1raw) {
+      var v1 = JSON.parse(v1raw) || [];
+      v1.forEach(function (t) {
+        App.templates.push({
+          id: 'tpl' + (App.nextId++), name: t.name,
+          canvas: 'v', mode: 'manual', hasHero: false,
+          rows: t.rows, hAspect: '3/2', vAspect: '3/4', active: true,
+          slots: cbMigrateV1Slots(t.rows, t.cols, t.slotNames)
+        });
+      });
+    }
+  } catch (e2) { /* нет v1 */ }
+
+  /* сиды */
+  if (!App.templates.length) {
+    App.templates = [
+      {
+        id: 'seed_hero4', name: 'Герой + 4', canvas: 'h', mode: 'manual',
+        hasHero: true, rows: 2, hAspect: '3/2', vAspect: '3/4', active: true,
+        slots: [
+          { orient: 'v', row: 0, name: 'Фронт' },
+          { orient: 'v', row: 0, name: 'Спинка' },
+          { orient: 'v', row: 0, name: '' },
+          { orient: 'v', row: 1, name: 'Деталь' },
+          { orient: 'v', row: 1, name: '' }
+        ]
+      },
+      {
+        id: 'seed_tape6', name: 'Лента · 6 вертикалей', canvas: 'v', mode: 'manual',
+        hasHero: false, rows: 3, hAspect: '3/2', vAspect: '3/4', active: true,
+        slots: [
+          { orient: 'v', row: 0, name: '' }, { orient: 'v', row: 0, name: '' },
+          { orient: 'v', row: 1, name: '' }, { orient: 'v', row: 1, name: '' },
+          { orient: 'v', row: 2, name: '' }, { orient: 'v', row: 2, name: '' }
+        ]
+      },
+      {
+        id: 'seed_auto', name: 'Авто · по фото', canvas: 'h', mode: 'auto',
+        hasHero: true, rows: 2, hAspect: '3/2', vAspect: '3/4', active: true,
+        slots: []
+      }
+    ];
+  }
+  cbStoreTemplates();
+}
+
+/* Мини-превью шаблона (для галереи и пикера): страница с пустыми слотами */
+function cbTplMiniHTML(tpl) {
+  var geom;
+  if (tpl.mode === 'auto') {
+    var demo = tpl.hasHero ? [0.75, 0.75, 1.5, 0.75] : [0.75, 1.5, 0.75];
+    geom = cbAutoBoxes(tpl, demo);
+  } else {
+    geom = cbManualBoxes(tpl);
+  }
+  return cbPageHTML(tpl.canvas, geom, function () {
+    return '<div class="cb-slot"></div>';
   });
-  App.templates.forEach(function (t) {
-    html += '<option value="t:' + t.id + '">' + cbEsc(t.name) + ' (' + t.rows + '×' + t.cols + ')</option>';
-  });
-  sel.innerHTML = html;
-  sel.value = cur;
-  if (!sel.value) sel.value = 'g:3x2';
 }
 
-/* --- Редактор шаблонов (модалка) --- */
+/* ============================================================
+   Редактор шаблона v2
+   ============================================================ */
 
-var TplEdit = { current: null };   /* редактируемая копия шаблона */
+var TE = { cur: null };   /* редактируемая копия */
 
-function cbTplOpenModal() {
-  cbTplEditSelectRender();
-  var first = App.templates.length ? App.templates[0].id : null;
-  cbTplEditLoad(first);
-  document.getElementById('cbTplModal').classList.add('cb-open');
-}
-
-function cbTplCloseModal() {
-  document.getElementById('cbTplModal').classList.remove('cb-open');
-}
-
-function cbTplEditSelectRender(selectedId) {
-  var sel = document.getElementById('cbTplEditSelect');
-  var html = '';
-  if (!App.templates.length) html = '<option value="">— нет шаблонов —</option>';
-  App.templates.forEach(function (t) {
-    html += '<option value="' + t.id + '">' + cbEsc(t.name) + '</option>';
-  });
-  sel.innerHTML = html;
-  if (selectedId) sel.value = selectedId;
-}
-
-function cbTplEditLoad(id) {
+function cbTeOpen(id) {
   var t = id ? cbTplById(id) : null;
   if (t) {
-    TplEdit.current = JSON.parse(JSON.stringify(t));
+    TE.cur = JSON.parse(JSON.stringify(t));
   } else {
-    TplEdit.current = { id: null, name: '', rows: 3, cols: 2, slotNames: ['', '', '', '', '', ''] };
+    TE.cur = {
+      id: null, name: '', canvas: 'h', mode: 'manual', hasHero: true,
+      rows: 2, hAspect: '3/2', vAspect: '3/4', active: true,
+      slots: [
+        { orient: 'v', row: 0, name: '' },
+        { orient: 'v', row: 0, name: '' },
+        { orient: 'v', row: 0, name: '' },
+        { orient: 'v', row: 1, name: '' },
+        { orient: 'v', row: 1, name: '' },
+        { orient: 'v', row: 1, name: '' }
+      ]
+    };
   }
-  cbTplEditRender();
+  document.getElementById('cbGalModal').classList.remove('cb-open');
+  document.getElementById('cbTplModal').classList.add('cb-open');
+  cbTeRender();
 }
 
-function cbTplEditRender() {
-  var t = TplEdit.current;
-  document.getElementById('cbTplName').value = t.name;
-  document.getElementById('cbTplGridLabel').textContent = t.rows + '×' + t.cols;
-  var html = '';
-  for (var r = 0; r < t.rows; r++) {
-    html += '<div class="cb-tpl-slot-row">';
-    for (var c = 0; c < t.cols; c++) {
-      var idx = r * t.cols + c;
-      html += '<input type="text" data-idx="' + idx + '" value="' + cbEsc(t.slotNames[idx] || '') + '" placeholder="Слот ' + (idx + 1) + '">';
-    }
-    html += '</div>';
-  }
-  document.getElementById('cbTplSlots').innerHTML = html;
-}
+function cbTeClose() { document.getElementById('cbTplModal').classList.remove('cb-open'); }
 
-function cbTplEditResize(dr, dc) {
-  var t = TplEdit.current;
-  /* собрать введённые имена перед пересборкой */
-  cbTplEditCollect();
-  t.rows = Math.max(1, Math.min(6, t.rows + dr));
-  t.cols = Math.max(1, Math.min(6, t.cols + dc));
-  var names = [];
-  for (var i = 0; i < t.rows * t.cols; i++) names.push(t.slotNames[i] || '');
-  t.slotNames = names;
-  cbTplEditRender();
-}
-
-function cbTplEditCollect() {
-  var t = TplEdit.current;
-  var inputs = document.getElementById('cbTplSlots').querySelectorAll('input');
+function cbTeCollectNames() {
+  var inputs = document.querySelectorAll('#cbTePreview .cb-te-name-in');
   for (var i = 0; i < inputs.length; i++) {
-    t.slotNames[parseInt(inputs[i].getAttribute('data-idx'), 10)] = inputs[i].value;
+    var idx = parseInt(inputs[i].getAttribute('data-idx'), 10);
+    if (TE.cur.slots[idx]) TE.cur.slots[idx].name = inputs[i].value;
   }
-  t.name = document.getElementById('cbTplName').value;
+  TE.cur.name = document.getElementById('cbTplName').value;
 }
 
-document.getElementById('cbBtnTpl').onclick = cbTplOpenModal;
-document.getElementById('cbTplClose').onclick = cbTplCloseModal;
-document.getElementById('cbTplNew').onclick = function () { cbTplEditLoad(null); };
-document.getElementById('cbTplEditSelect').onchange = function () { cbTplEditLoad(this.value); };
-document.getElementById('cbTplRowMinus').onclick = function () { cbTplEditResize(-1, 0); };
-document.getElementById('cbTplRowPlus').onclick = function () { cbTplEditResize(1, 0); };
-document.getElementById('cbTplColMinus').onclick = function () { cbTplEditResize(0, -1); };
-document.getElementById('cbTplColPlus').onclick = function () { cbTplEditResize(0, 1); };
+function cbTeRender() {
+  var t = TE.cur;
+  document.getElementById('cbTeEyebrow').textContent = t.id ? ('ID · ' + t.id) : 'НОВЫЙ';
+  document.getElementById('cbTplName').value = t.name;
+  document.getElementById('cbTeCanvasH').classList.toggle('cb-active', t.canvas === 'h');
+  document.getElementById('cbTeCanvasV').classList.toggle('cb-active', t.canvas === 'v');
+  document.getElementById('cbTeModeManual').classList.toggle('cb-active', t.mode === 'manual');
+  document.getElementById('cbTeModeAuto').classList.toggle('cb-active', t.mode === 'auto');
+  document.getElementById('cbTeHero').checked = !!t.hasHero;
+  document.getElementById('cbTeManualCtl').style.display = (t.mode === 'manual') ? '' : 'none';
+  document.getElementById('cbTeRowCount').textContent = t.rows;
+
+  var vc = 0, hc = 0;
+  t.slots.forEach(function (s, i) {
+    if (t.hasHero && i === 0) return;
+    if (s.orient === 'h') hc++; else vc++;
+  });
+  document.getElementById('cbTeVCount').textContent = vc;
+  document.getElementById('cbTeHCount').textContent = hc;
+
+  /* режим-лейбл: LANDSCAPE / PORTRAIT / EQUAL / AUTO */
+  var label = 'EQUAL';
+  if (t.mode === 'auto') label = 'AUTO';
+  else if (t.hasHero && t.slots.length) label = (t.slots[0].orient === 'h') ? 'PORTRAIT' : 'LANDSCAPE';
+  document.getElementById('cbTeModeLabel').textContent = label;
+
+  /* чипы пропорций */
+  var hHtml = '';
+  H_ASPECTS.forEach(function (a) {
+    hHtml += '<button class="cb-chip' + (t.hAspect === a ? ' cb-active' : '') + '" data-ha="' + a + '">' + ASPECT_LABELS[a] + '</button>';
+  });
+  document.getElementById('cbTeHAspects').innerHTML = hHtml;
+  var vHtml = '';
+  V_ASPECTS.forEach(function (a) {
+    vHtml += '<button class="cb-chip' + (t.vAspect === a ? ' cb-active' : '') + '" data-va="' + a + '">' + ASPECT_LABELS[a] + '</button>';
+  });
+  document.getElementById('cbTeVAspects').innerHTML = vHtml;
+
+  /* превью */
+  var host = document.getElementById('cbTePreview');
+  if (t.mode === 'auto') {
+    var demo = t.hasHero ? [0.75, 0.75, 1.5, 0.75, 0.75] : [0.75, 1.5, 0.75, 0.75];
+    var geomA = cbAutoBoxes(t, demo);
+    host.innerHTML = cbPageHTML(t.canvas, geomA, function (i) {
+      var hero = t.hasHero && i === 0;
+      return '<div class="cb-slot"><span class="cb-slot-hint">' + (hero ? '★ авто-герой' : 'авто') + '</span></div>';
+    });
+  } else {
+    var geom = cbManualBoxes(t);
+    host.innerHTML = cbPageHTML(t.canvas, geom, function (i) {
+      var s = t.slots[i];
+      var hero = t.hasHero && i === 0;
+      var html = '<div class="cb-slot" data-te-idx="' + i + '" draggable="true">';
+      html += '<button class="cb-te-badge" data-te-flip="' + i + '" title="Сменить ориентацию">' + (hero ? '★ ' : '') + (s.orient === 'h' ? 'H' : 'V') + '</button>';
+      html += '<button class="cb-slot-x" style="display:block" data-te-del="' + i + '" title="Удалить слот">×</button>';
+      html += '<input type="text" class="cb-te-name-in" data-idx="' + i + '" value="' + cbEsc(s.name || '') + '" placeholder="имя слота">';
+      html += '</div>';
+      return html;
+    });
+  }
+}
+
+/* распределить не-hero слоты по рядам поровну */
+function cbTeDistribute() {
+  var t = TE.cur;
+  var start = t.hasHero ? 1 : 0;
+  var rest = t.slots.slice(start);
+  var per = Math.ceil(rest.length / t.rows);
+  rest.forEach(function (s, i) { s.row = Math.min(t.rows - 1, Math.floor(i / per)); });
+}
+
+function cbTeAddSlot(orient) {
+  cbTeCollectNames();
+  TE.cur.slots.push({ orient: orient, row: TE.cur.rows - 1, name: '' });
+  cbTeRender();
+}
+function cbTeRemoveSlot(orient) {
+  cbTeCollectNames();
+  var t = TE.cur;
+  for (var i = t.slots.length - 1; i >= (t.hasHero ? 1 : 0); i--) {
+    if (t.slots[i].orient === orient) { t.slots.splice(i, 1); cbTeRender(); return; }
+  }
+}
+
+document.getElementById('cbTeCanvasH').onclick = function () { cbTeCollectNames(); TE.cur.canvas = 'h'; cbTeRender(); };
+document.getElementById('cbTeCanvasV').onclick = function () { cbTeCollectNames(); TE.cur.canvas = 'v'; cbTeRender(); };
+document.getElementById('cbTeModeManual').onclick = function () { cbTeCollectNames(); TE.cur.mode = 'manual'; cbTeRender(); };
+document.getElementById('cbTeModeAuto').onclick = function () { cbTeCollectNames(); TE.cur.mode = 'auto'; cbTeRender(); };
+document.getElementById('cbTeHero').onchange = function () { cbTeCollectNames(); TE.cur.hasHero = this.checked; cbTeRender(); };
+document.getElementById('cbTeRowMinus').onclick = function () {
+  cbTeCollectNames(); TE.cur.rows = Math.max(1, TE.cur.rows - 1);
+  TE.cur.slots.forEach(function (s) { s.row = Math.min(TE.cur.rows - 1, s.row || 0); });
+  cbTeRender();
+};
+document.getElementById('cbTeRowPlus').onclick = function () { cbTeCollectNames(); TE.cur.rows = Math.min(5, TE.cur.rows + 1); cbTeRender(); };
+document.getElementById('cbTeEven').onclick = function () { cbTeCollectNames(); cbTeDistribute(); cbTeRender(); };
+document.getElementById('cbTeVPlus').onclick = function () { cbTeAddSlot('v'); };
+document.getElementById('cbTeVMinus').onclick = function () { cbTeRemoveSlot('v'); };
+document.getElementById('cbTeHPlus').onclick = function () { cbTeAddSlot('h'); };
+document.getElementById('cbTeHMinus').onclick = function () { cbTeRemoveSlot('h'); };
+
+document.getElementById('cbTplPanel').addEventListener('click', function (e) {
+  var ha = e.target.getAttribute && e.target.getAttribute('data-ha');
+  var va = e.target.getAttribute && e.target.getAttribute('data-va');
+  if (ha) { cbTeCollectNames(); TE.cur.hAspect = ha; cbTeRender(); }
+  if (va) { cbTeCollectNames(); TE.cur.vAspect = va; cbTeRender(); }
+});
+
+/* превью: флип ориентации, удаление, drag между слотами (обмен позициями) */
+var _teDragIdx = null;
+document.getElementById('cbTePreview').addEventListener('click', function (e) {
+  var flip = e.target.getAttribute && e.target.getAttribute('data-te-flip');
+  var del = e.target.getAttribute && e.target.getAttribute('data-te-del');
+  if (flip != null) {
+    cbTeCollectNames();
+    var s = TE.cur.slots[parseInt(flip, 10)];
+    s.orient = (s.orient === 'h') ? 'v' : 'h';
+    cbTeRender();
+  } else if (del != null) {
+    cbTeCollectNames();
+    TE.cur.slots.splice(parseInt(del, 10), 1);
+    cbTeRender();
+  }
+});
+document.getElementById('cbTePreview').addEventListener('dragstart', function (e) {
+  var slot = e.target.closest('[data-te-idx]');
+  if (slot) _teDragIdx = parseInt(slot.getAttribute('data-te-idx'), 10);
+});
+document.getElementById('cbTePreview').addEventListener('dragover', function (e) {
+  var slot = e.target.closest('[data-te-idx]');
+  if (slot) { e.preventDefault(); slot.classList.add('cb-te-slot-dragover'); }
+});
+document.getElementById('cbTePreview').addEventListener('dragleave', function (e) {
+  var slot = e.target.closest('[data-te-idx]');
+  if (slot) slot.classList.remove('cb-te-slot-dragover');
+});
+document.getElementById('cbTePreview').addEventListener('drop', function (e) {
+  var slot = e.target.closest('[data-te-idx]');
+  if (!slot || _teDragIdx == null) return;
+  e.preventDefault();
+  e.stopPropagation();
+  cbTeCollectNames();
+  var to = parseInt(slot.getAttribute('data-te-idx'), 10);
+  var t = TE.cur;
+  var tmpOrient = t.slots[to].orient, tmpName = t.slots[to].name;
+  t.slots[to].orient = t.slots[_teDragIdx].orient;
+  t.slots[to].name = t.slots[_teDragIdx].name;
+  t.slots[_teDragIdx].orient = tmpOrient;
+  t.slots[_teDragIdx].name = tmpName;
+  _teDragIdx = null;
+  cbTeRender();
+});
 
 document.getElementById('cbTplSave').onclick = function () {
-  cbTplEditCollect();
-  var t = TplEdit.current;
+  cbTeCollectNames();
+  var t = TE.cur;
   if (!t.name) { cbToast('Дайте шаблону название'); return; }
   if (t.id) {
     var existing = cbTplById(t.id);
-    existing.name = t.name;
-    existing.rows = t.rows;
-    existing.cols = t.cols;
-    existing.slotNames = t.slotNames.slice();
+    if (existing) {
+      Object.keys(t).forEach(function (k) { existing[k] = JSON.parse(JSON.stringify(t[k])); });
+    }
   } else {
     t.id = 'tpl' + (App.nextId++);
     App.templates.push(JSON.parse(JSON.stringify(t)));
   }
   cbStoreTemplates();
   cbMarkDirty();
-  cbTplEditSelectRender(t.id);
-  cbRenderTplSelect('t:' + t.id);
   cbToast('Шаблон сохранён: ' + t.name);
+  cbTeClose();
+  cbGalOpen();
 };
+document.getElementById('cbTplClose').onclick = cbTeClose;
+document.getElementById('cbMenuTplNew').onclick = function () { cbTeOpen(null); };
 
-document.getElementById('cbTplDelete').onclick = function () {
-  var t = TplEdit.current;
-  if (!t.id) return;
-  if (!confirm('Удалить шаблон «' + t.name + '»? Существующие карточки не изменятся.')) return;
-  for (var i = 0; i < App.templates.length; i++) {
-    if (App.templates[i].id === t.id) { App.templates.splice(i, 1); break; }
+/* ============================================================
+   Галерея шаблонов
+   ============================================================ */
+
+function cbGalOpen() {
+  cbGalRender();
+  document.getElementById('cbGalModal').classList.add('cb-open');
+}
+function cbGalRender() {
+  var host = document.getElementById('cbGalGrid');
+  var html = '';
+  App.templates.forEach(function (t) {
+    html += '<div class="cb-gal-item">';
+    html += cbTplMiniHTML(t);
+    html += '<div class="cb-gal-name" title="' + cbEsc(t.name) + '">' + cbEsc(t.name) + '</div>';
+    html += '<div class="cb-gal-meta">' + (t.canvas === 'h' ? 'A4 ГОР' : 'A4 ВЕРТ') + ' · ' + (t.mode === 'auto' ? 'АВТО' : t.slots.length + ' СЛОТОВ') + (t.hasHero ? ' · ★' : '') + '</div>';
+    html += '<label class="cb-check cb-gal-check"><input type="checkbox" data-gal-active="' + t.id + '"' + (t.active !== false ? ' checked' : '') + '> предлагать в канвасе</label>';
+    html += '<div class="cb-gal-actions">';
+    html += '<button data-gal-edit="' + t.id + '">Изменить</button>';
+    html += '<button data-gal-dup="' + t.id + '">Дубль</button>';
+    html += '<button class="cb-danger" data-gal-del="' + t.id + '">Удалить</button>';
+    html += '</div></div>';
+  });
+  if (!App.templates.length) html = '<div class="cb-empty-hint" style="width:100%">Шаблонов нет — создайте первый.</div>';
+  host.innerHTML = html;
+}
+document.getElementById('cbGalGrid').addEventListener('click', function (e) {
+  var el = e.target;
+  var id = el.getAttribute('data-gal-edit') || el.getAttribute('data-gal-dup') || el.getAttribute('data-gal-del');
+  if (el.getAttribute('data-gal-edit')) { cbTeOpen(id); return; }
+  if (el.getAttribute('data-gal-dup')) {
+    var t = cbTplById(id);
+    var copy = JSON.parse(JSON.stringify(t));
+    copy.id = 'tpl' + (App.nextId++);
+    copy.name = t.name + ' (копия)';
+    App.templates.push(copy);
+    cbStoreTemplates(); cbGalRender();
+    return;
   }
-  cbStoreTemplates();
-  cbTplEditSelectRender();
-  cbRenderTplSelect();
-  cbTplEditLoad(App.templates.length ? App.templates[0].id : null);
+  if (el.getAttribute('data-gal-del')) {
+    var t2 = cbTplById(id);
+    if (!confirm('Удалить шаблон «' + t2.name + '»? Существующие карточки не изменятся.')) return;
+    App.templates = App.templates.filter(function (x) { return x.id !== id; });
+    cbStoreTemplates(); cbGalRender();
+  }
+});
+document.getElementById('cbGalGrid').addEventListener('change', function (e) {
+  var id = e.target.getAttribute && e.target.getAttribute('data-gal-active');
+  if (!id) return;
+  var t = cbTplById(id);
+  if (t) { t.active = e.target.checked; cbStoreTemplates(); }
+});
+document.getElementById('cbGalNew').onclick = function () { cbTeOpen(null); };
+document.getElementById('cbGalClose').onclick = function () {
+  document.getElementById('cbGalModal').classList.remove('cb-open');
 };
+document.getElementById('cbMenuTplGallery').onclick = cbGalOpen;
 
-/* ---------- Карточки ---------- */
+/* ============================================================
+   Карточки: пикер шаблона, создание, рендер страницами
+   ============================================================ */
 
-function cbAddCard() {
-  var v = document.getElementById('cbTplSelect').value;
-  var rows = 3, cols = 2, slotNames = [], title = 'Карточка ' + (App.cards.length + 1);
-  if (v.indexOf('g:') === 0) {
-    var g = v.slice(2).split('x');
-    rows = parseInt(g[0], 10); cols = parseInt(g[1], 10);
-  } else if (v.indexOf('t:') === 0) {
-    var tpl = cbTplById(v.slice(2));
-    if (tpl) { rows = tpl.rows; cols = tpl.cols; slotNames = tpl.slotNames.slice(); }
-  }
-  var slots = [];
-  for (var i = 0; i < rows * cols; i++) {
-    slots.push(null);
-    if (slotNames.length < i + 1) slotNames.push('');
-  }
-  App.cards.push({ id: cbId(), title: title, category: '', rows: rows, cols: cols, slots: slots, slotNames: slotNames });
+document.getElementById('cbBtnAdd').onclick = function (e) {
+  e.stopPropagation();
+  if (App.activeTab === 'conts') { cbAddCont(); return; }
+  var active = App.templates.filter(function (t) { return t.active !== false; });
+  if (!active.length) { cbGalOpen(); return; }
+  var html = '';
+  active.forEach(function (t) {
+    html += '<button class="cb-picker-item" data-pick-tpl="' + t.id + '">';
+    html += '<span class="cb-picker-mini">' + cbTplMiniHTML(t) + '</span>';
+    html += '<span class="cb-picker-info">' + cbEsc(t.name)
+      + '<small>' + (t.canvas === 'h' ? 'A4 ГОР' : 'A4 ВЕРТ') + ' · ' + (t.mode === 'auto' ? 'АВТО' : t.slots.length + ' СЛОТОВ') + '</small></span>';
+    html += '</button>';
+  });
+  html += '<div class="cb-pop-sep"></div><button id="cbPickerGal">Настроить шаблоны...</button>';
+  document.getElementById('cbPickerPop').innerHTML = html;
+  cbPop('cbPickerPop', true);
+};
+document.getElementById('cbPickerPop').addEventListener('click', function (e) {
+  if (e.target.closest('#cbPickerGal')) { cbGalOpen(); return; }
+  var btn = e.target.closest('[data-pick-tpl]');
+  if (btn) cbAddCardFromTpl(btn.getAttribute('data-pick-tpl'));
+});
+
+function cbAddCardFromTpl(tplId) {
+  var t = cbTplById(tplId);
+  if (!t) return;
+  var card = {
+    id: cbId(),
+    title: 'Карточка ' + (App.cards.length + 1),
+    category: '',
+    tplName: t.name,
+    canvas: t.canvas, mode: t.mode, hasHero: t.hasHero, rows: t.rows,
+    hAspect: t.hAspect, vAspect: t.vAspect,
+    slots: (t.mode === 'manual') ? t.slots.map(function (s) {
+      return { orient: s.orient, row: s.row, name: s.name, pid: null };
+    }) : [],
+    pids: []
+  };
+  App.cards.push(card);
   cbMarkDirty();
   cbRenderCards();
   cbSwitchTab('cards');
@@ -1417,26 +1956,51 @@ function cbCardById(id) {
   return null;
 }
 
-function cbCardResize(card, rows, cols) {
-  rows = Math.max(1, Math.min(6, rows));
-  cols = Math.max(1, Math.min(6, cols));
-  var filled = card.slots.filter(function (x) { return x; });
-  var slots = [], names = [];
-  for (var i = 0; i < rows * cols; i++) {
-    slots.push(filled[i] || null);
-    names.push(card.slotNames[i] || '');
+function cbCardSlotHTML(card, i) {
+  var s = card.slots[i];
+  var photo = s.pid ? cbPhotoById(s.pid) : null;
+  var hero = card.hasHero && i === 0;
+  var html = '<div class="cb-slot' + (photo ? ' cb-filled' : '') + '" data-cid="' + card.id + '" data-idx="' + i + '"' + (photo ? ' draggable="true"' : '') + '>';
+  if (photo) {
+    html += cbImgHtml(photo);
+    if (s.name) html += '<span class="cb-slot-tag">' + cbEsc(s.name) + '</span>';
+    if (photo.kind === 'ref') html += '<span class="cb-slot-ref">REF</span>';
+    html += '<button class="cb-slot-x" title="Убрать фото">×</button>';
+  } else {
+    html += '<span class="cb-slot-hint">' + (s.name ? cbEsc(s.name) : (hero ? '★ заглавное' : 'перетащите фото')) + '</span>';
   }
-  if (filled.length > rows * cols) cbToast('Лишние фото убраны из карточки (не удалены)');
-  card.rows = rows; card.cols = cols; card.slots = slots; card.slotNames = names;
-  cbMarkDirty();
-  cbRenderCards(); cbRenderTray();
+  html += '</div>';
+  return html;
+}
+
+function cbCardPageHTML(card) {
+  if (card.mode === 'auto') {
+    var photos = (card.pids || []).map(function (pid) { return cbPhotoById(pid); });
+    var aspects = photos.map(function (p) { return (p && p.w > 0 && p.h > 0) ? p.w / p.h : 0.75; });
+    var geom = cbAutoBoxes(card, aspects);
+    var page = cbPageHTML(card.canvas, geom, function (i) {
+      var p = photos[i];
+      if (!p) return '<div class="cb-slot"></div>';
+      var html = '<div class="cb-slot cb-filled" data-cid="' + card.id + '" data-auto-idx="' + i + '" draggable="true">';
+      html += cbImgHtml(p);
+      if (p.kind === 'ref') html += '<span class="cb-slot-ref">REF</span>';
+      html += '<button class="cb-slot-x" title="Убрать фото">×</button></div>';
+      return html;
+    }, ' data-page-cid="' + card.id + '"');
+    if (!aspects.length) {
+      page = '<div class="cb-page cb-page-' + card.canvas + '" data-page-cid="' + card.id + '" style="display:flex;align-items:center;justify-content:center"><span class="cb-slot-hint" style="color:#a3a09a">перетащите фото на страницу — раскладка соберётся сама</span></div>';
+    }
+    return page;
+  }
+  var geomM = cbManualBoxes(card);
+  return cbPageHTML(card.canvas, geomM, function (i) { return cbCardSlotHTML(card, i); });
 }
 
 function cbRenderCards() {
   cbUpdateTabLabels();
   var host = document.getElementById('cbCards');
   if (!App.cards.length) {
-    host.innerHTML = '<div class="cb-empty-hint">Карточек пока нет — нажмите «+ Карточка». Фото перетаскиваются из левой панели в слоты. Шаблоны с именами слотов — кнопка «Шаблоны...».</div>';
+    host.innerHTML = '<div class="cb-empty-hint">Карточек пока нет — нажмите «+ Карточка» и выберите шаблон. Шаблоны: меню Шаблон → Галерея.</div>';
     return;
   }
   var html = '';
@@ -1447,36 +2011,14 @@ function cbRenderCards() {
     html += '<input type="text" class="cb-title" value="' + cbEsc(card.title) + '" data-f="title" placeholder="Название / артикул">';
     html += '<input type="text" class="cb-cat" value="' + cbEsc(card.category) + '" data-f="category" placeholder="Категория">';
     html += '<span class="cb-spacer"></span>';
-    html += '<span class="cb-grid-ctl">Сетка ' + card.rows + '×' + card.cols + ' ';
-    html += '<button data-act="row-" title="Меньше рядов">−ряд</button><button data-act="row+" title="Больше рядов">+ряд</button>';
-    html += '<button data-act="col-" title="Меньше колонок">−кол</button><button data-act="col+" title="Больше колонок">+кол</button></span>';
+    html += '<span class="cb-tpl-badge">' + cbEsc(card.tplName || '') + (card.mode === 'auto' ? ' · АВТО' : '') + '</span>';
     html += '<button class="cb-mini" data-act="up" title="Выше">↑</button>';
     html += '<button class="cb-mini" data-act="down" title="Ниже">↓</button>';
     html += '<button class="cb-mini" data-act="dup">Дубль</button>';
     html += '<button class="cb-mini cb-danger" data-act="del">Удалить</button>';
     html += '</div>';
-    html += '<div class="cb-slots">';
-    for (var r = 0; r < card.rows; r++) {
-      html += '<div class="cb-slot-row">';
-      for (var c = 0; c < card.cols; c++) {
-        var idx = r * card.cols + c;
-        var pid = card.slots[idx];
-        var photo = pid ? cbPhotoById(pid) : null;
-        var slotName = card.slotNames[idx] || '';
-        html += '<div class="cb-slot' + (photo ? ' cb-filled' : '') + '" data-cid="' + card.id + '" data-idx="' + idx + '"' + (photo ? ' draggable="true"' : '') + '>';
-        if (photo) {
-          html += cbImgHtml(photo);
-          if (slotName) html += '<span class="cb-slot-tag">' + cbEsc(slotName) + '</span>';
-          html += '<div class="cb-slot-name">' + cbEsc(photo.name) + '</div>';
-          html += '<button class="cb-slot-x" title="Убрать фото">×</button>';
-        } else {
-          html += '<span class="cb-slot-hint">' + (slotName ? cbEsc(slotName) : 'перетащите фото') + '</span>';
-        }
-        html += '</div>';
-      }
-      html += '</div>';
-    }
-    html += '</div></div>';
+    html += cbCardPageHTML(card);
+    html += '</div>';
   });
   host.innerHTML = html;
 }
@@ -1486,33 +2028,33 @@ document.getElementById('cbCards').addEventListener('click', function (e) {
   if (slotX) {
     var slot = slotX.closest('.cb-slot');
     var card = cbCardById(slot.getAttribute('data-cid'));
-    card.slots[parseInt(slot.getAttribute('data-idx'), 10)] = null;
+    if (slot.hasAttribute('data-auto-idx')) {
+      card.pids.splice(parseInt(slot.getAttribute('data-auto-idx'), 10), 1);
+    } else {
+      card.slots[parseInt(slot.getAttribute('data-idx'), 10)].pid = null;
+    }
     cbMarkDirty(); cbRenderCards(); cbRenderTray();
     return;
   }
   var btn = e.target.closest('button[data-act]');
   if (!btn) return;
   var cardEl = btn.closest('.cb-card');
-  var card = cbCardById(cardEl.getAttribute('data-cid'));
-  var i = App.cards.indexOf(card);
+  var card2 = cbCardById(cardEl.getAttribute('data-cid'));
+  var i = App.cards.indexOf(card2);
   var act = btn.getAttribute('data-act');
   if (act === 'del') {
-    if (!confirm('Удалить карточку «' + card.title + '»? Фото останутся в панели слева.')) return;
+    if (!confirm('Удалить карточку «' + card2.title + '»? Фото останутся в галерее.')) return;
     App.cards.splice(i, 1);
   } else if (act === 'dup') {
-    var copy = JSON.parse(JSON.stringify(card));
+    var copy = JSON.parse(JSON.stringify(card2));
     copy.id = cbId();
-    copy.title = card.title + ' (копия)';
+    copy.title = card2.title + ' (копия)';
     App.cards.splice(i + 1, 0, copy);
   } else if (act === 'up' && i > 0) {
-    App.cards.splice(i, 1); App.cards.splice(i - 1, 0, card);
+    App.cards.splice(i, 1); App.cards.splice(i - 1, 0, card2);
   } else if (act === 'down' && i < App.cards.length - 1) {
-    App.cards.splice(i, 1); App.cards.splice(i + 1, 0, card);
-  } else if (act === 'row-') { cbCardResize(card, card.rows - 1, card.cols); return; }
-  else if (act === 'row+') { cbCardResize(card, card.rows + 1, card.cols); return; }
-  else if (act === 'col-') { cbCardResize(card, card.rows, card.cols - 1); return; }
-  else if (act === 'col+') { cbCardResize(card, card.rows, card.cols + 1); return; }
-  else return;
+    App.cards.splice(i, 1); App.cards.splice(i + 1, 0, card2);
+  } else return;
   cbMarkDirty(); cbRenderCards(); cbRenderTray();
 });
 
@@ -1524,44 +2066,93 @@ document.getElementById('cbCards').addEventListener('input', function (e) {
   cbMarkDirty();
 });
 
+/* DnD: фото в слоты, обмен слотов, авто-страницы */
 document.getElementById('cbCards').addEventListener('dragstart', function (e) {
   var slot = e.target.closest('.cb-slot.cb-filled');
-  if (slot) {
+  if (!slot) return;
+  if (slot.hasAttribute('data-auto-idx')) {
+    e.dataTransfer.setData('text/plain', 'auto:' + slot.getAttribute('data-cid') + ':' + slot.getAttribute('data-auto-idx'));
+  } else {
     e.dataTransfer.setData('text/plain', 'slot:' + slot.getAttribute('data-cid') + ':' + slot.getAttribute('data-idx'));
   }
 });
 document.getElementById('cbCards').addEventListener('dragover', function (e) {
   var slot = e.target.closest('.cb-slot');
-  if (slot) { e.preventDefault(); slot.classList.add('cb-over'); }
+  if (slot) { e.preventDefault(); slot.classList.add('cb-over'); return; }
+  var page = e.target.closest('[data-page-cid]');
+  if (page) { e.preventDefault(); page.classList.add('cb-over-page'); }
 });
 document.getElementById('cbCards').addEventListener('dragleave', function (e) {
   var slot = e.target.closest('.cb-slot');
   if (slot) slot.classList.remove('cb-over');
+  var page = e.target.closest('[data-page-cid]');
+  if (page) page.classList.remove('cb-over-page');
 });
 document.getElementById('cbCards').addEventListener('drop', function (e) {
-  var slot = e.target.closest('.cb-slot');
-  if (!slot) return;
-  e.preventDefault();
-  e.stopPropagation();
-  slot.classList.remove('cb-over');
   var data = e.dataTransfer.getData('text/plain');
-  var card = cbCardById(slot.getAttribute('data-cid'));
-  var idx = parseInt(slot.getAttribute('data-idx'), 10);
-  if (data.indexOf('photo:') === 0) {
-    card.slots[idx] = data.slice(6);
-  } else if (data.indexOf('slot:') === 0) {
-    var parts = data.split(':');
-    var srcCard = cbCardById(parts[1]);
-    var srcIdx = parseInt(parts[2], 10);
-    if (srcCard === card && srcIdx === idx) return;
-    var tmp = card.slots[idx];
-    card.slots[idx] = srcCard.slots[srcIdx];
-    srcCard.slots[srcIdx] = tmp;   /* обмен местами */
-  } else return;
-  cbMarkDirty(); cbRenderCards(); cbRenderTray();
+  var slot = e.target.closest('.cb-slot');
+  var page = e.target.closest('[data-page-cid]');
+
+  if (slot && slot.hasAttribute('data-idx')) {
+    /* ручной слот */
+    e.preventDefault(); e.stopPropagation();
+    slot.classList.remove('cb-over');
+    var card = cbCardById(slot.getAttribute('data-cid'));
+    var idx = parseInt(slot.getAttribute('data-idx'), 10);
+    if (data.indexOf('photo:') === 0) {
+      card.slots[idx].pid = data.slice(6);
+    } else if (data.indexOf('slot:') === 0) {
+      var parts = data.split(':');
+      var srcCard = cbCardById(parts[1]);
+      var srcIdx = parseInt(parts[2], 10);
+      if (srcCard === card && srcIdx === idx) return;
+      var tmp = card.slots[idx].pid;
+      card.slots[idx].pid = srcCard.slots[srcIdx].pid;
+      srcCard.slots[srcIdx].pid = tmp;
+    } else return;
+    cbMarkDirty(); cbRenderCards(); cbRenderTray();
+    return;
+  }
+
+  if (slot && slot.hasAttribute('data-auto-idx')) {
+    /* обмен позициями в авто-карточке */
+    e.preventDefault(); e.stopPropagation();
+    slot.classList.remove('cb-over');
+    var cardA = cbCardById(slot.getAttribute('data-cid'));
+    var toIdx = parseInt(slot.getAttribute('data-auto-idx'), 10);
+    if (data.indexOf('auto:') === 0) {
+      var pa = data.split(':');
+      var srcCardA = cbCardById(pa[1]);
+      var fromIdx = parseInt(pa[2], 10);
+      if (srcCardA === cardA) {
+        var moved = cardA.pids.splice(fromIdx, 1)[0];
+        cardA.pids.splice(toIdx, 0, moved);
+      }
+    } else if (data.indexOf('photo:') === 0) {
+      var pid0 = data.slice(6);
+      if (cardA.pids.indexOf(pid0) === -1) cardA.pids.splice(toIdx, 0, pid0);
+    } else return;
+    cbMarkDirty(); cbRenderCards(); cbRenderTray();
+    return;
+  }
+
+  if (page) {
+    /* дроп на страницу авто-карточки */
+    e.preventDefault(); e.stopPropagation();
+    page.classList.remove('cb-over-page');
+    var cardP = cbCardById(page.getAttribute('data-page-cid'));
+    if (cardP && cardP.mode === 'auto' && data.indexOf('photo:') === 0) {
+      var pid = data.slice(6);
+      if (cardP.pids.indexOf(pid) !== -1) { cbToast('Это фото уже на странице'); return; }
+      cardP.pids.push(pid);
+      cbMarkDirty(); cbRenderCards(); cbRenderTray();
+    }
+  }
 });
 
-/* ---------- Контейнеры (доп. контент) ---------- */
+/* ============================================================
+   Контейнеры (доп. контент) — без шаблона
+   ============================================================ */
 
 function cbAddCont() {
   App.containers.push({ id: cbId(), title: 'Контейнер ' + (App.containers.length + 1), size: 'm', photoIds: [], text: '' });
@@ -1590,12 +2181,12 @@ function cbRenderConts() {
     html += '<span class="cb-num">' + (ci + 1) + '.</span>';
     html += '<input type="text" class="cb-title" value="' + cbEsc(cont.title) + '" data-f="title" placeholder="Название блока">';
     html += '<span class="cb-spacer"></span>';
-    html += '<span class="cb-grid-ctl">Размер ';
+    html += '<span class="cb-tpl-badge">Размер</span>';
     html += '<select data-f="size">';
     html += '<option value="s"' + (cont.size === 's' ? ' selected' : '') + '>S</option>';
     html += '<option value="m"' + (cont.size === 'm' ? ' selected' : '') + '>M</option>';
     html += '<option value="l"' + (cont.size === 'l' ? ' selected' : '') + '>L</option>';
-    html += '</select></span>';
+    html += '</select>';
     html += '<button class="cb-mini" data-act="up" title="Выше">↑</button>';
     html += '<button class="cb-mini" data-act="down" title="Ниже">↓</button>';
     html += '<button class="cb-mini cb-danger" data-act="del">Удалить</button>';
@@ -1609,6 +2200,7 @@ function cbRenderConts() {
         if (!photo) return;
         html += '<div class="cb-cont-item" draggable="true" data-kid="' + cont.id + '" data-pi="' + pi + '">';
         html += cbImgHtml(photo);
+        if (photo.kind === 'ref') html += '<span class="cb-ref-chip">REF</span>';
         html += '<button class="cb-slot-x" title="Убрать фото">×</button>';
         html += '</div>';
       });
@@ -1631,16 +2223,16 @@ document.getElementById('cbConts').addEventListener('click', function (e) {
   }
   var btn = e.target.closest('button[data-act]');
   if (!btn) return;
-  var cont = cbContById(btn.closest('.cb-container').getAttribute('data-kid'));
-  var i = App.containers.indexOf(cont);
+  var cont2 = cbContById(btn.closest('.cb-container').getAttribute('data-kid'));
+  var i = App.containers.indexOf(cont2);
   var act = btn.getAttribute('data-act');
   if (act === 'del') {
-    if (!confirm('Удалить контейнер «' + cont.title + '»? Фото останутся в панели слева.')) return;
+    if (!confirm('Удалить контейнер «' + cont2.title + '»? Фото останутся в галерее.')) return;
     App.containers.splice(i, 1);
   } else if (act === 'up' && i > 0) {
-    App.containers.splice(i, 1); App.containers.splice(i - 1, 0, cont);
+    App.containers.splice(i, 1); App.containers.splice(i - 1, 0, cont2);
   } else if (act === 'down' && i < App.containers.length - 1) {
-    App.containers.splice(i, 1); App.containers.splice(i + 1, 0, cont);
+    App.containers.splice(i, 1); App.containers.splice(i + 1, 0, cont2);
   } else return;
   cbMarkDirty(); cbRenderConts(); cbRenderTray();
 });
@@ -1713,7 +2305,9 @@ document.getElementById('cbConts').addEventListener('drop', function (e) {
   cbMarkDirty(); cbRenderConts(); cbRenderTray();
 });
 
-/* ---------- Экспорт PDF (через печать) ---------- */
+/* ============================================================
+   Экспорт PDF (печать A4) и списка
+   ============================================================ */
 
 function cbExportPdf() {
   if (!App.cards.length && !App.containers.length) { cbToast('Нечего экспортировать'); return; }
@@ -1722,31 +2316,15 @@ function cbExportPdf() {
   var dateStr = ('0' + d.getDate()).slice(-2) + '.' + ('0' + (d.getMonth() + 1)).slice(-2) + '.' + d.getFullYear();
   var sizePx = { s: 90, m: 140, l: 220 };
   var html = '<div class="cbp-head"><h1>' + cbEsc(name) + '</h1>';
-  html += '<div class="cbp-meta">Карточек: ' + App.cards.length + ' · Контейнеров: ' + App.containers.length + ' · ' + dateStr + ' · Cardboard</div></div>';
+  html += '<div class="cbp-meta">Карточек: ' + App.cards.length + ' · Контейнеров: ' + App.containers.length + ' · ' + dateStr + ' · Cardboard · A4</div></div>';
 
-  if (App.cards.length) {
-    html += '<div class="cbp-sec">Карточки</div>';
-    App.cards.forEach(function (card, ci) {
-      html += '<div class="cbp-block"><h2>' + (ci + 1) + '. ' + cbEsc(card.title);
-      if (card.category) html += '<span class="cbp-cat">' + cbEsc(card.category) + '</span>';
-      html += '</h2>';
-      for (var r = 0; r < card.rows; r++) {
-        html += '<div class="cbp-row">';
-        for (var c = 0; c < card.cols; c++) {
-          var idx = r * card.cols + c;
-          var photo = card.slots[idx] ? cbPhotoById(card.slots[idx]) : null;
-          var slotName = card.slotNames[idx] || '';
-          html += '<div class="cbp-cell"><div class="cbp-cell-in">';
-          if (photo && photo.dataUrl) html += '<img src="' + photo.dataUrl + '">';
-          html += '</div>';
-          if (slotName) html += '<div class="cbp-slotname">' + cbEsc(slotName) + '</div>';
-          html += '</div>';
-        }
-        html += '</div>';
-      }
-      html += '</div>';
-    });
-  }
+  App.cards.forEach(function (card, ci) {
+    html += '<div class="cbp-card"><h2>' + (ci + 1) + '. ' + cbEsc(card.title);
+    if (card.category) html += '<span class="cbp-cat">' + cbEsc(card.category) + '</span>';
+    html += '</h2>';
+    html += cbCardPageHTML(card).replace(/draggable="true"/g, '').replace(/<button[^>]*cb-slot-x[^>]*>×<\/button>/g, '');
+    html += '</div>';
+  });
   if (App.containers.length) {
     html += '<div class="cbp-sec">Доп. контент</div>';
     App.containers.forEach(function (cont, ci) {
@@ -1762,14 +2340,11 @@ function cbExportPdf() {
   }
   document.getElementById('cbPrint').innerHTML = html;
   var oldTitle = document.title;
-  document.title = name;   /* имя PDF-файла в диалоге печати */
+  document.title = name;
   window.print();
   document.title = oldTitle;
 }
-
 document.getElementById('cbBtnPdf').onclick = cbExportPdf;
-
-/* ---------- Экспорт списка (CSV для Excel + TXT) ---------- */
 
 function cbDownload(filename, text, mime) {
   var blob = new Blob([text], { type: mime || 'text/plain;charset=utf-8' });
@@ -1787,57 +2362,60 @@ function cbCsvCell(s) { return '"' + String(s == null ? '' : s).replace(/"/g, '"
 function cbExportList() {
   if (!App.cards.length && !App.containers.length) { cbToast('Нечего экспортировать'); return; }
   var name = document.getElementById('cbProjectName').value || 'Проект';
-  var csv = 'Тип;Номер;Блок;Категория;Позиция;Слот;Файл;Путь\r\n';
+  var csv = 'Тип;Номер;Блок;Категория;Позиция;Слот;Реф;Файл;Путь\r\n';
   var txt = name + '\r\n' + new Date().toLocaleDateString('ru-RU') + '\r\n';
+
+  function addLine(type, num, block, cat, pos, slotName, photo) {
+    var isRef = photo.kind === 'ref' ? 'реф' : '';
+    csv += [type, num, cbCsvCell(block), cbCsvCell(cat), pos, cbCsvCell(slotName), isRef, cbCsvCell(photo.name), cbCsvCell(photo.path || '')].join(';') + '\r\n';
+    txt += '  ' + pos + '. ' + (slotName ? slotName + ' — ' : '') + photo.name + (isRef ? ' [РЕФ]' : '') + (photo.path ? ' (' + photo.path + ')' : '') + '\r\n';
+  }
+
   App.cards.forEach(function (card, ci) {
     txt += '\r\n[Карточка ' + (ci + 1) + '] ' + card.title + (card.category ? ' (' + card.category + ')' : '') + '\r\n';
-    card.slots.forEach(function (pid, si) {
-      if (!pid) return;
-      var photo = cbPhotoById(pid);
-      if (!photo) return;
-      var slotName = card.slotNames[si] || '';
-      csv += ['Карточка', (ci + 1), cbCsvCell(card.title), cbCsvCell(card.category), (si + 1), cbCsvCell(slotName), cbCsvCell(photo.name), cbCsvCell(photo.path || '')].join(';') + '\r\n';
-      txt += '  ' + (si + 1) + '. ' + (slotName ? slotName + ' — ' : '') + photo.name + (photo.path ? ' (' + photo.path + ')' : '') + '\r\n';
-    });
+    if (card.mode === 'auto') {
+      (card.pids || []).forEach(function (pid, pi) {
+        var photo = cbPhotoById(pid);
+        if (photo) addLine('Карточка', ci + 1, card.title, card.category, pi + 1, '', photo);
+      });
+    } else {
+      card.slots.forEach(function (s, si) {
+        if (!s.pid) return;
+        var photo = cbPhotoById(s.pid);
+        if (photo) addLine('Карточка', ci + 1, card.title, card.category, si + 1, s.name || '', photo);
+      });
+    }
   });
   App.containers.forEach(function (cont, ci) {
     txt += '\r\n[Контейнер ' + (ci + 1) + '] ' + cont.title + '\r\n';
     cont.photoIds.forEach(function (pid, pi) {
       var photo = cbPhotoById(pid);
-      if (!photo) return;
-      csv += ['Контейнер', (ci + 1), cbCsvCell(cont.title), '', (pi + 1), '', cbCsvCell(photo.name), cbCsvCell(photo.path || '')].join(';') + '\r\n';
-      txt += '  ' + (pi + 1) + '. ' + photo.name + (photo.path ? ' (' + photo.path + ')' : '') + '\r\n';
+      if (photo) addLine('Контейнер', ci + 1, cont.title, '', pi + 1, '', photo);
     });
     if (cont.text) txt += '  Комментарий: ' + cont.text + '\r\n';
   });
-  /* BOM, чтобы Excel корректно открыл кириллицу */
   cbDownload(name + ' — список.csv', '﻿' + csv, 'text/csv;charset=utf-8');
   cbDownload(name + ' — список.txt', txt);
   cbToast('Список выгружен (CSV + TXT)');
 }
-
 document.getElementById('cbBtnList').onclick = cbExportList;
 
-/* ---------- Сохранение / загрузка проекта ----------
-   Desktop: проект = ОДИН файл .cardboard с путями к фото — сами фото
-   не копируются и не встраиваются (для фото без пути, например
-   добавленных drag-and-drop без доступа к пути, встраивается миниатюра,
-   чтобы проект оставался открываемым).
-   Browser: фолбэк — всё встроено в файл. */
+/* ============================================================
+   Сохранение / загрузка проекта
+   ============================================================ */
 
 function cbProjectData() {
   var desktop = cbDesktop();
   return {
     app: 'cardboard',
-    version: 2,
+    version: 3,
     name: document.getElementById('cbProjectName').value || 'Проект',
     savedAt: new Date().toISOString(),
     mode: desktop ? 'paths' : 'embedded',
     nextId: App.nextId,
     photos: App.photos.map(function (p) {
       return {
-        id: p.id, name: p.name, path: p.path, w: p.w, h: p.h,
-        /* в desktop-режиме встраиваем миниатюру только если пути нет */
+        id: p.id, name: p.name, path: p.path, w: p.w, h: p.h, kind: p.kind || 'photo',
         dataUrl: (desktop && p.path) ? null : p.dataUrl
       };
     }),
@@ -1852,7 +2430,7 @@ function cbSaveProject() {
   var json = JSON.stringify(data);
   if (cbDesktop()) {
     cbApi().save_project(data.name, json, false).then(function (path) {
-      if (!path) return; /* отменено */
+      if (!path) return;
       App.projectPath = path;
       cbClearDirty();
       cbToast('Сохранено: ' + path);
@@ -1864,35 +2442,56 @@ function cbSaveProject() {
   }
 }
 
+/* Миграция карточек старых версий проекта (v1/v2: rows/cols + slots[pid]) */
+function cbMigrateCard(c) {
+  if (c.mode) return c;   /* уже v3 */
+  var cols = c.cols || 2;
+  var rows = c.rows || Math.ceil((c.slots || []).length / cols) || 1;
+  var slots = [];
+  (c.slots || []).forEach(function (pid, i) {
+    slots.push({
+      orient: 'v', row: Math.floor(i / cols),
+      name: (c.slotNames && c.slotNames[i]) || '',
+      pid: pid || null
+    });
+  });
+  return {
+    id: c.id, title: c.title, category: c.category || '',
+    tplName: 'конверт. сетка ' + rows + '×' + cols,
+    canvas: 'v', mode: 'manual', hasHero: false, rows: rows,
+    hAspect: '3/2', vAspect: '3/4',
+    slots: slots, pids: []
+  };
+}
+
 function cbApplyProject(data) {
   App.photos = (data.photos || []).map(function (p) {
     p.missing = false;
+    if (!p.kind) p.kind = 'photo';
     return p;
   });
-  App.cards = (data.cards || []).map(function (c) {
-    if (!c.slotNames) {
-      c.slotNames = [];
-      for (var i = 0; i < c.slots.length; i++) c.slotNames.push('');
-    }
-    return c;
-  });
+  App.cards = (data.cards || []).map(cbMigrateCard);
   App.containers = data.containers || [];
   if (data.templates && data.templates.length) {
-    /* шаблоны из проекта добавляются в библиотеку (без дублей по имени) */
     data.templates.forEach(function (t) {
+      if (!t.canvas) {   /* шаблон v1 из старого проекта */
+        t = {
+          id: 'tpl' + (App.nextId++), name: t.name, canvas: 'v', mode: 'manual',
+          hasHero: false, rows: t.rows, hAspect: '3/2', vAspect: '3/4', active: true,
+          slots: cbMigrateV1Slots(t.rows, t.cols, t.slotNames)
+        };
+      }
       var exists = App.templates.some(function (x) { return x.name === t.name; });
       if (!exists) App.templates.push(t);
     });
     cbStoreTemplates();
-    cbRenderTplSelect();
   }
-  App.nextId = data.nextId || (App.photos.length + App.cards.length + App.containers.length + 100);
+  App.nextId = Math.max(data.nextId || 0, App.nextId, App.photos.length + App.cards.length + 100);
   document.getElementById('cbProjectName').value = data.name || 'Проект';
   cbClearDirty();
   cbRenderTray(); cbRenderCards(); cbRenderConts();
 }
 
-/* Desktop: восстановить миниатюры по путям; пропавшие пометить */
 function cbRehydrateThumbs() {
   var paths = [];
   App.photos.forEach(function (p) { if (p.path && !p.dataUrl) paths.push(p.path); });
@@ -1950,21 +2549,19 @@ document.getElementById('cbProjInput').onchange = function () {
 };
 document.getElementById('cbProjectName').oninput = cbMarkDirty;
 
-/* ---------- Инициализация ---------- */
+/* ============================================================
+   Инициализация
+   ============================================================ */
 
 function cbInitDesktopUi() {
   document.getElementById('cbBtnFolder').style.display = '';
   document.getElementById('cbMode').textContent = 'desktop';
 }
 
-window.addEventListener('pywebviewready', function () {
-  cbInitDesktopUi();
-});
-/* на случай, если событие пришло до навешивания слушателя */
+window.addEventListener('pywebviewready', function () { cbInitDesktopUi(); });
 if (cbDesktop()) cbInitDesktopUi();
 
 cbLoadTemplates();
-cbRenderTplSelect();
 cbRenderTray();
 cbRenderCards();
 cbRenderConts();
