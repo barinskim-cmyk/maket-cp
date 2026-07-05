@@ -1000,6 +1000,45 @@ function cbHeroBox(W, H, heroAR, hasRest, boxes) {
   return { x: vw + CB_GAP, y: 0, w: Math.max(0, W - vw - CB_GAP), h: H };
 }
 
+/* Герой-вертикаль + ряды: СОВМЕСТНЫЙ расчёт (Маша 05.07) — высота героя
+   равна высоте блока рядов (N рядов + зазоры). Итерации до неподвижной
+   точки: высота героя задаёт ширину колонки -> ширину зоны -> высоты
+   рядов -> новую высоту героя. */
+function cbHeroVJoint(W, H, heroAR, byRow, boxes) {
+  var nonEmpty = byRow.filter(function (r) { return r.length > 0; });
+  var maxHeroW = W * 0.6;
+  /* Аналитическое решение: высота блока рядов при ширине героя x:
+       B(x) = A − S·x, где S = Σ(1/sumAR_r),
+       A = (W−gap)·S − Σ((k_r−1)·gap/sumAR_r) + (n−1)·gap.
+     Условие «герой = блоку рядов»: T = B(ar·T)  =>  T = A/(1 + S·ar). */
+  var S = 0, A = (nonEmpty.length - 1) * CB_GAP;
+  nonEmpty.forEach(function (row) {
+    var sum = 0;
+    row.forEach(function (c) { sum += c.ar; });
+    S += 1 / sum;
+    A += (W - CB_GAP - (row.length - 1) * CB_GAP) / sum;
+  });
+  var T = A / (1 + S * heroAR);
+  T = Math.min(T, H);
+  var heroW = Math.min(T * heroAR, maxHeroW);
+  var heroH = Math.min(T, heroW / heroAR);
+  boxes.push({ x: 0, y: 0, w: heroW, h: heroH, slotIdx: 0 });
+  cbRowsInZone({ x: heroW + CB_GAP, y: 0, w: W - heroW - CB_GAP, h: T }, byRow, boxes);
+}
+
+/* Симметрия: композиция целиком центрируется на листе (равные поля) */
+function cbCenterBoxes(W, H, boxes) {
+  if (!boxes.length) return;
+  var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  boxes.forEach(function (b) {
+    minX = Math.min(minX, b.x); minY = Math.min(minY, b.y);
+    maxX = Math.max(maxX, b.x + b.w); maxY = Math.max(maxY, b.y + b.h);
+  });
+  var dx = (W - (maxX - minX)) / 2 - minX;
+  var dy = (H - (maxY - minY)) / 2 - minY;
+  boxes.forEach(function (b) { b.x += dx; b.y += dy; });
+}
+
 /* Ручной шаблон: hero + ряды. layout = {canvas, hasHero, rows, hAspect, vAspect, slots} */
 function cbManualBoxes(layout) {
   var W = 1000;
@@ -1010,10 +1049,17 @@ function cbManualBoxes(layout) {
   var boxes = [];
   var zone = { x: 0, y: 0, w: W, h: H };
   var rest = slots.map(function (s, i) { return { s: s, idx: i }; });
+  var heroVJoint = false;
+  var heroAR = 0;
 
   if (layout.hasHero && slots.length > 0) {
     rest = rest.slice(1);
-    zone = cbHeroBox(W, H, (slots[0].orient === 'h') ? hAR : vAR, rest.length > 0, boxes);
+    heroAR = (slots[0].orient === 'h') ? hAR : vAR;
+    if (slots[0].orient !== 'h' && rest.length) {
+      heroVJoint = true;   /* совместный расчёт ниже */
+    } else {
+      zone = cbHeroBox(W, H, heroAR, rest.length > 0, boxes);
+    }
   }
 
   if (rest.length) {
@@ -1024,8 +1070,10 @@ function cbManualBoxes(layout) {
       var ri = Math.min(nRows - 1, Math.max(0, item.s.row || 0));
       byRow[ri].push({ ar: (item.s.orient === 'h') ? hAR : vAR, slotIdx: item.idx });
     });
-    cbRowsInZone(zone, byRow, boxes);
+    if (heroVJoint) cbHeroVJoint(W, H, heroAR, byRow, boxes);
+    else cbRowsInZone(zone, byRow, boxes);
   }
+  cbCenterBoxes(W, H, boxes);
   return { W: W, H: H, boxes: boxes };
 }
 
@@ -1037,18 +1085,24 @@ function cbAutoBoxes(layout, aspects) {
   if (!aspects.length) return { W: W, H: H, boxes: boxes };
   var zone = { x: 0, y: 0, w: W, h: H };
   var idx0 = 0;
+  var heroVJoint = false;
 
   if (layout.hasHero) {
     idx0 = 1;
-    zone = cbHeroBox(W, H, aspects[0], aspects.length > 1, boxes);
-    if (aspects.length === 1) return { W: W, H: H, boxes: boxes };
+    if (aspects.length === 1) {
+      cbHeroBox(W, H, aspects[0], false, boxes);
+      cbCenterBoxes(W, H, boxes);
+      return { W: W, H: H, boxes: boxes };
+    }
+    if (aspects[0] < 1) heroVJoint = true;   /* герой-вертикаль: совместный расчёт */
+    else zone = cbHeroBox(W, H, aspects[0], true, boxes);
   }
 
   var rest = aspects.slice(idx0);
   if (rest.length) {
     /* Компактность (по мотивам collage-бенчмарков): перебираем число рядов,
        ряды балансируем по сумме пропорций, берём вариант с максимальным
-       заполнением листа. Пропорции всегда целы (cbRowsInZone). */
+       заполнением листа. Пропорции всегда целы. */
     var best = null;
     var maxRows = Math.min(4, rest.length);
     for (var nRows = 1; nRows <= maxRows; nRows++) {
@@ -1064,13 +1118,15 @@ function cbAutoBoxes(layout, aspects) {
         acc += ar;
       });
       var trial = [];
-      cbRowsInZone(zone, byRow, trial);
+      if (heroVJoint) cbHeroVJoint(W, H, aspects[0], byRow, trial);
+      else cbRowsInZone(zone, byRow, trial);
       var used = 0;
       trial.forEach(function (b) { used += b.w * b.h; });
       if (!best || used > best.used) best = { used: used, boxes: trial };
     }
     if (best) best.boxes.forEach(function (b) { boxes.push(b); });
   }
+  cbCenterBoxes(W, H, boxes);
   return { W: W, H: H, boxes: boxes };
 }
 
