@@ -175,15 +175,28 @@ input[type="text"]:focus, textarea:focus { outline: none; border-color: #1a1a1a;
   overflow-y: auto;
   padding: 18px 22px 80px;
 }
-.cb-section-title {
+/* ---------- Вкладки: Карточки / Доп. контент ---------- */
+.cb-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #dcd9d4;
+}
+.cb-tab {
+  border: none;
+  background: none;
+  border-radius: 0;
+  padding: 8px 16px 10px;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 1px;
   text-transform: uppercase;
   color: #8a8680;
-  margin: 18px 0 10px;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
 }
-.cb-section-title:first-child { margin-top: 0; }
+.cb-tab:hover { background: none; color: #1a1a1a; }
+.cb-tab.cb-tab-active { color: #1a1a1a; border-bottom-color: #1a1a1a; }
 .cb-empty-hint {
   color: #8a8680;
   font-size: 12px;
@@ -439,10 +452,12 @@ body.cb-file-drag #cbDropOverlay { display: flex; }
     <div class="cb-tray-grid" id="cbTrayGrid"></div>
   </div>
   <div class="cb-work" id="cbWork">
-    <div class="cb-section-title">Карточки</div>
-    <div id="cbCards"></div>
-    <div class="cb-section-title">Доп. контент</div>
-    <div id="cbConts"></div>
+    <div class="cb-tabs">
+      <button class="cb-tab cb-tab-active" data-tab="cards" id="cbTabBtnCards">Карточки</button>
+      <button class="cb-tab" data-tab="conts" id="cbTabBtnConts">Доп. контент</button>
+    </div>
+    <div id="cbTabCards"><div id="cbCards"></div></div>
+    <div id="cbTabConts" style="display:none"><div id="cbConts"></div></div>
   </div>
 </div>
 
@@ -796,6 +811,25 @@ document.getElementById('cbBtnWatch').onclick = function () {
   if (App.watch.timer) cbWatchStop(); else cbWatchStart();
 };
 
+/* ---------- Вкладки: Карточки / Доп. контент ---------- */
+
+function cbSwitchTab(name) {
+  document.getElementById('cbTabCards').style.display = (name === 'cards') ? '' : 'none';
+  document.getElementById('cbTabConts').style.display = (name === 'conts') ? '' : 'none';
+  document.getElementById('cbTabBtnCards').classList.toggle('cb-tab-active', name === 'cards');
+  document.getElementById('cbTabBtnConts').classList.toggle('cb-tab-active', name === 'conts');
+}
+
+function cbUpdateTabLabels() {
+  document.getElementById('cbTabBtnCards').textContent =
+    'Карточки' + (App.cards.length ? ' · ' + App.cards.length : '');
+  document.getElementById('cbTabBtnConts').textContent =
+    'Доп. контент' + (App.containers.length ? ' · ' + App.containers.length : '');
+}
+
+document.getElementById('cbTabBtnCards').onclick = function () { cbSwitchTab('cards'); };
+document.getElementById('cbTabBtnConts').onclick = function () { cbSwitchTab('conts'); };
+
 /* ---------- Панель фото ---------- */
 
 function cbRenderTray() {
@@ -999,6 +1033,7 @@ function cbAddCard() {
   App.cards.push({ id: cbId(), title: title, category: '', rows: rows, cols: cols, slots: slots, slotNames: slotNames });
   cbMarkDirty();
   cbRenderCards();
+  cbSwitchTab('cards');
 }
 
 function cbCardById(id) {
@@ -1023,6 +1058,7 @@ function cbCardResize(card, rows, cols) {
 }
 
 function cbRenderCards() {
+  cbUpdateTabLabels();
   var host = document.getElementById('cbCards');
   if (!App.cards.length) {
     host.innerHTML = '<div class="cb-empty-hint">Карточек пока нет — нажмите «+ Карточка». Фото перетаскиваются из левой панели в слоты. Шаблоны с именами слотов — кнопка «Шаблоны...».</div>';
@@ -1158,6 +1194,7 @@ function cbAddCont() {
   App.containers.push({ id: cbId(), title: 'Контейнер ' + (App.containers.length + 1), size: 'm', photoIds: [], text: '' });
   cbMarkDirty();
   cbRenderConts();
+  cbSwitchTab('conts');
 }
 
 function cbContById(id) {
@@ -1167,6 +1204,7 @@ function cbContById(id) {
 }
 
 function cbRenderConts() {
+  cbUpdateTabLabels();
   var host = document.getElementById('cbConts');
   if (!App.containers.length) {
     host.innerHTML = '<div class="cb-empty-hint">Контейнеры — свободные блоки для доп. контента: детали, стайлинг, видео-кадры. Нажмите «+ Контейнер».</div>';
