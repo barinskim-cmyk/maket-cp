@@ -93,6 +93,11 @@ class CardboardAPI:
         """Frontend сообщает о несохранённых изменениях (для диалога при выходе)."""
         self._dirty = bool(dirty)
 
+    def set_title(self, title: str) -> None:
+        """Имя проекта в заголовке окна (топбар лаконичный, имени там нет)."""
+        if self._window:
+            self._window.set_title(str(title)[:120])
+
     def _thumb_cached(self, path: str) -> Optional[dict]:
         if path not in self._thumb_cache:
             t = make_thumb(path)
