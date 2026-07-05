@@ -399,6 +399,19 @@ body.cb-resizing * { pointer-events: none; }
   overflow-y: auto;
   padding: 18px 20px;
   box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+  position: relative;
+}
+/* крестик закрытия модалки (дублирует кнопку «Закрыть») */
+.cb-modal-x {
+  position: absolute;
+  top: 12px; right: 12px;
+  width: 26px; height: 26px;
+  padding: 0;
+  line-height: 24px;
+  text-align: center;
+  font-size: 14px;
+  border-radius: 3px;
+  z-index: 5;
 }
 .cb-panel h2 { font-size: 15px; font-weight: 500; margin-bottom: 4px; }
 .cb-panel .cb-eyebrow {
@@ -645,6 +658,7 @@ body.cb-file-drag #cbDropOverlay { display: flex; }
 <!-- Редактор шаблона v2 -->
 <div id="cbTplModal" class="cb-modal">
   <div class="cb-panel" id="cbTplPanel">
+    <button class="cb-modal-x" data-close-modal="cbTplModal" title="Закрыть">×</button>
     <div class="cb-te-left">
       <h2>Шаблон карточки</h2>
       <div class="cb-eyebrow" id="cbTeEyebrow">НОВЫЙ</div>
@@ -713,6 +727,7 @@ body.cb-file-drag #cbDropOverlay { display: flex; }
 <!-- Галерея шаблонов -->
 <div id="cbGalModal" class="cb-modal">
   <div class="cb-panel" id="cbGalPanel">
+    <button class="cb-modal-x" data-close-modal="cbGalModal" title="Закрыть">×</button>
     <h2>Галерея шаблонов</h2>
     <div class="cb-eyebrow">ОТМЕЧЕННЫЕ ПРЕДЛАГАЮТСЯ ПРИ СОЗДАНИИ КАРТОЧКИ</div>
     <div class="cb-gal-grid" id="cbGalGrid"></div>
@@ -727,6 +742,7 @@ body.cb-file-drag #cbDropOverlay { display: flex; }
 <!-- Создание / переименование проекта -->
 <div id="cbProjModal" class="cb-modal">
   <div class="cb-panel" style="width:400px">
+    <button class="cb-modal-x" data-close-modal="cbProjModal" title="Закрыть">×</button>
     <h2 id="cbProjModalTitle">Новый проект</h2>
     <div class="cb-eyebrow">CARDBOARD · ПРОЕКТ</div>
     <div class="cb-lbl">Название проекта</div>
@@ -742,6 +758,7 @@ body.cb-file-drag #cbDropOverlay { display: flex; }
 <!-- Справка -->
 <div id="cbInfoModal" class="cb-modal">
   <div class="cb-panel" id="cbInfoPanel">
+    <button class="cb-modal-x" data-close-modal="cbInfoModal" title="Закрыть">×</button>
     <h2 id="cbInfoTitle"></h2>
     <div class="cb-eyebrow">CARDBOARD · CONTENT PULSE</div>
     <div id="cbInfoBody"></div>
@@ -1043,12 +1060,15 @@ function cbRowsInZone(zone, rows, boxes) {
   });
 }
 
-/* Герой с сохранением пропорции. Возвращает зону для остальных слотов. */
-function cbHeroBox(W, H, heroAR, hasRest, boxes) {
+/* Герой с сохранением пропорции. Возвращает зону для остальных слотов.
+   restRows — число рядов под героем: определяет его долю высоты
+   (2 ряда «весом»: hero = 2/(2+n) бюджета высоты) */
+function cbHeroBox(W, H, heroAR, hasRest, boxes, restRows) {
   if (heroAR >= 1) {
     /* герой-горизонт: сверху; если высоковат — уменьшаем, держа пропорцию */
     var hw = W, hh = W / heroAR;
-    var maxH = hasRest ? H * 0.55 : H;
+    var n = Math.max(1, restRows || 1);
+    var maxH = hasRest ? (H - n * CB_GAP) * 2 / (2 + n) : H;
     if (hh > maxH) { hh = maxH; hw = hh * heroAR; }
     boxes.push({ x: (W - hw) / 2, y: 0, w: hw, h: hh, slotIdx: 0 });
     return { x: 0, y: hh + CB_GAP, w: W, h: Math.max(0, H - hh - CB_GAP) };
@@ -1171,10 +1191,13 @@ function cbManualBoxes(layout) {
   var heroVJoint = false;
   var heroAR = 0;
 
+  var heroIsH = false;
+
   if (layout.hasHero && slots.length > 0) {
     rest = rest.slice(1);
     heroAR = (slots[0].orient === 'h') ? hAR : vAR;
-    if (slots[0].orient !== 'h' && rest.length) {
+    heroIsH = slots[0].orient === 'h';
+    if (!heroIsH && rest.length) {
       heroVJoint = true;   /* совместный расчёт ниже */
     } else {
       zone = cbHeroBox(W, H, heroAR, rest.length > 0, boxes);
@@ -1182,7 +1205,10 @@ function cbManualBoxes(layout) {
   }
 
   if (rest.length) {
+    /* герой-горизонталь занимает ЦЕЛЫЙ ряд: «РЯДЫ» включают его,
+       остальные слоты делятся на rows−1 (как в основной проге) */
     var nRows = Math.max(1, layout.rows || 1);
+    if (heroIsH) nRows = Math.max(1, nRows - 1);
     var byRow = [];
     for (var r = 0; r < nRows; r++) byRow.push([]);
     rest.forEach(function (item) {
@@ -1505,6 +1531,9 @@ CB_POPS.forEach(function (id) {
 });
 document.addEventListener('click', function (e) {
   if (!e.target.closest('.cb-menu-wrap')) cbCloseAllPops();
+  /* крестики модалок */
+  var x = e.target.closest('.cb-modal-x');
+  if (x) document.getElementById(x.getAttribute('data-close-modal')).classList.remove('cb-open');
 });
 
 /* Хоткеи */
@@ -2028,13 +2057,22 @@ function cbTeRender() {
   }
 }
 
+/* герой-горизонталь занимает целый ряд — счётчик «РЯДЫ» включает его */
+function cbHeroTakesRow(t) {
+  return !!(t.hasHero && t.slots.length && t.slots[0].orient === 'h');
+}
+function cbRestRows(t) {
+  return Math.max(1, t.rows - (cbHeroTakesRow(t) ? 1 : 0));
+}
+
 /* распределить не-hero слоты по рядам поровну */
 function cbTeDistribute() {
   var t = TE.cur;
   var start = t.hasHero ? 1 : 0;
   var rest = t.slots.slice(start);
-  var per = Math.ceil(rest.length / t.rows);
-  rest.forEach(function (s, i) { s.row = Math.min(t.rows - 1, Math.floor(i / per)); });
+  var rows = cbRestRows(t);
+  var per = Math.ceil(rest.length / rows);
+  rest.forEach(function (s, i) { s.row = Math.min(rows - 1, Math.floor(i / per)); });
 }
 
 /* Перераспределение под канвас (Маша 05.07): при смене Г<->В ряды
@@ -2044,21 +2082,22 @@ function cbTeReflow(t) {
   var start = t.hasHero ? 1 : 0;
   var rest = t.slots.slice(start);
   if (!rest.length) return;
+  var heroRow = cbHeroTakesRow(t) ? 1 : 0;
   var best = null;
   var maxRows = Math.min(5, rest.length);
   for (var n = 1; n <= maxRows; n++) {
     var per = Math.ceil(rest.length / n);
     var trial = JSON.parse(JSON.stringify(t));
-    trial.rows = n;
+    trial.rows = n + heroRow;   /* герой-H = отдельный ряд в счётчике */
     trial.slots.slice(start).forEach(function (s, i) {
       s.row = Math.min(n - 1, Math.floor(i / per));
     });
     var score = cbLayoutScore(cbManualBoxes(trial), t.hasHero, trial);
-    if (!best || score > best.score) best = { score: score, rows: n, per: per };
+    if (!best || score > best.score) best = { score: score, rows: n + heroRow, per: per, restRows: n };
   }
   if (best) {
     t.rows = best.rows;
-    rest.forEach(function (s, i) { s.row = Math.min(best.rows - 1, Math.floor(i / best.per)); });
+    rest.forEach(function (s, i) { s.row = Math.min(best.restRows - 1, Math.floor(i / best.per)); });
   }
 }
 
@@ -2115,17 +2154,24 @@ document.getElementById('cbTeCanvasV').onclick = function () {
 };
 document.getElementById('cbTeModeManual').onclick = function () { cbTeCollectNames(); TE.cur.mode = 'manual'; cbTeRender(); };
 document.getElementById('cbTeModeAuto').onclick = function () { cbTeCollectNames(); TE.cur.mode = 'auto'; cbTeRender(); };
-document.getElementById('cbTeHero').onchange = function () { cbTeCollectNames(); TE.cur.hasHero = this.checked; cbTeRender(); };
+document.getElementById('cbTeHero').onchange = function () {
+  cbTeCollectNames();
+  TE.cur.hasHero = this.checked;
+  cbTeDistribute();   /* семантика рядов меняется (герой-H = ряд) */
+  cbTeRender();
+};
 document.getElementById('cbTeRowMinus').onclick = function () {
   cbTeCollectNames();
-  TE.cur.rows = Math.max(1, TE.cur.rows - 1);
+  var minRows = cbHeroTakesRow(TE.cur) ? 2 : 1;   /* ряд героя не отнимается */
+  TE.cur.rows = Math.max(minRows, TE.cur.rows - 1);
   cbTeDistribute();   /* слоты сразу перераспределяются по новым рядам */
   cbTeRender();
 };
 document.getElementById('cbTeRowPlus').onclick = function () {
   cbTeCollectNames();
-  var maxRows = Math.max(1, TE.cur.slots.length - (TE.cur.hasHero ? 1 : 0));
-  TE.cur.rows = Math.min(Math.min(5, maxRows), TE.cur.rows + 1);
+  var heroRow = cbHeroTakesRow(TE.cur) ? 1 : 0;
+  var maxRows = Math.min(5, Math.max(1, TE.cur.slots.length - (TE.cur.hasHero ? 1 : 0))) + heroRow;
+  TE.cur.rows = Math.min(maxRows, TE.cur.rows + 1);
   cbTeDistribute();   /* иначе новый ряд пустой и превью не меняется */
   cbTeRender();
 };
@@ -2149,8 +2195,10 @@ document.getElementById('cbTePreview').addEventListener('click', function (e) {
   var del = e.target.getAttribute && e.target.getAttribute('data-te-del');
   if (flip != null) {
     cbTeCollectNames();
-    var s = TE.cur.slots[parseInt(flip, 10)];
+    var fi = parseInt(flip, 10);
+    var s = TE.cur.slots[fi];
     s.orient = (s.orient === 'h') ? 'v' : 'h';
+    if (fi === 0 && TE.cur.hasHero) cbTeDistribute();   /* герой-H = ряд */
     cbTeRender();
   } else if (del != null) {
     cbTeCollectNames();
