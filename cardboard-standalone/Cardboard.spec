@@ -44,7 +44,7 @@ if sys.platform == 'darwin':
     app = BUNDLE(
         coll,
         name='Cardboard.app',
-        icon=None,          # TODO: design/brand-cardboard/icon.icns
+        icon='../design/brand-cardboard/icon.icns',   # знак cb-grid на тайле #131313
         bundle_identifier='pulse.content.cardboard',
         info_plist={
             'CFBundleName': 'Cardboard',

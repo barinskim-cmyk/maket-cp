@@ -4,141 +4,181 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cardboard — вёрстка карточек товара</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 /* ============================================================
    Cardboard — standalone инструмент вёрстки карточек товара.
-   Dual-mode: desktop (pywebview + Python, фото по путям, ничего
-   не копируется) и браузерный фолбэк (фото встраиваются в проект).
-   Семейство инструментов Content Pulse (как Rate Setter).
+   Айдентика CARDBOARD · CONTENT PULSE (хендофф 05.07.2026):
+   палитра «тёмная плёнка», Manrope + IBM Plex Mono,
+   медь #C9956B — единственный акцент (≤5% экрана).
+   Плоский CSS без переменных (стиль проекта).
    ============================================================ */
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
   font-size: 13px;
-  color: #1a1a1a;
-  background: #f2f1ef;
+  color: #f2f2f1;
+  background: #131313;
   height: 100vh;
   overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+.cb-mono {
+  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
 }
 
 button {
   font-family: inherit;
   font-size: 12px;
   padding: 6px 12px;
-  border: 1px solid #c8c5c0;
-  background: #fff;
-  color: #1a1a1a;
+  border: 1px solid #2a2a28;
+  background: #1d1d1b;
+  color: #f2f2f1;
   cursor: pointer;
   border-radius: 3px;
   white-space: nowrap;   /* кнопки не ломаются на несколько строк */
   flex-shrink: 0;
 }
-button:hover { background: #eceae7; }
-button.cb-primary { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
-button.cb-primary:hover { background: #3a3a3a; }
-button.cb-danger:hover { background: #f6e3e0; border-color: #c96; }
+button:hover { background: #262624; border-color: #3a3a38; }
+button.cb-primary { background: #f2f2f1; color: #131313; border-color: #f2f2f1; }
+button.cb-primary:hover { background: #dddbd7; }
+button.cb-danger:hover { border-color: #c96b6b; color: #c96b6b; background: #1d1d1b; }
 
 input[type="text"], select, textarea {
   font-family: inherit;
   font-size: 12px;
   padding: 5px 8px;
-  border: 1px solid #c8c5c0;
+  border: 1px solid #2a2a28;
   border-radius: 3px;
-  background: #fff;
+  background: #1a1a18;
+  color: #f2f2f1;
 }
-input[type="text"]:focus, textarea:focus { outline: none; border-color: #1a1a1a; }
+input[type="text"]::placeholder, textarea::placeholder { color: #6d6d6c; }
+input[type="text"]:focus, textarea:focus { outline: none; border-color: #f2f2f1; }
 
 /* ---------- Верхняя панель ---------- */
 .cb-topbar {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 48px;
+  height: 52px;
   padding: 0 14px;
-  background: #fff;
-  border-bottom: 1px solid #dcd9d4;
+  background: #191917;
+  border-bottom: 1px solid #262626;
   flex-wrap: nowrap;
   overflow-x: auto;      /* узкое окно: панель скроллится, не расползается */
   overflow-y: hidden;
 }
 .cb-topbar .cb-logo, .cb-topbar .cb-grid-ctl, .cb-topbar span { white-space: nowrap; flex-shrink: 0; }
 .cb-topbar input, .cb-topbar select { flex-shrink: 0; }
+
 .cb-logo {
-  font-weight: 700;
-  font-size: 14px;
-  letter-spacing: 2px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   margin-right: 6px;
 }
-.cb-logo span { color: #8a8680; font-weight: 400; letter-spacing: 0; font-size: 11px; margin-left: 6px; }
+.cb-logo img { height: 24px; display: block; }
+.cb-logo-word {
+  font-weight: 400;
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  line-height: 1.1;
+}
+.cb-logo-sub {
+  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  font-size: 8px;
+  letter-spacing: 0.2em;
+  color: #7a7a79;
+  margin-top: 2px;
+}
 #cbProjectName { width: 180px; font-weight: 600; }
-.cb-topbar .cb-sep { width: 1px; height: 24px; background: #dcd9d4; margin: 0 4px; }
+.cb-topbar .cb-sep { width: 1px; height: 24px; background: #262626; margin: 0 4px; }
 .cb-topbar .cb-spacer { flex: 1; }
-#cbMode { font-size: 10px; color: #8a8680; }
+#cbMode { font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 9px; letter-spacing: 0.14em; color: #6d6d6c; }
 
-/* ---------- Попап «Поделиться» ---------- */
+/* ---------- Попапы «Импорт» / «Экспорт» ---------- */
 .cb-share-wrap { position: relative; flex-shrink: 0; }
-#cbSharePop {
+.cb-pop {
   display: none;
-  /* fixed, а не absolute: топбар скроллится (overflow), absolute-попап
-     резался бы его рамкой и «не открывался» */
-  position: fixed;
-  top: 50px;
-  right: 12px;
-  background: #fff;
-  border: 1px solid #c8c5c0;
+  position: absolute;
+  top: 38px;
+  right: 0;
+  background: #1d1d1b;
+  border: 1px solid #2a2a28;
   border-radius: 4px;
-  box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
   padding: 6px;
-  z-index: 120;
-  min-width: 190px;
+  z-index: 80;
+  min-width: 200px;
   flex-direction: column;
   gap: 4px;
 }
-#cbSharePop.cb-open { display: flex; }
-#cbSharePop button { border: none; text-align: left; width: 100%; padding: 8px 10px; }
-.cb-share-sep { height: 1px; background: #eceae7; margin: 2px 0; }
-.cb-share-mode { font-size: 10px; color: #8a8680; padding: 2px 10px 4px; text-align: right; }
+.cb-pop.cb-open { display: flex; }
+.cb-pop button { border: none; background: none; text-align: left; width: 100%; padding: 8px 10px; }
+.cb-pop button:hover { background: #262624; }
+.cb-pop-left { left: 0; right: auto; }
+.cb-share-sep { height: 1px; background: #262626; margin: 2px 0; }
+.cb-share-mode { padding: 2px 10px 4px; text-align: right; }
 
 /* ---------- Основной лейаут ---------- */
 .cb-main {
   display: flex;
-  height: calc(100vh - 48px);
+  height: calc(100vh - 52px);
 }
 
 /* ---------- Левая панель: фото ---------- */
 .cb-tray {
   width: 300px;
-  min-width: 160px;
-  max-width: 720px;
-  background: #fff;
+  min-width: 180px;
+  max-width: 620px;
+  background: #191917;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
 }
-/* Перетаскиваемая граница галереи (как в Capture One) */
+
+/* Ресайзер: граница галереи тянется мышью, ширина запоминается */
 .cb-resizer {
   width: 5px;
-  flex-shrink: 0;
   cursor: col-resize;
-  background: #dcd9d4;
-  border-left: 2px solid #fff;
-  border-right: 2px solid #f2f1ef;
+  background: #262626;
+  flex-shrink: 0;
   transition: background 0.15s;
 }
-.cb-resizer:hover, .cb-resizer.cb-dragging { background: #1a1a1a; }
-body.cb-resizing { cursor: col-resize; user-select: none; -webkit-user-select: none; }
-body.cb-resizing .cb-work, body.cb-resizing .cb-tray { pointer-events: none; }
+.cb-resizer:hover, .cb-resizer.cb-dragging { background: #c9956b; }
+body.cb-resizing { cursor: col-resize; user-select: -webkit-user-select; }
+body.cb-resizing * { pointer-events: none; }
+
 .cb-tray-head {
   padding: 10px 12px 8px;
-  border-bottom: 1px solid #eceae7;
+  border-bottom: 1px solid #262626;
 }
 .cb-tray-head .cb-row { display: flex; gap: 6px; margin-bottom: 6px; }
 .cb-tray-head .cb-row:last-child { margin-bottom: 0; }
 #cbFilter { flex: 1; }
-.cb-tray-stats { font-size: 11px; color: #8a8680; padding: 6px 12px; border-bottom: 1px solid #eceae7; }
-#cbWatchStatus { font-size: 11px; color: #2a7a2a; padding: 6px 12px 6px; display: none; border-bottom: 1px solid #eceae7; }
+.cb-tray-stats {
+  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  color: #6d6d6c;
+  padding: 7px 12px;
+  border-bottom: 1px solid #262626;
+}
+#cbWatchStatus {
+  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  color: #7fae7f;
+  padding: 7px 12px;
+  display: none;
+  border-bottom: 1px solid #262626;
+}
 
 /* Библиотека превью — по аналогии с pv-gallery основной проги:
    вертикальное фото = 1/3 ряда, горизонтальное = 2/3, flex-grow добивает ряд */
@@ -161,7 +201,7 @@ body.cb-resizing .cb-work, body.cb-resizing .cb-tray { pointer-events: none; }
   transition: border-color 0.15s;
 }
 .cb-thumb.cb-h { width: calc(2 * (100% - 8px) / 3 + 4px); }
-.cb-thumb:hover { border-color: #1a1a1a; }
+.cb-thumb:hover { border-color: #f2f2f1; }
 .cb-thumb:active { cursor: grabbing; }
 .cb-thumb img {
   width: 100%;
@@ -171,14 +211,16 @@ body.cb-resizing .cb-work, body.cb-resizing .cb-tray { pointer-events: none; }
   display: block;
   pointer-events: none;
 }
-.cb-thumb.cb-used { opacity: 0.4; }
+.cb-thumb.cb-used { opacity: 0.35; }
 .cb-thumb.cb-used::after {
   content: "в макете";
   position: absolute;
   top: 4px; left: 4px;
-  font-size: 9px;
-  background: #1a1a1a;
-  color: #fff;
+  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  background: #f2f2f1;
+  color: #131313;
   padding: 1px 5px;
   border-radius: 2px;
 }
@@ -189,61 +231,68 @@ body.cb-resizing .cb-work, body.cb-resizing .cb-tray { pointer-events: none; }
   align-items: center;
   justify-content: center;
   font-size: 10px;
-  color: #b04a3a;
-  background: #f9efed;
+  color: #c96b6b;
+  background: #211816;
 }
 .cb-tray-empty {
   width: 100%;
-  color: #8a8680;
+  color: #8c8c8b;
   font-size: 12px;
   text-align: center;
   padding: 40px 16px;
   line-height: 1.6;
-  border: 1px dashed #c8c5c0;
+  border: 1px dashed #2a2a28;
   border-radius: 4px;
 }
 
 /* ---------- Рабочая область ---------- */
 .cb-work {
   flex: 1;
+  min-width: 0;
   overflow-y: auto;
   padding: 18px 22px 80px;
+  border-left: 1px solid #262626;
+  border-right: 1px solid #262626;
+  background: #131313;
 }
+
 /* ---------- Вкладки: Карточки / Доп. контент ---------- */
 .cb-tabs {
   display: flex;
   gap: 0;
   margin-bottom: 16px;
-  border-bottom: 1px solid #dcd9d4;
+  border-bottom: 1px solid #262626;
 }
 .cb-tab {
   border: none;
   background: none;
   border-radius: 0;
   padding: 8px 16px 10px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 1px;
+  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #8a8680;
+  color: #8c8c8b;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
 }
-.cb-tab:hover { background: none; color: #1a1a1a; }
-.cb-tab.cb-tab-active { color: #1a1a1a; border-bottom-color: #1a1a1a; }
+.cb-tab:hover { background: none; border-color: transparent transparent #3a3a38; color: #f2f2f1; }
+.cb-tab.cb-tab-active { color: #f2f2f1; border-bottom-color: #c9956b; }
+
 .cb-empty-hint {
-  color: #8a8680;
+  color: #8c8c8b;
   font-size: 12px;
   padding: 14px;
-  border: 1px dashed #c8c5c0;
+  border: 1px dashed #2a2a28;
   border-radius: 4px;
   margin-bottom: 10px;
 }
 
 /* ---------- Карточка ---------- */
 .cb-card, .cb-container {
-  background: #fff;
-  border: 1px solid #dcd9d4;
+  background: #1d1d1b;
+  border: 1px solid #2a2a28;
   border-radius: 4px;
   margin: 0 auto 16px;
   max-width: 780px;         /* как lay-container в основной проге */
@@ -257,15 +306,16 @@ body.cb-resizing .cb-work, body.cb-resizing .cb-tray { pointer-events: none; }
   flex-wrap: wrap;
 }
 .cb-card-head .cb-num {
-  font-weight: 700;
-  font-size: 12px;
-  color: #8a8680;
+  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  font-weight: 500;
+  font-size: 11px;
+  color: #6d6d6c;
   min-width: 24px;
 }
 .cb-card-head input.cb-title { width: 220px; font-weight: 600; }
 .cb-card-head input.cb-cat { width: 140px; }
 .cb-card-head .cb-spacer { flex: 1; }
-.cb-card-head .cb-grid-ctl { display: flex; align-items: center; gap: 4px; font-size: 11px; color: #8a8680; }
+.cb-card-head .cb-grid-ctl { display: flex; align-items: center; gap: 4px; font-size: 11px; color: #8c8c8b; }
 .cb-card-head .cb-grid-ctl button { padding: 2px 8px; }
 .cb-mini { padding: 3px 8px; font-size: 11px; }
 
@@ -278,16 +328,16 @@ body.cb-resizing .cb-work, body.cb-resizing .cb-tray { pointer-events: none; }
   flex: 1;
   min-width: 0;
   aspect-ratio: 3 / 4;
-  border: 1px dashed #c8c5c0;
-  background: #fafaf9;
+  border: 1px dashed #2f2f2d;
+  background: #1a1a18;
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
 }
-.cb-slot.cb-filled { border-style: solid; border-color: #e4e2de; background: #fff; }
-.cb-slot.cb-over { border-color: #1a1a1a; background: #eceae7; }
+.cb-slot.cb-filled { border-style: solid; border-color: #2f2f2d; background: #131313; }
+.cb-slot.cb-over { border-color: #f2f2f1; background: #262624; }
 .cb-slot img {
   position: absolute;
   top: 0; left: 0;
@@ -296,14 +346,16 @@ body.cb-resizing .cb-work, body.cb-resizing .cb-tray { pointer-events: none; }
   display: block;
   pointer-events: none;
 }
-.cb-slot .cb-slot-hint { color: #b5b1ab; font-size: 11px; text-align: center; padding: 0 6px; }
+.cb-slot .cb-slot-hint { color: #6d6d6c; font-size: 11px; text-align: center; padding: 0 6px; }
 .cb-slot .cb-slot-tag {
   position: absolute;
   top: 4px; left: 4px;
-  font-size: 9px;
-  background: rgba(255,255,255,0.9);
-  border: 1px solid #dcd9d4;
-  color: #55524e;
+  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  font-size: 8.5px;
+  letter-spacing: 0.08em;
+  background: rgba(19,19,19,0.85);
+  border: 1px solid #2f2f2d;
+  color: #f2f2f1;
   padding: 1px 5px;
   border-radius: 2px;
   max-width: 70%;
@@ -315,8 +367,8 @@ body.cb-resizing .cb-work, body.cb-resizing .cb-tray { pointer-events: none; }
   position: absolute;
   left: 0; right: 0; bottom: 0;
   font-size: 9px;
-  background: rgba(255,255,255,0.85);
-  color: #55524e;
+  background: rgba(19,19,19,0.85);
+  color: #b2b2b1;
   padding: 2px 5px;
   white-space: nowrap;
   overflow: hidden;
@@ -330,9 +382,9 @@ body.cb-resizing .cb-work, body.cb-resizing .cb-tray { pointer-events: none; }
   width: 18px; height: 18px;
   line-height: 16px;
   text-align: center;
-  border: 1px solid #c8c5c0;
+  border: 1px solid #2a2a28;
   border-radius: 2px;
-  background: #fff;
+  background: #1d1d1b;
   cursor: pointer;
   font-size: 11px;
   display: none;
@@ -343,25 +395,25 @@ body.cb-resizing .cb-work, body.cb-resizing .cb-tray { pointer-events: none; }
 /* ---------- Контейнер (доп. контент) ---------- */
 .cb-container-body {
   min-height: 90px;
-  border: 1px dashed #c8c5c0;
+  border: 1px dashed #2f2f2d;
   border-radius: 3px;
-  background: #fafaf9;
+  background: #1a1a18;
   padding: 8px;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   align-content: flex-start;
 }
-.cb-container-body.cb-over { border-color: #1a1a1a; background: #eceae7; }
-.cb-container-body .cb-cont-hint { color: #b5b1ab; font-size: 11px; width: 100%; text-align: center; padding: 24px 0; }
-.cb-cont-item { position: relative; border: 1px solid #e4e2de; background: #fff; border-radius: 3px; cursor: grab; }
-.cb-cont-item img { display: block; object-fit: contain; background: #f2f1ef; pointer-events: none; }
+.cb-container-body.cb-over { border-color: #f2f2f1; background: #262624; }
+.cb-container-body .cb-cont-hint { color: #6d6d6c; font-size: 11px; width: 100%; text-align: center; padding: 24px 0; }
+.cb-cont-item { position: relative; border: 1px solid #2f2f2d; background: #131313; border-radius: 3px; cursor: grab; }
+.cb-cont-item img { display: block; object-fit: contain; background: #131313; pointer-events: none; }
 .cb-size-s .cb-cont-item img, .cb-size-s .cb-cont-item .cb-missing-box { width: 90px; height: 90px; }
 .cb-size-m .cb-cont-item img, .cb-size-m .cb-cont-item .cb-missing-box { width: 150px; height: 150px; }
 .cb-size-l .cb-cont-item img, .cb-size-l .cb-cont-item .cb-missing-box { width: 240px; height: 240px; }
 .cb-cont-item .cb-slot-x { display: none; }
 .cb-cont-item:hover .cb-slot-x { display: block; }
-.cb-cont-item.cb-over { outline: 2px solid #1a1a1a; }
+.cb-cont-item.cb-over { outline: 2px solid #f2f2f1; }
 .cb-container textarea {
   width: 100%;
   margin-top: 8px;
@@ -373,17 +425,18 @@ body.cb-resizing .cb-work, body.cb-resizing .cb-tray { pointer-events: none; }
 .cb-outline {
   width: 190px;
   min-width: 150px;
-  background: #fff;
-  border-left: 1px solid #dcd9d4;
+  background: #191917;
   overflow-y: auto;
   padding: 12px 0;
+  flex-shrink: 0;
 }
 .cb-outline-title {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 1px;
+  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #8a8680;
+  color: #6d6d6c;
   padding: 0 14px 8px;
 }
 .cb-outline-item {
@@ -395,22 +448,27 @@ body.cb-resizing .cb-work, body.cb-resizing .cb-tray { pointer-events: none; }
   text-align: left;
   padding: 7px 14px;
   font-size: 12px;
-  color: #1a1a1a;
+  color: #f2f2f1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   border-left: 2px solid transparent;
 }
-.cb-outline-item:hover { background: #f2f1ef; }
-.cb-outline-item .cb-outline-num { color: #8a8680; margin-right: 6px; }
-.cb-outline-item .cb-outline-count { color: #8a8680; font-size: 10px; margin-left: 4px; }
-.cb-outline-empty { font-size: 11px; color: #8a8680; padding: 4px 14px; }
+.cb-outline-item:hover { background: #1f1f1d; border-left-color: #c9956b; }
+.cb-outline-item .cb-outline-num { color: #6d6d6c; margin-right: 6px; }
+.cb-outline-item .cb-outline-count {
+  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  color: #6d6d6c;
+  font-size: 9.5px;
+  margin-left: 4px;
+}
+.cb-outline-empty { font-size: 11px; color: #6d6d6c; padding: 4px 14px; }
 
 /* ---------- Модалка шаблонов ---------- */
 #cbTplModal {
   position: fixed;
   inset: 0;
-  background: rgba(26,26,26,0.45);
+  background: rgba(13,13,13,0.65);
   display: none;
   align-items: flex-start;
   justify-content: center;
@@ -419,18 +477,24 @@ body.cb-resizing .cb-work, body.cb-resizing .cb-tray { pointer-events: none; }
 }
 #cbTplModal.cb-open { display: flex; }
 .cb-tpl-panel {
-  background: #fff;
+  background: #1d1d1b;
+  border: 1px solid #2a2a28;
   border-radius: 6px;
   width: 560px;
   max-height: 80vh;
   overflow-y: auto;
   padding: 18px 20px;
-  box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.6);
 }
-.cb-tpl-panel h2 { font-size: 14px; margin-bottom: 12px; }
+.cb-tpl-panel h2 { font-size: 14px; font-weight: 500; margin-bottom: 12px; }
 .cb-tpl-row { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
-.cb-tpl-row label { font-size: 11px; color: #8a8680; }
+.cb-tpl-row label { font-size: 11px; color: #8c8c8b; }
 #cbTplName { width: 200px; font-weight: 600; }
+#cbTplGridLabel {
+  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  color: #b2b2b1;
+}
 .cb-tpl-slots { display: flex; flex-direction: column; gap: 4px; margin: 10px 0; max-width: 400px; }
 .cb-tpl-slot-row { display: flex; gap: 4px; }
 .cb-tpl-slot-row input {
@@ -438,10 +502,11 @@ body.cb-resizing .cb-work, body.cb-resizing .cb-tray { pointer-events: none; }
   min-width: 0;
   aspect-ratio: 3 / 4;      /* те же пропорции, что у слотов карточки */
   text-align: center;
-  background: #fafaf9;
+  background: #1a1a18;
   border-style: dashed;
   border-radius: 0;
 }
+.cb-tpl-hint { font-size: 11px; color: #8c8c8b; margin-bottom: 4px; }
 .cb-tpl-foot { display: flex; gap: 8px; margin-top: 14px; }
 .cb-tpl-foot .cb-spacer { flex: 1; }
 
@@ -449,12 +514,13 @@ body.cb-resizing .cb-work, body.cb-resizing .cb-tray { pointer-events: none; }
 #cbDropOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(26,26,26,0.75);
-  color: #fff;
+  background: rgba(13,13,13,0.82);
+  color: #f2f2f1;
   display: none;
   align-items: center;
   justify-content: center;
   font-size: 18px;
+  font-weight: 300;
   z-index: 100;
   pointer-events: none;
 }
@@ -466,8 +532,8 @@ body.cb-file-drag #cbDropOverlay { display: flex; }
   bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
-  background: #1a1a1a;
-  color: #fff;
+  background: #f2f2f1;
+  color: #131313;
   padding: 8px 16px;
   border-radius: 4px;
   font-size: 12px;
@@ -476,14 +542,14 @@ body.cb-file-drag #cbDropOverlay { display: flex; }
   max-width: 80%;
 }
 
-/* ---------- Печать (экспорт PDF) ---------- */
+/* ---------- Печать (экспорт PDF): остаётся светлой ---------- */
 #cbPrint { display: none; }
 @media print {
-  body { height: auto; overflow: visible; background: #fff; }
+  body { height: auto; overflow: visible; background: #fff; color: #131313; }
   .cb-topbar, .cb-main, #cbToast, #cbDropOverlay, #cbTplModal { display: none !important; }
-  #cbPrint { display: block; font-size: 12px; }
+  #cbPrint { display: block; font-size: 12px; font-family: 'Manrope', -apple-system, sans-serif; }
   #cbPrint .cbp-head { margin-bottom: 18px; }
-  #cbPrint .cbp-head h1 { font-size: 20px; margin-bottom: 4px; }
+  #cbPrint .cbp-head h1 { font-size: 20px; font-weight: 500; margin-bottom: 4px; }
   #cbPrint .cbp-head .cbp-meta { color: #666; font-size: 11px; }
   #cbPrint .cbp-block { page-break-inside: avoid; border: 1px solid #ccc; border-radius: 4px; padding: 10px 12px; margin-bottom: 14px; }
   #cbPrint .cbp-block h2 { font-size: 13px; margin-bottom: 8px; }
@@ -503,12 +569,18 @@ body.cb-file-drag #cbDropOverlay { display: flex; }
 <body>
 
 <div class="cb-topbar">
-  <div class="cb-logo">CARDBOARD<span>вёрстка карточек</span></div>
+  <div class="cb-logo"><img src="data:image/png;base64,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" alt=""><div><div class="cb-logo-word">CARDBOARD</div><div class="cb-logo-sub">▸ CONTENT PULSE</div></div></div>
   <input type="text" id="cbProjectName" value="Новый проект" title="Название проекта">
   <div class="cb-sep"></div>
-  <button id="cbBtnImport" class="cb-primary">Добавить фото</button>
-  <button id="cbBtnFolder" style="display:none">Папка</button>
-  <button id="cbBtnWatch" title="Следить за папкой экспорта Capture One">Следить за папкой</button>
+  <div class="cb-share-wrap">
+    <button id="cbBtnImport" class="cb-primary">Импорт</button>
+    <div id="cbImportPop" class="cb-pop cb-pop-left">
+      <button id="cbBtnPick">Добавить фото</button>
+      <button id="cbBtnFolder" style="display:none">Импорт папки целиком</button>
+      <div class="cb-share-sep"></div>
+      <button id="cbBtnWatch" title="Хоткей в Capture One кладёт фото в папку — Cardboard подхватывает">Следить за папкой</button>
+    </div>
+  </div>
   <div class="cb-sep"></div>
   <button id="cbBtnAdd">+ Контейнер</button>
   <span class="cb-grid-ctl" style="font-size:11px;color:#8a8680;">Шаблон:
@@ -517,8 +589,8 @@ body.cb-file-drag #cbDropOverlay { display: flex; }
   <button id="cbBtnTpl" class="cb-mini" title="Редактор шаблонов">Шаблоны...</button>
   <div class="cb-spacer"></div>
   <div class="cb-share-wrap">
-    <button id="cbBtnShare" class="cb-primary">Поделиться</button>
-    <div id="cbSharePop">
+    <button id="cbBtnShare">Экспорт</button>
+    <div id="cbSharePop" class="cb-pop">
       <button id="cbBtnPdf">Экспорт PDF</button>
       <button id="cbBtnList">Список (CSV + TXT)</button>
       <div class="cb-share-sep"></div>
@@ -757,7 +829,7 @@ function cbImportFilesEmbedded(files) {
 
 /* ---------- Импорт фото: кнопки ---------- */
 
-document.getElementById('cbBtnImport').onclick = function () {
+document.getElementById('cbBtnPick').onclick = function () {
   if (cbDesktop()) {
     cbApi().pick_photos().then(function (list) {
       var added = cbAddPhotos(list || []);
@@ -996,23 +1068,36 @@ function cbInitResizer() {
 
 cbInitResizer();
 
-/* ---------- Попап «Поделиться» ---------- */
+/* ---------- Попапы «Импорт» / «Экспорт» ---------- */
 
-function cbSharePop(open) {
-  var pop = document.getElementById('cbSharePop');
+function cbPop(id, open) {
+  var pop = document.getElementById(id);
   pop.classList.toggle('cb-open', open === undefined ? !pop.classList.contains('cb-open') : open);
 }
+function cbSharePop(open) { cbPop('cbSharePop', open); }   /* совместимость со старыми вызовами */
 
 document.getElementById('cbBtnShare').onclick = function (e) {
   e.stopPropagation();
-  cbSharePop();
+  cbPop('cbImportPop', false);
+  cbPop('cbSharePop');
 };
+document.getElementById('cbBtnImport').onclick = function (e) {
+  e.stopPropagation();
+  cbPop('cbSharePop', false);
+  cbPop('cbImportPop');
+};
+/* после выбора действия попап закрывается */
 document.getElementById('cbSharePop').addEventListener('click', function (e) {
-  /* после выбора действия попап закрывается */
-  if (e.target.closest('button')) cbSharePop(false);
+  if (e.target.closest('button')) cbPop('cbSharePop', false);
+});
+document.getElementById('cbImportPop').addEventListener('click', function (e) {
+  if (e.target.closest('button')) cbPop('cbImportPop', false);
 });
 document.addEventListener('click', function (e) {
-  if (!e.target.closest('.cb-share-wrap')) cbSharePop(false);
+  if (!e.target.closest('.cb-share-wrap')) {
+    cbPop('cbSharePop', false);
+    cbPop('cbImportPop', false);
+  }
 });
 
 /* ---------- Панель фото ---------- */

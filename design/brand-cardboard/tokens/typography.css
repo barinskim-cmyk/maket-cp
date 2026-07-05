@@ -1,0 +1,40 @@
+/* ═══════════ ТИПОГРАФИКА ═══════════
+   Три уровня: display (Manrope 200), body (Manrope 400/500),
+   mono-meta (IBM Plex Mono, UPPERCASE, tabular). Больше трёх — нельзя.
+*/
+:root {
+  --font-display: 'Manrope', system-ui, sans-serif;
+  --font-body:    'Manrope', system-ui, sans-serif;
+  --font-mono:    'IBM Plex Mono', ui-monospace, monospace;
+
+  /* — веса — */
+  --fw-display: 200;   /* только заголовки */
+  --fw-body:    400;
+  --fw-medium:  500;   /* акцент в абзаце, лейблы */
+
+  /* — display (заголовки) — */
+  --fs-display-1: clamp(40px, 6.4vw, 84px);  /* обложка */
+  --fs-display-2: clamp(30px, 4.6vw, 50px);  /* hero */
+  --fs-h1:        clamp(28px, 3.4vw, 40px);  /* секция */
+  --fs-h2:        30px;                       /* область */
+  --lh-display:   1.08;
+  --ls-display:   -0.02em;
+
+  /* — body — */
+  --fs-lead:  16px;   /* лид-абзац, lh 1.65 */
+  --fs-body:  15px;
+  --fs-sm:    13.5px;
+  --lh-body:  1.65;
+  --measure:  52ch;   /* макс. длина строки текста */
+
+  /* — mono-meta — */
+  --fs-meta:    11px;    /* eyebrow, счётчики */
+  --fs-meta-sm: 10.5px;
+  --fs-meta-xs: 9.5px;   /* оверлей на фото */
+  --ls-meta:    0.14em;  /* базовый трекинг mono */
+  --ls-meta-lg: 0.2em;   /* eyebrow секции */
+  --ls-meta-xl: 0.26em;  /* обложечный kicker */
+
+  /* — большая статистика («−40%») — */
+  --fs-stat: 44px;
+}

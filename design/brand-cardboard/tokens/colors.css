@@ -1,0 +1,80 @@
+/* ═══════════ ЦВЕТ · «ТЁМНАЯ ПЛЁНКА» ═══════════
+   Никаких чистых #000/#fff. Подложка плёночная, свет тёплый.
+   Тёмная тема — база (:root). Светлая — .theme-light / [data-theme="light"].
+   Один акцент (медь) ≤5% экрана. Семантика только в UI-мокапах.
+*/
+:root {
+  /* — базовая палитра — */
+  --mcp-base:        #131313;   /* основная подложка */
+  --mcp-bg-deep:     #0d0d0d;   /* борд/задник под экранами */
+  --mcp-panel:       #1d1d1b;   /* панель / карточка на тёмном */
+  --mcp-panel-2:     #191917;   /* оконная планка */
+  --mcp-field-bg:    #1a1a18;   /* поле ввода */
+
+  --mcp-light:       #eceae6;   /* светлая секция / грейн */
+  --mcp-light-deep:  #dcdad4;   /* задник светлой темы */
+  --mcp-light-muted: #d8d6d1;   /* приглушённый светлый */
+  --mcp-light-panel: #f4f3f0;   /* панель на светлом */
+
+  /* — линии — */
+  --mcp-line:        #262626;   /* разделитель на тёмном (борд) */
+  --mcp-line-panel:  #2a2a28;   /* граница панели на тёмном */
+  --mcp-line-soft:   #1f1f1f;   /* мягкая линия на тёмном */
+  --mcp-line-light:  #d3d1cb;   /* разделитель на светлом */
+  --mcp-field-border:#2a2a28;   /* граница поля (тёмная) */
+
+  /* — текст на тёмном — */
+  --mcp-text:        #f2f2f1;   /* основной */
+  --mcp-text-2:      #b2b2b1;   /* вторичный */
+  --mcp-text-3:      #8c8c8b;   /* приглушённый */
+  --mcp-meta:        #6d6d6c;   /* метаданные / mono */
+  --mcp-meta-2:      #7a7a79;   /* eyebrow-mono */
+
+  /* — акцент (единственный) — */
+  --mcp-accent:      #c9956b;   /* медь · опциональный акцент, ≤5% */
+  --mcp-invert-bg:   #f2f2f1;   /* инверт-чип (primary action) */
+  --mcp-invert-fg:   #131313;
+
+  /* — семантика (только внутри UI-мокапов, как точка-семафор) — */
+  --mcp-ok:          #7fae7f;
+  --mcp-warn:        #c9956b;
+  --mcp-danger:      #c96b6b;
+
+  /* — семантические алиасы (тёмная тема) — */
+  --surface:         var(--mcp-base);
+  --surface-panel:   var(--mcp-panel);
+  --surface-deep:    var(--mcp-bg-deep);
+  --border:          var(--mcp-line-panel);
+  --border-soft:     var(--mcp-line-soft);
+  --text-primary:    var(--mcp-text);
+  --text-secondary:  var(--mcp-text-2);
+  --text-muted:      var(--mcp-text-3);
+  --text-meta:       var(--mcp-meta);
+  --accent:          var(--mcp-accent);
+  --action-bg:       var(--mcp-invert-bg);
+  --action-fg:       var(--mcp-invert-fg);
+  --field-bg:        var(--mcp-field-bg);
+  --field-border:    var(--mcp-field-border);
+}
+
+/* ——— СВЕТЛАЯ ТЕМА ——— */
+.theme-light,
+[data-theme="light"] {
+  --surface:         var(--mcp-light);
+  --surface-panel:   var(--mcp-light-panel);
+  --surface-deep:    var(--mcp-light-deep);
+  --border:          var(--mcp-line-light);
+  --border-soft:     #e0ded8;
+  --text-primary:    #131313;
+  --text-secondary:  #57564e;
+  --text-muted:      #8a897f;
+  --text-meta:       #8a897f;
+  --accent:          #a56a3a;   /* медь темнее для контраста на светлом */
+  --action-bg:       #131313;
+  --action-fg:       #f2f2f1;
+  --field-bg:        #ffffff;
+  --field-border:    #cdcbc4;
+  --mcp-ok:          #3f7a4f;
+  --mcp-warn:        #a56a3a;
+  --mcp-danger:      #b5453f;
+}
