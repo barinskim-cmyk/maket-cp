@@ -1065,15 +1065,20 @@ function cbHeroBox(W, H, heroAR, hasRest, boxes) {
    равна высоте блока рядов (N рядов + зазоры). Итерации до неподвижной
    точки: высота героя задаёт ширину колонки -> ширину зоны -> высоты
    рядов -> новую высоту героя. */
-function cbHeroVJoint(W, H, heroAR, byRow, boxes) {
+function cbHeroVJoint(W, H, heroAR, byRow, boxes, maxT) {
   var nonEmptyAll = byRow.filter(function (r) { return r.length > 0; });
   /* Исключение (Маша): рядов больше 3 — герой выравнивается на ДВА ряда,
-     остальные ряды уходят под него на всю ширину листа */
+     остальные ряды уходят под него на всю ширину листа.
+     Верхнему блоку выделяется доля высоты ~2 ряда из (2+nBottom),
+     иначе он съест весь лист и нижним рядам не останется места. */
   if (nonEmptyAll.length > 3) {
     var topRows = nonEmptyAll.slice(0, 2);
     var bottomRows = nonEmptyAll.slice(2);
+    var nB = bottomRows.length;
+    var rowH = (H - nB * CB_GAP) / (2 + nB);
+    var topAlloc = 2 * rowH + CB_GAP;
     var topBoxes = [];
-    cbHeroVJoint(W, H, heroAR, topRows, topBoxes);
+    cbHeroVJoint(W, H, heroAR, topRows, topBoxes, topAlloc);
     var topBottom = 0;
     topBoxes.forEach(function (b) { topBottom = Math.max(topBottom, b.y + b.h); boxes.push(b); });
     cbRowsInZone({ x: 0, y: topBottom + CB_GAP, w: W, h: Math.max(0, H - topBottom - CB_GAP) }, bottomRows, boxes);
@@ -1093,7 +1098,7 @@ function cbHeroVJoint(W, H, heroAR, byRow, boxes) {
     A += (W - CB_GAP - (row.length - 1) * CB_GAP) / sum;
   });
   var T = A / (1 + S * heroAR);
-  T = Math.min(T, H);
+  T = Math.min(T, maxT || H, H);
   var heroW = T * heroAR;
   if (heroW > maxHeroW) {
     /* колонка героя упёрлась в 60% ширины: пересчитать высоту от клампа,
@@ -2048,15 +2053,45 @@ function cbTeReflow(t) {
     trial.slots.slice(start).forEach(function (s, i) {
       s.row = Math.min(n - 1, Math.floor(i / per));
     });
-    var geom = cbManualBoxes(trial);
-    var used = 0;
-    geom.boxes.forEach(function (b) { used += b.w * b.h; });
-    if (!best || used > best.used) best = { used: used, rows: n, per: per };
+    var score = cbLayoutScore(cbManualBoxes(trial), t.hasHero, trial);
+    if (!best || score > best.score) best = { score: score, rows: n, per: per };
   }
   if (best) {
     t.rows = best.rows;
     rest.forEach(function (s, i) { s.row = Math.min(best.rows - 1, Math.floor(i / best.per)); });
   }
+}
+
+/* Оценка раскладки (критерии из коллаж-бенчмарков):
+   заполнение листа × равномерность размеров × штраф за ряды-одиночки */
+function cbLayoutScore(geom, hasHero, layout) {
+  var used = 0;
+  geom.boxes.forEach(function (b) { used += b.w * b.h; });
+  var fill = used / (geom.W * geom.H);
+  /* жёсткий штраф, если раскладка потеряла слоты (не влезли в лист) */
+  if (layout && layout.slots && geom.boxes.length < layout.slots.length) {
+    fill *= 0.1 * geom.boxes.length / layout.slots.length;
+  }
+  var rest = geom.boxes.filter(function (b) { return !(hasHero && b.slotIdx === 0); });
+  if (rest.length < 2) return fill;
+  /* равномерность: разброс площадей не-hero боксов */
+  var mean = 0;
+  rest.forEach(function (b) { mean += b.w * b.h; });
+  mean /= rest.length;
+  var varsum = 0;
+  rest.forEach(function (b) { varsum += Math.pow(b.w * b.h - mean, 2); });
+  var cv = Math.sqrt(varsum / rest.length) / mean;
+  /* штраф за ряды из одного слота (уродливые «колонки одиночек») */
+  var singles = 0;
+  if (layout && layout.slots && rest.length > 2) {
+    var counts = {};
+    layout.slots.forEach(function (s, i) {
+      if (hasHero && i === 0) return;
+      counts[s.row || 0] = (counts[s.row || 0] || 0) + 1;
+    });
+    Object.keys(counts).forEach(function (r) { if (counts[r] === 1) singles++; });
+  }
+  return fill * (1 - Math.min(0.7, cv)) * Math.pow(0.8, singles);
 }
 
 function cbTeAddSlot(orient) {
