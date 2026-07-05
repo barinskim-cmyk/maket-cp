@@ -947,6 +947,59 @@ function cbJustifiedHTML(count, itemHTMLFn, aspectFn, opts) {
 
 var CB_GAP = 12; /* юниты */
 
+/* ── Принцип v3.1 (Маша 05.07): слот ВСЕГДА держит свою пропорцию.
+   Ничего не плющится и не обрезается: если ряды не влезают в зону,
+   весь блок масштабируется вниз, пустое место на канвасе — норма.
+   Ряды центрируются по горизонтали, блок прижат к верху зоны. ── */
+
+/* Раскладка рядов в зоне с сохранением пропорций каждого слота.
+   rows: [[{ar, slotIdx}, ...], ...] -> добавляет боксы в boxes */
+function cbRowsInZone(zone, rows, boxes) {
+  var nonEmpty = rows.filter(function (r) { return r.length > 0; });
+  if (!nonEmpty.length || zone.w <= 0 || zone.h <= 0) return;
+  /* максимальная высота каждого ряда: ряд занимает всю ширину зоны */
+  var hmax = nonEmpty.map(function (row) {
+    var sum = 0;
+    row.forEach(function (c) { sum += c.ar; });
+    return (zone.w - (row.length - 1) * CB_GAP) / sum;
+  });
+  var totalMax = 0;
+  hmax.forEach(function (h) { totalMax += h; });
+  var availH = zone.h - (nonEmpty.length - 1) * CB_GAP;
+  /* не влезает по высоте — масштабируем ВСЕ ряды, пропорции целы */
+  var f = Math.min(1, availH / totalMax);
+  var y = zone.y;
+  nonEmpty.forEach(function (row, ri) {
+    var h = hmax[ri] * f;
+    var rowW = -CB_GAP;
+    row.forEach(function (c) { rowW += c.ar * h + CB_GAP; });
+    var x = zone.x + (zone.w - rowW) / 2;   /* ряд по центру зоны */
+    row.forEach(function (c) {
+      boxes.push({ x: x, y: y, w: c.ar * h, h: h, slotIdx: c.slotIdx });
+      x += c.ar * h + CB_GAP;
+    });
+    y += h + CB_GAP;
+  });
+}
+
+/* Герой с сохранением пропорции. Возвращает зону для остальных слотов. */
+function cbHeroBox(W, H, heroAR, hasRest, boxes) {
+  if (heroAR >= 1) {
+    /* герой-горизонт: сверху; если высоковат — уменьшаем, держа пропорцию */
+    var hw = W, hh = W / heroAR;
+    var maxH = hasRest ? H * 0.55 : H;
+    if (hh > maxH) { hh = maxH; hw = hh * heroAR; }
+    boxes.push({ x: (W - hw) / 2, y: 0, w: hw, h: hh, slotIdx: 0 });
+    return { x: 0, y: hh + CB_GAP, w: W, h: Math.max(0, H - hh - CB_GAP) };
+  }
+  /* герой-вертикаль: колонка слева; если широковат — уменьшаем */
+  var vh = H, vw = H * heroAR;
+  var maxW = hasRest ? W * 0.6 : W;
+  if (vw > maxW) { vw = maxW; vh = vw / heroAR; }
+  boxes.push({ x: hasRest ? 0 : (W - vw) / 2, y: 0, w: vw, h: vh, slotIdx: 0 });
+  return { x: vw + CB_GAP, y: 0, w: Math.max(0, W - vw - CB_GAP), h: H };
+}
+
 /* Ручной шаблон: hero + ряды. layout = {canvas, hasHero, rows, hAspect, vAspect, slots} */
 function cbManualBoxes(layout) {
   var W = 1000;
@@ -959,47 +1012,19 @@ function cbManualBoxes(layout) {
   var rest = slots.map(function (s, i) { return { s: s, idx: i }; });
 
   if (layout.hasHero && slots.length > 0) {
-    var hero = slots[0];
     rest = rest.slice(1);
-    if (hero.orient === 'h') {
-      /* герой-горизонт: полоса сверху на всю ширину */
-      var heroH = Math.min(W / hAR, H * (rest.length ? 0.55 : 1));
-      boxes.push({ x: 0, y: 0, w: W, h: heroH, slotIdx: 0 });
-      zone = { x: 0, y: heroH + CB_GAP, w: W, h: Math.max(0, H - heroH - CB_GAP) };
-    } else {
-      /* герой-вертикаль: колонка слева на всю высоту */
-      var heroW = Math.max(W * 0.3, Math.min(H * vAR, W * 0.6));
-      if (!rest.length) heroW = W;
-      boxes.push({ x: 0, y: 0, w: heroW, h: H, slotIdx: 0 });
-      zone = { x: heroW + CB_GAP, y: 0, w: Math.max(0, W - heroW - CB_GAP), h: H };
-    }
+    zone = cbHeroBox(W, H, (slots[0].orient === 'h') ? hAR : vAR, rest.length > 0, boxes);
   }
 
   if (rest.length) {
     var nRows = Math.max(1, layout.rows || 1);
-    /* сгруппировать по row (кламп в границы) */
     var byRow = [];
     for (var r = 0; r < nRows; r++) byRow.push([]);
     rest.forEach(function (item) {
-      var r = Math.min(nRows - 1, Math.max(0, item.s.row || 0));
-      byRow[r].push(item);
+      var ri = Math.min(nRows - 1, Math.max(0, item.s.row || 0));
+      byRow[ri].push({ ar: (item.s.orient === 'h') ? hAR : vAR, slotIdx: item.idx });
     });
-    var rowH = (zone.h - (nRows - 1) * CB_GAP) / nRows;
-    for (var ri = 0; ri < nRows; ri++) {
-      var row = byRow[ri];
-      var y = zone.y + ri * (rowH + CB_GAP);
-      if (!row.length) continue;
-      var sum = 0;
-      row.forEach(function (item) { sum += (item.s.orient === 'h') ? hAR : vAR; });
-      var availW = zone.w - (row.length - 1) * CB_GAP;
-      var x = zone.x;
-      row.forEach(function (item) {
-        var ar = (item.s.orient === 'h') ? hAR : vAR;
-        var w = availW * ar / sum;
-        boxes.push({ x: x, y: y, w: w, h: rowH, slotIdx: item.idx });
-        x += w + CB_GAP;
-      });
-    }
+    cbRowsInZone(zone, byRow, boxes);
   }
   return { W: W, H: H, boxes: boxes };
 }
@@ -1013,44 +1038,38 @@ function cbAutoBoxes(layout, aspects) {
   var zone = { x: 0, y: 0, w: W, h: H };
   var idx0 = 0;
 
-  if (layout.hasHero && aspects.length > 0) {
-    var heroAR = aspects[0];
+  if (layout.hasHero) {
     idx0 = 1;
-    if (aspects.length === 1) {
-      boxes.push({ x: 0, y: 0, w: W, h: H, slotIdx: 0 });
-      return { W: W, H: H, boxes: boxes };
-    }
-    if (heroAR >= 1) {
-      var heroH = Math.min(W / heroAR, H * 0.55);
-      boxes.push({ x: 0, y: 0, w: W, h: heroH, slotIdx: 0 });
-      zone = { x: 0, y: heroH + CB_GAP, w: W, h: H - heroH - CB_GAP };
-    } else {
-      var heroW = Math.max(W * 0.3, Math.min(H * heroAR, W * 0.6));
-      boxes.push({ x: 0, y: 0, w: heroW, h: H, slotIdx: 0 });
-      zone = { x: heroW + CB_GAP, y: 0, w: W - heroW - CB_GAP, h: H };
-    }
+    zone = cbHeroBox(W, H, aspects[0], aspects.length > 1, boxes);
+    if (aspects.length === 1) return { W: W, H: H, boxes: boxes };
   }
 
   var rest = aspects.slice(idx0);
   if (rest.length) {
-    var perRow = (zone.w > zone.h) ? 3 : 2;
-    var nRows = Math.max(1, Math.ceil(rest.length / perRow));
-    var rowH = (zone.h - (nRows - 1) * CB_GAP) / nRows;
-    var i = 0;
-    for (var r = 0; r < nRows; r++) {
-      var count = Math.min(rest.length - i, Math.ceil((rest.length - i) / (nRows - r)));
-      var sum = 0;
-      for (var k = 0; k < count; k++) sum += rest[i + k];
-      var availW = zone.w - (count - 1) * CB_GAP;
-      var x = zone.x;
-      var y = zone.y + r * (rowH + CB_GAP);
-      for (var k2 = 0; k2 < count; k2++) {
-        var w = availW * rest[i + k2] / sum;
-        boxes.push({ x: x, y: y, w: w, h: rowH, slotIdx: idx0 + i + k2 });
-        x += w + CB_GAP;
-      }
-      i += count;
+    /* Компактность (по мотивам collage-бенчмарков): перебираем число рядов,
+       ряды балансируем по сумме пропорций, берём вариант с максимальным
+       заполнением листа. Пропорции всегда целы (cbRowsInZone). */
+    var best = null;
+    var maxRows = Math.min(4, rest.length);
+    for (var nRows = 1; nRows <= maxRows; nRows++) {
+      var totalAR = 0;
+      rest.forEach(function (ar) { totalAR += ar; });
+      var target = totalAR / nRows;
+      var byRow = [[]];
+      var acc = 0;
+      rest.forEach(function (ar, i) {
+        var rowIdx = byRow.length - 1;
+        if (acc >= target && rowIdx < nRows - 1) { byRow.push([]); acc = 0; rowIdx++; }
+        byRow[rowIdx].push({ ar: ar, slotIdx: idx0 + i });
+        acc += ar;
+      });
+      var trial = [];
+      cbRowsInZone(zone, byRow, trial);
+      var used = 0;
+      trial.forEach(function (b) { used += b.w * b.h; });
+      if (!best || used > best.used) best = { used: used, boxes: trial };
     }
+    if (best) best.boxes.forEach(function (b) { boxes.push(b); });
   }
   return { W: W, H: H, boxes: boxes };
 }
