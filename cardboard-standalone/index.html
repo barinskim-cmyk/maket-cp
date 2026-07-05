@@ -77,6 +77,28 @@ input[type="text"]:focus, textarea:focus { outline: none; border-color: #1a1a1a;
 .cb-topbar .cb-spacer { flex: 1; }
 #cbMode { font-size: 10px; color: #8a8680; }
 
+/* ---------- Попап «Поделиться» ---------- */
+.cb-share-wrap { position: relative; flex-shrink: 0; }
+#cbSharePop {
+  display: none;
+  position: absolute;
+  top: 36px;
+  right: 0;
+  background: #fff;
+  border: 1px solid #c8c5c0;
+  border-radius: 4px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+  padding: 6px;
+  z-index: 80;
+  min-width: 190px;
+  flex-direction: column;
+  gap: 4px;
+}
+#cbSharePop.cb-open { display: flex; }
+#cbSharePop button { border: none; text-align: left; width: 100%; padding: 8px 10px; }
+.cb-share-sep { height: 1px; background: #eceae7; margin: 2px 0; }
+.cb-share-mode { font-size: 10px; color: #8a8680; padding: 2px 10px 4px; text-align: right; }
+
 /* ---------- Основной лейаут ---------- */
 .cb-main {
   display: flex;
@@ -103,41 +125,38 @@ input[type="text"]:focus, textarea:focus { outline: none; border-color: #1a1a1a;
 .cb-tray-stats { font-size: 11px; color: #8a8680; padding: 6px 12px; border-bottom: 1px solid #eceae7; }
 #cbWatchStatus { font-size: 11px; color: #2a7a2a; padding: 6px 12px 6px; display: none; border-bottom: 1px solid #eceae7; }
 
+/* Библиотека превью — по аналогии с pv-gallery основной проги:
+   вертикальное фото = 1/3 ряда, горизонтальное = 2/3, flex-grow добивает ряд */
 .cb-tray-grid {
   flex: 1;
   overflow-y: auto;
-  padding: 10px;
+  padding: 8px;
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 4px;
   align-content: flex-start;
 }
 .cb-thumb {
-  width: calc(50% - 4px);
+  width: calc((100% - 8px) / 3);
+  flex-grow: 1;
   cursor: grab;
-  border: 1px solid #e4e2de;
-  border-radius: 3px;
-  background: #fafaf9;
+  border: 2px solid transparent;
   overflow: hidden;
   position: relative;
+  transition: border-color 0.15s;
 }
+.cb-thumb.cb-h { width: calc(2 * (100% - 8px) / 3 + 4px); }
+.cb-thumb:hover { border-color: #1a1a1a; }
+.cb-thumb:active { cursor: grabbing; }
 .cb-thumb img {
   width: 100%;
-  height: 110px;
-  object-fit: contain;
+  height: auto;
+  max-height: 320px;
+  object-fit: cover;
   display: block;
-  background: #f2f1ef;
   pointer-events: none;
 }
-.cb-thumb .cb-thumb-name {
-  font-size: 10px;
-  padding: 3px 5px;
-  color: #55524e;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.cb-thumb.cb-used { opacity: 0.45; }
+.cb-thumb.cb-used { opacity: 0.4; }
 .cb-thumb.cb-used::after {
   content: "в макете";
   position: absolute;
@@ -211,7 +230,8 @@ input[type="text"]:focus, textarea:focus { outline: none; border-color: #1a1a1a;
   background: #fff;
   border: 1px solid #dcd9d4;
   border-radius: 4px;
-  margin-bottom: 16px;
+  margin: 0 auto 16px;
+  max-width: 780px;         /* как lay-container в основной проге */
   padding: 12px 14px 14px;
 }
 .cb-card-head {
@@ -234,13 +254,16 @@ input[type="text"]:focus, textarea:focus { outline: none; border-color: #1a1a1a;
 .cb-card-head .cb-grid-ctl button { padding: 2px 8px; }
 .cb-mini { padding: 3px 8px; font-size: 11px; }
 
-.cb-slots { display: flex; flex-direction: column; gap: 6px; }
-.cb-slot-row { display: flex; gap: 6px; }
+/* Слоты по аналогии с layout основной проги: ячейка с фиксированной
+   пропорцией (3:4, вертикальный продуктовый кадр), фото заполняет ячейку
+   целиком (cover) — никаких «окошек непонятного размера». */
+.cb-slots { display: flex; flex-direction: column; gap: 4px; }
+.cb-slot-row { display: flex; gap: 4px; align-items: stretch; }
 .cb-slot {
   flex: 1;
-  height: 150px;
+  min-width: 0;
+  aspect-ratio: 3 / 4;
   border: 1px dashed #c8c5c0;
-  border-radius: 3px;
   background: #fafaf9;
   position: relative;
   display: flex;
@@ -248,8 +271,16 @@ input[type="text"]:focus, textarea:focus { outline: none; border-color: #1a1a1a;
   justify-content: center;
   overflow: hidden;
 }
+.cb-slot.cb-filled { border-style: solid; border-color: #e4e2de; background: #fff; }
 .cb-slot.cb-over { border-color: #1a1a1a; background: #eceae7; }
-.cb-slot img { max-width: 100%; max-height: 100%; display: block; pointer-events: none; }
+.cb-slot img {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+}
 .cb-slot .cb-slot-hint { color: #b5b1ab; font-size: 11px; text-align: center; padding: 0 6px; }
 .cb-slot .cb-slot-tag {
   position: absolute;
@@ -323,6 +354,43 @@ input[type="text"]:focus, textarea:focus { outline: none; border-color: #1a1a1a;
   resize: vertical;
 }
 
+/* ---------- Навигация по карточкам/контейнерам (правая панель) ---------- */
+.cb-outline {
+  width: 190px;
+  min-width: 150px;
+  background: #fff;
+  border-left: 1px solid #dcd9d4;
+  overflow-y: auto;
+  padding: 12px 0;
+}
+.cb-outline-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #8a8680;
+  padding: 0 14px 8px;
+}
+.cb-outline-item {
+  display: block;
+  width: 100%;
+  border: none;
+  background: none;
+  border-radius: 0;
+  text-align: left;
+  padding: 7px 14px;
+  font-size: 12px;
+  color: #1a1a1a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-left: 2px solid transparent;
+}
+.cb-outline-item:hover { background: #f2f1ef; }
+.cb-outline-item .cb-outline-num { color: #8a8680; margin-right: 6px; }
+.cb-outline-item .cb-outline-count { color: #8a8680; font-size: 10px; margin-left: 4px; }
+.cb-outline-empty { font-size: 11px; color: #8a8680; padding: 4px 14px; }
+
 /* ---------- Модалка шаблонов ---------- */
 #cbTplModal {
   position: fixed;
@@ -348,14 +416,16 @@ input[type="text"]:focus, textarea:focus { outline: none; border-color: #1a1a1a;
 .cb-tpl-row { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
 .cb-tpl-row label { font-size: 11px; color: #8a8680; }
 #cbTplName { width: 200px; font-weight: 600; }
-.cb-tpl-slots { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }
-.cb-tpl-slot-row { display: flex; gap: 6px; }
+.cb-tpl-slots { display: flex; flex-direction: column; gap: 4px; margin: 10px 0; max-width: 400px; }
+.cb-tpl-slot-row { display: flex; gap: 4px; }
 .cb-tpl-slot-row input {
   flex: 1;
-  height: 54px;
+  min-width: 0;
+  aspect-ratio: 3 / 4;      /* те же пропорции, что у слотов карточки */
   text-align: center;
   background: #fafaf9;
   border-style: dashed;
+  border-radius: 0;
 }
 .cb-tpl-foot { display: flex; gap: 8px; margin-top: 14px; }
 .cb-tpl-foot .cb-spacer { flex: 1; }
@@ -425,19 +495,23 @@ body.cb-file-drag #cbDropOverlay { display: flex; }
   <button id="cbBtnFolder" style="display:none">Папка</button>
   <button id="cbBtnWatch" title="Следить за папкой экспорта Capture One">Следить за папкой</button>
   <div class="cb-sep"></div>
-  <button id="cbBtnAddCard">+ Карточка</button>
-  <button id="cbBtnAddCont">+ Контейнер</button>
+  <button id="cbBtnAdd">+ Контейнер</button>
   <span class="cb-grid-ctl" style="font-size:11px;color:#8a8680;">Шаблон:
     <select id="cbTplSelect" title="Шаблон для новых карточек"></select>
   </span>
   <button id="cbBtnTpl" class="cb-mini" title="Редактор шаблонов">Шаблоны...</button>
   <div class="cb-spacer"></div>
-  <span id="cbMode"></span>
-  <button id="cbBtnList">Список</button>
-  <button id="cbBtnPdf">Экспорт PDF</button>
-  <div class="cb-sep"></div>
-  <button id="cbBtnSave">Сохранить</button>
-  <button id="cbBtnOpen">Открыть</button>
+  <div class="cb-share-wrap">
+    <button id="cbBtnShare" class="cb-primary">Поделиться</button>
+    <div id="cbSharePop">
+      <button id="cbBtnPdf">Экспорт PDF</button>
+      <button id="cbBtnList">Список (CSV + TXT)</button>
+      <div class="cb-share-sep"></div>
+      <button id="cbBtnSave">Сохранить проект</button>
+      <button id="cbBtnOpen">Открыть проект</button>
+      <div class="cb-share-mode"><span id="cbMode"></span></div>
+    </div>
+  </div>
 </div>
 
 <div class="cb-main">
@@ -459,6 +533,7 @@ body.cb-file-drag #cbDropOverlay { display: flex; }
     <div id="cbTabCards"><div id="cbCards"></div></div>
     <div id="cbTabConts" style="display:none"><div id="cbConts"></div></div>
   </div>
+  <div class="cb-outline" id="cbOutline"></div>
 </div>
 
 <!-- Редактор шаблонов карточек -->
@@ -526,6 +601,7 @@ var App = {
   nextId: 1,
   dirty: false,
   projectPath: null,          /* путь к .cardboard (desktop) */
+  activeTab: 'cards',         /* активная вкладка: cards | conts */
   watch: { handle: null, timer: null, seen: {} }
 };
 
@@ -814,10 +890,14 @@ document.getElementById('cbBtnWatch').onclick = function () {
 /* ---------- Вкладки: Карточки / Доп. контент ---------- */
 
 function cbSwitchTab(name) {
+  App.activeTab = name;
   document.getElementById('cbTabCards').style.display = (name === 'cards') ? '' : 'none';
   document.getElementById('cbTabConts').style.display = (name === 'conts') ? '' : 'none';
   document.getElementById('cbTabBtnCards').classList.toggle('cb-tab-active', name === 'cards');
   document.getElementById('cbTabBtnConts').classList.toggle('cb-tab-active', name === 'conts');
+  /* одна кнопка добавления — контекст зависит от вкладки */
+  document.getElementById('cbBtnAdd').textContent = (name === 'cards') ? '+ Карточка' : '+ Контейнер';
+  cbRenderOutline();
 }
 
 function cbUpdateTabLabels() {
@@ -825,10 +905,66 @@ function cbUpdateTabLabels() {
     'Карточки' + (App.cards.length ? ' · ' + App.cards.length : '');
   document.getElementById('cbTabBtnConts').textContent =
     'Доп. контент' + (App.containers.length ? ' · ' + App.containers.length : '');
+  cbRenderOutline();
 }
 
 document.getElementById('cbTabBtnCards').onclick = function () { cbSwitchTab('cards'); };
 document.getElementById('cbTabBtnConts').onclick = function () { cbSwitchTab('conts'); };
+
+/* Контекстное добавление: вкладка «Карточки» -> карточка по шаблону,
+   вкладка «Доп. контент» -> контейнер без шаблона */
+document.getElementById('cbBtnAdd').onclick = function () {
+  if (App.activeTab === 'conts') cbAddCont(); else cbAddCard();
+};
+
+/* ---------- Навигация по карточкам/контейнерам (правая панель) ---------- */
+
+function cbRenderOutline() {
+  var host = document.getElementById('cbOutline');
+  var isCards = App.activeTab !== 'conts';
+  var list = isCards ? App.cards : App.containers;
+  var html = '<div class="cb-outline-title">' + (isCards ? 'Карточки' : 'Контейнеры') + '</div>';
+  if (!list.length) {
+    html += '<div class="cb-outline-empty">пока пусто</div>';
+  }
+  list.forEach(function (item, i) {
+    var count = isCards
+      ? item.slots.filter(function (x) { return x; }).length + '/' + item.slots.length
+      : item.photoIds.length;
+    html += '<button class="cb-outline-item" data-target="' + item.id + '" title="' + cbEsc(item.title) + '">';
+    html += '<span class="cb-outline-num">' + (i + 1) + '.</span>' + cbEsc(item.title);
+    html += '<span class="cb-outline-count">' + count + '</span>';
+    html += '</button>';
+  });
+  host.innerHTML = html;
+}
+
+document.getElementById('cbOutline').addEventListener('click', function (e) {
+  var btn = e.target.closest('.cb-outline-item');
+  if (!btn) return;
+  var id = btn.getAttribute('data-target');
+  var el = document.querySelector('[data-cid="' + id + '"], [data-kid="' + id + '"]');
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
+/* ---------- Попап «Поделиться» ---------- */
+
+function cbSharePop(open) {
+  var pop = document.getElementById('cbSharePop');
+  pop.classList.toggle('cb-open', open === undefined ? !pop.classList.contains('cb-open') : open);
+}
+
+document.getElementById('cbBtnShare').onclick = function (e) {
+  e.stopPropagation();
+  cbSharePop();
+};
+document.getElementById('cbSharePop').addEventListener('click', function (e) {
+  /* после выбора действия попап закрывается */
+  if (e.target.closest('button')) cbSharePop(false);
+});
+document.addEventListener('click', function (e) {
+  if (!e.target.closest('.cb-share-wrap')) cbSharePop(false);
+});
 
 /* ---------- Панель фото ---------- */
 
@@ -841,9 +977,9 @@ function cbRenderTray() {
   App.photos.forEach(function (p) {
     if (filter && p.name.toLowerCase().indexOf(filter) === -1) return;
     shown++;
-    html += '<div class="cb-thumb' + (used[p.id] ? ' cb-used' : '') + '" draggable="true" data-pid="' + p.id + '">';
+    var horiz = p.w > p.h ? ' cb-h' : '';
+    html += '<div class="cb-thumb' + horiz + (used[p.id] ? ' cb-used' : '') + '" draggable="true" data-pid="' + p.id + '" title="' + cbEsc(p.name) + (p.path ? '\n' + cbEsc(p.path) : '') + '">';
     html += cbImgHtml(p);
-    html += '<div class="cb-thumb-name" title="' + cbEsc(p.path || p.name) + '">' + cbEsc(p.name) + '</div>';
     html += '</div>';
   });
   if (!App.photos.length) {
@@ -1106,8 +1242,6 @@ function cbRenderCards() {
   host.innerHTML = html;
 }
 
-document.getElementById('cbBtnAddCard').onclick = cbAddCard;
-
 document.getElementById('cbCards').addEventListener('click', function (e) {
   var slotX = e.target.closest('.cb-slot-x');
   if (slotX) {
@@ -1246,8 +1380,6 @@ function cbRenderConts() {
   });
   host.innerHTML = html;
 }
-
-document.getElementById('cbBtnAddCont').onclick = cbAddCont;
 
 document.getElementById('cbConts').addEventListener('click', function (e) {
   var x = e.target.closest('.cb-slot-x');
@@ -1597,6 +1729,7 @@ cbRenderTplSelect();
 cbRenderTray();
 cbRenderCards();
 cbRenderConts();
+cbSwitchTab('cards');
 </script>
 </body>
 </html>
