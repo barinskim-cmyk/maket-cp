@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cardboard — вёрстка карточек товара</title>
+<style>
+/* ============================================================
+   Cardboard — standalone инструмент вёрстки карточек товара.
+   Один HTML-файл, без бэкенда и внешних зависимостей.
+   Семейство инструментов Content Pulse (как Rate Setter).
+   ============================================================ */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  color: #1a1a1a;
+  background: #f2f1ef;
+  height: 100vh;
+  overflow: hidden;
+}
+
+button {
+  font-family: inherit;
+  font-size: 12px;
+  padding: 6px 12px;
+  border: 1px solid #c8c5c0;
+  background: #fff;
+  color: #1a1a1a;
+  cursor: pointer;
+  border-radius: 3px;
+}
+button:hover { background: #eceae7; }
+button.cb-primary { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+button.cb-primary:hover { background: #3a3a3a; }
+button.cb-danger:hover { background: #f6e3e0; border-color: #c96; }
+
+input[type="text"], select, textarea {
+  font-family: inherit;
+  font-size: 12px;
+  padding: 5px 8px;
+  border: 1px solid #c8c5c0;
+  border-radius: 3px;
+  background: #fff;
+}
+input[type="text"]:focus, textarea:focus { outline: none; border-color: #1a1a1a; }
+
+/* ---------- Верхняя панель ---------- */
+.cb-topbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 48px;
+  padding: 0 14px;
+  background: #fff;
+  border-bottom: 1px solid #dcd9d4;
+}
+.cb-logo {
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 2px;
+  margin-right: 6px;
+}
+.cb-logo span { color: #8a8680; font-weight: 400; letter-spacing: 0; font-size: 11px; margin-left: 6px; }
+#cbProjectName { width: 200px; font-weight: 600; }
+.cb-topbar .cb-sep { width: 1px; height: 24px; background: #dcd9d4; margin: 0 4px; }
+.cb-topbar .cb-spacer { flex: 1; }
+
+/* ---------- Основной лейаут ---------- */
+.cb-main {
+  display: flex;
+  height: calc(100vh - 48px);
+}
+
+/* ---------- Левая панель: фото ---------- */
+.cb-tray {
+  width: 300px;
+  min-width: 220px;
+  max-width: 480px;
+  background: #fff;
+  border-right: 1px solid #dcd9d4;
+  display: flex;
+  flex-direction: column;
+}
+.cb-tray-head {
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid #eceae7;
+}
+.cb-tray-head .cb-row { display: flex; gap: 6px; margin-bottom: 6px; }
+.cb-tray-head .cb-row:last-child { margin-bottom: 0; }
+#cbFilter { flex: 1; }
+.cb-tray-stats { font-size: 11px; color: #8a8680; padding: 6px 12px; border-bottom: 1px solid #eceae7; }
+#cbWatchStatus { font-size: 11px; color: #2a7a2a; padding: 0 12px 6px; display: none; }
+
+.cb-tray-grid {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-content: flex-start;
+}
+.cb-thumb {
+  width: calc(50% - 4px);
+  cursor: grab;
+  border: 1px solid #e4e2de;
+  border-radius: 3px;
+  background: #fafaf9;
+  overflow: hidden;
+  position: relative;
+}
+.cb-thumb img {
+  width: 100%;
+  height: 110px;
+  object-fit: contain;
+  display: block;
+  background: #f2f1ef;
+  pointer-events: none;
+}
+.cb-thumb .cb-thumb-name {
+  font-size: 10px;
+  padding: 3px 5px;
+  color: #55524e;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cb-thumb.cb-used { opacity: 0.45; }
+.cb-thumb.cb-used::after {
+  content: "в макете";
+  position: absolute;
+  top: 4px; left: 4px;
+  font-size: 9px;
+  background: #1a1a1a;
+  color: #fff;
+  padding: 1px 5px;
+  border-radius: 2px;
+}
+.cb-tray-empty {
+  width: 100%;
+  color: #8a8680;
+  font-size: 12px;
+  text-align: center;
+  padding: 40px 16px;
+  line-height: 1.6;
+  border: 1px dashed #c8c5c0;
+  border-radius: 4px;
+}
+
+/* ---------- Рабочая область ---------- */
+.cb-work {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 22px 80px;
+}
+.cb-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #8a8680;
+  margin: 18px 0 10px;
+}
+.cb-section-title:first-child { margin-top: 0; }
+.cb-empty-hint {
+  color: #8a8680;
+  font-size: 12px;
+  padding: 14px;
+  border: 1px dashed #c8c5c0;
+  border-radius: 4px;
+  margin-bottom: 10px;
+}
+
+/* ---------- Карточка ---------- */
+.cb-card, .cb-container {
+  background: #fff;
+  border: 1px solid #dcd9d4;
+  border-radius: 4px;
+  margin-bottom: 16px;
+  padding: 12px 14px 14px;
+}
+.cb-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.cb-card-head .cb-num {
+  font-weight: 700;
+  font-size: 12px;
+  color: #8a8680;
+  min-width: 24px;
+}
+.cb-card-head input.cb-title { width: 220px; font-weight: 600; }
+.cb-card-head input.cb-cat { width: 140px; }
+.cb-card-head .cb-spacer { flex: 1; }
+.cb-card-head .cb-grid-ctl { display: flex; align-items: center; gap: 4px; font-size: 11px; color: #8a8680; }
+.cb-card-head .cb-grid-ctl button { padding: 2px 8px; }
+.cb-mini { padding: 3px 8px; font-size: 11px; }
+
+.cb-slots { display: flex; flex-direction: column; gap: 6px; }
+.cb-slot-row { display: flex; gap: 6px; }
+.cb-slot {
+  flex: 1;
+  height: 150px;
+  border: 1px dashed #c8c5c0;
+  border-radius: 3px;
+  background: #fafaf9;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.cb-slot.cb-over { border-color: #1a1a1a; background: #eceae7; }
+.cb-slot img { max-width: 100%; max-height: 100%; display: block; pointer-events: none; }
+.cb-slot .cb-slot-hint { color: #b5b1ab; font-size: 11px; }
+.cb-slot .cb-slot-name {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  font-size: 9px;
+  background: rgba(255,255,255,0.85);
+  color: #55524e;
+  padding: 2px 5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: none;
+}
+.cb-slot.cb-filled:hover .cb-slot-name { display: block; }
+.cb-slot .cb-slot-x {
+  position: absolute;
+  top: 4px; right: 4px;
+  width: 18px; height: 18px;
+  line-height: 16px;
+  text-align: center;
+  border: 1px solid #c8c5c0;
+  border-radius: 2px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 11px;
+  display: none;
+  padding: 0;
+}
+.cb-slot.cb-filled:hover .cb-slot-x { display: block; }
+
+/* ---------- Контейнер (доп. контент) ---------- */
+.cb-container-body {
+  min-height: 90px;
+  border: 1px dashed #c8c5c0;
+  border-radius: 3px;
+  background: #fafaf9;
+  padding: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-content: flex-start;
+}
+.cb-container-body.cb-over { border-color: #1a1a1a; background: #eceae7; }
+.cb-container-body .cb-cont-hint { color: #b5b1ab; font-size: 11px; width: 100%; text-align: center; padding: 24px 0; }
+.cb-cont-item { position: relative; border: 1px solid #e4e2de; background: #fff; border-radius: 3px; cursor: grab; }
+.cb-cont-item img { display: block; object-fit: contain; background: #f2f1ef; pointer-events: none; }
+.cb-size-s .cb-cont-item img { width: 90px; height: 90px; }
+.cb-size-m .cb-cont-item img { width: 150px; height: 150px; }
+.cb-size-l .cb-cont-item img { width: 240px; height: 240px; }
+.cb-cont-item .cb-slot-x { display: none; }
+.cb-cont-item:hover .cb-slot-x { display: block; }
+.cb-cont-item.cb-over { outline: 2px solid #1a1a1a; }
+.cb-container textarea {
+  width: 100%;
+  margin-top: 8px;
+  min-height: 40px;
+  resize: vertical;
+}
+
+/* ---------- Дроп файлов на всё окно ---------- */
+#cbDropOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(26,26,26,0.75);
+  color: #fff;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  z-index: 100;
+  pointer-events: none;
+}
+body.cb-file-drag #cbDropOverlay { display: flex; }
+
+/* ---------- Тост ---------- */
+#cbToast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1a1a1a;
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 12px;
+  display: none;
+  z-index: 110;
+}
+
+/* ---------- Печать (экспорт PDF) ---------- */
+#cbPrint { display: none; }
+@media print {
+  body { height: auto; overflow: visible; background: #fff; }
+  .cb-topbar, .cb-main, #cbToast, #cbDropOverlay { display: none !important; }
+  #cbPrint { display: block; font-size: 12px; }
+  #cbPrint .cbp-head { margin-bottom: 18px; }
+  #cbPrint .cbp-head h1 { font-size: 20px; margin-bottom: 4px; }
+  #cbPrint .cbp-head .cbp-meta { color: #666; font-size: 11px; }
+  #cbPrint .cbp-block { page-break-inside: avoid; border: 1px solid #ccc; border-radius: 4px; padding: 10px 12px; margin-bottom: 14px; }
+  #cbPrint .cbp-block h2 { font-size: 13px; margin-bottom: 8px; }
+  #cbPrint .cbp-block h2 .cbp-cat { color: #666; font-weight: 400; font-size: 11px; margin-left: 8px; }
+  #cbPrint .cbp-row { display: flex; gap: 6px; margin-bottom: 6px; }
+  #cbPrint .cbp-cell { flex: 1; border: 1px solid #e0e0e0; min-height: 40px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  #cbPrint .cbp-cell img { max-width: 100%; max-height: 170px; display: block; }
+  #cbPrint .cbp-flow { display: flex; flex-wrap: wrap; gap: 6px; }
+  #cbPrint .cbp-flow img { border: 1px solid #e0e0e0; object-fit: contain; }
+  #cbPrint .cbp-text { margin-top: 8px; color: #333; white-space: pre-wrap; }
+  #cbPrint .cbp-sec { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #888; margin: 16px 0 10px; page-break-after: avoid; }
+}
+</style>
+</head>
+<body>
+
+<div class="cb-topbar">
+  <div class="cb-logo">CARDBOARD<span>вёрстка карточек</span></div>
+  <input type="text" id="cbProjectName" value="Новый проект" title="Название проекта">
+  <div class="cb-sep"></div>
+  <button id="cbBtnImport" class="cb-primary">Добавить фото</button>
+  <button id="cbBtnWatch" title="Следить за папкой экспорта Capture One">Следить за папкой</button>
+  <div class="cb-sep"></div>
+  <button id="cbBtnAddCard">+ Карточка</button>
+  <button id="cbBtnAddCont">+ Контейнер</button>
+  <span class="cb-grid-ctl" style="font-size:11px;color:#8a8680;">Шаблон:
+    <select id="cbTplSelect" title="Сетка для новых карточек">
+      <option value="2x2">2×2</option>
+      <option value="3x2" selected>3 ряда × 2</option>
+      <option value="3x3">3×3</option>
+      <option value="1x2">1 ряд × 2</option>
+      <option value="1x3">1 ряд × 3</option>
+    </select>
+  </span>
+  <div class="cb-spacer"></div>
+  <button id="cbBtnList">Список</button>
+  <button id="cbBtnPdf">Экспорт PDF</button>
+  <div class="cb-sep"></div>
+  <button id="cbBtnSave">Сохранить</button>
+  <button id="cbBtnOpen">Открыть</button>
+</div>
+
+<div class="cb-main">
+  <div class="cb-tray">
+    <div class="cb-tray-head">
+      <div class="cb-row">
+        <input type="text" id="cbFilter" placeholder="Фильтр по имени файла">
+      </div>
+    </div>
+    <div class="cb-tray-stats" id="cbTrayStats">Фото: 0</div>
+    <div id="cbWatchStatus"></div>
+    <div class="cb-tray-grid" id="cbTrayGrid"></div>
+  </div>
+  <div class="cb-work" id="cbWork">
+    <div class="cb-section-title">Карточки</div>
+    <div id="cbCards"></div>
+    <div class="cb-section-title">Доп. контент</div>
+    <div id="cbConts"></div>
+  </div>
+</div>
+
+<div id="cbDropOverlay">Отпустите, чтобы добавить фото</div>
+<div id="cbToast"></div>
+<div id="cbPrint"></div>
+
+<input type="file" id="cbFileInput" accept="image/*" multiple style="display:none">
+<input type="file" id="cbProjInput" accept=".cardboard,.json" style="display:none">
+
+<script>
+/* ============================================================
+   Cardboard — логика приложения.
+   Чистый JS без фреймворков. Префикс функций: cb*.
+   Модель данных:
+     App.photos[]     — {id, name, dataUrl, w, h}
+     App.cards[]      — {id, title, category, rows, cols, slots: [photoId|null]}
+     App.containers[] — {id, title, size ('s'|'m'|'l'), photoIds: [], text}
+   ============================================================ */
+
+var App = {
+  photos: [],
+  cards: [],
+  containers: [],
+  nextId: 1,
+  dirty: false,               /* есть несохранённые изменения */
+  watch: { handle: null, timer: null, seen: {} }
+};
+
+var MAX_SIDE = 1400;          /* макс. сторона фото при импорте, px */
+var JPEG_Q = 0.85;
+var IMG_EXT = /\.(jpe?g|png|gif|webp|tiff?|bmp)$/i;
+
+/* ---------- Утилиты ---------- */
+
+function cbId() { return 'p' + (App.nextId++); }
+
+function cbEsc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function cbToast(msg) {
+  var t = document.getElementById('cbToast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(function () { t.style.display = 'none'; }, 2500);
+}
+
+function cbPhotoById(id) {
+  for (var i = 0; i < App.photos.length; i++)
+    if (App.photos[i].id === id) return App.photos[i];
+  return null;
+}
+
+/* Все photoId, занятые в карточках и контейнерах */
+function cbUsedIds() {
+  var used = {};
+  App.cards.forEach(function (c) {
+    c.slots.forEach(function (pid) { if (pid) used[pid] = true; });
+  });
+  App.containers.forEach(function (c) {
+    c.photoIds.forEach(function (pid) { used[pid] = true; });
+  });
+  return used;
+}
+
+function cbMarkDirty() { App.dirty = true; }
+
+window.addEventListener('beforeunload', function (e) {
+  if (App.dirty) { e.preventDefault(); e.returnValue = ''; }
+});
+
+/* ---------- Импорт фото ---------- */
+
+/* Читает File, уменьшает до MAX_SIDE и сохраняет как JPEG dataURL */
+function cbImportFile(file, done) {
+  if (!IMG_EXT.test(file.name)) { done(false); return; }
+  /* дубликаты по имени пропускаем */
+  for (var i = 0; i < App.photos.length; i++) {
+    if (App.photos[i].name === file.name) { done(false); return; }
+  }
+  var url = URL.createObjectURL(file);
+  var img = new Image();
+  img.onload = function () {
+    var w = img.naturalWidth, h = img.naturalHeight;
+    var scale = Math.min(1, MAX_SIDE / Math.max(w, h));
+    var cw = Math.round(w * scale), ch = Math.round(h * scale);
+    var cnv = document.createElement('canvas');
+    cnv.width = cw; cnv.height = ch;
+    var ctx = cnv.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, cw, ch);
+    ctx.drawImage(img, 0, 0, cw, ch);
+    URL.revokeObjectURL(url);
+    App.photos.push({ id: cbId(), name: file.name, dataUrl: cnv.toDataURL('image/jpeg', JPEG_Q), w: cw, h: ch });
+    done(true);
+  };
+  img.onerror = function () { URL.revokeObjectURL(url); done(false); };
+  img.src = url;
+}
+
+/* Импорт набора файлов последовательно, чтобы не съесть память */
+function cbImportFiles(files) {
+  var list = Array.prototype.slice.call(files);
+  var added = 0, idx = 0;
+  function next() {
+    if (idx >= list.length) {
+      if (added) { cbMarkDirty(); cbRenderTray(); cbToast('Добавлено фото: ' + added); }
+      else cbToast('Новых фото нет');
+      return;
+    }
+    cbImportFile(list[idx++], function (ok) { if (ok) added++; next(); });
+  }
+  next();
+}
+
+document.getElementById('cbBtnImport').onclick = function () {
+  document.getElementById('cbFileInput').click();
+};
+document.getElementById('cbFileInput').onchange = function () {
+  if (this.files.length) cbImportFiles(this.files);
+  this.value = '';
+};
+
+/* Drag-and-drop файлов на всё окно */
+var dragDepth = 0;
+document.addEventListener('dragenter', function (e) {
+  if (e.dataTransfer && e.dataTransfer.types.indexOf('Files') !== -1) {
+    dragDepth++;
+    document.body.classList.add('cb-file-drag');
+  }
+});
+document.addEventListener('dragleave', function () {
+  if (dragDepth > 0 && --dragDepth === 0) document.body.classList.remove('cb-file-drag');
+});
+document.addEventListener('dragover', function (e) { e.preventDefault(); });
+document.addEventListener('drop', function (e) {
+  e.preventDefault();
+  dragDepth = 0;
+  document.body.classList.remove('cb-file-drag');
+  if (e.dataTransfer && e.dataTransfer.files.length) cbImportFiles(e.dataTransfer.files);
+});
+
+/* ---------- Слежение за папкой (синхронизация с Capture One) ----------
+   В Capture One на хоткей вешается экспорт-рецепт в папку.
+   Cardboard раз в 2 секунды сканирует папку и подхватывает новые файлы. */
+
+function cbWatchStart() {
+  if (!window.showDirectoryPicker) {
+    cbToast('Слежение за папкой работает в Chrome или Edge');
+    return;
+  }
+  window.showDirectoryPicker().then(function (handle) {
+    App.watch.handle = handle;
+    App.watch.seen = {};
+    /* уже лежащие файлы импортируем сразу */
+    cbWatchScan(true);
+    App.watch.timer = setInterval(function () { cbWatchScan(false); }, 2000);
+    var st = document.getElementById('cbWatchStatus');
+    st.style.display = 'block';
+    st.textContent = 'Слежу за папкой: ' + handle.name + ' (нажмите ещё раз чтобы остановить)';
+    document.getElementById('cbBtnWatch').textContent = 'Остановить слежение';
+    cbToast('Слежение включено: ' + handle.name);
+  }).catch(function () { /* пользователь отменил выбор */ });
+}
+
+function cbWatchStop() {
+  clearInterval(App.watch.timer);
+  App.watch.handle = null;
+  App.watch.timer = null;
+  document.getElementById('cbWatchStatus').style.display = 'none';
+  document.getElementById('cbBtnWatch').textContent = 'Следить за папкой';
+  cbToast('Слежение остановлено');
+}
+
+function cbWatchScan(isFirst) {
+  var h = App.watch.handle;
+  if (!h) return;
+  var fresh = [];
+  var it = h.values();
+  function step() {
+    it.next().then(function (r) {
+      if (r.done) {
+        if (fresh.length) {
+          var added = 0, idx = 0;
+          (function next() {
+            if (idx >= fresh.length) {
+              if (added) { cbMarkDirty(); cbRenderTray(); cbToast('Из папки: +' + added + ' фото'); }
+              return;
+            }
+            cbImportFile(fresh[idx++], function (ok) { if (ok) added++; next(); });
+          })();
+        }
+        return;
+      }
+      var entry = r.value;
+      if (entry.kind === 'file' && IMG_EXT.test(entry.name) && !App.watch.seen[entry.name]) {
+        App.watch.seen[entry.name] = true;
+        entry.getFile().then(function (f) { fresh.push(f); step(); });
+        return;
+      }
+      step();
+    }).catch(function () { /* папка стала недоступна */ cbWatchStop(); });
+  }
+  step();
+}
+
+document.getElementById('cbBtnWatch').onclick = function () {
+  if (App.watch.handle) cbWatchStop(); else cbWatchStart();
+};
+
+/* ---------- Панель фото ---------- */
+
+function cbRenderTray() {
+  var grid = document.getElementById('cbTrayGrid');
+  var filter = document.getElementById('cbFilter').value.toLowerCase();
+  var used = cbUsedIds();
+  var html = '';
+  var shown = 0;
+  App.photos.forEach(function (p) {
+    if (filter && p.name.toLowerCase().indexOf(filter) === -1) return;
+    shown++;
+    html += '<div class="cb-thumb' + (used[p.id] ? ' cb-used' : '') + '" draggable="true" data-pid="' + p.id + '">';
+    html += '<img src="' + p.dataUrl + '" alt="">';
+    html += '<div class="cb-thumb-name" title="' + cbEsc(p.name) + '">' + cbEsc(p.name) + '</div>';
+    html += '</div>';
+  });
+  if (!App.photos.length) {
+    html = '<div class="cb-tray-empty">Перетащите фото сюда,<br>нажмите «Добавить фото»<br>или включите слежение за папкой<br>экспорта Capture One</div>';
+  }
+  grid.innerHTML = html;
+  var usedCount = Object.keys(used).length;
+  document.getElementById('cbTrayStats').textContent =
+    'Фото: ' + App.photos.length + (filter ? ' (показано ' + shown + ')' : '') + ' · в макете: ' + usedCount;
+}
+
+document.getElementById('cbFilter').oninput = function () { cbRenderTray(); };
+
+/* Drag из панели фото: кладём photoId в dataTransfer */
+document.getElementById('cbTrayGrid').addEventListener('dragstart', function (e) {
+  var t = e.target.closest('.cb-thumb');
+  if (t) e.dataTransfer.setData('text/plain', 'photo:' + t.getAttribute('data-pid'));
+});
+
+/* ---------- Карточки ---------- */
+
+function cbAddCard() {
+  var tpl = document.getElementById('cbTplSelect').value.split('x');
+  var rows = parseInt(tpl[0], 10), cols = parseInt(tpl[1], 10);
+  var slots = [];
+  for (var i = 0; i < rows * cols; i++) slots.push(null);
+  App.cards.push({ id: cbId(), title: 'Карточка ' + (App.cards.length + 1), category: '', rows: rows, cols: cols, slots: slots });
+  cbMarkDirty();
+  cbRenderCards();
+}
+
+function cbCardById(id) {
+  for (var i = 0; i < App.cards.length; i++)
+    if (App.cards[i].id === id) return App.cards[i];
+  return null;
+}
+
+/* Меняет сетку карточки, сохраняя фото по порядку */
+function cbCardResize(card, rows, cols) {
+  rows = Math.max(1, Math.min(6, rows));
+  cols = Math.max(1, Math.min(6, cols));
+  var filled = card.slots.filter(function (x) { return x; });
+  var slots = [];
+  for (var i = 0; i < rows * cols; i++) slots.push(filled[i] || null);
+  if (filled.length > rows * cols) cbToast('Лишние фото убраны из карточки (не удалены)');
+  card.rows = rows; card.cols = cols; card.slots = slots;
+  cbMarkDirty();
+  cbRenderCards(); cbRenderTray();
+}
+
+function cbRenderCards() {
+  var host = document.getElementById('cbCards');
+  if (!App.cards.length) {
+    host.innerHTML = '<div class="cb-empty-hint">Карточек пока нет — нажмите «+ Карточка». Фото перетаскиваются из левой панели в слоты.</div>';
+    return;
+  }
+  var html = '';
+  App.cards.forEach(function (card, ci) {
+    html += '<div class="cb-card" data-cid="' + card.id + '">';
+    html += '<div class="cb-card-head">';
+    html += '<span class="cb-num">' + (ci + 1) + '.</span>';
+    html += '<input type="text" class="cb-title" value="' + cbEsc(card.title) + '" data-f="title" placeholder="Название / артикул">';
+    html += '<input type="text" class="cb-cat" value="' + cbEsc(card.category) + '" data-f="category" placeholder="Категория">';
+    html += '<span class="cb-spacer"></span>';
+    html += '<span class="cb-grid-ctl">Сетка ' + card.rows + '×' + card.cols + ' ';
+    html += '<button data-act="row-" title="Меньше рядов">−ряд</button><button data-act="row+" title="Больше рядов">+ряд</button>';
+    html += '<button data-act="col-" title="Меньше колонок">−кол</button><button data-act="col+" title="Больше колонок">+кол</button></span>';
+    html += '<button class="cb-mini" data-act="up" title="Выше">↑</button>';
+    html += '<button class="cb-mini" data-act="down" title="Ниже">↓</button>';
+    html += '<button class="cb-mini" data-act="dup">Дубль</button>';
+    html += '<button class="cb-mini cb-danger" data-act="del">Удалить</button>';
+    html += '</div>';
+    html += '<div class="cb-slots">';
+    for (var r = 0; r < card.rows; r++) {
+      html += '<div class="cb-slot-row">';
+      for (var c = 0; c < card.cols; c++) {
+        var idx = r * card.cols + c;
+        var pid = card.slots[idx];
+        var photo = pid ? cbPhotoById(pid) : null;
+        html += '<div class="cb-slot' + (photo ? ' cb-filled' : '') + '" data-cid="' + card.id + '" data-idx="' + idx + '"' + (photo ? ' draggable="true"' : '') + '>';
+        if (photo) {
+          html += '<img src="' + photo.dataUrl + '" alt="">';
+          html += '<div class="cb-slot-name">' + cbEsc(photo.name) + '</div>';
+          html += '<button class="cb-slot-x" title="Убрать фото">×</button>';
+        } else {
+          html += '<span class="cb-slot-hint">перетащите фото</span>';
+        }
+        html += '</div>';
+      }
+      html += '</div>';
+    }
+    html += '</div></div>';
+  });
+  host.innerHTML = html;
+}
+
+document.getElementById('cbBtnAddCard').onclick = cbAddCard;
+
+/* Делегирование событий по карточкам */
+document.getElementById('cbCards').addEventListener('click', function (e) {
+  var slotX = e.target.closest('.cb-slot-x');
+  if (slotX) {
+    var slot = slotX.closest('.cb-slot');
+    var card = cbCardById(slot.getAttribute('data-cid'));
+    card.slots[parseInt(slot.getAttribute('data-idx'), 10)] = null;
+    cbMarkDirty(); cbRenderCards(); cbRenderTray();
+    return;
+  }
+  var btn = e.target.closest('button[data-act]');
+  if (!btn) return;
+  var cardEl = btn.closest('.cb-card');
+  var card = cbCardById(cardEl.getAttribute('data-cid'));
+  var i = App.cards.indexOf(card);
+  var act = btn.getAttribute('data-act');
+  if (act === 'del') {
+    if (!confirm('Удалить карточку «' + card.title + '»? Фото останутся в панели слева.')) return;
+    App.cards.splice(i, 1);
+  } else if (act === 'dup') {
+    var copy = JSON.parse(JSON.stringify(card));
+    copy.id = cbId();
+    copy.title = card.title + ' (копия)';
+    App.cards.splice(i + 1, 0, copy);
+  } else if (act === 'up' && i > 0) {
+    App.cards.splice(i, 1); App.cards.splice(i - 1, 0, card);
+  } else if (act === 'down' && i < App.cards.length - 1) {
+    App.cards.splice(i, 1); App.cards.splice(i + 1, 0, card);
+  } else if (act === 'row-') { cbCardResize(card, card.rows - 1, card.cols); return; }
+  else if (act === 'row+') { cbCardResize(card, card.rows + 1, card.cols); return; }
+  else if (act === 'col-') { cbCardResize(card, card.rows, card.cols - 1); return; }
+  else if (act === 'col+') { cbCardResize(card, card.rows, card.cols + 1); return; }
+  else return;
+  cbMarkDirty(); cbRenderCards(); cbRenderTray();
+});
+
+document.getElementById('cbCards').addEventListener('input', function (e) {
+  var f = e.target.getAttribute('data-f');
+  if (!f) return;
+  var card = cbCardById(e.target.closest('.cb-card').getAttribute('data-cid'));
+  card[f] = e.target.value;
+  cbMarkDirty();
+});
+
+/* DnD в слоты: из панели фото или из другого слота (перестановка) */
+document.getElementById('cbCards').addEventListener('dragstart', function (e) {
+  var slot = e.target.closest('.cb-slot.cb-filled');
+  if (slot) {
+    e.dataTransfer.setData('text/plain', 'slot:' + slot.getAttribute('data-cid') + ':' + slot.getAttribute('data-idx'));
+  }
+});
+document.getElementById('cbCards').addEventListener('dragover', function (e) {
+  var slot = e.target.closest('.cb-slot');
+  if (slot) { e.preventDefault(); slot.classList.add('cb-over'); }
+});
+document.getElementById('cbCards').addEventListener('dragleave', function (e) {
+  var slot = e.target.closest('.cb-slot');
+  if (slot) slot.classList.remove('cb-over');
+});
+document.getElementById('cbCards').addEventListener('drop', function (e) {
+  var slot = e.target.closest('.cb-slot');
+  if (!slot) return;
+  e.preventDefault();
+  e.stopPropagation();
+  slot.classList.remove('cb-over');
+  var data = e.dataTransfer.getData('text/plain');
+  var card = cbCardById(slot.getAttribute('data-cid'));
+  var idx = parseInt(slot.getAttribute('data-idx'), 10);
+  if (data.indexOf('photo:') === 0) {
+    card.slots[idx] = data.slice(6);
+  } else if (data.indexOf('slot:') === 0) {
+    var parts = data.split(':');
+    var srcCard = cbCardById(parts[1]);
+    var srcIdx = parseInt(parts[2], 10);
+    if (srcCard === card && srcIdx === idx) return;
+    var tmp = card.slots[idx];
+    card.slots[idx] = srcCard.slots[srcIdx];
+    srcCard.slots[srcIdx] = tmp;   /* обмен местами */
+  } else return;
+  cbMarkDirty(); cbRenderCards(); cbRenderTray();
+});
+
+/* ---------- Контейнеры (доп. контент) ---------- */
+
+function cbAddCont() {
+  App.containers.push({ id: cbId(), title: 'Контейнер ' + (App.containers.length + 1), size: 'm', photoIds: [], text: '' });
+  cbMarkDirty();
+  cbRenderConts();
+}
+
+function cbContById(id) {
+  for (var i = 0; i < App.containers.length; i++)
+    if (App.containers[i].id === id) return App.containers[i];
+  return null;
+}
+
+function cbRenderConts() {
+  var host = document.getElementById('cbConts');
+  if (!App.containers.length) {
+    host.innerHTML = '<div class="cb-empty-hint">Контейнеры — свободные блоки для доп. контента: детали, стайлинг, видео-кадры. Нажмите «+ Контейнер».</div>';
+    return;
+  }
+  var html = '';
+  App.containers.forEach(function (cont, ci) {
+    html += '<div class="cb-container" data-kid="' + cont.id + '">';
+    html += '<div class="cb-card-head">';
+    html += '<span class="cb-num">' + (ci + 1) + '.</span>';
+    html += '<input type="text" class="cb-title" value="' + cbEsc(cont.title) + '" data-f="title" placeholder="Название блока">';
+    html += '<span class="cb-spacer"></span>';
+    html += '<span class="cb-grid-ctl">Размер ';
+    html += '<select data-f="size">';
+    html += '<option value="s"' + (cont.size === 's' ? ' selected' : '') + '>S</option>';
+    html += '<option value="m"' + (cont.size === 'm' ? ' selected' : '') + '>M</option>';
+    html += '<option value="l"' + (cont.size === 'l' ? ' selected' : '') + '>L</option>';
+    html += '</select></span>';
+    html += '<button class="cb-mini" data-act="up" title="Выше">↑</button>';
+    html += '<button class="cb-mini" data-act="down" title="Ниже">↓</button>';
+    html += '<button class="cb-mini cb-danger" data-act="del">Удалить</button>';
+    html += '</div>';
+    html += '<div class="cb-container-body cb-size-' + cont.size + '" data-kid="' + cont.id + '">';
+    if (!cont.photoIds.length) {
+      html += '<div class="cb-cont-hint">перетащите фото сюда — порядок свободный</div>';
+    } else {
+      cont.photoIds.forEach(function (pid, pi) {
+        var photo = cbPhotoById(pid);
+        if (!photo) return;
+        html += '<div class="cb-cont-item" draggable="true" data-kid="' + cont.id + '" data-pi="' + pi + '">';
+        html += '<img src="' + photo.dataUrl + '" title="' + cbEsc(photo.name) + '" alt="">';
+        html += '<button class="cb-slot-x" title="Убрать фото">×</button>';
+        html += '</div>';
+      });
+    }
+    html += '</div>';
+    html += '<textarea data-f="text" placeholder="Комментарий к блоку (попадёт в PDF)">' + cbEsc(cont.text) + '</textarea>';
+    html += '</div>';
+  });
+  host.innerHTML = html;
+}
+
+document.getElementById('cbBtnAddCont').onclick = cbAddCont;
+
+document.getElementById('cbConts').addEventListener('click', function (e) {
+  var x = e.target.closest('.cb-slot-x');
+  if (x) {
+    var item = x.closest('.cb-cont-item');
+    var cont = cbContById(item.getAttribute('data-kid'));
+    cont.photoIds.splice(parseInt(item.getAttribute('data-pi'), 10), 1);
+    cbMarkDirty(); cbRenderConts(); cbRenderTray();
+    return;
+  }
+  var btn = e.target.closest('button[data-act]');
+  if (!btn) return;
+  var cont = cbContById(btn.closest('.cb-container').getAttribute('data-kid'));
+  var i = App.containers.indexOf(cont);
+  var act = btn.getAttribute('data-act');
+  if (act === 'del') {
+    if (!confirm('Удалить контейнер «' + cont.title + '»? Фото останутся в панели слева.')) return;
+    App.containers.splice(i, 1);
+  } else if (act === 'up' && i > 0) {
+    App.containers.splice(i, 1); App.containers.splice(i - 1, 0, cont);
+  } else if (act === 'down' && i < App.containers.length - 1) {
+    App.containers.splice(i, 1); App.containers.splice(i + 1, 0, cont);
+  } else return;
+  cbMarkDirty(); cbRenderConts(); cbRenderTray();
+});
+
+document.getElementById('cbConts').addEventListener('input', function (e) {
+  var f = e.target.getAttribute('data-f');
+  if (!f) return;
+  var cont = cbContById(e.target.closest('.cb-container').getAttribute('data-kid'));
+  cont[f] = e.target.value;
+  cbMarkDirty();
+});
+document.getElementById('cbConts').addEventListener('change', function (e) {
+  if (e.target.getAttribute('data-f') === 'size') {
+    var cont = cbContById(e.target.closest('.cb-container').getAttribute('data-kid'));
+    cont.size = e.target.value;
+    cbMarkDirty(); cbRenderConts();
+  }
+});
+
+/* DnD в контейнеры: добавление из панели и перестановка внутри */
+document.getElementById('cbConts').addEventListener('dragstart', function (e) {
+  var item = e.target.closest('.cb-cont-item');
+  if (item) {
+    e.dataTransfer.setData('text/plain', 'cont:' + item.getAttribute('data-kid') + ':' + item.getAttribute('data-pi'));
+  }
+});
+document.getElementById('cbConts').addEventListener('dragover', function (e) {
+  var body = e.target.closest('.cb-container-body');
+  if (body) {
+    e.preventDefault();
+    body.classList.add('cb-over');
+    var item = e.target.closest('.cb-cont-item');
+    if (item) item.classList.add('cb-over');
+  }
+});
+document.getElementById('cbConts').addEventListener('dragleave', function (e) {
+  var body = e.target.closest('.cb-container-body');
+  if (body) body.classList.remove('cb-over');
+  var item = e.target.closest('.cb-cont-item');
+  if (item) item.classList.remove('cb-over');
+});
+document.getElementById('cbConts').addEventListener('drop', function (e) {
+  var body = e.target.closest('.cb-container-body');
+  if (!body) return;
+  e.preventDefault();
+  e.stopPropagation();
+  body.classList.remove('cb-over');
+  var cont = cbContById(body.getAttribute('data-kid'));
+  var data = e.dataTransfer.getData('text/plain');
+  /* позиция вставки: перед элементом, на который бросили, иначе в конец */
+  var targetItem = e.target.closest('.cb-cont-item');
+  var insertAt = targetItem ? parseInt(targetItem.getAttribute('data-pi'), 10) : cont.photoIds.length;
+  if (data.indexOf('photo:') === 0) {
+    var pid = data.slice(6);
+    if (cont.photoIds.indexOf(pid) !== -1) { cbToast('Это фото уже в контейнере'); return; }
+    cont.photoIds.splice(insertAt, 0, pid);
+  } else if (data.indexOf('cont:') === 0) {
+    var parts = data.split(':');
+    var srcCont = cbContById(parts[1]);
+    var srcIdx = parseInt(parts[2], 10);
+    var moved = srcCont.photoIds[srcIdx];
+    if (srcCont === cont) {
+      srcCont.photoIds.splice(srcIdx, 1);
+      if (insertAt > srcIdx) insertAt--;
+      cont.photoIds.splice(insertAt, 0, moved);
+    } else {
+      if (cont.photoIds.indexOf(moved) !== -1) { cbToast('Это фото уже в контейнере'); return; }
+      srcCont.photoIds.splice(srcIdx, 1);
+      cont.photoIds.splice(insertAt, 0, moved);
+    }
+  } else return;
+  cbMarkDirty(); cbRenderConts(); cbRenderTray();
+});
+
+/* ---------- Экспорт PDF (через печать) ---------- */
+
+function cbExportPdf() {
+  if (!App.cards.length && !App.containers.length) { cbToast('Нечего экспортировать'); return; }
+  var name = document.getElementById('cbProjectName').value || 'Проект';
+  var d = new Date();
+  var dateStr = ('0' + d.getDate()).slice(-2) + '.' + ('0' + (d.getMonth() + 1)).slice(-2) + '.' + d.getFullYear();
+  var sizePx = { s: 90, m: 140, l: 220 };
+  var html = '<div class="cbp-head"><h1>' + cbEsc(name) + '</h1>';
+  html += '<div class="cbp-meta">Карточек: ' + App.cards.length + ' · Контейнеров: ' + App.containers.length + ' · ' + dateStr + ' · Cardboard</div></div>';
+
+  if (App.cards.length) {
+    html += '<div class="cbp-sec">Карточки</div>';
+    App.cards.forEach(function (card, ci) {
+      html += '<div class="cbp-block"><h2>' + (ci + 1) + '. ' + cbEsc(card.title);
+      if (card.category) html += '<span class="cbp-cat">' + cbEsc(card.category) + '</span>';
+      html += '</h2>';
+      for (var r = 0; r < card.rows; r++) {
+        html += '<div class="cbp-row">';
+        for (var c = 0; c < card.cols; c++) {
+          var photo = card.slots[r * card.cols + c] ? cbPhotoById(card.slots[r * card.cols + c]) : null;
+          html += '<div class="cbp-cell">' + (photo ? '<img src="' + photo.dataUrl + '">' : '') + '</div>';
+        }
+        html += '</div>';
+      }
+      html += '</div>';
+    });
+  }
+  if (App.containers.length) {
+    html += '<div class="cbp-sec">Доп. контент</div>';
+    App.containers.forEach(function (cont, ci) {
+      html += '<div class="cbp-block"><h2>' + (ci + 1) + '. ' + cbEsc(cont.title) + '</h2><div class="cbp-flow">';
+      cont.photoIds.forEach(function (pid) {
+        var photo = cbPhotoById(pid);
+        if (photo) html += '<img src="' + photo.dataUrl + '" style="width:' + sizePx[cont.size] + 'px;height:' + sizePx[cont.size] + 'px;">';
+      });
+      html += '</div>';
+      if (cont.text) html += '<div class="cbp-text">' + cbEsc(cont.text) + '</div>';
+      html += '</div>';
+    });
+  }
+  document.getElementById('cbPrint').innerHTML = html;
+  var oldTitle = document.title;
+  document.title = name;   /* имя PDF-файла в диалоге печати */
+  window.print();
+  document.title = oldTitle;
+}
+
+document.getElementById('cbBtnPdf').onclick = cbExportPdf;
+
+/* ---------- Экспорт списка (CSV для Excel + TXT) ---------- */
+
+function cbDownload(filename, text, mime) {
+  var blob = new Blob([text], { type: mime || 'text/plain;charset=utf-8' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+}
+
+function cbExportList() {
+  if (!App.cards.length && !App.containers.length) { cbToast('Нечего экспортировать'); return; }
+  var name = document.getElementById('cbProjectName').value || 'Проект';
+  /* CSV: Тип;Номер;Блок;Категория;Позиция;Файл */
+  var csv = 'Тип;Номер;Блок;Категория;Позиция;Файл\r\n';
+  var txt = name + '\r\n' + new Date().toLocaleDateString('ru-RU') + '\r\n';
+  App.cards.forEach(function (card, ci) {
+    txt += '\r\n[Карточка ' + (ci + 1) + '] ' + card.title + (card.category ? ' (' + card.category + ')' : '') + '\r\n';
+    card.slots.forEach(function (pid, si) {
+      if (!pid) return;
+      var photo = cbPhotoById(pid);
+      if (!photo) return;
+      csv += 'Карточка;' + (ci + 1) + ';"' + card.title.replace(/"/g, '""') + '";"' + card.category.replace(/"/g, '""') + '";' + (si + 1) + ';"' + photo.name.replace(/"/g, '""') + '"\r\n';
+      txt += '  ' + (si + 1) + '. ' + photo.name + '\r\n';
+    });
+  });
+  App.containers.forEach(function (cont, ci) {
+    txt += '\r\n[Контейнер ' + (ci + 1) + '] ' + cont.title + '\r\n';
+    cont.photoIds.forEach(function (pid, pi) {
+      var photo = cbPhotoById(pid);
+      if (!photo) return;
+      csv += 'Контейнер;' + (ci + 1) + ';"' + cont.title.replace(/"/g, '""') + '";;' + (pi + 1) + ';"' + photo.name.replace(/"/g, '""') + '"\r\n';
+      txt += '  ' + (pi + 1) + '. ' + photo.name + '\r\n';
+    });
+    if (cont.text) txt += '  Комментарий: ' + cont.text + '\r\n';
+  });
+  /* BOM, чтобы Excel корректно открыл кириллицу */
+  cbDownload(name + ' — список.csv', '﻿' + csv, 'text/csv;charset=utf-8');
+  cbDownload(name + ' — список.txt', txt);
+  cbToast('Список выгружен (CSV + TXT)');
+}
+
+document.getElementById('cbBtnList').onclick = cbExportList;
+
+/* ---------- Сохранение / загрузка проекта ---------- */
+
+function cbSaveProject() {
+  var name = document.getElementById('cbProjectName').value || 'Проект';
+  var data = {
+    app: 'cardboard',
+    version: 1,
+    name: name,
+    savedAt: new Date().toISOString(),
+    nextId: App.nextId,
+    photos: App.photos,
+    cards: App.cards,
+    containers: App.containers
+  };
+  cbDownload(name + '.cardboard', JSON.stringify(data), 'application/json');
+  App.dirty = false;
+  cbToast('Проект сохранён: ' + name + '.cardboard');
+}
+
+function cbOpenProject(file) {
+  var reader = new FileReader();
+  reader.onload = function () {
+    try {
+      var data = JSON.parse(reader.result);
+      if (data.app !== 'cardboard') throw new Error('not cardboard');
+      App.photos = data.photos || [];
+      App.cards = data.cards || [];
+      App.containers = data.containers || [];
+      App.nextId = data.nextId || (App.photos.length + App.cards.length + App.containers.length + 1);
+      document.getElementById('cbProjectName').value = data.name || 'Проект';
+      App.dirty = false;
+      cbRenderTray(); cbRenderCards(); cbRenderConts();
+      cbToast('Проект открыт: ' + (data.name || file.name));
+    } catch (err) {
+      cbToast('Не удалось открыть файл — это не проект Cardboard');
+    }
+  };
+  reader.readAsText(file);
+}
+
+document.getElementById('cbBtnSave').onclick = cbSaveProject;
+document.getElementById('cbBtnOpen').onclick = function () {
+  if (App.dirty && !confirm('Есть несохранённые изменения. Открыть другой проект?')) return;
+  document.getElementById('cbProjInput').click();
+};
+document.getElementById('cbProjInput').onchange = function () {
+  if (this.files.length) cbOpenProject(this.files[0]);
+  this.value = '';
+};
+document.getElementById('cbProjectName').oninput = cbMarkDirty;
+
+/* ---------- Старт ---------- */
+cbRenderTray();
+cbRenderCards();
+cbRenderConts();
+</script>
+</body>
+</html>
