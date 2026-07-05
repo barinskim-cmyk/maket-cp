@@ -35,6 +35,19 @@ cd cardboard-standalone && python3 main.py
 2. В Cardboard — «Следить за папкой», выбрать её.
 3. Выделил фото → хоткей → через 2 секунды фото в панели Cardboard.
 
+## Сборка .app (macOS)
+
+```bash
+cd cardboard-standalone
+/Library/Frameworks/Python.framework/Versions/3.14/bin/python3 -m PyInstaller Cardboard.spec --noconfirm
+open dist/Cardboard.app
+```
+Иконка: когда появится `design/brand-cardboard/icon.icns` — вписать в `Cardboard.spec` (BUNDLE, `icon=`) и пересобрать.
+
+Нюанс, чтобы не наступать снова: в .app-бандле PyInstaller кладёт данные в Resources и делает симлинк из Frameworks — WKWebView не грузит file:// по симлинку (белое окно). Поэтому `find_frontend()` в main.py делает `.resolve()`. Плюс `private_mode=False` + `storage_path` (~/Library/Application Support/Cardboard), иначе localStorage с шаблонами стирается при каждом запуске.
+
+Самопроверка сборки: `CB_DIAG=1 ./dist/Cardboard.app/Contents/MacOS/Cardboard` — печатает READY/TOPBAR/BRIDGE и выходит.
+
 ## Технически
 
 - `main.py` — pywebview-мост: диалоги файлов, миниатюры (Pillow, RAM-кэш, на диск не пишутся), слежение за папкой, сохранение проекта, диалоги при закрытии.

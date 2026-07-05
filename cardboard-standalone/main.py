@@ -228,11 +228,26 @@ class CardboardAPI:
             subprocess.Popen(["xdg-open", os.path.dirname(path)])
 
 
+def find_frontend() -> Path:
+    """Путь к index.html: рядом с main.py или внутри frozen-бандла (PyInstaller).
+
+    ВАЖНО: .resolve() обязателен — в .app-бандле PyInstaller кладёт data-файлы
+    в Resources и делает симлинк из Frameworks; WKWebView отказывается грузить
+    file:// по симлинку, ведущему за пределы разрешённой папки (белое окно).
+    """
+    if getattr(sys, "frozen", False):
+        base = Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
+        candidate = base / "index.html"
+        if candidate.exists():
+            return candidate.resolve()
+    return (Path(__file__).parent / "index.html").resolve()
+
+
 def main() -> None:
     import webview
 
     api = CardboardAPI()
-    html = Path(__file__).parent / "index.html"
+    html = find_frontend()
     window = webview.create_window(
         "Cardboard — вёрстка карточек",
         html.as_uri(),
@@ -269,7 +284,42 @@ def main() -> None:
         return True
 
     window.events.closing += on_closing
-    webview.start()
+
+    def _diag() -> None:
+        """CB_DIAG=1 — самопроверка после запуска: загрузился ли frontend."""
+        import time
+        time.sleep(5)
+        try:
+            print("DIAG READY:", window.evaluate_js("document.readyState"))
+            print("DIAG TOPBAR:", window.evaluate_js(
+                "document.querySelector('.cb-topbar') ? 'yes' : 'no'"))
+            print("DIAG BRIDGE:", window.evaluate_js(
+                "!!(window.pywebview && window.pywebview.api)"))
+        except Exception as exc:   # noqa: BLE001
+            print("DIAG FAIL:", exc)
+        window.destroy()
+
+    # Persistent storage: иначе pywebview (private_mode по умолчанию) стирает
+    # localStorage при каждом запуске — пропадала бы библиотека шаблонов.
+    home = Path.home()
+    if sys.platform == "darwin":
+        storage_dir = home / "Library" / "Application Support" / "Cardboard"
+    elif sys.platform.startswith("win"):
+        storage_dir = Path(os.environ.get("APPDATA", str(home))) / "Cardboard"
+    else:
+        storage_dir = home / ".config" / "Cardboard"
+    start_kwargs = {"private_mode": False, "debug": "--debug" in sys.argv}
+    try:
+        storage_dir.mkdir(parents=True, exist_ok=True)
+        start_kwargs["storage_path"] = str(storage_dir)
+    except OSError:
+        pass
+
+    if os.environ.get("CB_DIAG"):
+        print("DIAG HTML:", find_frontend())
+        webview.start(_diag, **start_kwargs)
+    else:
+        webview.start(**start_kwargs)
 
 
 if __name__ == "__main__":

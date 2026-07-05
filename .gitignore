@@ -110,3 +110,7 @@ contacts.md
 # локальная папка остаётся для ручных сборок, в git — только README.
 rate-setter-standalone/*
 !rate-setter-standalone/README.md
+
+# Cardboard: артефакты сборки PyInstaller не коммитим
+cardboard-standalone/build/
+cardboard-standalone/dist/
