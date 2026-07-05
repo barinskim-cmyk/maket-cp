@@ -1094,10 +1094,50 @@ function cbHeroVJoint(W, H, heroAR, byRow, boxes) {
   });
   var T = A / (1 + S * heroAR);
   T = Math.min(T, H);
-  var heroW = Math.min(T * heroAR, maxHeroW);
-  var heroH = Math.min(T, heroW / heroAR);
-  boxes.push({ x: 0, y: 0, w: heroW, h: heroH, slotIdx: 0 });
+  var heroW = T * heroAR;
+  if (heroW > maxHeroW) {
+    /* колонка героя упёрлась в 60% ширины: пересчитать высоту от клампа,
+       чтобы низ героя и низ рядов остались в одну линию */
+    heroW = maxHeroW;
+    T = Math.min(H, heroW / heroAR);
+  }
+  boxes.push({ x: 0, y: 0, w: heroW, h: T, slotIdx: 0 });
   cbRowsInZone({ x: heroW + CB_GAP, y: 0, w: W - heroW - CB_GAP, h: T }, byRow, boxes);
+}
+
+/* Linear partition (классика раскладок: Google+/perfect-layout):
+   делит последовательность aspect'ов на k непрерывных групп так, чтобы
+   максимальная сумма группы была минимальной — ряды получаются ровными */
+function cbLinearPartition(seq, k) {
+  var n = seq.length;
+  if (k <= 0) return [];
+  if (k >= n) return seq.map(function (x) { return [x]; });
+  var prefix = [0];
+  for (var i = 0; i < n; i++) prefix.push(prefix[i] + seq[i]);
+  /* dp[i][j] = минимально возможный максимум суммы при разбиении первых i на j групп */
+  var dp = [], div = [];
+  for (var i2 = 0; i2 <= n; i2++) {
+    dp.push(new Array(k + 1).fill(Infinity));
+    div.push(new Array(k + 1).fill(0));
+  }
+  dp[0][0] = 0;
+  for (var i3 = 1; i3 <= n; i3++) {
+    for (var j = 1; j <= Math.min(i3, k); j++) {
+      for (var m = j - 1; m < i3; m++) {
+        var cost = Math.max(dp[m][j - 1], prefix[i3] - prefix[m]);
+        if (cost < dp[i3][j]) { dp[i3][j] = cost; div[i3][j] = m; }
+      }
+    }
+  }
+  /* восстановление разбиения */
+  var rows = [];
+  var end = n;
+  for (var j2 = k; j2 >= 1; j2--) {
+    var start = div[end][j2];
+    rows.unshift(seq.slice(start, end));
+    end = start;
+  }
+  return rows;
 }
 
 /* Симметрия: композиция целиком центрируется на листе (равные поля) */
@@ -1180,16 +1220,17 @@ function cbAutoBoxes(layout, aspects) {
     var best = null;
     var maxRows = Math.min(4, rest.length);
     for (var nRows = 1; nRows <= maxRows; nRows++) {
-      var totalAR = 0;
-      rest.forEach(function (ar) { totalAR += ar; });
-      var target = totalAR / nRows;
-      var byRow = [[]];
-      var acc = 0;
-      rest.forEach(function (ar, i) {
-        var rowIdx = byRow.length - 1;
-        if (acc >= target && rowIdx < nRows - 1) { byRow.push([]); acc = 0; rowIdx++; }
-        byRow[rowIdx].push({ ar: ar, slotIdx: idx0 + i });
-        acc += ar;
+      /* linear partition: ряды сбалансированы по сумме пропорций */
+      var parts = cbLinearPartition(rest, nRows);
+      var byRow = [];
+      var cursor = 0;
+      parts.forEach(function (part) {
+        var row = [];
+        part.forEach(function (ar) {
+          row.push({ ar: ar, slotIdx: idx0 + cursor });
+          cursor++;
+        });
+        byRow.push(row);
       });
       var trial = [];
       if (heroVJoint) cbHeroVJoint(W, H, aspects[0], byRow, trial);
