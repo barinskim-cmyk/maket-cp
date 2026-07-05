@@ -180,33 +180,27 @@ body.cb-resizing * { pointer-events: none; }
   border-bottom: 1px solid #262626;
 }
 
-/* Библиотека превью — по аналогии с pv-gallery основной проги:
-   вертикальное фото = 1/3 ряда, горизонтальное = 2/3, flex-grow добивает ряд */
+/* Библиотека превью — justified-раскладка (движок из layout.js основной
+   проги): натуральные пропорции, ряды впритык, масштабируется чистым CSS */
 .cb-tray-grid {
   flex: 1;
   overflow-y: auto;
   padding: 8px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  align-content: flex-start;
 }
+.cb-just-box .cb-thumb { width: 100%; height: 100%; }
 .cb-thumb {
-  width: calc((100% - 8px) / 3);
-  flex-grow: 1;
   cursor: grab;
   border: 2px solid transparent;
   overflow: hidden;
   position: relative;
   transition: border-color 0.15s;
+  display: block;
 }
-.cb-thumb.cb-h { width: calc(2 * (100% - 8px) / 3 + 4px); }
 .cb-thumb:hover { border-color: #f2f2f1; }
 .cb-thumb:active { cursor: grabbing; }
 .cb-thumb img {
   width: 100%;
-  height: auto;
-  max-height: 320px;
+  height: 100%;
   object-fit: cover;
   display: block;
   pointer-events: none;
@@ -224,6 +218,7 @@ body.cb-resizing * { pointer-events: none; }
   padding: 1px 5px;
   border-radius: 2px;
 }
+.cb-just-box .cb-missing-box { height: 100%; }
 .cb-missing-box {
   width: 100%;
   height: 110px;
@@ -1100,29 +1095,139 @@ document.addEventListener('click', function (e) {
   }
 });
 
+/* ---------- Justified-движок раскладки (порт из layout.js основной проги) ----------
+   Раскладка в стиле Flickr/Яндекс.Диска: фото сохраняют натуральные
+   пропорции, БЕЗ кропа рядов, каждый ряд заполнен по ширине впритык.
+   Боксы считаются в эталонной ширине и раскладываются в процентах —
+   контейнер масштабируется чистым CSS (важно для ресайзабельной галереи).
+   Используется для превью-галереи; позже — для раскладки карточек. */
+
+var CB_JUST_REF_WIDTH = 1060;   /* эталонная ширина расчёта */
+
+function cbSimpleJustified(aspects, opts) {
+  var cw = opts.containerWidth || CB_JUST_REF_WIDTH;
+  var maxItems = opts.maxItemsPerRow || Number.POSITIVE_INFINITY;
+  var spacing = (opts.boxSpacing != null) ? opts.boxSpacing : 0;
+  var trh = opts.targetRowHeight || 320;
+  var minRowHeight = trh * 0.5;
+
+  var boxes = [];
+  var top = 0;
+  var i = 0;
+
+  while (i < aspects.length) {
+    var rowAspects = [];
+    var sumAspect = 0;
+
+    while (i < aspects.length && rowAspects.length < maxItems) {
+      var ar = aspects[i];
+      var trialSum = sumAspect + ar;
+      var availableWidth = cw - rowAspects.length * spacing;
+      var trialHeight = availableWidth / trialSum;
+
+      if (rowAspects.length === 0) {
+        rowAspects.push(ar);
+        sumAspect = trialSum;
+        i++;
+        if (trialHeight <= trh) break;
+        continue;
+      }
+      if (trialHeight < minRowHeight) break;
+
+      rowAspects.push(ar);
+      sumAspect = trialSum;
+      i++;
+      if (trialHeight <= trh) break;
+    }
+
+    if (rowAspects.length === 0) break;
+
+    var rowAvailableWidth = cw - (rowAspects.length - 1) * spacing;
+    var rowHeight = rowAvailableWidth / sumAspect;
+    var isLastRow = (i >= aspects.length);
+    if (isLastRow && rowHeight > trh * 1.3) rowHeight = trh;
+
+    var x = 0;
+    for (var j = 0; j < rowAspects.length; j++) {
+      var w = rowAspects[j] * rowHeight;
+      boxes.push({ left: x, top: top, width: w, height: rowHeight });
+      x += w + spacing;
+    }
+    top += rowHeight + spacing;
+  }
+
+  return { containerHeight: (top > 0) ? top - spacing : 0, boxes: boxes };
+}
+
+/* items -> HTML: абсолютные боксы в процентах + padding-top trick */
+function cbJustifiedHTML(count, itemHTMLFn, aspectFn, opts) {
+  opts = opts || {};
+  var aspects = [];
+  for (var i = 0; i < count; i++) {
+    var ar = aspectFn(i);
+    if (!isFinite(ar) || ar <= 0) ar = 0.75;
+    aspects.push(ar);
+  }
+  var cw = CB_JUST_REF_WIDTH;
+  var geom = cbSimpleJustified(aspects, {
+    containerWidth: cw,
+    maxItemsPerRow: opts.maxItemsPerRow || Number.POSITIVE_INFINITY,
+    boxSpacing: (opts.boxSpacing != null) ? opts.boxSpacing : 6,
+    targetRowHeight: opts.targetRowHeight || 430
+  });
+  if (!geom.boxes.length) return '';
+  var ratio = geom.containerHeight / cw;
+  var html = '<div class="cb-just" style="position:relative;width:100%;padding-top:' + (ratio * 100).toFixed(4) + '%;">';
+  for (var b = 0; b < geom.boxes.length; b++) {
+    var box = geom.boxes[b];
+    html += '<div class="cb-just-box" style="position:absolute;left:' + (box.left / cw * 100).toFixed(4)
+      + '%;top:' + (box.top / cw * 100).toFixed(4)
+      + '%;width:' + (box.width / cw * 100).toFixed(4)
+      + '%;height:' + (box.height / cw * 100).toFixed(4) + '%;">';
+    html += itemHTMLFn(b);
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
 /* ---------- Панель фото ---------- */
 
 function cbRenderTray() {
   var grid = document.getElementById('cbTrayGrid');
   var filter = document.getElementById('cbFilter').value.toLowerCase();
   var used = cbUsedIds();
-  var html = '';
-  var shown = 0;
-  App.photos.forEach(function (p) {
-    if (filter && p.name.toLowerCase().indexOf(filter) === -1) return;
-    shown++;
-    var horiz = p.w > p.h ? ' cb-h' : '';
-    html += '<div class="cb-thumb' + horiz + (used[p.id] ? ' cb-used' : '') + '" draggable="true" data-pid="' + p.id + '" title="' + cbEsc(p.name) + (p.path ? '\n' + cbEsc(p.path) : '') + '">';
-    html += cbImgHtml(p);
-    html += '</div>';
+
+  /* Натуральная числовая сортировка имён (как в previews.js основной проги):
+     иначе "_0001 10.jpg" встаёт раньше "_0001 2.jpg" */
+  var list = App.photos.slice().sort(function (a, b) {
+    return String(a.name).localeCompare(String(b.name), undefined, { numeric: true, sensitivity: 'base' });
   });
-  if (!App.photos.length) {
-    html = '<div class="cb-tray-empty">Перетащите фото сюда,<br>нажмите «Добавить фото»<br>или включите слежение за папкой<br>экспорта Capture One</div>';
+  if (filter) {
+    list = list.filter(function (p) { return p.name.toLowerCase().indexOf(filter) !== -1; });
   }
-  grid.innerHTML = html;
+
+  if (!App.photos.length) {
+    grid.innerHTML = '<div class="cb-tray-empty">Перетащите фото сюда,<br>нажмите «Импорт»<br>или включите слежение за папкой<br>экспорта Capture One</div>';
+  } else {
+    grid.innerHTML = cbJustifiedHTML(
+      list.length,
+      function (i) {
+        var p = list[i];
+        return '<div class="cb-thumb' + (used[p.id] ? ' cb-used' : '') + '" draggable="true" data-pid="' + p.id
+          + '" title="' + cbEsc(p.name) + (p.path ? '\n' + cbEsc(p.path) : '') + '">' + cbImgHtml(p) + '</div>';
+      },
+      function (i) {
+        var p = list[i];
+        return (p.w > 0 && p.h > 0) ? p.w / p.h : 0.75;
+      },
+      { targetRowHeight: 430, maxItemsPerRow: 3, boxSpacing: 6 }
+    );
+  }
+
   var usedCount = Object.keys(used).length;
   document.getElementById('cbTrayStats').textContent =
-    'Фото: ' + App.photos.length + (filter ? ' (показано ' + shown + ')' : '') + ' · в макете: ' + usedCount;
+    'Фото: ' + App.photos.length + (filter ? ' (показано ' + list.length + ')' : '') + ' · в макете: ' + usedCount;
 }
 
 document.getElementById('cbFilter').oninput = function () { cbRenderTray(); };
