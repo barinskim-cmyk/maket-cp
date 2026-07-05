@@ -32,6 +32,8 @@ button {
   color: #1a1a1a;
   cursor: pointer;
   border-radius: 3px;
+  white-space: nowrap;   /* кнопки не ломаются на несколько строк */
+  flex-shrink: 0;
 }
 button:hover { background: #eceae7; }
 button.cb-primary { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
@@ -57,7 +59,12 @@ input[type="text"]:focus, textarea:focus { outline: none; border-color: #1a1a1a;
   padding: 0 14px;
   background: #fff;
   border-bottom: 1px solid #dcd9d4;
+  flex-wrap: nowrap;
+  overflow-x: auto;      /* узкое окно: панель скроллится, не расползается */
+  overflow-y: hidden;
 }
+.cb-topbar .cb-logo, .cb-topbar .cb-grid-ctl, .cb-topbar span { white-space: nowrap; flex-shrink: 0; }
+.cb-topbar input, .cb-topbar select { flex-shrink: 0; }
 .cb-logo {
   font-weight: 700;
   font-size: 14px;
