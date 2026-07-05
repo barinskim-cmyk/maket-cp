@@ -81,15 +81,17 @@ input[type="text"]:focus, textarea:focus { outline: none; border-color: #1a1a1a;
 .cb-share-wrap { position: relative; flex-shrink: 0; }
 #cbSharePop {
   display: none;
-  position: absolute;
-  top: 36px;
-  right: 0;
+  /* fixed, а не absolute: топбар скроллится (overflow), absolute-попап
+     резался бы его рамкой и «не открывался» */
+  position: fixed;
+  top: 50px;
+  right: 12px;
   background: #fff;
   border: 1px solid #c8c5c0;
   border-radius: 4px;
   box-shadow: 0 6px 20px rgba(0,0,0,0.15);
   padding: 6px;
-  z-index: 80;
+  z-index: 120;
   min-width: 190px;
   flex-direction: column;
   gap: 4px;
@@ -108,13 +110,26 @@ input[type="text"]:focus, textarea:focus { outline: none; border-color: #1a1a1a;
 /* ---------- Левая панель: фото ---------- */
 .cb-tray {
   width: 300px;
-  min-width: 220px;
-  max-width: 480px;
+  min-width: 160px;
+  max-width: 720px;
   background: #fff;
-  border-right: 1px solid #dcd9d4;
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
 }
+/* Перетаскиваемая граница галереи (как в Capture One) */
+.cb-resizer {
+  width: 5px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  background: #dcd9d4;
+  border-left: 2px solid #fff;
+  border-right: 2px solid #f2f1ef;
+  transition: background 0.15s;
+}
+.cb-resizer:hover, .cb-resizer.cb-dragging { background: #1a1a1a; }
+body.cb-resizing { cursor: col-resize; user-select: none; -webkit-user-select: none; }
+body.cb-resizing .cb-work, body.cb-resizing .cb-tray { pointer-events: none; }
 .cb-tray-head {
   padding: 10px 12px 8px;
   border-bottom: 1px solid #eceae7;
@@ -525,6 +540,7 @@ body.cb-file-drag #cbDropOverlay { display: flex; }
     <div id="cbWatchStatus"></div>
     <div class="cb-tray-grid" id="cbTrayGrid"></div>
   </div>
+  <div class="cb-resizer" id="cbResizer" title="Потяните, чтобы изменить ширину галереи"></div>
   <div class="cb-work" id="cbWork">
     <div class="cb-tabs">
       <button class="cb-tab cb-tab-active" data-tab="cards" id="cbTabBtnCards">Карточки</button>
@@ -946,6 +962,39 @@ document.getElementById('cbOutline').addEventListener('click', function (e) {
   var el = document.querySelector('[data-cid="' + id + '"], [data-kid="' + id + '"]');
   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
+
+/* ---------- Ресайз галереи перетаскиванием границы ---------- */
+
+var TRAY_W_KEY = 'cardboard_tray_width';
+
+function cbInitResizer() {
+  var tray = document.querySelector('.cb-tray');
+  var rz = document.getElementById('cbResizer');
+  try {
+    var saved = parseInt(localStorage.getItem(TRAY_W_KEY), 10);
+    if (saved) tray.style.width = Math.max(160, Math.min(720, saved)) + 'px';
+  } catch (e) { /* приватный режим */ }
+  rz.addEventListener('mousedown', function (e) {
+    e.preventDefault();
+    rz.classList.add('cb-dragging');
+    document.body.classList.add('cb-resizing');
+    function onMove(ev) {
+      var w = Math.max(160, Math.min(720, ev.clientX - tray.getBoundingClientRect().left));
+      tray.style.width = w + 'px';
+    }
+    function onUp() {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      rz.classList.remove('cb-dragging');
+      document.body.classList.remove('cb-resizing');
+      try { localStorage.setItem(TRAY_W_KEY, parseInt(tray.style.width, 10)); } catch (e) { }
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+}
+
+cbInitResizer();
 
 /* ---------- Попап «Поделиться» ---------- */
 
