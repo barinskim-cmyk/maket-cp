@@ -82,6 +82,7 @@ class CardboardAPI:
         self._watch_seen: set = set()
         self._project_path: Optional[str] = None
         self._dirty: bool = False           # есть несохранённые изменения
+        self._native_menu: bool = False     # удалось ли собрать нативное меню
 
     # ---------- служебное ----------
 
@@ -97,6 +98,10 @@ class CardboardAPI:
         """Имя проекта в заголовке окна (топбар лаконичный, имени там нет)."""
         if self._window:
             self._window.set_title(str(title)[:120])
+
+    def has_native_menu(self) -> bool:
+        """Frontend спрашивает: есть ли нативное меню (тогда HTML-меню прячется)."""
+        return self._native_menu
 
     def _thumb_cached(self, path: str) -> Optional[dict]:
         if path not in self._thumb_cache:
@@ -304,6 +309,48 @@ def main() -> None:
             print("DIAG FAIL:", exc)
         window.destroy()
 
+    # Нативное меню (macOS: системный бар сверху — «где обычно Файл»).
+    # Пункты дёргают JS-обработчики через evaluate_js; HTML-меню при этом
+    # прячется (frontend спрашивает has_native_menu).
+    menu = None
+    try:
+        import webview.menu as wm
+
+        def _js(action: str):
+            def _cb():
+                window.evaluate_js(f'cbMenuNative("{action}")')
+            return _cb
+
+        menu = [
+            wm.Menu("Файл", [
+                wm.MenuAction("Новый проект", _js("new")),
+                wm.MenuAction("Открыть проект", _js("open")),
+                wm.MenuAction("Сохранить", _js("save")),
+                wm.MenuAction("Переименовать проект", _js("rename")),
+                wm.MenuSeparator(),
+                wm.MenuAction("Импорт фото", _js("pick")),
+                wm.MenuAction("Импорт референсов", _js("pickref")),
+                wm.MenuAction("Импорт папки целиком", _js("folder")),
+                wm.MenuAction("Следить за папкой (вкл/выкл)", _js("watch")),
+                wm.MenuSeparator(),
+                wm.MenuAction("Экспорт PDF", _js("pdf")),
+                wm.MenuAction("Экспорт списка (CSV + TXT)", _js("list")),
+            ]),
+            wm.Menu("Шаблон", [
+                wm.MenuAction("Создать шаблон", _js("tplnew")),
+                wm.MenuAction("Галерея шаблонов", _js("tplgal")),
+            ]),
+            wm.Menu("Справка Cardboard", [
+                wm.MenuAction("Инструкция", _js("helpguide")),
+                wm.MenuAction("Синхронизация с Capture One", _js("helpsync")),
+                wm.MenuAction("Другие продукты", _js("helpprod")),
+            ]),
+        ]
+        api._native_menu = True
+    except Exception:
+        menu = None
+        api._native_menu = False
+
     # Persistent storage: иначе pywebview (private_mode по умолчанию) стирает
     # localStorage при каждом запуске — пропадала бы библиотека шаблонов.
     home = Path.home()
@@ -314,6 +361,8 @@ def main() -> None:
     else:
         storage_dir = home / ".config" / "Cardboard"
     start_kwargs = {"private_mode": False, "debug": "--debug" in sys.argv}
+    if menu:
+        start_kwargs["menu"] = menu
     try:
         storage_dir.mkdir(parents=True, exist_ok=True)
         start_kwargs["storage_path"] = str(storage_dir)
