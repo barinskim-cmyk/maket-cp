@@ -2041,11 +2041,18 @@ document.getElementById('cbTeModeManual').onclick = function () { cbTeCollectNam
 document.getElementById('cbTeModeAuto').onclick = function () { cbTeCollectNames(); TE.cur.mode = 'auto'; cbTeRender(); };
 document.getElementById('cbTeHero').onchange = function () { cbTeCollectNames(); TE.cur.hasHero = this.checked; cbTeRender(); };
 document.getElementById('cbTeRowMinus').onclick = function () {
-  cbTeCollectNames(); TE.cur.rows = Math.max(1, TE.cur.rows - 1);
-  TE.cur.slots.forEach(function (s) { s.row = Math.min(TE.cur.rows - 1, s.row || 0); });
+  cbTeCollectNames();
+  TE.cur.rows = Math.max(1, TE.cur.rows - 1);
+  cbTeDistribute();   /* слоты сразу перераспределяются по новым рядам */
   cbTeRender();
 };
-document.getElementById('cbTeRowPlus').onclick = function () { cbTeCollectNames(); TE.cur.rows = Math.min(5, TE.cur.rows + 1); cbTeRender(); };
+document.getElementById('cbTeRowPlus').onclick = function () {
+  cbTeCollectNames();
+  var maxRows = Math.max(1, TE.cur.slots.length - (TE.cur.hasHero ? 1 : 0));
+  TE.cur.rows = Math.min(Math.min(5, maxRows), TE.cur.rows + 1);
+  cbTeDistribute();   /* иначе новый ряд пустой и превью не меняется */
+  cbTeRender();
+};
 document.getElementById('cbTeEven').onclick = function () { cbTeCollectNames(); cbTeDistribute(); cbTeRender(); };
 document.getElementById('cbTeVPlus').onclick = function () { cbTeAddSlot('v'); };
 document.getElementById('cbTeVMinus').onclick = function () { cbTeRemoveSlot('v'); };
