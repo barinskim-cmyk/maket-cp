@@ -422,7 +422,13 @@ class CardboardAPI:
                     path = str(folder / p.name)
                 except Exception:
                     pass   # не смогли создать папку — сохраняем как выбрано
-        Path(path).write_text(json_str, encoding="utf-8")
+        # Атомарная запись: сначала соседний tmp-файл, потом мгновенная
+        # подмена (os.replace). Даже если приложение убьют посреди
+        # автосейва — старый файл проекта останется целым.
+        p = Path(path)
+        tmp = p.with_name(p.name + ".tmp")
+        tmp.write_text(json_str, encoding="utf-8")
+        os.replace(tmp, p)
         self._project_path = path
         self._previews_dir()   # создать previews/ сразу
         return path
