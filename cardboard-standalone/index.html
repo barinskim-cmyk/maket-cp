@@ -1729,7 +1729,19 @@ function cbImportFilesEmbedded(files, kind) {
 
 var _pendingImportKind = 'photo';
 
+/* Строгий режим (как сессия Capture One): без файла проекта не работаем —
+   иначе нет ни автосохранения, ни кэша превью, и работу можно потерять */
+function cbRequireProject() {
+  if (cbDesktop() && !App.projectPath) {
+    cbToast('Сначала создайте или откройте проект');
+    cbProjModalOpen('launcher', true);
+    return true;
+  }
+  return false;
+}
+
 function cbImportPick(kind) {
+  if (cbRequireProject()) return;
   _pendingImportKind = kind;
   if (cbDesktop()) {
     cbApi().pick_photos().then(function (list) {
@@ -1821,6 +1833,7 @@ document.addEventListener('drop', function (e) {
   dragDepth = 0;
   document.body.classList.remove('cb-file-drag');
   if (!e.dataTransfer || !e.dataTransfer.files.length) return;
+  if (cbRequireProject()) return;
   var kind = App.trayTab === 'ref' ? 'ref' : 'photo';
   if (cbDesktop()) {
     var paths = [];
@@ -1921,6 +1934,7 @@ function cbWatchScanBrowser() {
 }
 
 document.getElementById('cbBtnWatch').onclick = function () {
+  if (!App.watch.timer && cbRequireProject()) return;
   if (App.watch.timer) cbWatchStop(); else cbWatchStart();
 };
 
@@ -2071,6 +2085,10 @@ function cbProjModalOpen(mode, startup) {
   _projModalMode = mode;
   _projStartup = !!startup;
   var launcher = (mode === 'launcher');
+  /* строгий режим: пока проекта нет, окно не закрыть — работа без файла
+     проекта невозможна (нет автосейва и кэша превью) */
+  document.querySelector('#cbProjModal .cb-modal-x').style.display =
+    (cbDesktop() && !App.projectPath) ? 'none' : '';
   document.getElementById('cbProjStep0').style.display = launcher ? '' : 'none';
   document.getElementById('cbProjStep1').style.display = launcher ? 'none' : '';
   document.getElementById('cbProjStep2').style.display = 'none';
@@ -3095,6 +3113,7 @@ function cbPickerOpen(forCid) {
 
 document.getElementById('cbBtnAdd').onclick = function (e) {
   e.stopPropagation();
+  if (cbRequireProject()) return;
   if (App.activeTab === 'conts') { cbAddCont(); return; }
   cbPickerOpen(null);
 };
