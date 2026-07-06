@@ -682,11 +682,10 @@ body.cb-file-drag #cbDropOverlay { display: flex; }
       <label class="cb-check"><input type="checkbox" id="cbTeHero"> Заглавное фото <span class="cb-check-note">(герой = 1-й слот)</span></label>
 
       <div id="cbTeManualCtl">
-        <div class="cb-lbl">Ряды · <span id="cbTeRowCount">2</span></div>
+        <div class="cb-lbl">Слотов в ряду · <span id="cbTePerRow">3</span> <span style="color:#6d6d6c">(рядов · <span id="cbTeRowCount">2</span>)</span></div>
         <div class="cb-te-row">
           <button class="cb-mini" id="cbTeRowMinus">−</button>
           <button class="cb-mini" id="cbTeRowPlus">+</button>
-          <button class="cb-mini" id="cbTeEven">Ровно</button>
         </div>
         <div class="cb-lbl">Слоты</div>
         <div class="cb-te-row">
@@ -1980,10 +1979,15 @@ function cbTeOpen(id) {
   var t = id ? cbTplById(id) : null;
   if (t) {
     TE.cur = JSON.parse(JSON.stringify(t));
+    if (!TE.cur.perRow) {
+      /* миграция старых шаблонов: вычислить «слотов в ряду» из рядов */
+      var restN = Math.max(1, TE.cur.slots.length - (TE.cur.hasHero ? 1 : 0));
+      TE.cur.perRow = Math.max(1, Math.min(5, Math.ceil(restN / cbRestRows(TE.cur))));
+    }
   } else {
     TE.cur = {
       id: null, name: '', canvas: 'h', mode: 'manual', hasHero: true,
-      rows: 2, hAspect: '3/2', vAspect: '3/4', active: true,
+      rows: 2, perRow: 3, hAspect: '3/2', vAspect: '3/4', active: true,
       slots: [
         { orient: 'v', row: 0, name: '' },
         { orient: 'v', row: 0, name: '' },
@@ -1993,6 +1997,7 @@ function cbTeOpen(id) {
         { orient: 'v', row: 1, name: '' }
       ]
     };
+    cbTeApplyPerRow(TE.cur);
   }
   document.getElementById('cbGalModal').classList.remove('cb-open');
   document.getElementById('cbTplModal').classList.add('cb-open');
@@ -2020,6 +2025,7 @@ function cbTeRender() {
   document.getElementById('cbTeModeAuto').classList.toggle('cb-active', t.mode === 'auto');
   document.getElementById('cbTeHero').checked = !!t.hasHero;
   document.getElementById('cbTeManualCtl').style.display = (t.mode === 'manual') ? '' : 'none';
+  document.getElementById('cbTePerRow').textContent = t.perRow || 3;
   document.getElementById('cbTeRowCount').textContent = t.rows;
 
   var vc = 0, hc = 0;
@@ -2080,14 +2086,15 @@ function cbRestRows(t) {
   return Math.max(1, t.rows - (cbHeroTakesRow(t) ? 1 : 0));
 }
 
-/* распределить не-hero слоты по рядам поровну */
-function cbTeDistribute() {
-  var t = TE.cur;
+/* МОДЕЛЬ (Маша): герой да/нет + СЛОТОВ В РЯДУ. Ряды нарезаются
+   автоматически — результат детерминирован, путь не важен. */
+function cbTeApplyPerRow(t) {
   var start = t.hasHero ? 1 : 0;
   var rest = t.slots.slice(start);
-  var rows = cbRestRows(t);
-  var per = Math.ceil(rest.length / rows);
-  rest.forEach(function (s, i) { s.row = Math.min(rows - 1, Math.floor(i / per)); });
+  var K = Math.max(1, Math.min(5, t.perRow || 3));
+  t.perRow = K;
+  rest.forEach(function (s, i) { s.row = Math.floor(i / K); });
+  t.rows = Math.max(1, Math.ceil(rest.length / K)) + (cbHeroTakesRow(t) ? 1 : 0);
 }
 
 /* Перераспределение под канвас (Маша 05.07): при смене Г<->В ряды
@@ -2097,28 +2104,43 @@ function cbTeReflow(t) {
   var start = t.hasHero ? 1 : 0;
   var rest = t.slots.slice(start);
   if (!rest.length) return;
+  cbTeOptimize(t, null);   /* полный подбор числа рядов */
+}
+
+/* ЕДИНЫЙ оптимизатор распределения (Маша: результат не должен зависеть
+   от пути — смена канваса, +/- ряд и «Ровно» дают одно и то же).
+   fixedRest = зафиксированное число rest-рядов или null (подобрать). */
+function cbTeOptimize(t, fixedRest) {
+  var start = t.hasHero ? 1 : 0;
+  var rest = t.slots.slice(start);
+  if (!rest.length) return;
   var heroRow = cbHeroTakesRow(t) ? 1 : 0;
   var heroV = t.hasHero && t.slots.length && t.slots[0].orient !== 'h';
   var n2 = rest.length;
 
-  /* кандидаты распределения: [индекс ряда для каждого rest-слота] */
+  /* кандидаты: [индекс ряда для каждого rest-слота], число рядов кандидата */
   var candidates = [];
-  var maxRows = Math.min(5, n2);
-  for (var n = 1; n <= maxRows; n++) {
+  function addEven(n) {
     var per = Math.ceil(n2 / n);
     var a = [];
     for (var i = 0; i < n2; i++) a.push(Math.min(n - 1, Math.floor(i / per)));
     candidates.push(a);
   }
-  /* колоночный вариант для героя-V (Маша): справа по одной картинке
-     в 2 ряда, остальные — рядами внизу */
-  if (heroV && n2 >= 3) {
-    for (var k = 1; k <= Math.min(3, n2 - 2); k++) {
-      var a2 = [0, 1];
-      var perB = Math.ceil((n2 - 2) / k);
-      for (var j = 0; j < n2 - 2; j++) a2.push(2 + Math.min(k - 1, Math.floor(j / perB)));
-      candidates.push(a2);
-    }
+  /* колоночный вариант героя-V: справа по одной в 2 ряда, остальное внизу */
+  function addColumn(nBottom) {
+    if (!heroV || n2 < 3 || nBottom < 1 || nBottom > n2 - 2) return;
+    var a = [0, 1];
+    var perB = Math.ceil((n2 - 2) / nBottom);
+    for (var j = 0; j < n2 - 2; j++) a.push(2 + Math.min(nBottom - 1, Math.floor(j / perB)));
+    candidates.push(a);
+  }
+  if (fixedRest) {
+    addEven(Math.min(fixedRest, n2));
+    addColumn(fixedRest - 2);   /* колонка с тем же итоговым числом рядов */
+  } else {
+    var maxRows = Math.min(5, n2);
+    for (var n = 1; n <= maxRows; n++) addEven(n);
+    for (var k = 1; k <= Math.min(3, n2 - 2); k++) addColumn(k);
   }
 
   var best = null;
@@ -2171,47 +2193,50 @@ function cbLayoutScore(geom, hasHero, layout) {
 
 function cbTeAddSlot(orient) {
   cbTeCollectNames();
-  TE.cur.slots.push({ orient: orient, row: TE.cur.rows - 1, name: '' });
+  TE.cur.slots.push({ orient: orient, row: 0, name: '' });
+  cbTeApplyPerRow(TE.cur);
   cbTeRender();
 }
 function cbTeRemoveSlot(orient) {
   cbTeCollectNames();
   var t = TE.cur;
   for (var i = t.slots.length - 1; i >= (t.hasHero ? 1 : 0); i--) {
-    if (t.slots[i].orient === orient) { t.slots.splice(i, 1); cbTeRender(); return; }
+    if (t.slots[i].orient === orient) {
+      t.slots.splice(i, 1);
+      cbTeApplyPerRow(t);
+      cbTeRender();
+      return;
+    }
   }
 }
 
+/* смена канваса НЕ меняет раскладку — только пропорции листа (Маша) */
 document.getElementById('cbTeCanvasH').onclick = function () {
-  cbTeCollectNames(); TE.cur.canvas = 'h'; cbTeReflow(TE.cur); cbTeRender();
+  cbTeCollectNames(); TE.cur.canvas = 'h'; cbTeRender();
 };
 document.getElementById('cbTeCanvasV').onclick = function () {
-  cbTeCollectNames(); TE.cur.canvas = 'v'; cbTeReflow(TE.cur); cbTeRender();
+  cbTeCollectNames(); TE.cur.canvas = 'v'; cbTeRender();
 };
 document.getElementById('cbTeModeManual').onclick = function () { cbTeCollectNames(); TE.cur.mode = 'manual'; cbTeRender(); };
 document.getElementById('cbTeModeAuto').onclick = function () { cbTeCollectNames(); TE.cur.mode = 'auto'; cbTeRender(); };
 document.getElementById('cbTeHero').onchange = function () {
   cbTeCollectNames();
   TE.cur.hasHero = this.checked;
-  cbTeDistribute();   /* семантика рядов меняется (герой-H = ряд) */
+  cbTeApplyPerRow(TE.cur);
   cbTeRender();
 };
 document.getElementById('cbTeRowMinus').onclick = function () {
   cbTeCollectNames();
-  var minRows = cbHeroTakesRow(TE.cur) ? 2 : 1;   /* ряд героя не отнимается */
-  TE.cur.rows = Math.max(minRows, TE.cur.rows - 1);
-  cbTeDistribute();   /* слоты сразу перераспределяются по новым рядам */
+  TE.cur.perRow = Math.max(1, (TE.cur.perRow || 3) - 1);
+  cbTeApplyPerRow(TE.cur);
   cbTeRender();
 };
 document.getElementById('cbTeRowPlus').onclick = function () {
   cbTeCollectNames();
-  var heroRow = cbHeroTakesRow(TE.cur) ? 1 : 0;
-  var maxRows = Math.min(5, Math.max(1, TE.cur.slots.length - (TE.cur.hasHero ? 1 : 0))) + heroRow;
-  TE.cur.rows = Math.min(maxRows, TE.cur.rows + 1);
-  cbTeDistribute();   /* иначе новый ряд пустой и превью не меняется */
+  TE.cur.perRow = Math.min(5, (TE.cur.perRow || 3) + 1);
+  cbTeApplyPerRow(TE.cur);
   cbTeRender();
 };
-document.getElementById('cbTeEven').onclick = function () { cbTeCollectNames(); cbTeDistribute(); cbTeRender(); };
 document.getElementById('cbTeVPlus').onclick = function () { cbTeAddSlot('v'); };
 document.getElementById('cbTeVMinus').onclick = function () { cbTeRemoveSlot('v'); };
 document.getElementById('cbTeHPlus').onclick = function () { cbTeAddSlot('h'); };
@@ -2234,7 +2259,7 @@ document.getElementById('cbTePreview').addEventListener('click', function (e) {
     var fi = parseInt(flip, 10);
     var s = TE.cur.slots[fi];
     s.orient = (s.orient === 'h') ? 'v' : 'h';
-    if (fi === 0 && TE.cur.hasHero) cbTeDistribute();   /* герой-H = ряд */
+    if (fi === 0 && TE.cur.hasHero) cbTeApplyPerRow(TE.cur);   /* герой-H = ряд */
     cbTeRender();
   } else if (del != null) {
     cbTeCollectNames();
@@ -2261,13 +2286,25 @@ document.getElementById('cbTePreview').addEventListener('drop', function (e) {
   e.stopPropagation();
   cbTeCollectNames();
   var to = parseInt(slot.getAttribute('data-te-idx'), 10);
-  var t = TE.cur;
-  var tmpOrient = t.slots[to].orient, tmpName = t.slots[to].name;
-  t.slots[to].orient = t.slots[_teDragIdx].orient;
-  t.slots[to].name = t.slots[_teDragIdx].name;
-  t.slots[_teDragIdx].orient = tmpOrient;
-  t.slots[_teDragIdx].name = tmpName;
+  var from = _teDragIdx;
   _teDragIdx = null;
+  var t = TE.cur;
+  if (from === to) return;
+  if (t.hasHero && (from === 0 || to === 0)) {
+    /* с участием героя — обмен местами (герой остаётся якорем) */
+    var tmpOrient = t.slots[to].orient, tmpName = t.slots[to].name;
+    t.slots[to].orient = t.slots[from].orient;
+    t.slots[to].name = t.slots[from].name;
+    t.slots[from].orient = tmpOrient;
+    t.slots[from].name = tmpName;
+  } else {
+    /* ручное ПЕРЕМЕЩЕНИЕ в ряд/колонку цели: слот встаёт в ряд цели,
+       авто-оптимизация руки не перетирает */
+    var moved = t.slots.splice(from, 1)[0];
+    var toIdx = (from < to) ? to - 1 : to;
+    moved.row = t.slots[toIdx] ? t.slots[toIdx].row : 0;
+    t.slots.splice(toIdx, 0, moved);
+  }
   cbTeRender();
 });
 
