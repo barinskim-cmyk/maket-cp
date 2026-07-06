@@ -574,6 +574,9 @@ def main() -> None:
                 wm.MenuAction("Инструкция", _js("helpguide")),
                 wm.MenuAction("Синхронизация с Capture One", _js("helpsync")),
                 wm.MenuAction("Другие продукты", _js("helpprod")),
+                wm.MenuSeparator(),
+                wm.MenuAction("Проверить обновления", _js("update")),
+                wm.MenuAction("Отчёты об ошибках (вкл/выкл)", _js("telemetry")),
             ]),
         ]
         api._native_menu = True

@@ -728,6 +728,9 @@ body.cb-file-drag #cbDropOverlay { display: flex; }
       <button id="cbMenuHelpGuide">Инструкция</button>
       <button id="cbMenuHelpSync">Синхронизация с Capture One</button>
       <button id="cbMenuHelpProducts">Другие продукты</button>
+      <div class="cb-pop-sep"></div>
+      <button id="cbMenuHelpUpdate">Проверить обновления</button>
+      <button id="cbMenuHelpTelemetry">Отчёты об ошибках (вкл/выкл)</button>
     </div>
   </div>
 
@@ -855,6 +858,25 @@ body.cb-file-drag #cbDropOverlay { display: flex; }
 </div>
 
 <!-- Создание / переименование проекта -->
+<!-- Согласие на отправку логов (первый запуск) -->
+<div id="cbTelModal" class="cb-modal">
+  <div class="cb-panel" style="width:400px">
+    <h2>Отчёты об ошибках</h2>
+    <div class="cb-eyebrow">CARDBOARD · АНОНИМНО</div>
+    <div style="font-size:12.5px;line-height:1.6;color:#b2b2b1">
+      Разрешить Cardboard отправлять анонимные отчёты об ошибках?<br><br>
+      Что уходит: версия приложения и macOS, случайный номер установки, текст ошибки.<br>
+      Что НЕ уходит: фотографии, названия проектов, пути к файлам, что-либо личное.<br><br>
+      Решение можно изменить в Справке.
+    </div>
+    <div class="cb-te-foot">
+      <button class="cb-primary" id="cbTelYes">Разрешить</button>
+      <span class="cb-spacer"></span>
+      <button id="cbTelNo">Не отправлять</button>
+    </div>
+  </div>
+</div>
+
 <!-- Настройки экспорта PDF -->
 <div id="cbPdfModal" class="cb-modal">
   <div class="cb-panel" style="width:360px">
@@ -2404,6 +2426,12 @@ function cbShowInfo(key) {
 document.getElementById('cbMenuHelpGuide').onclick = function () { cbShowInfo('guide'); };
 document.getElementById('cbMenuHelpSync').onclick = function () { cbShowInfo('sync'); };
 document.getElementById('cbMenuHelpProducts').onclick = function () { cbShowInfo('products'); };
+document.getElementById('cbMenuHelpUpdate').onclick = function () { cbCheckUpdate(true); };
+document.getElementById('cbMenuHelpTelemetry').onclick = function () {
+  var on = localStorage.getItem('cardboard_telemetry') === '1';
+  try { localStorage.setItem('cardboard_telemetry', on ? '0' : '1'); } catch (e) { }
+  cbToast(on ? 'Отчёты об ошибках выключены' : 'Отчёты об ошибках включены — спасибо!');
+};
 document.getElementById('cbInfoClose').onclick = function () {
   document.getElementById('cbInfoModal').classList.remove('cb-open');
 };
@@ -4080,7 +4108,8 @@ function cbMenuNative(action) {
     'locate': 'cbBtnLocate',
     'pdf': 'cbBtnPdf', 'print': 'cbBtnPrint', 'list': 'cbBtnList',
     'tplnew': 'cbMenuTplNew', 'tplgal': 'cbMenuTplGallery',
-    'helpguide': 'cbMenuHelpGuide', 'helpsync': 'cbMenuHelpSync', 'helpprod': 'cbMenuHelpProducts'
+    'helpguide': 'cbMenuHelpGuide', 'helpsync': 'cbMenuHelpSync', 'helpprod': 'cbMenuHelpProducts',
+    'update': 'cbMenuHelpUpdate', 'telemetry': 'cbMenuHelpTelemetry'
   };
   var el = document.getElementById(map[action]);
   if (el) el.click();
@@ -4097,8 +4126,140 @@ cbRenderConts();
 cbSwitchTab('cards');
 cbHistoryReset();
 /* при запуске сразу предлагаем создать (или открыть) проект */
-/* Лаунчер при запуске: недавние проекты или новый (как в Capture One) */
-setTimeout(function () { cbProjModalOpen('launcher', true); }, 150);
+/* ============================================================
+   Телеметрия (опт-ин) и проверка обновлений — отдельный Supabase
+   проект инструментов Content Pulse. Без согласия ничего не уходит.
+   ============================================================ */
+var CB_VERSION = '1.1.0';
+var CB_TOOLS_DB = {
+  url: '',   /* https://<project>.supabase.co — проект инструментов */
+  key: ''    /* publishable/anon ключ (insert-only RLS, читать нельзя) */
+};
+
+function cbInstallId() {
+  var id = localStorage.getItem('cardboard_install_id');
+  if (!id) {
+    id = 'ins_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    try { localStorage.setItem('cardboard_install_id', id); } catch (e) { }
+  }
+  return id;
+}
+
+/* пути и имена проектов НЕ уходят: вырезаем всё похожее на путь */
+function cbTelSanitize(s) {
+  return String(s == null ? '' : s)
+    .replace(/\/(Users|Volumes|home)\/[^\s'")\]]+/g, '‹путь›')
+    .slice(0, 800);
+}
+
+function cbTelemetryOn() {
+  return localStorage.getItem('cardboard_telemetry') === '1'
+    && CB_TOOLS_DB.url && CB_TOOLS_DB.key;
+}
+
+function cbLogEvent(kind, msg) {
+  if (!cbTelemetryOn()) return;
+  var q = [];
+  try { q = JSON.parse(localStorage.getItem('cardboard_log_queue') || '[]'); } catch (e) { }
+  q.push({
+    install_id: cbInstallId(), app: 'cardboard', version: CB_VERSION,
+    os: cbTelSanitize(navigator.userAgent), kind: kind,
+    message: cbTelSanitize(msg), at: new Date().toISOString()
+  });
+  if (q.length > 50) q = q.slice(-50);   /* очередь не растёт бесконечно */
+  try { localStorage.setItem('cardboard_log_queue', JSON.stringify(q)); } catch (e) { }
+  cbLogFlush();
+}
+
+var _telFlushing = false;
+function cbLogFlush() {
+  if (_telFlushing || !cbTelemetryOn()) return;
+  var q = [];
+  try { q = JSON.parse(localStorage.getItem('cardboard_log_queue') || '[]'); } catch (e) { }
+  if (!q.length) return;
+  _telFlushing = true;
+  fetch(CB_TOOLS_DB.url + '/rest/v1/cardboard_logs', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: CB_TOOLS_DB.key,
+      Authorization: 'Bearer ' + CB_TOOLS_DB.key,
+      Prefer: 'return=minimal'
+    },
+    body: JSON.stringify(q)
+  }).then(function (r) {
+    _telFlushing = false;
+    if (r.ok) { try { localStorage.setItem('cardboard_log_queue', '[]'); } catch (e) { } }
+  }).catch(function () { _telFlushing = false; });   /* офлайн — попробуем позже */
+}
+
+window.addEventListener('error', function (e) {
+  cbLogEvent('js_error', (e.message || '') + ' @' + (e.filename || '').split('/').pop() + ':' + (e.lineno || 0));
+});
+window.addEventListener('unhandledrejection', function (e) {
+  cbLogEvent('bridge_error', String(e.reason && e.reason.message || e.reason || ''));
+});
+
+/* Проверка обновлений: таблица app_versions (только чтение) */
+function cbVersionNewer(a, b) {
+  var pa = String(a).split('.').map(Number), pb = String(b).split('.').map(Number);
+  for (var i = 0; i < 3; i++) {
+    if ((pa[i] || 0) > (pb[i] || 0)) return true;
+    if ((pa[i] || 0) < (pb[i] || 0)) return false;
+  }
+  return false;
+}
+
+function cbCheckUpdate(manual) {
+  if (!CB_TOOLS_DB.url || !CB_TOOLS_DB.key) { if (manual) cbToast('Проверка обновлений не настроена'); return; }
+  fetch(CB_TOOLS_DB.url + '/rest/v1/app_versions?app=eq.cardboard&select=version,url,note', {
+    headers: { apikey: CB_TOOLS_DB.key, Authorization: 'Bearer ' + CB_TOOLS_DB.key }
+  }).then(function (r) { return r.json(); }).then(function (rows) {
+    var v = rows && rows[0];
+    if (v && cbVersionNewer(v.version, CB_VERSION)) {
+      document.getElementById('cbInfoTitle').textContent = 'Доступна версия ' + v.version;
+      document.getElementById('cbInfoBody').innerHTML =
+        (v.note ? cbEsc(v.note) + '<br><br>' : '')
+        + (v.url ? '<a href="' + cbEsc(v.url) + '" target="_blank">Скачать обновление</a>' : 'Спросите новую сборку у Маши.');
+      document.getElementById('cbInfoModal').classList.add('cb-open');
+    } else if (manual) {
+      cbToast('Вы на последней версии: ' + CB_VERSION);
+    }
+  }).catch(function () { if (manual) cbToast('Не удалось проверить обновления'); });
+}
+
+function cbMaybeCheckUpdate() {
+  var last = parseInt(localStorage.getItem('cardboard_update_check') || '0', 10);
+  if (Date.now() - last < 22 * 3600 * 1000) return;   /* раз в сутки */
+  try { localStorage.setItem('cardboard_update_check', String(Date.now())); } catch (e) { }
+  cbCheckUpdate(false);
+}
+
+/* Согласие: первый запуск → вопрос, потом лаунчер */
+document.getElementById('cbTelYes').onclick = function () {
+  try { localStorage.setItem('cardboard_telemetry', '1'); } catch (e) { }
+  document.getElementById('cbTelModal').classList.remove('cb-open');
+  cbLogEvent('app_start', 'consent_granted');
+  cbProjModalOpen('launcher', true);
+};
+document.getElementById('cbTelNo').onclick = function () {
+  try { localStorage.setItem('cardboard_telemetry', '0'); } catch (e) { }
+  document.getElementById('cbTelModal').classList.remove('cb-open');
+  cbProjModalOpen('launcher', true);
+};
+
+/* Лаунчер при запуске: недавние проекты или новый (как в Capture One).
+   Перед самым первым запуском — вопрос про отчёты об ошибках. */
+setTimeout(function () {
+  if (cbDesktop() && CB_TOOLS_DB.url && localStorage.getItem('cardboard_telemetry') === null) {
+    document.getElementById('cbTelModal').classList.add('cb-open');
+  } else {
+    cbProjModalOpen('launcher', true);
+  }
+  if (cbTelemetryOn()) cbLogEvent('app_start', 'v' + CB_VERSION);
+  cbLogFlush();
+  cbMaybeCheckUpdate();
+}, 150);
 </script>
 </body>
 </html>
