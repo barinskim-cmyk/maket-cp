@@ -2223,10 +2223,19 @@ function cbTeRender() {
   document.getElementById('cbTeModeAuto').classList.toggle('cb-active', t.mode === 'auto');
   document.getElementById('cbTeHero').checked = !!t.hasHero;
   document.getElementById('cbTeManualCtl').style.display = (t.mode === 'manual') ? '' : 'none';
-  /* ЧЕСТНАЯ цифра: герой-V занимает 2 колонки сетки, они входят в счёт */
+  /* ЧЕСТНАЯ сетка: герой-V = 2 колонки и 2 ряда; ряды считаем по факту
+     раскладки (верх 2 ряда возле героя + свернутый низ), а не по нарезке */
   var honestCols = (t.perRow || 3) + cbHeroColSpan(t);
+  var honestRows;
+  if (cbHeroColSpan(t)) {
+    var nRest = t.slots.length - 1;
+    var Kx = t.perRow || 3;
+    honestRows = 2 + Math.max(0, Math.ceil((nRest - 2 * Kx) / honestCols));
+  } else {
+    honestRows = t.rows;
+  }
   document.getElementById('cbTePerRow').textContent = honestCols;
-  document.getElementById('cbTeRowCount').textContent = honestCols + '×' + t.rows;
+  document.getElementById('cbTeRowCount').textContent = honestCols + '×' + honestRows;
 
   var vc = 0, hc = 0;
   t.slots.forEach(function (s, i) {
