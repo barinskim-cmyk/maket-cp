@@ -46,7 +46,7 @@ button.cb-primary { background: #f2f2f1; color: #131313; border-color: #f2f2f1; 
 button.cb-primary:hover { background: #dddbd7; }
 button.cb-danger:hover { border-color: #c96b6b; color: #c96b6b; background: #1d1d1b; }
 
-input[type="text"], select, textarea {
+input[type="text"], input[type="date"], select, textarea {
   font-family: inherit;
   font-size: 12px;
   padding: 5px 8px;
@@ -56,7 +56,8 @@ input[type="text"], select, textarea {
   color: #f2f2f1;
 }
 input[type="text"]::placeholder, textarea::placeholder { color: #6d6d6c; }
-input[type="text"]:focus, textarea:focus { outline: none; border-color: #f2f2f1; }
+input[type="text"]:focus, input[type="date"]:focus, textarea:focus { outline: none; border-color: #f2f2f1; }
+input[type="date"] { color-scheme: dark; }
 
 /* ---------- Меню-бар ---------- */
 .cb-topbar {
@@ -802,8 +803,14 @@ body.cb-file-drag #cbDropOverlay { display: flex; }
       </div>
     </div>
     <div id="cbProjStep1">
+      <div class="cb-lbl">Бренд</div>
+      <input type="text" id="cbProjBrand" placeholder="Например: BRANDX" style="width:100%">
+      <div class="cb-lbl">Название съёмки</div>
+      <input type="text" id="cbProjShoot" placeholder="Например: осенняя коллекция" style="width:100%">
+      <div class="cb-lbl">Дата</div>
+      <input type="date" id="cbProjDate" style="width:100%">
       <div class="cb-lbl">Название проекта</div>
-      <input type="text" id="cbProjNameInput" placeholder="Например: Осенняя съёмка · обувь" style="width:100%">
+      <input type="text" id="cbProjNameInput" placeholder="Соберётся из полей выше — или впишите своё" style="width:100%">
       <div class="cb-te-foot">
         <button class="cb-primary" id="cbProjModalOk">Создать</button>
         <span class="cb-spacer"></span>
@@ -1985,9 +1992,43 @@ function cbProjModalOpen(mode, startup) {
   }
   document.getElementById('cbProjModalOk').textContent = (mode === 'new') ? 'Создать' : 'Переименовать';
   document.getElementById('cbProjNameInput').value = (mode === 'new') ? '' : App.projectName;
+  /* конструктор названия: бренд + название съёмки + дата */
+  _projNameManual = (mode !== 'new');   /* при переименовании имя не перетирать автосборкой */
+  var meta = App.projectMeta || {};
+  document.getElementById('cbProjBrand').value = (mode === 'new') ? '' : (meta.brand || '');
+  document.getElementById('cbProjShoot').value = (mode === 'new') ? '' : (meta.shoot || '');
+  document.getElementById('cbProjDate').value = (mode === 'new')
+    ? new Date().toISOString().slice(0, 10)
+    : (meta.date || '');
   document.getElementById('cbProjModal').classList.add('cb-open');
-  setTimeout(function () { document.getElementById('cbProjNameInput').focus(); }, 50);
+  setTimeout(function () { document.getElementById('cbProjBrand').focus(); }, 50);
 }
+
+/* Автосборка названия: BRANDX_NAME_YYYY-MM-DD; пустые части выпадают.
+   Ручной ввод в поле названия перебивает автосборку (пока поле не очищено). */
+var _projNameManual = false;
+
+function cbProjCompose() {
+  if (_projNameManual) return;
+  var brand = document.getElementById('cbProjBrand').value.trim();
+  var shoot = document.getElementById('cbProjShoot').value.trim();
+  var date = document.getElementById('cbProjDate').value;
+  if (!brand && !shoot) return;   /* одна дата названием не становится */
+  var parts = [];
+  if (brand) parts.push(brand);
+  if (shoot) parts.push(shoot);
+  if (date) parts.push(date);
+  document.getElementById('cbProjNameInput').value = parts.join('_');
+}
+['cbProjBrand', 'cbProjShoot', 'cbProjDate'].forEach(function (id) {
+  document.getElementById(id).addEventListener('input', cbProjCompose);
+  document.getElementById(id).addEventListener('change', cbProjCompose);
+});
+document.getElementById('cbProjNameInput').addEventListener('input', function () {
+  /* пользователь правит имя руками; очистил — автосборка снова работает */
+  _projNameManual = this.value.trim() !== '';
+  if (!_projNameManual) cbProjCompose();
+});
 
 /* шаг 2: проект создан — предложить источник фото */
 function cbProjModalStep2() {
@@ -2002,6 +2043,11 @@ function cbProjModalStep2() {
 document.getElementById('cbProjModalOk').onclick = function () {
   var name = document.getElementById('cbProjNameInput').value.trim();
   if (!name) { cbToast('Дайте проекту название'); return; }
+  App.projectMeta = {
+    brand: document.getElementById('cbProjBrand').value.trim(),
+    shoot: document.getElementById('cbProjShoot').value.trim(),
+    date: document.getElementById('cbProjDate').value
+  };
   if (_projModalMode === 'new') {
     if (App.dirty && App.projectPath === null
       && (App.cards.length || App.photos.length)
@@ -3442,7 +3488,8 @@ function cbProjectData() {
     }),
     cards: App.cards,
     containers: App.containers,
-    templates: App.templates
+    templates: App.templates,
+    meta: App.projectMeta || {}
   };
 }
 
@@ -3509,6 +3556,7 @@ function cbApplyProject(data) {
     cbStoreTemplates();
   }
   App.nextId = Math.max(data.nextId || 0, App.nextId, App.photos.length + App.cards.length + 100);
+  App.projectMeta = data.meta || {};
   cbSetProjectName(data.name || 'Проект');
   cbClearDirty();
   cbHistoryReset();
