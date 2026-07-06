@@ -2223,9 +2223,10 @@ function cbTeRender() {
   document.getElementById('cbTeModeAuto').classList.toggle('cb-active', t.mode === 'auto');
   document.getElementById('cbTeHero').checked = !!t.hasHero;
   document.getElementById('cbTeManualCtl').style.display = (t.mode === 'manual') ? '' : 'none';
-  document.getElementById('cbTePerRow').textContent = t.perRow || 3;
-  /* счётчик показывает сетку: слотов в ряду × рядов (адекватнее числа рядов) */
-  document.getElementById('cbTeRowCount').textContent = (t.perRow || 3) + '×' + t.rows;
+  /* ЧЕСТНАЯ цифра: герой-V занимает 2 колонки сетки, они входят в счёт */
+  var honestCols = (t.perRow || 3) + cbHeroColSpan(t);
+  document.getElementById('cbTePerRow').textContent = honestCols;
+  document.getElementById('cbTeRowCount').textContent = honestCols + '×' + t.rows;
 
   var vc = 0, hc = 0;
   t.slots.forEach(function (s, i) {
@@ -2283,6 +2284,10 @@ function cbHeroTakesRow(t) {
 }
 function cbRestRows(t) {
   return Math.max(1, t.rows - (cbHeroTakesRow(t) ? 1 : 0));
+}
+/* герой-V занимает 2 колонки сетки — для честного счётчика */
+function cbHeroColSpan(t) {
+  return (t.hasHero && t.slots.length && t.slots[0].orient !== 'h') ? 2 : 0;
 }
 
 /* МОДЕЛЬ (Маша): герой да/нет + СЛОТОВ В РЯДУ. Ряды нарезаются
@@ -2433,13 +2438,16 @@ document.getElementById('cbTeHero').onchange = function () {
 };
 document.getElementById('cbTeRowMinus').onclick = function () {
   cbTeCollectNames();
-  TE.cur.perRow = Math.max(1, (TE.cur.perRow || 3) - 1);
+  /* кнопки крутят честную ширину сетки (с учётом 2 колонок героя-V) */
+  var span = cbHeroColSpan(TE.cur);
+  TE.cur.perRow = Math.max(1, ((TE.cur.perRow || 3) + span) - 1 - span);
   cbTeApplyPerRow(TE.cur);
   cbTeRender();
 };
 document.getElementById('cbTeRowPlus').onclick = function () {
   cbTeCollectNames();
-  TE.cur.perRow = Math.min(5, (TE.cur.perRow || 3) + 1);
+  var span = cbHeroColSpan(TE.cur);
+  TE.cur.perRow = Math.min(5, ((TE.cur.perRow || 3) + span) + 1 - span);
   cbTeApplyPerRow(TE.cur);
   cbTeRender();
 };
