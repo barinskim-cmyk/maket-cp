@@ -1051,12 +1051,22 @@ function cbRowsInZone(zone, rows, boxes, maxRowH) {
   var y = zone.y;
   nonEmpty.forEach(function (row, ri) {
     var h = hmax[ri] * f;
-    var rowW = -CB_GAP;
-    row.forEach(function (c) { rowW += c.ar * h + CB_GAP; });
-    var x = zone.x + (zone.w - rowW) / 2;   /* ряд по центру зоны */
+    var slotsW = 0;
+    row.forEach(function (c) { slotsW += c.ar * h; });
+    /* ЦЕЛЬНАЯ РАМКА (Маша): крайние слоты прижимаются к краям зоны,
+       лишний воздух уходит в зазоры между слотами, размеры не меняются */
+    var x, step;
+    if (row.length === 1) {
+      /* одиночка: к внешнему краю (справа от героя — вправо), иначе центр */
+      x = (zone.x > CB_GAP) ? (zone.x + zone.w - slotsW) : (zone.x + (zone.w - slotsW) / 2);
+      step = 0;
+    } else {
+      x = zone.x;
+      step = Math.max(CB_GAP, (zone.w - slotsW) / (row.length - 1));
+    }
     row.forEach(function (c) {
       boxes.push({ x: x, y: y, w: c.ar * h, h: h, slotIdx: c.slotIdx });
-      x += c.ar * h + CB_GAP;
+      x += c.ar * h + step;
     });
     y += h + CB_GAP;
   });
