@@ -1338,7 +1338,9 @@ function cbHeroVShelf(W, H, heroAR, cells, boxes) {
     for (var i = 0; i < kCol; i++) colW = Math.max(colW, cells[i].ar * h);
     var scale = Math.min(1, zoneW / colW);
     var h2 = h * scale;
-    /* остаток — вниз рядами-потоком */
+    /* остаток — вниз рядами-потоком ПО ШИРИНЕ БЛОКА (герой + колонка),
+       не по ширине листа: иначе низ вылезает за правый край колонки */
+    var compWk = heroW + CB_GAP + colW * scale;
     var restN = n - kCol;
     var fits = true;
     var rowsB = 0;
@@ -1347,7 +1349,7 @@ function cbHeroVShelf(W, H, heroAR, cells, boxes) {
       rowsB = 1;
       for (var j = kCol; j < n; j++) {
         var w = cells[j].ar * h2;
-        if (x > 0 && x + w > W) { rowsB++; x = 0; }
+        if (x > 0 && x + w > compWk + 2) { rowsB++; x = 0; }
         x += w + CB_GAP;
       }
       var bottomH = rowsB * h2 + rowsB * CB_GAP;
@@ -1368,24 +1370,52 @@ function cbHeroVShelf(W, H, heroAR, cells, boxes) {
     boxes.push({ x: heroW + CB_GAP, y: y, w: wC, h: h3, slotIdx: cells[c].slotIdx });
     y += h3 + CB_GAP;
   }
-  /* остаток вниз потоком: собираем ряды wrap по ширине и центрируем каждый */
+  /* остаток вниз потоком в пределах ширины блока (герой + колонка).
+     Полные ряды растягиваются точно на эту ширину — рамка слева и
+     справа цельная; лёгкое отклонение высоты ряда допустимо (кап 1.25),
+     неполный последний ряд — с базовой высотой по центру. */
+  var colWmax = 0;
+  for (var c2 = 0; c2 < best.kCol; c2++) colWmax = Math.max(colWmax, cells[c2].ar * h3);
+  var compW = heroW + CB_GAP + colWmax;
   var flowRows = [[]];
   var xAcc = 0;
   for (var j2 = best.kCol; j2 < cells.length; j2++) {
     var w2 = cells[j2].ar * h3;
-    if (xAcc > 0 && xAcc + w2 > W) { flowRows.push([]); xAcc = 0; }
+    if (xAcc > 0 && xAcc + w2 > compW + 2) { flowRows.push([]); xAcc = 0; }
     flowRows[flowRows.length - 1].push(cells[j2]);
     xAcc += w2 + CB_GAP;
   }
+  flowRows = flowRows.filter(function (fr) { return fr.length; });
+  /* высоты рядов: полный ряд — точно в compW (кап 1.25·h3), последний
+     недобранный — h3; затем общий даунскейл, если не влезли по высоте */
+  var rowHs = flowRows.map(function (fr, ri) {
+    var sumAR = 0;
+    fr.forEach(function (c) { sumAR += c.ar; });
+    var hFit = (compW - (fr.length - 1) * CB_GAP) / sumAR;
+    var last = ri === flowRows.length - 1;
+    if (last && hFit > h3 * 1.25) return h3;      /* недобранный хвост */
+    return Math.min(hFit, h3 * 1.25);
+  });
+  var sumH = 0;
+  rowHs.forEach(function (hh) { sumH += hh + CB_GAP; });
+  var avail = H - heroH - CB_GAP;
+  if (sumH > avail && sumH > 0) {
+    var k = Math.max(0.1, (avail - flowRows.length * CB_GAP) /
+      (sumH - flowRows.length * CB_GAP));
+    rowHs = rowHs.map(function (hh) { return hh * k; });
+  }
   var y2 = heroH + CB_GAP;
-  flowRows.forEach(function (fr) {
-    if (!fr.length) return;
-    var x2 = 0;   /* низ от левой грани героя — рамка слева цельная */
+  flowRows.forEach(function (fr, ri) {
+    var hR = rowHs[ri];
+    var rowW = -CB_GAP;
+    fr.forEach(function (c) { rowW += c.ar * hR + CB_GAP; });
+    /* ряд в compW — от левой грани (совпадёт с рамкой), недобранный — центр */
+    var x2 = (compW - rowW > 4) ? (compW - rowW) / 2 : 0;
     fr.forEach(function (c) {
-      boxes.push({ x: x2, y: y2, w: c.ar * h3, h: h3, slotIdx: c.slotIdx });
-      x2 += c.ar * h3 + CB_GAP;
+      boxes.push({ x: x2, y: y2, w: c.ar * hR, h: hR, slotIdx: c.slotIdx });
+      x2 += c.ar * hR + CB_GAP;
     });
-    y2 += h3 + CB_GAP;
+    y2 += hR + CB_GAP;
   });
 }
 
@@ -2571,6 +2601,7 @@ function cbTplMiniHTML(tpl) {
 var TE = { cur: null, lastAutoName: null };   /* редактируемая копия */
 
 function cbTeOpen(id) {
+  TE.applyTo = null;   /* обычное открытие — не из карточки */
   var t = id ? cbTplById(id) : null;
   if (t) {
     TE.cur = JSON.parse(JSON.stringify(t));
@@ -2963,6 +2994,13 @@ document.getElementById('cbTplSave').onclick = function () {
   cbTeCollectNames();
   var t = TE.cur;
   if (!t.name) t.name = cbTeAutoName(t);   /* пустое имя -> автоимя */
+  if (!t.id && TE.applyTo) {
+    /* редактор открыт из карточки: то же имя -> обновить шаблон, не плодить копии */
+    var byName = App.templates.filter(function (x) {
+      return x.mode !== 'auto' && x.name === t.name;
+    })[0];
+    if (byName) t.id = byName.id;
+  }
   if (t.id) {
     var existing = cbTplById(t.id);
     if (existing) {
@@ -2974,8 +3012,19 @@ document.getElementById('cbTplSave').onclick = function () {
   }
   cbStoreTemplates();
   cbMarkDirty();
-  cbToast('Шаблон сохранён: ' + t.name);
   cbTeClose();
+  if (TE.applyTo) {
+    /* применить конфигурацию к карточке, из которой открыли редактор */
+    var card = cbCardById(TE.applyTo);
+    TE.applyTo = null;
+    if (card) {
+      cbApplyTplToCard(card, t);
+      cbRenderCards(); cbRenderTray();
+    }
+    cbToast('Шаблон сохранён и применён к карточке: ' + t.name);
+    return;   /* остаёмся на карточках, галерею не открываем */
+  }
+  cbToast('Шаблон сохранён: ' + t.name);
   cbGalOpen();
 };
 document.getElementById('cbTplClose').onclick = cbTeClose;
@@ -3049,12 +3098,19 @@ document.getElementById('cbMenuTplGallery').onclick = cbGalOpen;
    Карточки: пикер шаблона, создание, рендер страницами
    ============================================================ */
 
-document.getElementById('cbBtnAdd').onclick = function (e) {
-  e.stopPropagation();
-  if (App.activeTab === 'conts') { cbAddCont(); return; }
+var _pickerFor = null;   /* id карточки: попап меняет её шаблон, null — новая карточка */
+
+function cbPickerOpen(forCid) {
+  _pickerFor = forCid || null;
   var active = App.templates.filter(function (t) { return t.active !== false; });
   if (!active.length) { cbGalOpen(); return; }
   var html = '';
+  if (_pickerFor) {
+    var card = cbCardById(_pickerFor);
+    if (card && card.mode === 'manual') {
+      html += '<button id="cbPickerEditCur">Изменить шаблон этой карточки...</button><div class="cb-pop-sep"></div>';
+    }
+  }
   active.forEach(function (t) {
     html += '<button class="cb-picker-item" data-pick-tpl="' + t.id + '">';
     html += '<span class="cb-picker-mini">' + cbTplMiniHTML(t) + '</span>';
@@ -3065,12 +3121,88 @@ document.getElementById('cbBtnAdd').onclick = function (e) {
   html += '<div class="cb-pop-sep"></div><button id="cbPickerGal">Настроить шаблоны...</button>';
   document.getElementById('cbPickerPop').innerHTML = html;
   cbPop('cbPickerPop', true);
+}
+
+document.getElementById('cbBtnAdd').onclick = function (e) {
+  e.stopPropagation();
+  if (App.activeTab === 'conts') { cbAddCont(); return; }
+  cbPickerOpen(null);
 };
 document.getElementById('cbPickerPop').addEventListener('click', function (e) {
   if (e.target.closest('#cbPickerGal')) { cbGalOpen(); return; }
+  if (e.target.closest('#cbPickerEditCur')) {
+    cbPop('cbPickerPop', false);
+    cbTeOpenForCard(_pickerFor);
+    return;
+  }
   var btn = e.target.closest('[data-pick-tpl]');
-  if (btn) cbAddCardFromTpl(btn.getAttribute('data-pick-tpl'));
+  if (!btn) return;
+  if (_pickerFor) {
+    var card = cbCardById(_pickerFor);
+    var t = cbTplById(btn.getAttribute('data-pick-tpl'));
+    if (card && t) {
+      cbApplyTplToCard(card, t);
+      cbMarkDirty(); cbRenderCards(); cbRenderTray();
+      cbToast('Шаблон карточки: ' + t.name);
+    }
+  } else {
+    cbAddCardFromTpl(btn.getAttribute('data-pick-tpl'));
+  }
 });
+
+/* Заменить шаблон карточки: фото остаются, раскладываются по порядку слотов */
+function cbApplyTplToCard(card, t) {
+  var pids = [];
+  if (card.mode === 'auto') {
+    pids = (card.pids || []).slice();
+  } else {
+    card.slots.forEach(function (s) { if (s.pid) pids.push(s.pid); });
+  }
+  card.tplName = t.name;
+  card.mode = t.mode;
+  card.hasHero = t.hasHero;
+  card.rows = t.rows;
+  card.perRow = t.perRow;
+  card.hAspect = t.hAspect;
+  card.vAspect = t.vAspect;
+  if (t.mode === 'manual') {
+    card.canvas = t.canvas;
+    card.slots = t.slots.map(function (s) {
+      return { orient: s.orient, row: s.row, name: s.name, pid: null };
+    });
+    card.pids = [];
+    var k = 0;
+    card.slots.forEach(function (s) { if (k < pids.length) s.pid = pids[k++]; });
+    if (pids.length > k) cbToast('Фото больше, чем слотов: ' + (pids.length - k) + ' вернулись в галерею');
+  } else {
+    /* авто-шаблон: фото в поток, канвас выберется сам */
+    card.slots = [];
+    card.pids = pids;
+  }
+}
+
+/* Редактор шаблона, открытый ИЗ карточки: старт с её текущей конфигурации,
+   сохранение применяется к карточке (и обновляет шаблон с тем же именем в библиотеке) */
+function cbTeOpenForCard(cid) {
+  var card = cbCardById(cid);
+  if (!card || card.mode !== 'manual') return;
+  TE.applyTo = cid;
+  TE.cur = {
+    id: null, name: card.tplName || '', canvas: card.canvas, mode: 'manual',
+    hasHero: !!card.hasHero, rows: card.rows,
+    perRow: card.perRow || null,
+    hAspect: card.hAspect, vAspect: card.vAspect, active: true,
+    slots: card.slots.map(function (s) {
+      return { orient: s.orient, row: s.row, name: s.name || '' };
+    })
+  };
+  if (!TE.cur.perRow) {
+    var restN = Math.max(1, TE.cur.slots.length - (TE.cur.hasHero ? 1 : 0));
+    TE.cur.perRow = Math.max(1, Math.min(5, Math.ceil(restN / cbRestRows(TE.cur))));
+  }
+  document.getElementById('cbTplModal').classList.add('cb-open');
+  cbTeRender();
+}
 
 function cbAddCardFromTpl(tplId) {
   var t = cbTplById(tplId);
@@ -3170,6 +3302,7 @@ function cbRenderCards() {
     html += '<input type="text" class="cb-cat" value="' + cbEsc(card.category) + '" data-f="category" placeholder="Категория">';
     html += '<span class="cb-spacer"></span>';
     html += '<span class="cb-tpl-badge">' + cbEsc(card.tplName || '') + (card.mode === 'auto' ? ' · АВТО' : '') + '</span>';
+    html += '<button class="cb-mini" data-act="tpl" title="Заменить или изменить шаблон">Шаблон</button>';
     html += '<button class="cb-mini" data-act="up" title="Выше">↑</button>';
     html += '<button class="cb-mini" data-act="down" title="Ниже">↓</button>';
     html += '<button class="cb-mini" data-act="dup">Дубль</button>';
@@ -3200,6 +3333,7 @@ document.getElementById('cbCards').addEventListener('click', function (e) {
   var card2 = cbCardById(cardEl.getAttribute('data-cid'));
   var i = App.cards.indexOf(card2);
   var act = btn.getAttribute('data-act');
+  if (act === 'tpl') { e.stopPropagation(); cbPickerOpen(card2.id); return; }
   if (act === 'del') {
     if (!confirm('Удалить карточку «' + card2.title + '»? Фото останутся в галерее.')) return;
     App.cards.splice(i, 1);
