@@ -1032,14 +1032,16 @@ var CB_GAP = 12; /* юниты */
 
 /* Раскладка рядов в зоне с сохранением пропорций каждого слота.
    rows: [[{ar, slotIdx}, ...], ...] -> добавляет боксы в boxes */
-function cbRowsInZone(zone, rows, boxes) {
+function cbRowsInZone(zone, rows, boxes, maxRowH) {
   var nonEmpty = rows.filter(function (r) { return r.length > 0; });
   if (!nonEmpty.length || zone.w <= 0 || zone.h <= 0) return;
-  /* максимальная высота каждого ряда: ряд занимает всю ширину зоны */
+  /* максимальная высота каждого ряда: ряд занимает всю ширину зоны
+     (+ необязательный кап, чтобы одиночный слот не раздувался) */
   var hmax = nonEmpty.map(function (row) {
     var sum = 0;
     row.forEach(function (c) { sum += c.ar; });
-    return (zone.w - (row.length - 1) * CB_GAP) / sum;
+    var h = (zone.w - (row.length - 1) * CB_GAP) / sum;
+    return maxRowH ? Math.min(h, maxRowH) : h;
   });
   var totalMax = 0;
   hmax.forEach(function (h) { totalMax += h; });
@@ -1101,7 +1103,10 @@ function cbHeroVJoint(W, H, heroAR, byRow, boxes, maxT) {
     cbHeroVJoint(W, H, heroAR, topRows, topBoxes, topAlloc);
     var topBottom = 0;
     topBoxes.forEach(function (b) { topBottom = Math.max(topBottom, b.y + b.h); boxes.push(b); });
-    cbRowsInZone({ x: 0, y: topBottom + CB_GAP, w: W, h: Math.max(0, H - topBottom - CB_GAP) }, bottomRows, boxes);
+    /* не-hero слоты максимально одного размера (Маша): нижние ряды
+       ровно в высоту верхних, одиночный слот внизу не раздувается */
+    var topRowCap = Math.max(60, (topBottom - CB_GAP) / 2);
+    cbRowsInZone({ x: 0, y: topBottom + CB_GAP, w: W, h: Math.max(0, H - topBottom - CB_GAP) }, bottomRows, boxes, topRowCap);
     return;
   }
   var nonEmpty = nonEmptyAll;
@@ -2083,21 +2088,41 @@ function cbTeReflow(t) {
   var rest = t.slots.slice(start);
   if (!rest.length) return;
   var heroRow = cbHeroTakesRow(t) ? 1 : 0;
-  var best = null;
-  var maxRows = Math.min(5, rest.length);
+  var heroV = t.hasHero && t.slots.length && t.slots[0].orient !== 'h';
+  var n2 = rest.length;
+
+  /* кандидаты распределения: [индекс ряда для каждого rest-слота] */
+  var candidates = [];
+  var maxRows = Math.min(5, n2);
   for (var n = 1; n <= maxRows; n++) {
-    var per = Math.ceil(rest.length / n);
-    var trial = JSON.parse(JSON.stringify(t));
-    trial.rows = n + heroRow;   /* герой-H = отдельный ряд в счётчике */
-    trial.slots.slice(start).forEach(function (s, i) {
-      s.row = Math.min(n - 1, Math.floor(i / per));
-    });
-    var score = cbLayoutScore(cbManualBoxes(trial), t.hasHero, trial);
-    if (!best || score > best.score) best = { score: score, rows: n + heroRow, per: per, restRows: n };
+    var per = Math.ceil(n2 / n);
+    var a = [];
+    for (var i = 0; i < n2; i++) a.push(Math.min(n - 1, Math.floor(i / per)));
+    candidates.push(a);
   }
+  /* колоночный вариант для героя-V (Маша): справа по одной картинке
+     в 2 ряда, остальные — рядами внизу */
+  if (heroV && n2 >= 3) {
+    for (var k = 1; k <= Math.min(3, n2 - 2); k++) {
+      var a2 = [0, 1];
+      var perB = Math.ceil((n2 - 2) / k);
+      for (var j = 0; j < n2 - 2; j++) a2.push(2 + Math.min(k - 1, Math.floor(j / perB)));
+      candidates.push(a2);
+    }
+  }
+
+  var best = null;
+  candidates.forEach(function (assign) {
+    var trial = JSON.parse(JSON.stringify(t));
+    var nRows = Math.max.apply(null, assign) + 1;
+    trial.rows = nRows + heroRow;   /* герой-H = отдельный ряд в счётчике */
+    trial.slots.slice(start).forEach(function (s, i) { s.row = assign[i]; });
+    var score = cbLayoutScore(cbManualBoxes(trial), t.hasHero, trial);
+    if (!best || score > best.score) best = { score: score, rows: nRows + heroRow, assign: assign };
+  });
   if (best) {
     t.rows = best.rows;
-    rest.forEach(function (s, i) { s.row = Math.min(best.restRows - 1, Math.floor(i / best.per)); });
+    rest.forEach(function (s, i) { s.row = best.assign[i]; });
   }
 }
 
@@ -2130,7 +2155,8 @@ function cbLayoutScore(geom, hasHero, layout) {
     });
     Object.keys(counts).forEach(function (r) { if (counts[r] === 1) singles++; });
   }
-  return fill * (1 - Math.min(0.7, cv)) * Math.pow(0.8, singles);
+  /* равномерность не-hero слотов — приоритетный критерий (Маша) */
+  return fill * (1 - Math.min(0.85, cv * 1.5)) * Math.pow(0.8, singles);
 }
 
 function cbTeAddSlot(orient) {
