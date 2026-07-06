@@ -674,6 +674,7 @@ body.cb-file-drag #cbDropOverlay { display: flex; }
       <button id="cbBtnWatch" title="Хоткей в Capture One кладёт фото в папку — Cardboard подхватывает">Следить за папкой</button>
       <div class="cb-pop-sep"></div>
       <button id="cbBtnPdf">Экспорт PDF<span class="cb-hotkey">⌘E</span></button>
+      <button id="cbBtnPrint">Печать...</button>
       <button id="cbBtnList">Экспорт списка (CSV + TXT)</button>
       <div class="cb-pop-note"><span id="cbMode"></span></div>
     </div>
@@ -2285,7 +2286,7 @@ var CB_HELP = {
     body: '<h3>1. Импорт</h3>Файл → Импорт фото (⌘I) — или просто перетащите файлы в окно: они попадут в активную вкладку галереи (Фото или Референсы). Фото не копируются: Cardboard запоминает только пути.'
       + '<h3>2. Шаблон</h3>Шаблон → Создать шаблон: канвас A4 (горизонтальный/вертикальный), ручная раскладка (ряды + слоты В/Г) или авто по фото, заглавное фото, имена слотов. В Галерее шаблонов отметьте те, что предлагать при вёрстке.'
       + '<h3>3. Вёрстка</h3>«+ Карточка» → выберите шаблон → перетаскивайте фото из галереи в слоты. Слоты меняются местами перетаскиванием. Референсы можно ставить в слоты как ТЗ — на них метка REF.'
-      + '<h3>4. Экспорт</h3>Файл → Экспорт PDF (⌘E): карточки печатаются страницами A4 один в один. Экспорт списка — CSV/TXT: карточка → слот → файл → полный путь.'
+      + '<h3>4. Экспорт</h3>Файл → Экспорт PDF (⌘E): многостраничный PDF-файл A4, карточка = страница один в один. Файл → Печать: тот же макет через системный диалог печати. Экспорт списка — CSV/TXT: карточка → слот → файл → полный путь.'
       + '<h3>5. Проект</h3>Один файл .cardboard: пути, структура, шаблоны. При закрытии приложение спросит про несохранённое и предложит удалить файл проекта, если он больше не нужен.',
     links: []
   },
@@ -3591,8 +3592,9 @@ document.getElementById('cbConts').addEventListener('drop', function (e) {
    Экспорт PDF (печать A4) и списка
    ============================================================ */
 
-function cbExportPdf() {
-  if (!App.cards.length && !App.containers.length) { cbToast('Нечего экспортировать'); return; }
+/* Печать (системный диалог) — отдельно от экспорта PDF в файл */
+function cbPrintPdf() {
+  if (!App.cards.length && !App.containers.length) { cbToast('Нечего печатать'); return; }
   var name = App.projectName || 'Проект';
   var d = new Date();
   var dateStr = ('0' + d.getDate()).slice(-2) + '.' + ('0' + (d.getMonth() + 1)).slice(-2) + '.' + d.getFullYear();
@@ -3626,7 +3628,55 @@ function cbExportPdf() {
   window.print();
   document.title = oldTitle;
 }
+
+/* Спецификация страниц для PDF-файла: раскладка + фото каждой карточки */
+function cbPdfSpec() {
+  var pages = [];
+  App.cards.forEach(function (card, ci) {
+    var geom, getPid;
+    if (card.mode === 'auto') {
+      var photos = (card.pids || []).map(function (pid) { return cbPhotoById(pid); });
+      var aspects = photos.map(function (p) { return (p && p.w > 0 && p.h > 0) ? p.w / p.h : 0.75; });
+      if (!aspects.length) return;   /* пустая авто-карточка — нечего класть */
+      geom = cbAutoBestGeom(card, aspects).geom;
+      getPid = function (i) { return card.pids[i] || null; };
+    } else {
+      geom = cbManualBoxes(card);
+      getPid = function (i) { return card.slots[i] ? card.slots[i].pid : null; };
+    }
+    var boxes = geom.boxes.map(function (b) {
+      var pid = getPid(b.slotIdx);
+      var p = pid ? cbPhotoById(pid) : null;
+      return {
+        x: b.x, y: b.y, w: b.w, h: b.h,
+        path: (p && p.path) ? p.path : null,
+        dataUrl: (p && !p.path && p.dataUrl) ? p.dataUrl : null
+      };
+    });
+    var title = (ci + 1) + '. ' + (card.title || '');
+    if (card.category) title += ' · ' + card.category;
+    pages.push({ canvas: card.canvas, W: geom.W, H: geom.H, title: title, boxes: boxes });
+  });
+  return pages;
+}
+
+/* Экспорт PDF в файл (desktop: Python+Pillow, A4 300dpi; браузер: печать) */
+function cbExportPdf() {
+  if (!App.cards.length) { cbToast('Нет карточек для экспорта'); return; }
+  if (!cbDesktop() || !cbApi().export_pdf) { cbPrintPdf(); return; }
+  var pages = cbPdfSpec();
+  if (!pages.length) { cbToast('Нет карточек для экспорта'); return; }
+  cbBusyShow('Экспорт PDF: страниц ' + pages.length, 0.3);
+  cbApi().export_pdf(JSON.stringify({ name: App.projectName, pages: pages })).then(function (path) {
+    cbBusyHide();
+    if (path) cbToast('PDF сохранён: ' + path);
+  }).catch(function () {
+    cbBusyHide();
+    cbToast('Не удалось собрать PDF');
+  });
+}
 document.getElementById('cbBtnPdf').onclick = cbExportPdf;
+document.getElementById('cbBtnPrint').onclick = cbPrintPdf;
 
 function cbDownload(filename, text, mime) {
   var blob = new Blob([text], { type: mime || 'text/plain;charset=utf-8' });
@@ -3890,7 +3940,7 @@ function cbMenuNative(action) {
   var map = {
     'new': 'cbMenuNew', 'open': 'cbBtnOpen', 'save': 'cbBtnSave', 'rename': 'cbMenuRename',
     'pick': 'cbBtnPick', 'pickref': 'cbBtnPickRef', 'folder': 'cbBtnFolder', 'watch': 'cbBtnWatch',
-    'pdf': 'cbBtnPdf', 'list': 'cbBtnList',
+    'pdf': 'cbBtnPdf', 'print': 'cbBtnPrint', 'list': 'cbBtnList',
     'tplnew': 'cbMenuTplNew', 'tplgal': 'cbMenuTplGallery',
     'helpguide': 'cbMenuHelpGuide', 'helpsync': 'cbMenuHelpSync', 'helpprod': 'cbMenuHelpProducts'
   };

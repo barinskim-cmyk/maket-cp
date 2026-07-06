@@ -88,6 +88,20 @@ def make_thumb(path: str, save_to: Optional[Path] = None) -> Optional[dict]:
         return {"error": "unreadable"}
 
 
+def from_dataurl(du: str) -> Optional[Image.Image]:
+    """data:image/...;base64 -> PIL Image (RGB)."""
+    try:
+        b64 = du.split(",", 1)[1]
+        return Image.open(io.BytesIO(base64.b64decode(b64))).convert("RGB")
+    except Exception:
+        return None
+
+
+def cover_fit(im: Image.Image, w: int, h: int) -> Image.Image:
+    """Заполнить бокс с обрезкой по центру (как CSS object-fit: cover)."""
+    return ImageOps.fit(im.convert("RGB"), (w, h), Image.LANCZOS)
+
+
 def load_preview(fp: Path) -> Optional[dict]:
     """Готовое JPEG-превью с диска -> dataUrl + размеры (быстро, без исходника)."""
     try:
@@ -244,6 +258,77 @@ class CardboardAPI:
         kind = denied (нет доступа, TCC) | missing (файла нет) | unreadable.
         """
         return {p: self._thumb_cached(p) for p in paths}
+
+    def write_pdf(self, spec: dict, out: str) -> Optional[str]:
+        """Собрать многостраничный PDF A4 (300 dpi) из раскладки карточек.
+
+        Страница = карточка: боксы из движка (юниты W), фото — оригинал
+        (макс. качество), фолбэк превью-кэш/dataUrl; пустой слот — плашка.
+        """
+        from PIL import ImageDraw
+        pages = []
+        for pg in spec.get("pages", []):
+            size = (3508, 2480) if pg.get("canvas") == "h" else (2480, 3508)
+            img = Image.new("RGB", size, (255, 255, 255))
+            draw = ImageDraw.Draw(img)
+            sc = size[0] / float(pg.get("W") or 1000)
+            for b in pg.get("boxes", []):
+                bx, by = int(b["x"] * sc), int(b["y"] * sc)
+                bw, bh = max(1, int(b["w"] * sc)), max(1, int(b["h"] * sc))
+                src = self._pdf_source(b)
+                if src is not None:
+                    img.paste(cover_fit(src, bw, bh), (bx, by))
+                    src.close()
+                else:
+                    draw.rectangle([bx, by, bx + bw, by + bh],
+                                   fill=(245, 245, 244), outline=(221, 221, 219), width=2)
+            title = (pg.get("title") or "").strip()
+            if title:
+                try:
+                    from PIL import ImageFont
+                    font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 42)
+                    draw.text((int(size[0] * 0.032), 20), title, fill=(128, 128, 128), font=font)
+                except Exception:
+                    pass   # нет шрифта — страница без заголовка
+            pages.append(img)
+        if not pages:
+            return None
+        pages[0].save(out, "PDF", save_all=True, append_images=pages[1:], resolution=300.0)
+        return out
+
+    def _pdf_source(self, b: dict) -> Optional[Image.Image]:
+        """Источник фото для бокса: оригинал -> превью-кэш -> dataUrl."""
+        path = b.get("path")
+        if path:
+            try:
+                im = Image.open(path)
+                im.load()
+                return ImageOps.exif_transpose(im).convert("RGB")
+            except Exception:
+                t = self._thumb_cached(path)
+                if t and t.get("dataUrl"):
+                    return from_dataurl(t["dataUrl"])
+        if b.get("dataUrl"):
+            return from_dataurl(b["dataUrl"])
+        return None
+
+    def export_pdf(self, spec_json: str) -> Optional[str]:
+        """Экспорт PDF в файл (печать — отдельно, через системный диалог)."""
+        import webview
+        try:
+            spec = json.loads(spec_json)
+        except Exception:
+            return None
+        result = self._window.create_file_dialog(
+            webview.SAVE_DIALOG,
+            save_filename=f"{spec.get('name') or 'Карточки'}.pdf",
+            file_types=("PDF (*.pdf)",))
+        if not result:
+            return None
+        out = result if isinstance(result, str) else result[0]
+        if not out.endswith(".pdf"):
+            out += ".pdf"
+        return self.write_pdf(spec, out)
 
     def grant_folder_access(self, directory: Optional[str] = None) -> bool:
         """Вернуть доступ к папке с фото после запрета macOS (TCC).
@@ -455,6 +540,7 @@ def main() -> None:
                 wm.MenuAction("Следить за папкой (вкл/выкл)", _js("watch")),
                 wm.MenuSeparator(),
                 wm.MenuAction("Экспорт PDF", _js("pdf")),
+                wm.MenuAction("Печать", _js("print")),
                 wm.MenuAction("Экспорт списка (CSV + TXT)", _js("list")),
             ]),
             wm.Menu("Шаблон", [
