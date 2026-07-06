@@ -56,7 +56,10 @@ PROJ_TYPES = ("Проект Cardboard (*.cardboard)",)
 def make_thumb(path: str) -> Optional[dict]:
     """Прочитать изображение с диска и вернуть миниатюру как base64 dataURL.
 
-    Ничего не пишет на диск. Возвращает None, если файл не читается.
+    Ничего не пишет на диск. При ошибке возвращает {"error": kind}:
+    - "denied"  — macOS TCC запретил доступ (Загрузки/Документы и т.п.);
+    - "missing" — файла нет по этому пути;
+    - "unreadable" — файл есть, но не читается как изображение.
     """
     try:
         with Image.open(path) as im:
@@ -68,8 +71,12 @@ def make_thumb(path: str) -> Optional[dict]:
             im.save(buf, "JPEG", quality=JPEG_Q)
             b64 = base64.b64encode(buf.getvalue()).decode("ascii")
             return {"dataUrl": "data:image/jpeg;base64," + b64, "w": im.width, "h": im.height}
+    except PermissionError:
+        return {"error": "denied"}
+    except FileNotFoundError:
+        return {"error": "missing"}
     except Exception:
-        return None
+        return {"error": "unreadable"}
 
 
 class CardboardAPI:
@@ -104,10 +111,11 @@ class CardboardAPI:
         return self._native_menu
 
     def _thumb_cached(self, path: str) -> Optional[dict]:
+        """Миниатюра из кэша; при ошибке возвращает {"error": kind} (не кэшируется)."""
         if path not in self._thumb_cache:
             t = make_thumb(path)
-            if t is None:
-                return None
+            if t is None or "error" in t:
+                return t
             self._thumb_cache[path] = t
         return self._thumb_cache[path]
 
@@ -118,7 +126,7 @@ class CardboardAPI:
             if Path(p).suffix.lower() not in IMG_EXT:
                 continue
             t = self._thumb_cached(p)
-            if t is None:
+            if t is None or "error" in t:
                 continue
             out.append({
                 "name": Path(p).name,
@@ -170,9 +178,23 @@ class CardboardAPI:
     def thumbs_for(self, paths: list) -> dict:
         """Миниатюры для списка путей (при открытии проекта).
 
-        Возвращает {path: {dataUrl,w,h} | None} — None, если файл пропал.
+        Возвращает {path: {dataUrl,w,h} | {"error": kind}} —
+        kind = denied (нет доступа, TCC) | missing (файла нет) | unreadable.
         """
         return {p: self._thumb_cached(p) for p in paths}
+
+    def grant_folder_access(self, directory: Optional[str] = None) -> bool:
+        """Вернуть доступ к папке с фото после запрета macOS (TCC).
+
+        Открывает системный диалог выбора папки (сразу на нужной) —
+        выбор пользователем в диалоге даёт приложению право чтения.
+        """
+        import webview
+        kwargs = {}
+        if directory and Path(directory).is_dir():
+            kwargs["directory"] = directory
+        result = self._window.create_file_dialog(webview.FOLDER_DIALOG, **kwargs)
+        return bool(result)
 
     # ---------- слежение за папкой (Capture One hot key) ----------
 

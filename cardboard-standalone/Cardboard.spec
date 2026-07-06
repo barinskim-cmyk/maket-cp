@@ -51,5 +51,16 @@ if sys.platform == 'darwin':
             'CFBundleDisplayName': 'Cardboard',
             'CFBundleShortVersionString': '1.0.0',
             'NSHighResolutionCapable': True,
+            # TCC: без usage-описаний macOS МОЛЧА запрещает чтение
+            # защищённых папок (Загрузки/Документы/Рабочий стол) при
+            # открытии проекта без диалога — «файл не найден» на всё.
+            'NSDownloadsFolderUsageDescription':
+                'Cardboard читает фото съёмки по путям из файла проекта.',
+            'NSDocumentsFolderUsageDescription':
+                'Cardboard читает фото съёмки по путям из файла проекта.',
+            'NSDesktopFolderUsageDescription':
+                'Cardboard читает фото съёмки по путям из файла проекта.',
+            'NSRemovableVolumesUsageDescription':
+                'Cardboard читает фото съёмки с внешних дисков по путям из файла проекта.',
         },
     )

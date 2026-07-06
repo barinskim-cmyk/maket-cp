@@ -3654,21 +3654,40 @@ function cbApplyProject(data) {
   cbRenderTray(); cbRenderCards(); cbRenderConts();
 }
 
-function cbRehydrateThumbs() {
+function cbRehydrateThumbs(isRetry) {
   var paths = [];
   App.photos.forEach(function (p) { if (p.path && !p.dataUrl) paths.push(p.path); });
   if (!paths.length) return;
+  if (paths.length > 30) cbBusyShow('Загрузка фото: ' + paths.length, 0.3);
   cbApi().thumbs_for(paths).then(function (map) {
-    var missing = 0;
+    var missing = 0, denied = 0, deniedPath = null;
     App.photos.forEach(function (p) {
       if (!p.path || p.dataUrl) return;
       var t = map[p.path];
-      if (t) { p.dataUrl = t.dataUrl; p.w = t.w; p.h = t.h; }
-      else { p.missing = true; missing++; }
+      if (t && t.dataUrl) { p.missing = false; p.dataUrl = t.dataUrl; p.w = t.w; p.h = t.h; }
+      else {
+        p.missing = true; missing++;
+        if (t && t.error === 'denied') { denied++; if (!deniedPath) deniedPath = p.path; }
+      }
     });
+    cbBusyHide();
     cbRenderTray(); cbRenderCards(); cbRenderConts();
-    if (missing) cbToast('Не найдено файлов: ' + missing + ' (пути изменились?)');
-  });
+    if (denied && !isRetry) {
+      /* macOS (TCC) молча запретил чтение защищённой папки — выбор папки
+         в системном диалоге возвращает приложению право читать её */
+      var dir = deniedPath.slice(0, deniedPath.lastIndexOf('/'));
+      if (confirm('macOS не даёт приложению доступ к папке с фото:\n' + dir
+        + '\n\nОткрыть диалог и выбрать эту папку, чтобы вернуть доступ?')) {
+        cbApi().grant_folder_access(dir).then(function (ok) {
+          if (ok) cbRehydrateThumbs(true);
+        });
+      }
+    } else if (missing) {
+      cbToast(denied
+        ? 'Нет доступа к файлам: ' + denied + ' (macOS, Настройки → Конфиденциальность → Файлы и папки)'
+        : 'Не найдено файлов: ' + missing + ' (пути изменились?)');
+    }
+  }).catch(function () { cbBusyHide(); });
 }
 
 function cbOpenProjectBrowser(file) {
