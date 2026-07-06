@@ -1338,9 +1338,7 @@ function cbHeroVShelf(W, H, heroAR, cells, boxes) {
     for (var i = 0; i < kCol; i++) colW = Math.max(colW, cells[i].ar * h);
     var scale = Math.min(1, zoneW / colW);
     var h2 = h * scale;
-    /* остаток — вниз рядами-потоком ПО ШИРИНЕ БЛОКА (герой + колонка),
-       не по ширине листа: иначе низ вылезает за правый край колонки */
-    var compWk = heroW + CB_GAP + colW * scale;
+    /* остаток — вниз рядами-потоком */
     var restN = n - kCol;
     var fits = true;
     var rowsB = 0;
@@ -1349,7 +1347,7 @@ function cbHeroVShelf(W, H, heroAR, cells, boxes) {
       rowsB = 1;
       for (var j = kCol; j < n; j++) {
         var w = cells[j].ar * h2;
-        if (x > 0 && x + w > compWk + 2) { rowsB++; x = 0; }
+        if (x > 0 && x + w > W) { rowsB++; x = 0; }
         x += w + CB_GAP;
       }
       var bottomH = rowsB * h2 + rowsB * CB_GAP;
@@ -1370,52 +1368,24 @@ function cbHeroVShelf(W, H, heroAR, cells, boxes) {
     boxes.push({ x: heroW + CB_GAP, y: y, w: wC, h: h3, slotIdx: cells[c].slotIdx });
     y += h3 + CB_GAP;
   }
-  /* остаток вниз потоком в пределах ширины блока (герой + колонка).
-     Полные ряды растягиваются точно на эту ширину — рамка слева и
-     справа цельная; лёгкое отклонение высоты ряда допустимо (кап 1.25),
-     неполный последний ряд — с базовой высотой по центру. */
-  var colWmax = 0;
-  for (var c2 = 0; c2 < best.kCol; c2++) colWmax = Math.max(colWmax, cells[c2].ar * h3);
-  var compW = heroW + CB_GAP + colWmax;
+  /* остаток вниз потоком: собираем ряды wrap по ширине и центрируем каждый */
   var flowRows = [[]];
   var xAcc = 0;
   for (var j2 = best.kCol; j2 < cells.length; j2++) {
     var w2 = cells[j2].ar * h3;
-    if (xAcc > 0 && xAcc + w2 > compW + 2) { flowRows.push([]); xAcc = 0; }
+    if (xAcc > 0 && xAcc + w2 > W) { flowRows.push([]); xAcc = 0; }
     flowRows[flowRows.length - 1].push(cells[j2]);
     xAcc += w2 + CB_GAP;
   }
-  flowRows = flowRows.filter(function (fr) { return fr.length; });
-  /* высоты рядов: полный ряд — точно в compW (кап 1.25·h3), последний
-     недобранный — h3; затем общий даунскейл, если не влезли по высоте */
-  var rowHs = flowRows.map(function (fr, ri) {
-    var sumAR = 0;
-    fr.forEach(function (c) { sumAR += c.ar; });
-    var hFit = (compW - (fr.length - 1) * CB_GAP) / sumAR;
-    var last = ri === flowRows.length - 1;
-    if (last && hFit > h3 * 1.25) return h3;      /* недобранный хвост */
-    return Math.min(hFit, h3 * 1.25);
-  });
-  var sumH = 0;
-  rowHs.forEach(function (hh) { sumH += hh + CB_GAP; });
-  var avail = H - heroH - CB_GAP;
-  if (sumH > avail && sumH > 0) {
-    var k = Math.max(0.1, (avail - flowRows.length * CB_GAP) /
-      (sumH - flowRows.length * CB_GAP));
-    rowHs = rowHs.map(function (hh) { return hh * k; });
-  }
   var y2 = heroH + CB_GAP;
-  flowRows.forEach(function (fr, ri) {
-    var hR = rowHs[ri];
-    var rowW = -CB_GAP;
-    fr.forEach(function (c) { rowW += c.ar * hR + CB_GAP; });
-    /* ряд в compW — от левой грани (совпадёт с рамкой), недобранный — центр */
-    var x2 = (compW - rowW > 4) ? (compW - rowW) / 2 : 0;
+  flowRows.forEach(function (fr) {
+    if (!fr.length) return;
+    var x2 = 0;   /* низ от левой грани героя — рамка слева цельная */
     fr.forEach(function (c) {
-      boxes.push({ x: x2, y: y2, w: c.ar * hR, h: hR, slotIdx: c.slotIdx });
-      x2 += c.ar * hR + CB_GAP;
+      boxes.push({ x: x2, y: y2, w: c.ar * h3, h: h3, slotIdx: c.slotIdx });
+      x2 += c.ar * h3 + CB_GAP;
     });
-    y2 += hR + CB_GAP;
+    y2 += h3 + CB_GAP;
   });
 }
 
@@ -3213,6 +3183,7 @@ function cbAddCardFromTpl(tplId) {
     category: '',
     tplName: t.name,
     canvas: t.canvas, mode: t.mode, hasHero: t.hasHero, rows: t.rows,
+    perRow: t.perRow,   /* без perRow движок гадает K по рядам — карточка «съезжает» от шаблона */
     hAspect: t.hAspect, vAspect: t.vAspect,
     slots: (t.mode === 'manual') ? t.slots.map(function (s) {
       return { orient: s.orient, row: s.row, name: s.name, pid: null };
@@ -3765,6 +3736,22 @@ function cbApplyProject(data) {
     return p;
   });
   App.cards = (data.cards || []).map(cbMigrateCard);
+  /* карточки старых проектов без perRow: взять из одноимённого шаблона,
+     иначе вывести из рядов — чтобы карточка рендерилась КАК шаблон */
+  App.cards.forEach(function (c) {
+    if (c.mode !== 'manual' || c.perRow) return;
+    var tpl = App.templates.filter(function (t) { return t.name === c.tplName; })[0];
+    if (tpl && tpl.perRow) { c.perRow = tpl.perRow; return; }
+    var restN = Math.max(1, c.slots.length - (c.hasHero ? 1 : 0));
+    var rows = {};
+    c.slots.forEach(function (s, i) {
+      if (c.hasHero && i === 0) return;
+      rows[s.row || 0] = (rows[s.row || 0] || 0) + 1;
+    });
+    var maxRow = 1;
+    Object.keys(rows).forEach(function (r) { maxRow = Math.max(maxRow, rows[r]); });
+    c.perRow = Math.max(1, Math.min(5, maxRow || Math.ceil(restN / Math.max(1, c.rows || 1))));
+  });
   App.containers = data.containers || [];
   if (data.templates && data.templates.length) {
     data.templates.forEach(function (t) {
