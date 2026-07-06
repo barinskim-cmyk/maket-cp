@@ -2280,8 +2280,15 @@ function cbTeApplyPerRow(t) {
   var rest = t.slots.slice(start);
   var K = Math.max(1, Math.min(5, t.perRow || 3));
   t.perRow = K;
-  rest.forEach(function (s, i) { s.row = Math.floor(i / K); });
-  t.rows = Math.max(1, Math.ceil(rest.length / K)) + (cbHeroTakesRow(t) ? 1 : 0);
+  /* нарезка по ВЕСУ: вертикаль = 1 ячейка, горизонталь = 2 ячейки (Маша) */
+  var row = 0, acc = 0;
+  rest.forEach(function (s) {
+    var wgt = (s.orient === 'h') ? 2 : 1;
+    if (acc > 0 && acc + wgt > K) { row++; acc = 0; }
+    s.row = row;
+    acc += wgt;
+  });
+  t.rows = (rest.length ? row + 1 : 1) + (cbHeroTakesRow(t) ? 1 : 0);
 }
 
 /* Перераспределение под канвас (Маша 05.07): при смене Г<->В ряды
