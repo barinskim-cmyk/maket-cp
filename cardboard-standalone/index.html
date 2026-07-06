@@ -682,7 +682,7 @@ body.cb-file-drag #cbDropOverlay { display: flex; }
       <label class="cb-check"><input type="checkbox" id="cbTeHero"> Заглавное фото <span class="cb-check-note">(герой = 1-й слот)</span></label>
 
       <div id="cbTeManualCtl">
-        <div class="cb-lbl">Слотов в ряду · <span id="cbTePerRow">3</span> <span style="color:#6d6d6c">(рядов · <span id="cbTeRowCount">2</span>)</span></div>
+        <div class="cb-lbl">Слотов в ряду · <span id="cbTePerRow">3</span> <span style="color:#6d6d6c">· сетка <span id="cbTeRowCount">3×2</span></span></div>
         <div class="cb-te-row">
           <button class="cb-mini" id="cbTeRowMinus">−</button>
           <button class="cb-mini" id="cbTeRowPlus">+</button>
@@ -2224,7 +2224,8 @@ function cbTeRender() {
   document.getElementById('cbTeHero').checked = !!t.hasHero;
   document.getElementById('cbTeManualCtl').style.display = (t.mode === 'manual') ? '' : 'none';
   document.getElementById('cbTePerRow').textContent = t.perRow || 3;
-  document.getElementById('cbTeRowCount').textContent = t.rows;
+  /* счётчик показывает сетку: слотов в ряду × рядов (адекватнее числа рядов) */
+  document.getElementById('cbTeRowCount').textContent = (t.perRow || 3) + '×' + t.rows;
 
   var vc = 0, hc = 0;
   t.slots.forEach(function (s, i) {
