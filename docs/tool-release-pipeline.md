@@ -11,8 +11,8 @@
 | Разработка (источник правды) | `maket-cp/cardboard-standalone/` | публичный репо (локальная копия `rate-setter-standalone/` устарела) |
 | Публичный репо (сборки) | `barinskim-cmyk/content-pulse-cardboard` | `barinskim-cmyk/content-pulse-rate-setter` |
 | Скачивание (без аккаунта GitHub) | github.com/barinskim-cmyk/content-pulse-cardboard/releases/latest | github.com/barinskim-cmyk/content-pulse-rate-setter/releases/latest |
-| Артефакты релиза | Cardboard-macOS.zip, .sha256.txt, version.txt, INSTALL.md | macOS.zip, Windows.exe, их .sha256.txt, instruction.html |
-| Самообновление | да (с 1.2.1) | нет (пока) |
+| Артефакты релиза | macOS.zip, Windows.exe, их .sha256.txt, version.txt, INSTALL.md | macOS.zip, Windows.exe, их .sha256.txt, instruction.html |
+| Самообновление | Mac: да (с 1.2.1); Windows: уведомление + ссылка (exe нельзя подменить на лету) | нет (пока) |
 
 Релиз-тег в обоих репо — скользящий `latest`: каждая сборка заменяет файлы в одном и том же релизе.
 

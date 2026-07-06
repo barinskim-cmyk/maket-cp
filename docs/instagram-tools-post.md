@@ -11,6 +11,7 @@
 Прямое скачивание (сразу файл):
 
 - Cardboard (Mac): https://github.com/barinskim-cmyk/content-pulse-cardboard/releases/latest/download/Cardboard-macOS.zip
+- Cardboard (Windows): https://github.com/barinskim-cmyk/content-pulse-cardboard/releases/latest/download/Cardboard-Windows.exe
 - Rate Setter (Mac): https://github.com/barinskim-cmyk/content-pulse-rate-setter/releases/latest/download/Content-Pulse-Rate-Setter-macOS.zip
 - Rate Setter (Windows): https://github.com/barinskim-cmyk/content-pulse-rate-setter/releases/latest/download/Content-Pulse-Rate-Setter-Windows.exe
 
@@ -29,7 +30,7 @@ CARDBOARD — вёрстка карточек товара. Кидаешь фо�
 
 RATE SETTER — отбор одним хоткеем: рейтинг и метка сразу в сессию Capture One по списку выбранных кадров. Больше не щёлкать по одной.
 
-Оба бесплатные, без регистраций. Ссылки в шапке профиля: скачал, открыл, работаешь. Mac (Rate Setter — ещё и Windows).
+Оба бесплатные, без регистраций, Mac и Windows. Ссылки в шапке профиля: скачал, открыл, работаешь.
 
 Если macOS спросит про «неустановленного разработчика» — это норма для программ не из App Store: правый клик → Открыть (или Настройки → Конфиденциальность → «Открыть всё равно»). Инструкция лежит рядом со скачиванием.
 
