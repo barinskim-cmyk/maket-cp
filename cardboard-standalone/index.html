@@ -697,10 +697,13 @@ body.cb-file-drag #cbDropOverlay { display: flex; }
         <button class="cb-canvas-btn" data-canvas="v" id="cbTeCanvasV"><span class="cb-canvas-ico cb-ico-v"></span>Вертикальный</button>
       </div>
 
-      <div class="cb-lbl">Раскладка</div>
-      <div class="cb-mode-pick">
-        <button class="cb-mode-btn" data-mode="manual" id="cbTeModeManual">Ручная</button>
-        <button class="cb-mode-btn" data-mode="auto" id="cbTeModeAuto">Авто · по фото</button>
+      <!-- авто-шаблоны не создаются пользователем: только базовые в галерее -->
+      <div id="cbTeModeRow" style="display:none">
+        <div class="cb-lbl">Раскладка</div>
+        <div class="cb-mode-pick">
+          <button class="cb-mode-btn" data-mode="manual" id="cbTeModeManual">Ручная</button>
+          <button class="cb-mode-btn" data-mode="auto" id="cbTeModeAuto">Авто · по фото</button>
+        </div>
       </div>
 
       <div class="cb-lbl">&nbsp;</div>
@@ -837,10 +840,11 @@ var JPEG_Q = 0.85;
 var IMG_EXT = /\.(jpe?g|png|gif|webp|tiff?|bmp)$/i;
 var TPL_STORE_V1 = 'cardboard_templates';
 var TPL_STORE = 'cardboard_templates_v2';
-var H_ASPECTS = ['3/2', '4/3', '16/9', '5/4'];
-var V_ASPECTS = ['2/3', '3/4', '4/5', '9/16'];
+var H_ASPECTS = ['3/2', '4/3', '16/9', '5/4', 'auto'];
+var V_ASPECTS = ['2/3', '3/4', '4/5', '9/16', 'auto'];
 var ASPECT_LABELS = { '3/2': '3:2', '4/3': '4:3', '16/9': '16:9', '5/4': '5:4',
-                      '2/3': '2:3', '3/4': '3:4', '4/5': '4:5', '9/16': '9:16' };
+                      '2/3': '2:3', '3/4': '3:4', '4/5': '4:5', '9/16': '9:16',
+                      'auto': 'Авто' };
 /* Канвас A4 */
 var CANVAS_AR = { h: 297 / 210, v: 210 / 297 };
 
@@ -1133,15 +1137,16 @@ function cbHeroBox(W, H, heroAR, hasRest, boxes, restRows) {
    пропорция), справа K колонок × 2 ряда, остальное — вниз потоком на
    ширину листа тем же шагом сетки. Не влезло по высоте — масштаб всей
    композиции. Всё выровнено по построению. ═══ */
-function cbHeroVGrid(W, H, vAR, K, cells, boxes) {
+function cbHeroVGrid(W, H, vAR, K, cells, boxes, heroAR) {
   var g = CB_GAP;
   K = Math.max(1, K);
+  heroAR = heroAR || vAR;   /* при «Авто» — пропорция фото героя */
 
   /* раскладка потоком при заданном размере ячейки; place=false — только счёт */
   function flow(u, place) {
     var q = u / vAR;
     var heroH = 2 * q + g;
-    var heroW = vAR * heroH;
+    var heroW = heroAR * heroH;
     var compW = heroW + g + K * u + (K - 1) * g;   /* ширина блока */
     var local = place ? [{ x: 0, y: 0, w: heroW, h: heroH, slotIdx: 0 }] : null;
     var zoneX = heroW + g;
@@ -1149,10 +1154,14 @@ function cbHeroVGrid(W, H, vAR, K, cells, boxes) {
     /* верх: 2 ряда справа от героя, в пределах compW */
     while (i < cells.length) {
       var w = cells[i].ar * q;
+      /* слот шире зоны героя даже в одиночку (широкая горизонталь) —
+         верхняя зона закрывается, остаток вниз на всю ширину */
+      if (x === zoneX && zoneX + w > compW + 2) break;
       if (x + w > compW + 2) {
         y += q + g;
         x = zoneX;
         if (y + q > heroH + 2) break;
+        if (zoneX + w > compW + 2) break;
       }
       if (y + q > heroH + 2) break;
       if (place) local.push({ x: x, y: y, w: w, h: q, slotIdx: cells[i].slotIdx });
@@ -1176,8 +1185,9 @@ function cbHeroVGrid(W, H, vAR, K, cells, boxes) {
   }
 
   /* размер ячейки: из ширины листа, затем ужимаем итерациями по высоте
-     (число нижних рядов дискретно меняется — пересчитываем) */
-  var u = (W - g * (vAR + K)) / (K + 2);
+     (число нижних рядов дискретно меняется — пересчитываем).
+     Учитываем фактическую пропорцию героя: heroW = heroAR*(2u/vAR+g) */
+  var u = (W - g * (heroAR + K)) / (K + 2 * heroAR / vAR);
   for (var it = 0; it < 8; it++) {
     var probe = flow(u, false);
     if (probe.totalH <= H + 1) break;
@@ -1380,8 +1390,19 @@ function cbManualBoxes(layout) {
   /* стандартизация отступов: работаем в области с полями, потом центр */
   var Wp = W - 2 * CB_MARGIN;
   var Hp = H - 2 * CB_MARGIN;
-  var hAR = cbAspectNum(layout.hAspect);
-  var vAR = cbAspectNum(layout.vAspect);
+  /* «Авто»: слот берёт пропорцию своего фото, пустой — дефолт ориентации */
+  var hAuto = layout.hAspect === 'auto';
+  var vAuto = layout.vAspect === 'auto';
+  var hAR = hAuto ? 1.5 : cbAspectNum(layout.hAspect);
+  var vAR = vAuto ? 0.75 : cbAspectNum(layout.vAspect);
+  function slotAR(s) {
+    var isH = s.orient === 'h';
+    if ((isH ? hAuto : vAuto) && s.pid) {
+      var ph = cbPhotoById(s.pid);
+      if (ph && ph.w > 0 && ph.h > 0) return ph.w / ph.h;
+    }
+    return isH ? hAR : vAR;
+  }
   var slots = layout.slots || [];
   var boxes = [];
   var zone = { x: 0, y: 0, w: Wp, h: Hp };
@@ -1393,7 +1414,7 @@ function cbManualBoxes(layout) {
 
   if (layout.hasHero && slots.length > 0) {
     rest = rest.slice(1);
-    heroAR = (slots[0].orient === 'h') ? hAR : vAR;
+    heroAR = slotAR(slots[0]);   /* при «Авто» — пропорция фото героя */
     heroIsH = slots[0].orient === 'h';
     if (!heroIsH && rest.length) {
       heroVJoint = true;   /* совместный расчёт ниже */
@@ -1411,13 +1432,13 @@ function cbManualBoxes(layout) {
     for (var r = 0; r < nRows; r++) byRow.push([]);
     rest.forEach(function (item) {
       var ri = Math.min(nRows - 1, Math.max(0, item.s.row || 0));
-      byRow[ri].push({ ar: (item.s.orient === 'h') ? hAR : vAR, slotIdx: item.idx });
+      byRow[ri].push({ ar: slotAR(item.s), slotIdx: item.idx });
     });
     if (heroVJoint) {
       var K0 = Math.max(1, Math.min(5, layout.perRow || Math.max.apply(null, byRow.map(function (rw) { return rw.length; }))));
       var flatCells = [];
       rest.forEach(function (item) {
-        flatCells.push({ ar: (item.s.orient === 'h') ? hAR : vAR, slotIdx: item.idx });
+        flatCells.push({ ar: slotAR(item.s), slotIdx: item.idx });
       });
       if (K0 === 1) {
         /* колонка: полочная упаковка (герой макс, колонка вплотную) */
@@ -1425,7 +1446,7 @@ function cbManualBoxes(layout) {
         cbHeroVShelf(Wp, Hp, heroAR, flatCells, boxes);
       } else {
         /* сетка: единая ячейка, герой = 2 ряда, низ на том же шаге */
-        cbHeroVGrid(Wp, Hp, vAR, K0, flatCells, boxes);
+        cbHeroVGrid(Wp, Hp, vAR, K0, flatCells, boxes, heroAR);
       }
     } else if (heroIsH) {
       /* герой-H на ОБЩЕЙ контентной ширине с рядами (Маша: герой сужается
@@ -2169,11 +2190,24 @@ function cbLoadTemplates() {
         ]
       },
       {
-        id: 'seed_auto', name: 'Авто · по фото', canvas: 'h', mode: 'auto',
+        id: 'seed_auto', name: 'Авто · с героем', canvas: 'h', mode: 'auto',
         hasHero: true, rows: 2, hAspect: '3/2', vAspect: '3/4', active: true,
         slots: []
       }
     ];
+  }
+  /* базовые авто-шаблоны гарантированы всегда (создавать свои нельзя) */
+  if (!App.templates.some(function (t) { return t.mode === 'auto' && t.hasHero; })) {
+    App.templates.push({
+      id: 'seed_auto', name: 'Авто · с героем', canvas: 'h', mode: 'auto',
+      hasHero: true, rows: 2, hAspect: '3/2', vAspect: '3/4', active: true, slots: []
+    });
+  }
+  if (!App.templates.some(function (t) { return t.mode === 'auto' && !t.hasHero; })) {
+    App.templates.push({
+      id: 'seed_auto_flat', name: 'Авто · лента', canvas: 'h', mode: 'auto',
+      hasHero: false, rows: 2, hAspect: '3/2', vAspect: '3/4', active: true, slots: []
+    });
   }
   cbStoreTemplates();
 }
@@ -2624,13 +2658,19 @@ function cbGalRender() {
     html += '<div class="cb-gal-item">';
     html += cbTplMiniHTML(t);
     html += '<div class="cb-gal-name" title="' + cbEsc(t.name) + '">' + cbEsc(t.name) + '</div>';
-    html += '<div class="cb-gal-meta">' + (t.canvas === 'h' ? 'A4 ГОР' : 'A4 ВЕРТ') + ' · ' + (t.mode === 'auto' ? 'АВТО' : t.slots.length + ' СЛОТОВ') + (t.hasHero ? ' · ★' : '') + '</div>';
+    html += '<div class="cb-gal-meta">' + (t.mode === 'auto'
+      ? 'АВТО · ОРИЕНТАЦИЯ САМА · БАЗОВЫЙ'
+      : (t.canvas === 'h' ? 'A4 ГОР' : 'A4 ВЕРТ') + ' · ' + t.slots.length + ' СЛОТОВ') + (t.hasHero ? ' · ★' : '') + '</div>';
     html += '<label class="cb-check cb-gal-check"><input type="checkbox" data-gal-active="' + t.id + '"' + (t.active !== false ? ' checked' : '') + '> предлагать в канвасе</label>';
-    html += '<div class="cb-gal-actions">';
-    html += '<button data-gal-edit="' + t.id + '">Изменить</button>';
-    html += '<button data-gal-dup="' + t.id + '">Дубль</button>';
-    html += '<button class="cb-danger" data-gal-del="' + t.id + '">Удалить</button>';
-    html += '</div></div>';
+    if (t.mode !== 'auto') {
+      /* базовые авто-шаблоны не редактируются и не удаляются */
+      html += '<div class="cb-gal-actions">';
+      html += '<button data-gal-edit="' + t.id + '">Изменить</button>';
+      html += '<button data-gal-dup="' + t.id + '">Дубль</button>';
+      html += '<button class="cb-danger" data-gal-del="' + t.id + '">Удалить</button>';
+      html += '</div>';
+    }
+    html += '</div>';
   });
   if (!App.templates.length) html = '<div class="cb-empty-hint" style="width:100%">Шаблонов нет — создайте первый.</div>';
   host.innerHTML = html;
@@ -2738,11 +2778,26 @@ function cbCardSlotHTML(card, i) {
   return html;
 }
 
+/* авто-режим сам выбирает ориентацию листа: считаем оба канваса,
+   берём тот, где заполнение больше */
+function cbAutoBestGeom(card, aspects) {
+  var gH = cbAutoBoxes({ canvas: 'h', hasHero: card.hasHero }, aspects);
+  var gV = cbAutoBoxes({ canvas: 'v', hasHero: card.hasHero }, aspects);
+  var fill = function (g) {
+    var used = 0;
+    g.boxes.forEach(function (b) { used += b.w * b.h; });
+    return used / (g.W * g.H);
+  };
+  return (fill(gH) >= fill(gV)) ? { canvas: 'h', geom: gH } : { canvas: 'v', geom: gV };
+}
+
 function cbCardPageHTML(card) {
   if (card.mode === 'auto') {
     var photos = (card.pids || []).map(function (pid) { return cbPhotoById(pid); });
     var aspects = photos.map(function (p) { return (p && p.w > 0 && p.h > 0) ? p.w / p.h : 0.75; });
-    var geom = cbAutoBoxes(card, aspects);
+    var best = cbAutoBestGeom(card, aspects);
+    var geom = best.geom;
+    card.canvas = aspects.length ? best.canvas : card.canvas;   /* для PDF */
     var page = cbPageHTML(card.canvas, geom, function (i) {
       var p = photos[i];
       if (!p) return '<div class="cb-slot"></div>';
