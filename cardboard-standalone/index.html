@@ -1022,7 +1022,8 @@ function cbJustifiedHTML(count, itemHTMLFn, aspectFn, opts) {
    для превью редактора, карточек и PDF.
    ============================================================ */
 
-var CB_GAP = 12; /* юниты */
+var CB_GAP = 12;    /* юниты: стандартный зазор сетки */
+var CB_MARGIN = 32; /* юниты: поле листа — всё вписывается в рабочую область */
 
 /* ── Принцип v3.1 (Маша 05.07): слот ВСЕГДА держит свою пропорцию.
    Ничего не плющится и не обрезается: если ряды не влезают в зону,
@@ -1351,11 +1352,14 @@ function cbCenterBoxes(W, H, boxes) {
 function cbManualBoxes(layout) {
   var W = 1000;
   var H = W / CANVAS_AR[layout.canvas || 'h'];
+  /* стандартизация отступов: работаем в области с полями, потом центр */
+  var Wp = W - 2 * CB_MARGIN;
+  var Hp = H - 2 * CB_MARGIN;
   var hAR = cbAspectNum(layout.hAspect);
   var vAR = cbAspectNum(layout.vAspect);
   var slots = layout.slots || [];
   var boxes = [];
-  var zone = { x: 0, y: 0, w: W, h: H };
+  var zone = { x: 0, y: 0, w: Wp, h: Hp };
   var rest = slots.map(function (s, i) { return { s: s, idx: i }; });
   var heroVJoint = false;
   var heroAR = 0;
@@ -1369,7 +1373,7 @@ function cbManualBoxes(layout) {
     if (!heroIsH && rest.length) {
       heroVJoint = true;   /* совместный расчёт ниже */
     } else if (!rest.length) {
-      zone = cbHeroBox(W, H, heroAR, false, boxes);
+      zone = cbHeroBox(Wp, Hp, heroAR, false, boxes);
     }
   }
 
@@ -1393,38 +1397,33 @@ function cbManualBoxes(layout) {
       if (K0 === 1) {
         /* колонка: полочная упаковка (герой макс, колонка вплотную) */
         flatCells.heroIdx = 0;
-        cbHeroVShelf(W, H, heroAR, flatCells, boxes);
+        cbHeroVShelf(Wp, Hp, heroAR, flatCells, boxes);
       } else {
         /* сетка: единая ячейка, герой = 2 ряда, низ на том же шаге */
-        cbHeroVGrid(W, H, vAR, K0, flatCells, boxes);
+        cbHeroVGrid(Wp, Hp, vAR, K0, flatCells, boxes);
       }
     } else if (heroIsH) {
-      /* герой-H: если высоты хватает — и герой, и ряды получают максимум
-         (герой на всю ширину, ряды на всю ширину); если тесно — герой
-         занимает долю двух рядов, не-герои единой высоты */
+      /* герой-H на ОБЩЕЙ контентной ширине с рядами (Маша: герой сужается
+         до сетки, края героя и рядов совпадают, отступы стандартные).
+         contentW решается аналитически из высоты рабочей области. */
       var nonEmpty = byRow.filter(function (rw) { return rw.length > 0; });
       var nR = Math.max(1, nonEmpty.length);
       var g2 = CB_GAP;
-      var hRowW = Infinity;
+      /* самый плотный ряд задаёт единую высоту ряда */
+      var S = 0, kmax = 1;
       nonEmpty.forEach(function (rw) {
         var sum = 0;
         rw.forEach(function (c) { sum += c.ar; });
-        hRowW = Math.min(hRowW, (W - (rw.length - 1) * g2) / sum);
+        if (sum > S) { S = sum; kmax = rw.length; }
       });
-      var heroHfull = W / heroAR;
-      var hRow = Math.min(hRowW, (H - heroHfull - nR * g2) / nR);
-      var heroH2;
-      if (hRow >= 0.35 * heroHfull) {
-        heroH2 = heroHfull;              /* свободно: оба максимума */
-      } else {
-        var hh = (H - g2 - nR * g2) / (2 + nR);   /* тесно: герой = 2 ряда */
-        hh = Math.min(hh, (W / heroAR - g2) / 2, hRowW);
-        heroH2 = 2 * hh + g2;
-        hRow = hh;
-      }
-      var heroW2 = Math.min(W, heroAR * heroH2);
-      boxes.push({ x: (W - heroW2) / 2, y: 0, w: heroW2, h: heroH2, slotIdx: 0 });
-      cbRowsInZone({ x: 0, y: heroH2 + g2, w: W, h: H - heroH2 - g2 }, byRow, boxes, hRow);
+      var contentW = Math.min(
+        Wp,
+        (Hp - nR * g2 + nR * (kmax - 1) * g2 / S) / (1 / heroAR + nR / S)
+      );
+      var heroH2 = contentW / heroAR;
+      var hRow = (contentW - (kmax - 1) * g2) / S;
+      boxes.push({ x: 0, y: 0, w: contentW, h: heroH2, slotIdx: 0 });
+      cbRowsInZone({ x: 0, y: heroH2 + g2, w: contentW, h: Hp - heroH2 - g2 }, byRow, boxes, hRow);
     } else {
       cbRowsInZone(zone, byRow, boxes);
     }
@@ -1437,21 +1436,23 @@ function cbManualBoxes(layout) {
 function cbAutoBoxes(layout, aspects) {
   var W = 1000;
   var H = W / CANVAS_AR[layout.canvas || 'h'];
+  var Wp = W - 2 * CB_MARGIN;
+  var Hp = H - 2 * CB_MARGIN;
   var boxes = [];
   if (!aspects.length) return { W: W, H: H, boxes: boxes };
-  var zone = { x: 0, y: 0, w: W, h: H };
+  var zone = { x: 0, y: 0, w: Wp, h: Hp };
   var idx0 = 0;
   var heroVJoint = false;
 
   if (layout.hasHero) {
     idx0 = 1;
     if (aspects.length === 1) {
-      cbHeroBox(W, H, aspects[0], false, boxes);
+      cbHeroBox(Wp, Hp, aspects[0], false, boxes);
       cbCenterBoxes(W, H, boxes);
       return { W: W, H: H, boxes: boxes };
     }
     if (aspects[0] < 1) heroVJoint = true;   /* герой-вертикаль: совместный расчёт */
-    else zone = cbHeroBox(W, H, aspects[0], true, boxes);
+    else zone = cbHeroBox(Wp, Hp, aspects[0], true, boxes);
   }
 
   var rest = aspects.slice(idx0);
@@ -1475,7 +1476,7 @@ function cbAutoBoxes(layout, aspects) {
         byRow.push(row);
       });
       var trial = [];
-      if (heroVJoint) cbHeroVJoint(W, H, aspects[0], byRow, trial);
+      if (heroVJoint) cbHeroVJoint(Wp, Hp, aspects[0], byRow, trial);
       else cbRowsInZone(zone, byRow, trial);
       var used = 0;
       trial.forEach(function (b) { used += b.w * b.h; });
