@@ -1102,6 +1102,65 @@ function cbHeroBox(W, H, heroAR, hasRest, boxes, restRows) {
    равна высоте блока рядов (N рядов + зазоры). Итерации до неподвижной
    точки: высота героя задаёт ширину колонки -> ширину зоны -> высоты
    рядов -> новую высоту героя. */
+/* ═══ СЕТОЧНАЯ раскладка героя-V (переписано с нуля, паттерн CSS-grid):
+   единая ячейка u×q (q = u/vAR), герой = ровно 2 ряда ячеек (точная
+   пропорция), справа K колонок × 2 ряда, остальное — вниз потоком на
+   ширину листа тем же шагом сетки. Не влезло по высоте — масштаб всей
+   композиции. Всё выровнено по построению. ═══ */
+function cbHeroVGrid(W, H, vAR, K, cells, boxes) {
+  var g = CB_GAP;
+  K = Math.max(1, K);
+
+  /* раскладка потоком при заданном размере ячейки; place=false — только счёт */
+  function flow(u, place) {
+    var q = u / vAR;
+    var heroH = 2 * q + g;
+    var heroW = vAR * heroH;
+    var compW = heroW + g + K * u + (K - 1) * g;   /* ширина блока */
+    var local = place ? [{ x: 0, y: 0, w: heroW, h: heroH, slotIdx: 0 }] : null;
+    var zoneX = heroW + g;
+    var x = zoneX, y = 0, i = 0;
+    /* верх: 2 ряда справа от героя, в пределах compW */
+    while (i < cells.length) {
+      var w = cells[i].ar * q;
+      if (x + w > compW + 2) {
+        y += q + g;
+        x = zoneX;
+        if (y + q > heroH + 2) break;
+      }
+      if (y + q > heroH + 2) break;
+      if (place) local.push({ x: x, y: y, w: w, h: q, slotIdx: cells[i].slotIdx });
+      x += w + g;
+      i++;
+    }
+    /* низ: поток по ширине блока (рамка сшивается с верхом) */
+    var rB = 0;
+    x = 0;
+    y = heroH + g;
+    var started = false;
+    for (; i < cells.length; i++) {
+      var w2 = cells[i].ar * q;
+      if (started && x + w2 > compW + 2) { x = 0; y += q + g; rB++; }
+      if (!started) { started = true; rB = 1; }
+      if (place) local.push({ x: x, y: y, w: w2, h: q, slotIdx: cells[i].slotIdx });
+      x += w2 + g;
+    }
+    var totalH = heroH + (rB ? rB * (q + g) : 0);
+    return { totalH: totalH, boxes: local };
+  }
+
+  /* размер ячейки: из ширины листа, затем ужимаем итерациями по высоте
+     (число нижних рядов дискретно меняется — пересчитываем) */
+  var u = (W - g * (vAR + K)) / (K + 2);
+  for (var it = 0; it < 8; it++) {
+    var probe = flow(u, false);
+    if (probe.totalH <= H + 1) break;
+    u = u * Math.sqrt(H / probe.totalH) * 0.99;   /* мягко вниз, пересчёт рядов */
+  }
+  var done = flow(u, true);
+  done.boxes.forEach(function (b) { boxes.push(b); });
+}
+
 /* «Полочная» упаковка для рядов-одиночек (слотов в ряду = 1):
    герой максимального размера сверху-слева, правая колонка одиночек
    в высоту героя, остаток — вниз потоком слева направо. Все не-герои
@@ -1144,12 +1203,12 @@ function cbHeroVShelf(W, H, heroAR, cells, boxes) {
 
   /* герой */
   boxes.push({ x: 0, y: 0, w: heroW, h: heroH, slotIdx: cells.heroIdx });
-  /* правая колонка: к правому краю, в высоту героя */
+  /* правая колонка: примыкает к герою (стандартный зазор, без дыры) */
   var h3 = best.h;
   var y = 0;
   for (var c = 0; c < best.kCol; c++) {
     var wC = cells[c].ar * h3;
-    boxes.push({ x: W - wC, y: y, w: wC, h: h3, slotIdx: cells[c].slotIdx });
+    boxes.push({ x: heroW + CB_GAP, y: y, w: wC, h: h3, slotIdx: cells[c].slotIdx });
     y += h3 + CB_GAP;
   }
   /* остаток вниз потоком: собираем ряды wrap по ширине и центрируем каждый */
@@ -1164,9 +1223,7 @@ function cbHeroVShelf(W, H, heroAR, cells, boxes) {
   var y2 = heroH + CB_GAP;
   flowRows.forEach(function (fr) {
     if (!fr.length) return;
-    var rowW = -CB_GAP;
-    fr.forEach(function (c) { rowW += c.ar * h3 + CB_GAP; });
-    var x2 = (W - rowW) / 2;   /* симметрия */
+    var x2 = 0;   /* низ от левой грани героя — рамка слева цельная */
     fr.forEach(function (c) {
       boxes.push({ x: x2, y: y2, w: c.ar * h3, h: h3, slotIdx: c.slotIdx });
       x2 += c.ar * h3 + CB_GAP;
@@ -1328,7 +1385,19 @@ function cbManualBoxes(layout) {
       byRow[ri].push({ ar: (item.s.orient === 'h') ? hAR : vAR, slotIdx: item.idx });
     });
     if (heroVJoint) {
-      cbHeroVJoint(W, H, heroAR, byRow, boxes);
+      var K0 = Math.max(1, Math.min(5, layout.perRow || Math.max.apply(null, byRow.map(function (rw) { return rw.length; }))));
+      var flatCells = [];
+      rest.forEach(function (item) {
+        flatCells.push({ ar: (item.s.orient === 'h') ? hAR : vAR, slotIdx: item.idx });
+      });
+      if (K0 === 1) {
+        /* колонка: полочная упаковка (герой макс, колонка вплотную) */
+        flatCells.heroIdx = 0;
+        cbHeroVShelf(W, H, heroAR, flatCells, boxes);
+      } else {
+        /* сетка: единая ячейка, герой = 2 ряда, низ на том же шаге */
+        cbHeroVGrid(W, H, vAR, K0, flatCells, boxes);
+      }
     } else if (heroIsH) {
       /* герой-H = «двухрядный» верх: единая высота ряда h для не-героев,
          heroH = 2h+gap, всё аналитически — равенство по построению */
