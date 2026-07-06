@@ -58,6 +58,11 @@ input[type="text"], input[type="date"], select, textarea {
 input[type="text"]::placeholder, textarea::placeholder { color: #6d6d6c; }
 input[type="text"]:focus, input[type="date"]:focus, textarea:focus { outline: none; border-color: #f2f2f1; }
 input[type="date"] { color-scheme: dark; }
+input.cb-color {
+  width: 26px; height: 22px; padding: 1px;
+  border: 1px solid #2a2a28; border-radius: 3px;
+  background: #1a1a18; cursor: pointer;
+}
 
 /* ---------- Меню-бар ---------- */
 .cb-topbar {
@@ -152,6 +157,25 @@ body.cb-native-menu .cb-appmenu { display: none; }
 .cb-tray-tab:hover { background: none; border-color: transparent transparent #3a3a38; color: #f2f2f1; }
 .cb-tray-tab.cb-tab-active { color: #f2f2f1; border-bottom-color: #c9956b; }
 
+/* ---------- Полосы сворачивания панелей (большое поле для работы) ---------- */
+.cb-strip {
+  width: 17px; flex-shrink: 0;
+  border: none; border-radius: 0;
+  background: #191917;
+  color: #6d6d6c;
+  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  font-size: 8.5px; font-weight: 500;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  writing-mode: vertical-rl;
+  padding: 12px 0;
+  cursor: pointer;
+}
+.cb-strip:hover { color: #f2f2f1; background: #1d1d1b; }
+#cbStripTray { border-right: 1px solid #262626; }
+#cbStripOutline { border-left: 1px solid #262626; }
+body.cb-tray-off .cb-tray, body.cb-tray-off .cb-resizer { display: none; }
+body.cb-outline-off .cb-outline { display: none; }
+
 .cb-resizer {
   width: 5px; cursor: col-resize; background: #262626;
   flex-shrink: 0; transition: background 0.15s;
@@ -230,7 +254,15 @@ body.cb-resizing * { pointer-events: none; }
   background: #131313;
 }
 
-.cb-tabs { display: flex; gap: 0; margin-bottom: 16px; border-bottom: 1px solid #262626; }
+/* вкладки закреплены: при прокрутке карточек остаются сверху (просьба Маши) */
+.cb-tabs {
+  display: flex; gap: 0; margin-bottom: 16px;
+  border-bottom: 1px solid #262626;
+  position: sticky; top: -18px;   /* компенсация padding-top .cb-work */
+  z-index: 40;
+  background: #131313;
+  padding-top: 2px;
+}
 .cb-tab {
   border: none; background: none; border-radius: 0;
   padding: 8px 16px 10px;
@@ -642,7 +674,8 @@ body.cb-file-drag #cbDropOverlay { display: flex; }
   #cbPrint .cbp-card { page-break-inside: avoid; margin-bottom: 12px; }
   #cbPrint .cbp-card h2 { font-size: 13px; margin-bottom: 6px; }
   #cbPrint .cbp-card h2 .cbp-cat { color: #666; font-weight: 400; font-size: 11px; margin-left: 8px; }
-  #cbPrint .cb-page { border: 1px solid #ddd; background: #fff; }
+  #cbPrint .cb-page { border: 1px solid #ddd; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  #cbPrint .cbp-flow { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   #cbPrint .cb-slot { border-color: #ddd; background: #fafafa; }
   #cbPrint .cb-slot.cb-filled { background: #fff; }
   #cbPrint .cb-slot .cb-slot-hint { color: #bbb; }
@@ -707,6 +740,7 @@ body.cb-file-drag #cbDropOverlay { display: flex; }
 </div>
 
 <div class="cb-main">
+  <button class="cb-strip" id="cbStripTray" title="Свернуть/развернуть галерею">Галерея</button>
   <div class="cb-tray">
     <div class="cb-tray-tabs">
       <button class="cb-tray-tab cb-tab-active" id="cbTrayTabPhoto">Фото</button>
@@ -731,6 +765,7 @@ body.cb-file-drag #cbDropOverlay { display: flex; }
     <div id="cbTabConts" style="display:none"><div id="cbConts"></div></div>
   </div>
   <div class="cb-outline" id="cbOutline"></div>
+  <button class="cb-strip" id="cbStripOutline" title="Свернуть/развернуть навигацию">Навигация</button>
 </div>
 
 <!-- Редактор шаблона v2 -->
@@ -820,6 +855,23 @@ body.cb-file-drag #cbDropOverlay { display: flex; }
 </div>
 
 <!-- Создание / переименование проекта -->
+<!-- Настройки экспорта PDF -->
+<div id="cbPdfModal" class="cb-modal">
+  <div class="cb-panel" style="width:360px">
+    <button class="cb-modal-x" data-close-modal="cbPdfModal" title="Закрыть">×</button>
+    <h2>Экспорт PDF</h2>
+    <div class="cb-eyebrow">CARDBOARD · A4 · 300 DPI</div>
+    <label class="cb-check" style="display:block;margin:6px 0 2px">
+      <input type="checkbox" id="cbPdfSkipEmpty" checked> убирать пустые слоты (чистый лист вместо плашек)
+    </label>
+    <div class="cb-te-foot">
+      <button class="cb-primary" id="cbPdfGo">Экспортировать</button>
+      <span class="cb-spacer"></span>
+      <button data-close-modal="cbPdfModal">Отмена</button>
+    </div>
+  </div>
+</div>
+
 <!-- Окно прогресса (импорт папки и другие долгие операции) -->
 <div id="cbBusy" class="cb-busy">
   <div class="cb-busy-panel">
@@ -2008,8 +2060,8 @@ CB_POPS.forEach(function (id) {
 });
 document.addEventListener('click', function (e) {
   if (!e.target.closest('.cb-menu-wrap')) cbCloseAllPops();
-  /* крестики модалок */
-  var x = e.target.closest('.cb-modal-x');
+  /* крестики модалок и любые кнопки с data-close-modal */
+  var x = e.target.closest('[data-close-modal]');
   if (x) document.getElementById(x.getAttribute('data-close-modal')).classList.remove('cb-open');
 });
 
@@ -3302,14 +3354,16 @@ function cbCardPageHTML(card) {
       if (p.kind === 'ref') html += '<span class="cb-slot-ref">REF</span>';
       html += '<button class="cb-slot-x" title="Убрать фото">×</button></div>';
       return html;
-    }, ' data-page-cid="' + card.id + '"');
+    }, ' data-page-cid="' + card.id + '"'
+      + (card.bg ? ' style="background:' + cbEsc(card.bg) + '"' : ''));
     if (!aspects.length) {
       page = '<div class="cb-page cb-page-' + card.canvas + '" data-page-cid="' + card.id + '" style="display:flex;align-items:center;justify-content:center"><span class="cb-slot-hint" style="color:#a3a09a">перетащите фото на страницу — раскладка соберётся сама</span></div>';
     }
     return page;
   }
   var geomM = cbManualBoxes(card);
-  return cbPageHTML(card.canvas, geomM, function (i) { return cbCardSlotHTML(card, i); });
+  return cbPageHTML(card.canvas, geomM, function (i) { return cbCardSlotHTML(card, i); },
+    card.bg ? ' style="background:' + cbEsc(card.bg) + '"' : '');
 }
 
 function cbRenderCards() {
@@ -3328,6 +3382,7 @@ function cbRenderCards() {
     html += '<input type="text" class="cb-cat" value="' + cbEsc(card.category) + '" data-f="category" placeholder="Категория">';
     html += '<span class="cb-spacer"></span>';
     html += '<span class="cb-tpl-badge">' + cbEsc(card.tplName || '') + (card.mode === 'auto' ? ' · АВТО' : '') + '</span>';
+    html += '<input type="color" class="cb-color" data-f="bg" value="' + (card.bg || '#ffffff') + '" title="Цвет фона карточки">';
     html += '<button class="cb-mini" data-act="tpl" title="Заменить или изменить шаблон">Шаблон</button>';
     html += '<button class="cb-mini" data-act="up" title="Выше">↑</button>';
     html += '<button class="cb-mini" data-act="down" title="Ниже">↓</button>';
@@ -3379,8 +3434,14 @@ document.getElementById('cbCards').addEventListener('click', function (e) {
 document.getElementById('cbCards').addEventListener('input', function (e) {
   var f = e.target.getAttribute('data-f');
   if (!f) return;
-  var card = cbCardById(e.target.closest('.cb-card').getAttribute('data-cid'));
+  var cardEl = e.target.closest('.cb-card');
+  var card = cbCardById(cardEl.getAttribute('data-cid'));
   card[f] = e.target.value;
+  if (f === 'bg') {
+    /* живой предпросмотр фона, без пересборки DOM */
+    var pageEl = cardEl.querySelector('.cb-page');
+    if (pageEl) pageEl.style.background = e.target.value;
+  }
   cbMarkDirty();
 });
 
@@ -3499,6 +3560,7 @@ function cbRenderConts() {
     html += '<span class="cb-num">' + (ci + 1) + '.</span>';
     html += '<input type="text" class="cb-title" value="' + cbEsc(cont.title) + '" data-f="title" placeholder="Название блока">';
     html += '<span class="cb-spacer"></span>';
+    html += '<input type="color" class="cb-color" data-f="bg" value="' + (cont.bg || '#1a1a18') + '" title="Цвет фона блока">';
     html += '<span class="cb-tpl-badge">Размер</span>';
     html += '<select data-f="size">';
     html += '<option value="s"' + (cont.size === 's' ? ' selected' : '') + '>S</option>';
@@ -3509,7 +3571,8 @@ function cbRenderConts() {
     html += '<button class="cb-mini" data-act="down" title="Ниже">↓</button>';
     html += '<button class="cb-mini cb-danger" data-act="del">Удалить</button>';
     html += '</div>';
-    html += '<div class="cb-container-body cb-size-' + cont.size + '" data-kid="' + cont.id + '">';
+    html += '<div class="cb-container-body cb-size-' + cont.size + '" data-kid="' + cont.id + '"'
+      + (cont.bg ? ' style="background:' + cbEsc(cont.bg) + '"' : '') + '>';
     if (!cont.photoIds.length) {
       html += '<div class="cb-cont-hint">перетащите фото сюда — порядок свободный</div>';
     } else {
@@ -3558,8 +3621,13 @@ document.getElementById('cbConts').addEventListener('click', function (e) {
 document.getElementById('cbConts').addEventListener('input', function (e) {
   var f = e.target.getAttribute('data-f');
   if (!f) return;
-  var cont = cbContById(e.target.closest('.cb-container').getAttribute('data-kid'));
+  var contEl = e.target.closest('.cb-container');
+  var cont = cbContById(contEl.getAttribute('data-kid'));
   cont[f] = e.target.value;
+  if (f === 'bg') {
+    var body = contEl.querySelector('.cb-container-body');
+    if (body) body.style.background = e.target.value;
+  }
   cbMarkDirty();
 });
 document.getElementById('cbConts').addEventListener('change', function (e) {
@@ -3664,8 +3732,9 @@ function cbPrintPdf() {
   document.title = oldTitle;
 }
 
-/* Спецификация страниц для PDF-файла: раскладка + фото каждой карточки */
-function cbPdfSpec() {
+/* Спецификация страниц для PDF-файла: раскладка + фото каждой карточки.
+   skipEmpty — пустые слоты не попадают в PDF (чистый лист вместо плашек) */
+function cbPdfSpec(skipEmpty) {
   var pages = [];
   App.cards.forEach(function (card, ci) {
     var geom, getPid;
@@ -3679,27 +3748,40 @@ function cbPdfSpec() {
       geom = cbManualBoxes(card);
       getPid = function (i) { return card.slots[i] ? card.slots[i].pid : null; };
     }
-    var boxes = geom.boxes.map(function (b) {
+    var boxes = [];
+    geom.boxes.forEach(function (b) {
       var pid = getPid(b.slotIdx);
       var p = pid ? cbPhotoById(pid) : null;
-      return {
+      if (skipEmpty && !p) return;   /* пустой слот → чистое место на листе */
+      boxes.push({
         x: b.x, y: b.y, w: b.w, h: b.h,
         path: (p && p.path) ? p.path : null,
         dataUrl: (p && !p.path && p.dataUrl) ? p.dataUrl : null
-      };
+      });
     });
     var title = (ci + 1) + '. ' + (card.title || '');
     if (card.category) title += ' · ' + card.category;
-    pages.push({ canvas: card.canvas, W: geom.W, H: geom.H, title: title, boxes: boxes });
+    pages.push({ canvas: card.canvas, W: geom.W, H: geom.H, title: title, boxes: boxes,
+      bg: card.bg || '#ffffff' });
   });
   return pages;
 }
 
-/* Экспорт PDF в файл (desktop: Python+Pillow, A4 300dpi; браузер: печать) */
+/* Экспорт PDF в файл (desktop: Python+Pillow, A4 300dpi; браузер: печать).
+   Перед экспортом — окно настроек (галочка «убирать пустые слоты»). */
 function cbExportPdf() {
   if (!App.cards.length) { cbToast('Нет карточек для экспорта'); return; }
   if (!cbDesktop() || !cbApi().export_pdf) { cbPrintPdf(); return; }
-  var pages = cbPdfSpec();
+  var saved = localStorage.getItem('cardboard_pdf_skipempty');
+  document.getElementById('cbPdfSkipEmpty').checked = (saved === null) ? true : saved === '1';
+  document.getElementById('cbPdfModal').classList.add('cb-open');
+}
+
+function cbExportPdfGo() {
+  var skipEmpty = document.getElementById('cbPdfSkipEmpty').checked;
+  try { localStorage.setItem('cardboard_pdf_skipempty', skipEmpty ? '1' : '0'); } catch (e) { }
+  document.getElementById('cbPdfModal').classList.remove('cb-open');
+  var pages = cbPdfSpec(skipEmpty);
   if (!pages.length) { cbToast('Нет карточек для экспорта'); return; }
   cbBusyShow('Экспорт PDF: страниц ' + pages.length, 0.3);
   cbApi().export_pdf(JSON.stringify({ name: App.projectName, pages: pages })).then(function (path) {
@@ -3711,6 +3793,21 @@ function cbExportPdf() {
   });
 }
 document.getElementById('cbBtnPdf').onclick = cbExportPdf;
+document.getElementById('cbPdfGo').onclick = cbExportPdfGo;
+
+/* Сворачивание боковых панелей: полосы по краям, состояние запоминается */
+(function cbInitPanels() {
+  var st = {};
+  try { st = JSON.parse(localStorage.getItem('cardboard_panels') || '{}'); } catch (e) { }
+  function apply() {
+    document.body.classList.toggle('cb-tray-off', !!st.trayOff);
+    document.body.classList.toggle('cb-outline-off', !!st.outlineOff);
+    try { localStorage.setItem('cardboard_panels', JSON.stringify(st)); } catch (e) { }
+  }
+  document.getElementById('cbStripTray').onclick = function () { st.trayOff = !st.trayOff; apply(); };
+  document.getElementById('cbStripOutline').onclick = function () { st.outlineOff = !st.outlineOff; apply(); };
+  apply();
+})();
 document.getElementById('cbBtnPrint').onclick = cbPrintPdf;
 
 function cbDownload(filename, text, mime) {

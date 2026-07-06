@@ -269,7 +269,11 @@ class CardboardAPI:
         pages = []
         for pg in spec.get("pages", []):
             size = (3508, 2480) if pg.get("canvas") == "h" else (2480, 3508)
-            img = Image.new("RGB", size, (255, 255, 255))
+            try:
+                bg = pg.get("bg") or "#ffffff"
+                img = Image.new("RGB", size, bg)
+            except Exception:
+                img = Image.new("RGB", size, (255, 255, 255))
             draw = ImageDraw.Draw(img)
             sc = size[0] / float(pg.get("W") or 1000)
             for b in pg.get("boxes", []):
