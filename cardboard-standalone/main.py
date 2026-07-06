@@ -330,6 +330,24 @@ class CardboardAPI:
             out += ".pdf"
         return self.write_pdf(spec, out)
 
+    def locate_scan(self) -> Optional[dict]:
+        """Locate как в Capture One: выбрать папку, собрать {имя файла: путь}.
+
+        Сканирует папку с подпапками; при дублях имён берётся первый
+        (сортировка по пути). Frontend сопоставляет фото проекта по имени.
+        """
+        import webview
+        result = self._window.create_file_dialog(webview.FOLDER_DIALOG)
+        if not result:
+            return None
+        folder = result[0]
+        names: dict = {}
+        for root, _dirs, files in os.walk(folder):
+            for fn in sorted(files):
+                if Path(fn).suffix.lower() in IMG_EXT and fn not in names:
+                    names[fn] = str(Path(root) / fn)
+        return {"folder": folder, "names": names}
+
     def grant_folder_access(self, directory: Optional[str] = None) -> bool:
         """Вернуть доступ к папке с фото после запрета macOS (TCC).
 
@@ -538,6 +556,7 @@ def main() -> None:
                 wm.MenuAction("Импорт референсов", _js("pickref")),
                 wm.MenuAction("Импорт папки целиком", _js("folder")),
                 wm.MenuAction("Следить за папкой (вкл/выкл)", _js("watch")),
+                wm.MenuAction("Подставить папку с фото (Locate)", _js("locate")),
                 wm.MenuSeparator(),
                 wm.MenuAction("Экспорт PDF", _js("pdf")),
                 wm.MenuAction("Печать", _js("print")),

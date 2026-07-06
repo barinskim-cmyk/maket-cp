@@ -672,6 +672,7 @@ body.cb-file-drag #cbDropOverlay { display: flex; }
       <button id="cbBtnPickRef">Импорт референсов</button>
       <button id="cbBtnFolder" style="display:none">Импорт папки целиком</button>
       <button id="cbBtnWatch" title="Хоткей в Capture One кладёт фото в папку — Cardboard подхватывает">Следить за папкой</button>
+      <button id="cbBtnLocate" title="Фото переехали или довыгружены? Пути обновятся по именам файлов">Подставить папку с фото...</button>
       <div class="cb-pop-sep"></div>
       <button id="cbBtnPdf">Экспорт PDF<span class="cb-hotkey">⌘E</span></button>
       <button id="cbBtnPrint">Печать...</button>
@@ -1938,6 +1939,40 @@ document.getElementById('cbBtnWatch').onclick = function () {
   if (!App.watch.timer && cbRequireProject()) return;
   if (App.watch.timer) cbWatchStop(); else cbWatchStart();
 };
+
+/* Locate (как в Capture One): пути фото обновляются по имени файла */
+function cbApplyLocateMap(names) {
+  var updated = 0;
+  App.photos.forEach(function (p) {
+    var np = names[p.name];
+    if (!np) return;
+    if (np !== p.path) {
+      p.path = np;
+      p.dataUrl = null;   /* перечитать превью с нового места */
+      p.missing = false;
+      updated++;
+    } else if (p.missing) {
+      p.missing = false;
+      p.dataUrl = null;
+      updated++;
+    }
+  });
+  return updated;
+}
+
+function cbLocatePhotos() {
+  if (cbRequireProject()) return;
+  if (!App.photos.length) { cbToast('В проекте нет фото'); return; }
+  cbApi().locate_scan().then(function (res) {
+    if (!res) return;
+    var updated = cbApplyLocateMap(res.names || {});
+    if (!updated) { cbToast('Совпадений по именам файлов нет: ' + res.folder); return; }
+    cbMarkDirty();
+    cbToast('Пути обновлены: ' + updated);
+    cbRehydrateThumbs();
+  });
+}
+document.getElementById('cbBtnLocate').onclick = cbLocatePhotos;
 
 /* ============================================================
    Меню-бар и попапы
@@ -3873,9 +3908,14 @@ function cbRehydrateThumbs(isRetry) {
         });
       }
     } else if (missing) {
-      cbToast(denied
-        ? 'Нет доступа к файлам: ' + denied + ' (macOS, Настройки → Конфиденциальность → Файлы и папки)'
-        : 'Не найдено файлов: ' + missing + ' (пути изменились?)');
+      if (denied) {
+        cbToast('Нет доступа к файлам: ' + denied + ' (macOS, Настройки → Конфиденциальность → Файлы и папки)');
+      } else if (!isRetry && confirm('Не найдено файлов: ' + missing
+        + '.\nФото переехали в другую папку?\n\nВыбрать её — пути обновятся по именам файлов.')) {
+        cbLocatePhotos();   /* Locate как в Capture One */
+      } else {
+        cbToast('Не найдено файлов: ' + missing + ' (Файл → Подставить папку с фото)');
+      }
     }
   }).catch(function () { cbBusyHide(); });
 }
@@ -3940,6 +3980,7 @@ function cbMenuNative(action) {
   var map = {
     'new': 'cbMenuNew', 'open': 'cbBtnOpen', 'save': 'cbBtnSave', 'rename': 'cbMenuRename',
     'pick': 'cbBtnPick', 'pickref': 'cbBtnPickRef', 'folder': 'cbBtnFolder', 'watch': 'cbBtnWatch',
+    'locate': 'cbBtnLocate',
     'pdf': 'cbBtnPdf', 'print': 'cbBtnPrint', 'list': 'cbBtnList',
     'tplnew': 'cbMenuTplNew', 'tplgal': 'cbMenuTplGallery',
     'helpguide': 'cbMenuHelpGuide', 'helpsync': 'cbMenuHelpSync', 'helpprod': 'cbMenuHelpProducts'
