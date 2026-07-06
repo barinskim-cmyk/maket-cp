@@ -427,6 +427,27 @@ body.cb-resizing * { pointer-events: none; }
   margin: 14px 0 6px;
 }
 
+/* ---------- Лаунчер: недавние проекты (как в Capture One) ---------- */
+#cbRecentList { display: flex; flex-direction: column; gap: 4px; max-height: 260px; overflow-y: auto; }
+.cb-recent-item {
+  border: 1px solid #2a2a28;
+  background: #1a1a18;
+  border-radius: 4px;
+  text-align: left;
+  padding: 8px 10px;
+  white-space: normal;
+  cursor: pointer;
+}
+.cb-recent-item:hover { border-color: #c9956b; }
+.cb-recent-name { font-weight: 600; font-size: 12.5px; color: #f2f2f1; }
+.cb-recent-meta {
+  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  font-size: 9px; color: #6d6d6c; margin-top: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 100%;
+}
+.cb-recent-empty { font-size: 11.5px; color: #6d6d6c; padding: 8px 2px; }
+
 /* ---------- Редактор шаблона v2 ---------- */
 #cbTplPanel { width: 880px; display: flex; gap: 22px; }
 .cb-te-left { width: 340px; flex-shrink: 0; }
@@ -768,16 +789,38 @@ body.cb-file-drag #cbDropOverlay { display: flex; }
 
 <!-- Создание / переименование проекта -->
 <div id="cbProjModal" class="cb-modal">
-  <div class="cb-panel" style="width:400px">
+  <div class="cb-panel" style="width:420px">
     <button class="cb-modal-x" data-close-modal="cbProjModal" title="Закрыть">×</button>
     <h2 id="cbProjModalTitle">Новый проект</h2>
     <div class="cb-eyebrow">CARDBOARD · ПРОЕКТ</div>
-    <div class="cb-lbl">Название проекта</div>
-    <input type="text" id="cbProjNameInput" placeholder="Например: Осенняя съёмка · обувь" style="width:100%">
-    <div class="cb-te-foot">
-      <button class="cb-primary" id="cbProjModalOk">Создать</button>
-      <span class="cb-spacer"></span>
-      <button id="cbProjModalCancel">Отмена</button>
+    <div id="cbProjStep0" style="display:none">
+      <div class="cb-lbl">Недавние проекты</div>
+      <div id="cbRecentList"></div>
+      <div class="cb-te-foot" style="flex-direction:column;align-items:stretch;gap:6px">
+        <button class="cb-primary" id="cbProjLaunchNew">Новый проект</button>
+        <button id="cbProjLaunchOpen">Открыть другой...</button>
+      </div>
+    </div>
+    <div id="cbProjStep1">
+      <div class="cb-lbl">Название проекта</div>
+      <input type="text" id="cbProjNameInput" placeholder="Например: Осенняя съёмка · обувь" style="width:100%">
+      <div class="cb-te-foot">
+        <button class="cb-primary" id="cbProjModalOk">Создать</button>
+        <span class="cb-spacer"></span>
+        <button id="cbProjModalCancel">Отмена</button>
+      </div>
+    </div>
+    <div id="cbProjStep2" style="display:none">
+      <div style="font-size:12.5px;line-height:1.6;color:#b2b2b1;margin-top:4px">
+        Файл проекта создан — всё будет сохраняться автоматически.<br>
+        Откуда брать фото?
+      </div>
+      <div id="cbProjStep2Path" class="cb-recent-meta" style="margin-top:6px"></div>
+      <div class="cb-te-foot" style="flex-direction:column;align-items:stretch;gap:6px">
+        <button class="cb-primary" id="cbProjWatch">Следить за папкой Capture One</button>
+        <button id="cbProjImportFolder">Импортировать папку с фото</button>
+        <button id="cbProjSkip">Позже — начать с пустого</button>
+      </div>
     </div>
   </div>
 </div>
@@ -932,6 +975,7 @@ function cbAutosaveNow() {
       if (path) {
         cbClearDirty();
         cbAutosaveBadge();
+        cbRecentAdd(data.name, path);   /* держим имя/дату в списке недавних свежими */
       }
     });
   } else {
@@ -1168,6 +1212,20 @@ function cbHeroVGrid(W, H, vAR, K, cells, boxes, heroAR) {
       x += w + g;
       i++;
     }
+    /* неполный ряд справа от героя — прижать ВПРАВО: правый край рамки цел */
+    var topEnd = place ? local.length : 0;
+    if (place) {
+      var rowsT = {};
+      for (var t = 1; t < topEnd; t++) {
+        (rowsT[local[t].y] = rowsT[local[t].y] || []).push(local[t]);
+      }
+      Object.keys(rowsT).forEach(function (yy) {
+        var row = rowsT[yy], right = 0;
+        row.forEach(function (b) { right = Math.max(right, b.x + b.w); });
+        var dx = compW - right;
+        if (dx > 2) row.forEach(function (b) { b.x += dx; });
+      });
+    }
     /* низ: поток по ширине блока (рамка сшивается с верхом) */
     var rB = 0;
     x = 0;
@@ -1179,6 +1237,19 @@ function cbHeroVGrid(W, H, vAR, K, cells, boxes, heroAR) {
       if (!started) { started = true; rB = 1; }
       if (place) local.push({ x: x, y: y, w: w2, h: q, slotIdx: cells[i].slotIdx });
       x += w2 + g;
+    }
+    /* нижние ряды — по центру блока (симметрия, как неполные ряды в joint-пути) */
+    if (place) {
+      var rowsB = {};
+      for (var b2 = topEnd; b2 < local.length; b2++) {
+        (rowsB[local[b2].y] = rowsB[local[b2].y] || []).push(local[b2]);
+      }
+      Object.keys(rowsB).forEach(function (yy) {
+        var row = rowsB[yy], right = 0;
+        row.forEach(function (b) { right = Math.max(right, b.x + b.w); });
+        var dx = (compW - right) / 2;
+        if (dx > 2) row.forEach(function (b) { b.x += dx; });
+      });
     }
     var totalH = heroH + (rB ? rB * (q + g) : 0);
     return { totalH: totalH, boxes: local };
@@ -1811,20 +1882,126 @@ document.addEventListener('keydown', function (e) {
 /* ---------- Окно создания / переименования проекта ---------- */
 
 var _projModalMode = 'new';
+var _projStartup = false;   /* открыто как лаунчер при запуске */
 
-function cbProjModalOpen(mode) {
+/* Недавние проекты (лаунчер как в Capture One).
+   localStorage cardboard_recent: [{name, path, ts}], новые сверху, максимум 8. */
+function cbRecentsGet() {
+  try { return JSON.parse(localStorage.getItem('cardboard_recent') || '[]'); }
+  catch (e) { return []; }
+}
+
+function cbRecentAdd(name, path) {
+  if (!path) return;
+  var list = cbRecentsGet().filter(function (r) { return r.path !== path; });
+  list.unshift({ name: name || 'Проект', path: path, ts: Date.now() });
+  if (list.length > 8) list.length = 8;
+  try { localStorage.setItem('cardboard_recent', JSON.stringify(list)); } catch (e) { }
+}
+
+function cbRecentRemove(path) {
+  var list = cbRecentsGet().filter(function (r) { return r.path !== path; });
+  try { localStorage.setItem('cardboard_recent', JSON.stringify(list)); } catch (e) { }
+}
+
+function cbRecentDate(ts) {
+  if (!ts) return '';
+  var d = new Date(ts);
+  return d.toLocaleDateString('ru-RU') + ' ' + d.toLocaleTimeString('ru-RU').slice(0, 5);
+}
+
+function cbRenderRecents() {
+  var box = document.getElementById('cbRecentList');
+  var html = '';
+  if (cbDesktop()) {
+    var list = cbRecentsGet();
+    list.forEach(function (r) {
+      html += '<button class="cb-recent-item" data-path="' + cbEsc(r.path) + '">'
+        + '<div class="cb-recent-name">' + cbEsc(r.name) + '</div>'
+        + '<div class="cb-recent-meta">' + cbEsc(r.path) + ' · ' + cbRecentDate(r.ts) + '</div>'
+        + '</button>';
+    });
+    if (!list.length) html = '<div class="cb-recent-empty">Пока нет проектов — создайте первый.</div>';
+  } else {
+    /* браузер: единственный «недавний» — автосейв в localStorage */
+    var snap = null;
+    try { snap = JSON.parse(localStorage.getItem('cardboard_autosave') || 'null'); } catch (e) { }
+    if (snap && snap.app === 'cardboard') {
+      html = '<button class="cb-recent-item" data-autosave="1">'
+        + '<div class="cb-recent-name">' + cbEsc(snap.name || 'Проект') + '</div>'
+        + '<div class="cb-recent-meta">автосохранение в браузере</div>'
+        + '</button>';
+    } else {
+      html = '<div class="cb-recent-empty">Пока нет проектов — создайте первый.</div>';
+    }
+  }
+  box.innerHTML = html;
+  Array.prototype.forEach.call(box.querySelectorAll('.cb-recent-item'), function (btn) {
+    btn.onclick = function () { cbRecentOpen(btn.dataset.path, btn.dataset.autosave); };
+  });
+}
+
+function cbRecentOpen(path, autosave) {
+  if (autosave) {   /* браузерный автосейв */
+    try {
+      var data = JSON.parse(localStorage.getItem('cardboard_autosave'));
+      cbApplyProject(data);
+      document.getElementById('cbProjModal').classList.remove('cb-open');
+      cbToast('Проект восстановлен из автосохранения');
+    } catch (e) { cbToast('Не удалось восстановить автосохранение'); }
+    return;
+  }
+  cbApi().open_project_at(path).then(function (res) {
+    if (!res || !res.data) {
+      cbToast('Файл проекта не найден: ' + path);
+      cbRecentRemove(path);
+      cbRenderRecents();
+      return;
+    }
+    var data = JSON.parse(res.data);
+    if (data.app !== 'cardboard') { cbToast('Это не проект Cardboard'); return; }
+    App.projectPath = res.path;
+    cbApplyProject(data);
+    cbRehydrateThumbs();
+    cbRecentAdd(data.name, res.path);
+    document.getElementById('cbProjModal').classList.remove('cb-open');
+    cbToast('Проект открыт: ' + res.path);
+  });
+}
+
+function cbProjModalOpen(mode, startup) {
   _projModalMode = mode;
-  document.getElementById('cbProjModalTitle').textContent = (mode === 'new') ? 'Новый проект' : 'Проект';
+  _projStartup = !!startup;
+  var launcher = (mode === 'launcher');
+  document.getElementById('cbProjStep0').style.display = launcher ? '' : 'none';
+  document.getElementById('cbProjStep1').style.display = launcher ? 'none' : '';
+  document.getElementById('cbProjStep2').style.display = 'none';
+  document.getElementById('cbProjModalTitle').textContent =
+    launcher ? 'Проекты' : (mode === 'new') ? 'Новый проект' : 'Проект';
+  if (launcher) {
+    cbRenderRecents();
+    document.getElementById('cbProjModal').classList.add('cb-open');
+    return;
+  }
   document.getElementById('cbProjModalOk').textContent = (mode === 'new') ? 'Создать' : 'Переименовать';
   document.getElementById('cbProjNameInput').value = (mode === 'new') ? '' : App.projectName;
   document.getElementById('cbProjModal').classList.add('cb-open');
   setTimeout(function () { document.getElementById('cbProjNameInput').focus(); }, 50);
 }
 
+/* шаг 2: проект создан — предложить источник фото */
+function cbProjModalStep2() {
+  document.getElementById('cbProjModalTitle').textContent = 'Проект создан';
+  document.getElementById('cbProjStep1').style.display = 'none';
+  document.getElementById('cbProjStep2').style.display = '';
+  /* показать, куда именно сохраняется проект */
+  document.getElementById('cbProjStep2Path').textContent =
+    App.projectPath ? App.projectPath : (cbDesktop() ? '' : 'автосохранение в браузере');
+}
+
 document.getElementById('cbProjModalOk').onclick = function () {
   var name = document.getElementById('cbProjNameInput').value.trim();
   if (!name) { cbToast('Дайте проекту название'); return; }
-  document.getElementById('cbProjModal').classList.remove('cb-open');
   if (_projModalMode === 'new') {
     if (App.dirty && App.projectPath === null
       && (App.cards.length || App.photos.length)
@@ -1838,21 +2015,45 @@ document.getElementById('cbProjModalOk').onclick = function () {
     cbHistoryReset();
     cbRenderTray(); cbRenderCards(); cbRenderConts();
     if (cbDesktop()) {
-      /* сразу выбираем файл проекта — дальше всё автосохраняется */
+      /* сразу создаём файл проекта в выбранной папке — дальше автосейв */
       var data = cbProjectData();
       cbApi().save_project(name, JSON.stringify(data), true).then(function (path) {
-        if (path) { App.projectPath = path; cbAutosaveBadge(); cbToast('Проект создан: ' + path); }
-        else cbToast('Проект создан (файл выберется при первом ⌘S)');
+        if (path) { App.projectPath = path; cbAutosaveBadge(); cbRecentAdd(name, path); }
+        cbProjModalStep2();   /* шаг 2: откуда брать фото */
       });
     } else {
-      cbToast('Проект создан: ' + name);
+      cbProjModalStep2();
     }
   } else {
+    document.getElementById('cbProjModal').classList.remove('cb-open');
     cbSetProjectName(name);
     cbMarkDirty();
   }
 };
 document.getElementById('cbProjModalCancel').onclick = function () {
+  /* на старте «Отмена» возвращает в лаунчер, а не закрывает окно в пустоту */
+  if (_projStartup) { cbProjModalOpen('launcher', true); return; }
+  document.getElementById('cbProjModal').classList.remove('cb-open');
+};
+/* лаунчер: новый проект / открыть другой */
+document.getElementById('cbProjLaunchNew').onclick = function () {
+  cbProjModalOpen('new', _projStartup);
+};
+document.getElementById('cbProjLaunchOpen').onclick = function () {
+  document.getElementById('cbProjModal').classList.remove('cb-open');
+  document.getElementById('cbBtnOpen').click();
+};
+/* шаг 2: источник фото */
+document.getElementById('cbProjWatch').onclick = function () {
+  document.getElementById('cbProjModal').classList.remove('cb-open');
+  document.getElementById('cbBtnWatch').click();
+};
+document.getElementById('cbProjImportFolder').onclick = function () {
+  document.getElementById('cbProjModal').classList.remove('cb-open');
+  if (cbDesktop()) document.getElementById('cbBtnFolder').click();
+  else document.getElementById('cbBtnPick').click();
+};
+document.getElementById('cbProjSkip').onclick = function () {
   document.getElementById('cbProjModal').classList.remove('cb-open');
 };
 document.getElementById('cbProjNameInput').addEventListener('keydown', function (e) {
@@ -3253,6 +3454,7 @@ function cbSaveProject() {
       if (!path) return;
       App.projectPath = path;
       cbClearDirty();
+      cbRecentAdd(data.name, path);
       cbToast('Сохранено: ' + path);
     });
   } else {
@@ -3358,6 +3560,7 @@ document.getElementById('cbBtnOpen').onclick = function () {
       App.projectPath = res.path;
       cbApplyProject(data);
       cbRehydrateThumbs();
+      cbRecentAdd(data.name, res.path);
       cbToast('Проект открыт: ' + res.path);
     });
   } else {
@@ -3407,6 +3610,9 @@ cbRenderCards();
 cbRenderConts();
 cbSwitchTab('cards');
 cbHistoryReset();
+/* при запуске сразу предлагаем создать (или открыть) проект */
+/* Лаунчер при запуске: недавние проекты или новый (как в Capture One) */
+setTimeout(function () { cbProjModalOpen('launcher', true); }, 150);
 </script>
 </body>
 </html>

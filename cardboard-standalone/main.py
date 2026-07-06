@@ -228,6 +228,16 @@ class CardboardAPI:
     def project_path(self) -> Optional[str]:
         return self._project_path
 
+    def open_project_at(self, path: str) -> Optional[dict]:
+        """Открыть проект по известному пути (лаунчер недавних проектов)."""
+        try:
+            data = Path(path).read_text(encoding="utf-8")
+            json.loads(data)  # валидация
+        except Exception:
+            return None
+        self._project_path = path
+        return {"path": path, "data": data}
+
     def reveal(self, path: str) -> None:
         """Показать файл в Finder/Explorer."""
         if sys.platform == "darwin":
