@@ -2,11 +2,12 @@
 """
 Cardboard — desktop-запуск (pywebview).
 
-Локальный инструмент вёрстки карточек товара. Ничего не копирует и не
-создаёт лишних файлов: фотографии остаются на своих местах, приложение
-хранит только пути к ним. Миниатюры генерируются в памяти (RAM-кэш)
-и на диск не пишутся. Единственный файл, который создаёт приложение, —
-файл проекта `имя.cardboard` (JSON: пути к фото + структура карточек).
+Локальный инструмент вёрстки карточек товара. Фотографии остаются на
+своих местах, приложение хранит только пути к ним. Проект устроен как
+сессия Capture One: папка проекта, внутри `имя.cardboard` (JSON: пути
+к фото + структура карточек) и `previews/` — локальные JPEG-превью
+до 1200px. Превью пишутся один раз при импорте, дальше проект
+открывается мгновенно с диска и не зависит от доступа к исходникам.
 
 Запуск: python3 main.py
 Зависимости: pywebview, Pillow (доустановятся сами при первом запуске).
@@ -46,17 +47,20 @@ if not getattr(sys, "frozen", False) and __name__ == "__main__":
 
 from PIL import Image, ImageOps  # noqa: E402
 
+import hashlib  # noqa: E402
+
 IMG_EXT = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".tif", ".tiff", ".bmp"}
-THUMB_SIDE = 1400   # макс. сторона миниатюры (хватает и для PDF-экспорта)
+THUMB_SIDE = 1200   # макс. сторона превью (просьба Маши: локальные превью 1200px)
 JPEG_Q = 85
 FILE_TYPES = ("Изображения (*.jpg;*.jpeg;*.png;*.gif;*.webp;*.tif;*.tiff;*.bmp)",)
 PROJ_TYPES = ("Проект Cardboard (*.cardboard)",)
 
 
-def make_thumb(path: str) -> Optional[dict]:
-    """Прочитать изображение с диска и вернуть миниатюру как base64 dataURL.
+def make_thumb(path: str, save_to: Optional[Path] = None) -> Optional[dict]:
+    """Прочитать изображение с диска и вернуть превью как base64 dataURL.
 
-    Ничего не пишет на диск. При ошибке возвращает {"error": kind}:
+    save_to — записать JPEG-превью на диск (папка previews проекта).
+    При ошибке возвращает {"error": kind}:
     - "denied"  — macOS TCC запретил доступ (Загрузки/Документы и т.п.);
     - "missing" — файла нет по этому пути;
     - "unreadable" — файл есть, но не читается как изображение.
@@ -69,6 +73,11 @@ def make_thumb(path: str) -> Optional[dict]:
                 im = im.convert("RGB")
             buf = io.BytesIO()
             im.save(buf, "JPEG", quality=JPEG_Q)
+            if save_to is not None:
+                try:
+                    save_to.write_bytes(buf.getvalue())
+                except Exception:
+                    pass   # кэш — best effort, превью в памяти всё равно есть
             b64 = base64.b64encode(buf.getvalue()).decode("ascii")
             return {"dataUrl": "data:image/jpeg;base64," + b64, "w": im.width, "h": im.height}
     except PermissionError:
@@ -77,6 +86,18 @@ def make_thumb(path: str) -> Optional[dict]:
         return {"error": "missing"}
     except Exception:
         return {"error": "unreadable"}
+
+
+def load_preview(fp: Path) -> Optional[dict]:
+    """Готовое JPEG-превью с диска -> dataUrl + размеры (быстро, без исходника)."""
+    try:
+        data = fp.read_bytes()
+        with Image.open(io.BytesIO(data)) as im:
+            w, h = im.size
+        b64 = base64.b64encode(data).decode("ascii")
+        return {"dataUrl": "data:image/jpeg;base64," + b64, "w": w, "h": h}
+    except Exception:
+        return None
 
 
 class CardboardAPI:
@@ -110,14 +131,55 @@ class CardboardAPI:
         """Frontend спрашивает: есть ли нативное меню (тогда HTML-меню прячется)."""
         return self._native_menu
 
+    def _previews_dir(self) -> Optional[Path]:
+        """Папка previews рядом с файлом проекта (как сессия Capture One)."""
+        if not self._project_path:
+            return None
+        d = Path(self._project_path).parent / "previews"
+        try:
+            d.mkdir(exist_ok=True)
+        except Exception:
+            return None
+        return d
+
     def _thumb_cached(self, path: str) -> Optional[dict]:
-        """Миниатюра из кэша; при ошибке возвращает {"error": kind} (не кэшируется)."""
-        if path not in self._thumb_cache:
-            t = make_thumb(path)
-            if t is None or "error" in t:
-                return t
-            self._thumb_cache[path] = t
-        return self._thumb_cache[path]
+        """Превью: RAM-кэш -> дисковый кэш previews/ -> генерация из исходника.
+
+        Дисковый кэш: previews/<sha1(путь)>_<mtime>.jpg. Если исходник
+        недоступен (файл переехал, TCC) — используем последнее превью
+        с диска: проект открывается всегда.
+        """
+        if path in self._thumb_cache:
+            return self._thumb_cache[path]
+        pdir = self._previews_dir()
+        key = hashlib.sha1(path.encode("utf-8")).hexdigest()[:24]
+        try:
+            mtime = int(Path(path).stat().st_mtime)
+        except Exception:
+            mtime = None   # исходник недоступен — сгодится любое превью
+        hits = sorted(pdir.glob(key + "_*.jpg")) if pdir else []
+        for f in hits:
+            try:
+                fm = int(f.stem.split("_", 1)[1])
+            except Exception:
+                fm = None
+            if mtime is None or fm == mtime:
+                t = load_preview(f)
+                if t:
+                    self._thumb_cache[path] = t
+                    return t
+        save_to = (pdir / f"{key}_{mtime}.jpg") if (pdir and mtime is not None) else None
+        if save_to is not None:
+            for old in hits:   # устаревшие превью этого файла
+                try:
+                    old.unlink()
+                except Exception:
+                    pass
+        t = make_thumb(path, save_to)
+        if t is None or "error" in t:
+            return t
+        self._thumb_cache[path] = t
+        return t
 
     def _import_paths(self, paths: list) -> list:
         """Пути -> список фото для frontend: name, path, размеры, миниатюра."""
@@ -242,8 +304,20 @@ class CardboardAPI:
             path = result if isinstance(result, str) else result[0]
             if not path.endswith(".cardboard"):
                 path += ".cardboard"
+            # Проект как сессия Capture One: папка проекта, внутри файл
+            # и previews/. Если пользователь уже в одноимённой папке —
+            # не вкладывать вторую.
+            p = Path(path)
+            if p.parent.name != p.stem:
+                try:
+                    folder = p.parent / p.stem
+                    folder.mkdir(exist_ok=True)
+                    path = str(folder / p.name)
+                except Exception:
+                    pass   # не смогли создать папку — сохраняем как выбрано
         Path(path).write_text(json_str, encoding="utf-8")
         self._project_path = path
+        self._previews_dir()   # создать previews/ сразу
         return path
 
     def open_project(self) -> Optional[dict]:
