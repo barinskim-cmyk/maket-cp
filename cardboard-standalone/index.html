@@ -1042,26 +1042,32 @@ function cbRowsInZone(zone, rows, boxes, maxRowH) {
     var h = (zone.w - (row.length - 1) * CB_GAP) / sum;
     return maxRowH ? Math.min(h, maxRowH) : h;
   });
-  var totalMax = 0;
-  hmax.forEach(function (h) { totalMax += h; });
+  /* ЕДИНАЯ высота всех рядов зоны — по самому плотному ряду:
+     не-герои максимально одного размера (Маша), неполные ряды
+     не растягиваются */
+  var hUni = Math.min.apply(null, hmax);
   var availH = zone.h - (nonEmpty.length - 1) * CB_GAP;
-  /* не влезает по высоте — масштабируем ВСЕ ряды, пропорции целы */
-  var f = Math.min(1, availH / totalMax);
+  var f = Math.min(1, availH / (hUni * nonEmpty.length));
+  var h = hUni * f;
   var y = zone.y;
-  nonEmpty.forEach(function (row, ri) {
-    var h = hmax[ri] * f;
+  nonEmpty.forEach(function (row) {
     var slotsW = 0;
     row.forEach(function (c) { slotsW += c.ar * h; });
-    /* ЦЕЛЬНАЯ РАМКА (Маша): крайние слоты прижимаются к краям зоны,
-       лишний воздух уходит в зазоры между слотами, размеры не меняются */
+    var full = slotsW + (row.length - 1) * CB_GAP >= zone.w * 0.9;
+    /* ЦЕЛЬНАЯ РАМКА: полные ряды прижимаются к краям (воздух в зазоры);
+       неполные: одиночка у героя — вправо, иначе лево-прижато */
     var x, step;
     if (row.length === 1) {
-      /* одиночка: к внешнему краю (справа от героя — вправо), иначе центр */
+      /* одиночка: справа от героя — вправо (рамка), иначе центр (симметрия) */
       x = (zone.x > CB_GAP) ? (zone.x + zone.w - slotsW) : (zone.x + (zone.w - slotsW) / 2);
       step = 0;
-    } else {
+    } else if (full) {
       x = zone.x;
       step = Math.max(CB_GAP, (zone.w - slotsW) / (row.length - 1));
+    } else {
+      /* неполный ряд: по центру зоны, обычные зазоры (симметрия) */
+      x = zone.x + (zone.w - slotsW - (row.length - 1) * CB_GAP) / 2;
+      step = CB_GAP;
     }
     row.forEach(function (c) {
       boxes.push({ x: x, y: y, w: c.ar * h, h: h, slotIdx: c.slotIdx });
@@ -1096,26 +1102,118 @@ function cbHeroBox(W, H, heroAR, hasRest, boxes, restRows) {
    равна высоте блока рядов (N рядов + зазоры). Итерации до неподвижной
    точки: высота героя задаёт ширину колонки -> ширину зоны -> высоты
    рядов -> новую высоту героя. */
+/* «Полочная» упаковка для рядов-одиночек (слотов в ряду = 1):
+   герой максимального размера сверху-слева, правая колонка одиночек
+   в высоту героя, остаток — вниз потоком слева направо. Все не-герои
+   одного размера. Перебираем, сколько одиночек уходит в колонку,
+   берём вариант с максимальным размером слота. */
+function cbHeroVShelf(W, H, heroAR, cells, boxes) {
+  var n = cells.length;
+  var heroW = Math.min(W * 0.6, H * heroAR);
+  var heroH = heroW / heroAR;
+  var zoneW = W - heroW - CB_GAP;
+  var best = null;
+
+  for (var kCol = 1; kCol <= n; kCol++) {
+    var h = (heroH - (kCol - 1) * CB_GAP) / kCol;
+    if (h <= 0) continue;
+    /* колонка должна влезать по ширине */
+    var colW = 0;
+    for (var i = 0; i < kCol; i++) colW = Math.max(colW, cells[i].ar * h);
+    var scale = Math.min(1, zoneW / colW);
+    var h2 = h * scale;
+    /* остаток — вниз рядами-потоком */
+    var restN = n - kCol;
+    var fits = true;
+    var rowsB = 0;
+    if (restN > 0) {
+      var x = 0;
+      rowsB = 1;
+      for (var j = kCol; j < n; j++) {
+        var w = cells[j].ar * h2;
+        if (x > 0 && x + w > W) { rowsB++; x = 0; }
+        x += w + CB_GAP;
+      }
+      var bottomH = rowsB * h2 + rowsB * CB_GAP;
+      fits = (heroH + bottomH) <= H + 1;
+    }
+    if (!fits) continue;
+    if (!best || h2 > best.h) best = { kCol: kCol, h: h2 };
+  }
+  if (!best) best = { kCol: Math.min(2, n), h: (heroH - CB_GAP) / 2 * 0.8 };
+
+  /* герой */
+  boxes.push({ x: 0, y: 0, w: heroW, h: heroH, slotIdx: cells.heroIdx });
+  /* правая колонка: к правому краю, в высоту героя */
+  var h3 = best.h;
+  var y = 0;
+  for (var c = 0; c < best.kCol; c++) {
+    var wC = cells[c].ar * h3;
+    boxes.push({ x: W - wC, y: y, w: wC, h: h3, slotIdx: cells[c].slotIdx });
+    y += h3 + CB_GAP;
+  }
+  /* остаток вниз потоком: собираем ряды wrap по ширине и центрируем каждый */
+  var flowRows = [[]];
+  var xAcc = 0;
+  for (var j2 = best.kCol; j2 < cells.length; j2++) {
+    var w2 = cells[j2].ar * h3;
+    if (xAcc > 0 && xAcc + w2 > W) { flowRows.push([]); xAcc = 0; }
+    flowRows[flowRows.length - 1].push(cells[j2]);
+    xAcc += w2 + CB_GAP;
+  }
+  var y2 = heroH + CB_GAP;
+  flowRows.forEach(function (fr) {
+    if (!fr.length) return;
+    var rowW = -CB_GAP;
+    fr.forEach(function (c) { rowW += c.ar * h3 + CB_GAP; });
+    var x2 = (W - rowW) / 2;   /* симметрия */
+    fr.forEach(function (c) {
+      boxes.push({ x: x2, y: y2, w: c.ar * h3, h: h3, slotIdx: c.slotIdx });
+      x2 += c.ar * h3 + CB_GAP;
+    });
+    y2 += h3 + CB_GAP;
+  });
+}
+
 function cbHeroVJoint(W, H, heroAR, byRow, boxes, maxT) {
   var nonEmptyAll = byRow.filter(function (r) { return r.length > 0; });
+  /* все ряды-одиночки (слотов в ряду = 1) и их больше двух — полочная
+     упаковка вместо правила двух рядов (иначе зигзаг из одиночек) */
+  if (!maxT && nonEmptyAll.length > 2 && nonEmptyAll.every(function (r) { return r.length === 1; })) {
+    var cells = nonEmptyAll.map(function (r) { return r[0]; });
+    cells.heroIdx = 0;
+    cbHeroVShelf(W, H, heroAR, cells, boxes);
+    return;
+  }
   /* Исключение (Маша): рядов три и больше — герой выравнивается на ДВА ряда,
      остальные ряды уходят под него на всю ширину листа.
-     Верхнему блоку выделяется доля высоты ~2 ряда из (2+nBottom),
-     иначе он съест весь лист и нижним рядам не останется места. */
+     ЕДИНАЯ высота ряда h для всех не-hero (равенство по построению):
+     heroH = 2h+gap; ограничения — ширина верхних рядов рядом с героем,
+     ширина нижних на весь лист, кап героя 60% ширины, общая высота. */
   if (nonEmptyAll.length > 2) {
     var topRows = nonEmptyAll.slice(0, 2);
     var bottomRows = nonEmptyAll.slice(2);
     var nB = bottomRows.length;
-    var rowH = (H - nB * CB_GAP) / (2 + nB);
-    var topAlloc = 2 * rowH + CB_GAP;
-    var topBoxes = [];
-    cbHeroVJoint(W, H, heroAR, topRows, topBoxes, topAlloc);
-    var topBottom = 0;
-    topBoxes.forEach(function (b) { topBottom = Math.max(topBottom, b.y + b.h); boxes.push(b); });
-    /* не-hero слоты максимально одного размера (Маша): нижние ряды
-       ровно в высоту верхних, одиночный слот внизу не раздувается */
-    var topRowCap = Math.max(60, (topBottom - CB_GAP) / 2);
-    cbRowsInZone({ x: 0, y: topBottom + CB_GAP, w: W, h: Math.max(0, H - topBottom - CB_GAP) }, bottomRows, boxes, topRowCap);
+    var g = CB_GAP;
+    var h = (H - g - nB * g) / (2 + nB);                       /* высота листа */
+    h = Math.min(h, (W * 0.6 / heroAR - g) / 2);               /* кап героя */
+    topRows.forEach(function (row) {                            /* верх с героем */
+      var sum = 0;
+      row.forEach(function (c) { sum += c.ar; });
+      h = Math.min(h, (W - g - (row.length - 1) * g - heroAR * g) / (sum + 2 * heroAR));
+    });
+    bottomRows.forEach(function (row) {                         /* низ на весь лист */
+      var sum = 0;
+      row.forEach(function (c) { sum += c.ar; });
+      h = Math.min(h, (W - (row.length - 1) * g) / sum);
+    });
+    var heroH = 2 * h + g;
+    var heroW = heroAR * heroH;
+    boxes.push({ x: 0, y: 0, w: heroW, h: heroH, slotIdx: 0 });
+    var zone = { x: heroW + g, y: 0, w: W - heroW - g, h: heroH };
+    /* верхние ряды: своя функция разместит их с высотой ровно h */
+    cbRowsInZone(zone, topRows, boxes, h);
+    cbRowsInZone({ x: 0, y: heroH + g, w: W, h: H - heroH - g }, bottomRows, boxes, h);
     return;
   }
   var nonEmpty = nonEmptyAll;
@@ -1213,8 +1311,8 @@ function cbManualBoxes(layout) {
     heroIsH = slots[0].orient === 'h';
     if (!heroIsH && rest.length) {
       heroVJoint = true;   /* совместный расчёт ниже */
-    } else {
-      zone = cbHeroBox(W, H, heroAR, rest.length > 0, boxes);
+    } else if (!rest.length) {
+      zone = cbHeroBox(W, H, heroAR, false, boxes);
     }
   }
 
@@ -1229,8 +1327,28 @@ function cbManualBoxes(layout) {
       var ri = Math.min(nRows - 1, Math.max(0, item.s.row || 0));
       byRow[ri].push({ ar: (item.s.orient === 'h') ? hAR : vAR, slotIdx: item.idx });
     });
-    if (heroVJoint) cbHeroVJoint(W, H, heroAR, byRow, boxes);
-    else cbRowsInZone(zone, byRow, boxes);
+    if (heroVJoint) {
+      cbHeroVJoint(W, H, heroAR, byRow, boxes);
+    } else if (heroIsH) {
+      /* герой-H = «двухрядный» верх: единая высота ряда h для не-героев,
+         heroH = 2h+gap, всё аналитически — равенство по построению */
+      var nonEmpty = byRow.filter(function (rw) { return rw.length > 0; });
+      var nR = Math.max(1, nonEmpty.length);
+      var g2 = CB_GAP;
+      var h2 = (H - g2 - nR * g2) / (2 + nR);
+      h2 = Math.min(h2, (W / heroAR - g2) / 2);      /* герой не шире листа */
+      nonEmpty.forEach(function (rw) {
+        var sum = 0;
+        rw.forEach(function (c) { sum += c.ar; });
+        h2 = Math.min(h2, (W - (rw.length - 1) * g2) / sum);
+      });
+      var heroH2 = 2 * h2 + g2;
+      var heroW2 = heroAR * heroH2;
+      boxes.push({ x: (W - heroW2) / 2, y: 0, w: heroW2, h: heroH2, slotIdx: 0 });
+      cbRowsInZone({ x: 0, y: heroH2 + g2, w: W, h: H - heroH2 - g2 }, byRow, boxes, h2);
+    } else {
+      cbRowsInZone(zone, byRow, boxes);
+    }
   }
   cbCenterBoxes(W, H, boxes);
   return { W: W, H: H, boxes: boxes };
