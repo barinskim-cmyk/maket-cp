@@ -3,7 +3,11 @@
 # Сборка: python3 -m PyInstaller Cardboard.spec --noconfirm
 # Иконка: когда появится design/brand-cardboard/icon.icns — вписать в BUNDLE (icon=...).
 
+import os
 import sys
+
+# Иконка: в maket-cp лежит в design/, в публичном репо — рядом со spec
+ICON = 'icon.icns' if os.path.exists('icon.icns') else '../design/brand-cardboard/icon.icns'
 
 a = Analysis(
     ['main.py'],
@@ -44,7 +48,7 @@ if sys.platform == 'darwin':
     app = BUNDLE(
         coll,
         name='Cardboard.app',
-        icon='../design/brand-cardboard/icon.icns',   # знак cb-grid на тайле #131313
+        icon=ICON,   # знак cb-grid на тайле #131313
         bundle_identifier='pulse.content.cardboard',
         info_plist={
             'CFBundleName': 'Cardboard',
