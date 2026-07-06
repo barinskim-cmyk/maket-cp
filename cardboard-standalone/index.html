@@ -1399,22 +1399,32 @@ function cbManualBoxes(layout) {
         cbHeroVGrid(W, H, vAR, K0, flatCells, boxes);
       }
     } else if (heroIsH) {
-      /* герой-H = «двухрядный» верх: единая высота ряда h для не-героев,
-         heroH = 2h+gap, всё аналитически — равенство по построению */
+      /* герой-H: если высоты хватает — и герой, и ряды получают максимум
+         (герой на всю ширину, ряды на всю ширину); если тесно — герой
+         занимает долю двух рядов, не-герои единой высоты */
       var nonEmpty = byRow.filter(function (rw) { return rw.length > 0; });
       var nR = Math.max(1, nonEmpty.length);
       var g2 = CB_GAP;
-      var h2 = (H - g2 - nR * g2) / (2 + nR);
-      h2 = Math.min(h2, (W / heroAR - g2) / 2);      /* герой не шире листа */
+      var hRowW = Infinity;
       nonEmpty.forEach(function (rw) {
         var sum = 0;
         rw.forEach(function (c) { sum += c.ar; });
-        h2 = Math.min(h2, (W - (rw.length - 1) * g2) / sum);
+        hRowW = Math.min(hRowW, (W - (rw.length - 1) * g2) / sum);
       });
-      var heroH2 = 2 * h2 + g2;
-      var heroW2 = heroAR * heroH2;
+      var heroHfull = W / heroAR;
+      var hRow = Math.min(hRowW, (H - heroHfull - nR * g2) / nR);
+      var heroH2;
+      if (hRow >= 0.35 * heroHfull) {
+        heroH2 = heroHfull;              /* свободно: оба максимума */
+      } else {
+        var hh = (H - g2 - nR * g2) / (2 + nR);   /* тесно: герой = 2 ряда */
+        hh = Math.min(hh, (W / heroAR - g2) / 2, hRowW);
+        heroH2 = 2 * hh + g2;
+        hRow = hh;
+      }
+      var heroW2 = Math.min(W, heroAR * heroH2);
       boxes.push({ x: (W - heroW2) / 2, y: 0, w: heroW2, h: heroH2, slotIdx: 0 });
-      cbRowsInZone({ x: 0, y: heroH2 + g2, w: W, h: H - heroH2 - g2 }, byRow, boxes, h2);
+      cbRowsInZone({ x: 0, y: heroH2 + g2, w: W, h: H - heroH2 - g2 }, byRow, boxes, hRow);
     } else {
       cbRowsInZone(zone, byRow, boxes);
     }
