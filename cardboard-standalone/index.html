@@ -1087,11 +1087,11 @@ function cbHeroBox(W, H, heroAR, hasRest, boxes, restRows) {
    рядов -> новую высоту героя. */
 function cbHeroVJoint(W, H, heroAR, byRow, boxes, maxT) {
   var nonEmptyAll = byRow.filter(function (r) { return r.length > 0; });
-  /* Исключение (Маша): рядов больше 3 — герой выравнивается на ДВА ряда,
+  /* Исключение (Маша): рядов три и больше — герой выравнивается на ДВА ряда,
      остальные ряды уходят под него на всю ширину листа.
      Верхнему блоку выделяется доля высоты ~2 ряда из (2+nBottom),
      иначе он съест весь лист и нижним рядам не останется места. */
-  if (nonEmptyAll.length > 3) {
+  if (nonEmptyAll.length > 2) {
     var topRows = nonEmptyAll.slice(0, 2);
     var bottomRows = nonEmptyAll.slice(2);
     var nB = bottomRows.length;
