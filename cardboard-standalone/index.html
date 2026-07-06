@@ -2196,7 +2196,7 @@ function cbTplMiniHTML(tpl) {
    Редактор шаблона v2
    ============================================================ */
 
-var TE = { cur: null };   /* редактируемая копия */
+var TE = { cur: null, lastAutoName: null };   /* редактируемая копия */
 
 function cbTeOpen(id) {
   var t = id ? cbTplById(id) : null;
@@ -2250,17 +2250,19 @@ function cbTeRender() {
   document.getElementById('cbTeManualCtl').style.display = (t.mode === 'manual') ? '' : 'none';
   /* ЧЕСТНАЯ сетка: герой-V = 2 колонки и 2 ряда; ряды считаем по факту
      раскладки (верх 2 ряда возле героя + свернутый низ), а не по нарезке */
-  var honestCols = (t.perRow || 3) + cbHeroColSpan(t);
-  var honestRows;
-  if (cbHeroColSpan(t)) {
-    var nRest = t.slots.length - 1;
-    var Kx = t.perRow || 3;
-    honestRows = 2 + Math.max(0, Math.ceil((nRest - 2 * Kx) / honestCols));
-  } else {
-    honestRows = t.rows;
+  var dims = cbTeGridDims(t);
+  document.getElementById('cbTePerRow').textContent = dims.cols;
+  document.getElementById('cbTeRowCount').textContent = dims.cols + '×' + dims.rows;
+
+  /* автоимя по признакам: VERT_5x3_V_HERO; живёт, пока юзер не впишет своё */
+  var autoName = cbTeAutoName(t);
+  var nameInput = document.getElementById('cbTplName');
+  nameInput.placeholder = autoName;
+  if (!nameInput.value || nameInput.value === TE.lastAutoName) {
+    nameInput.value = autoName;
+    t.name = autoName;
   }
-  document.getElementById('cbTePerRow').textContent = honestCols;
-  document.getElementById('cbTeRowCount').textContent = honestCols + '×' + honestRows;
+  TE.lastAutoName = autoName;
 
   var vc = 0, hc = 0;
   t.slots.forEach(function (s, i) {
@@ -2322,6 +2324,35 @@ function cbRestRows(t) {
 /* герой-V занимает 2 колонки сетки — для честного счётчика */
 function cbHeroColSpan(t) {
   return (t.hasHero && t.slots.length && t.slots[0].orient !== 'h') ? 2 : 0;
+}
+
+/* честные размеры сетки (колонки × ряды, герой учтён) */
+function cbTeGridDims(t) {
+  var cols = (t.perRow || 3) + cbHeroColSpan(t);
+  var rows;
+  if (cbHeroColSpan(t)) {
+    var nRest = t.slots.length - 1;
+    var Kx = t.perRow || 3;
+    rows = 2 + Math.max(0, Math.ceil((nRest - 2 * Kx) / cols));
+  } else {
+    rows = t.rows;
+  }
+  return { cols: cols, rows: rows };
+}
+
+/* автоимя шаблона по признакам: VERT_5x3_V_HERO */
+function cbTeAutoName(t) {
+  var parts = [t.canvas === 'h' ? 'HOR' : 'VERT'];
+  if (t.mode === 'auto') {
+    parts.push('AUTO');
+  } else {
+    var d = cbTeGridDims(t);
+    parts.push(d.cols + 'x' + d.rows);
+  }
+  if (t.hasHero && t.slots.length) {
+    parts.push((t.slots[0].orient === 'h' ? 'H' : 'V') + '_HERO');
+  }
+  return parts.join('_');
 }
 
 /* МОДЕЛЬ (Маша): герой да/нет + СЛОТОВ В РЯДУ. Ряды нарезаются
@@ -2559,7 +2590,7 @@ document.getElementById('cbTePreview').addEventListener('drop', function (e) {
 document.getElementById('cbTplSave').onclick = function () {
   cbTeCollectNames();
   var t = TE.cur;
-  if (!t.name) { cbToast('Дайте шаблону название'); return; }
+  if (!t.name) t.name = cbTeAutoName(t);   /* пустое имя -> автоимя */
   if (t.id) {
     var existing = cbTplById(t.id);
     if (existing) {
