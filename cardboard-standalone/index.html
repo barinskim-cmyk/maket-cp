@@ -428,6 +428,35 @@ body.cb-resizing * { pointer-events: none; }
   margin: 14px 0 6px;
 }
 
+/* ---------- Окно прогресса ---------- */
+.cb-busy {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(19, 19, 19, 0.72);
+  z-index: 300;
+  align-items: center; justify-content: center;
+}
+.cb-busy.cb-open { display: flex; }
+.cb-busy-panel {
+  background: #1d1d1b;
+  border: 1px solid #262626;
+  border-radius: 6px;
+  padding: 20px 24px;
+  width: 300px;
+}
+.cb-busy-track {
+  height: 3px; background: #2a2a28; border-radius: 2px; overflow: hidden;
+}
+.cb-busy-track i {
+  display: block; height: 100%; width: 0;
+  background: #c9956b;
+  transition: width 0.15s linear;
+}
+.cb-busy-text {
+  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  font-size: 10px; color: #b2b2b1; margin-top: 10px;
+}
+
 /* ---------- Лаунчер: недавние проекты (как в Capture One) ---------- */
 #cbRecentList { display: flex; flex-direction: column; gap: 4px; max-height: 260px; overflow-y: auto; }
 .cb-recent-item {
@@ -789,6 +818,15 @@ body.cb-file-drag #cbDropOverlay { display: flex; }
 </div>
 
 <!-- Создание / переименование проекта -->
+<!-- Окно прогресса (импорт папки и другие долгие операции) -->
+<div id="cbBusy" class="cb-busy">
+  <div class="cb-busy-panel">
+    <div class="cb-eyebrow" style="margin-bottom:8px">CARDBOARD · ЗАГРУЗКА</div>
+    <div class="cb-busy-track"><i id="cbBusyBar"></i></div>
+    <div id="cbBusyText" class="cb-busy-text"></div>
+  </div>
+</div>
+
 <div id="cbProjModal" class="cb-modal">
   <div class="cb-panel" style="width:420px">
     <button class="cb-modal-x" data-close-modal="cbProjModal" title="Закрыть">×</button>
@@ -1079,14 +1117,19 @@ function cbJustifiedHTML(count, itemHTMLFn, aspectFn, opts) {
     targetRowHeight: opts.targetRowHeight || 430
   });
   if (!geom.boxes.length) return '';
-  var ratio = geom.containerHeight / cw;
+  var ch = Math.max(geom.containerHeight, 1);
+  var ratio = ch / cw;
+  /* ВАЖНО: left/width абс. боксов браузер считает от ШИРИНЫ контейнера,
+     а top/height — от его ВЫСОТЫ. База процентов разная! На больших
+     галереях (сотни фото) высота >> ширины, и единая база по cw
+     растягивала превью в полосы. */
   var html = '<div class="cb-just" style="position:relative;width:100%;padding-top:' + (ratio * 100).toFixed(4) + '%;">';
   for (var b = 0; b < geom.boxes.length; b++) {
     var box = geom.boxes[b];
     html += '<div class="cb-just-box" style="position:absolute;left:' + (box.left / cw * 100).toFixed(4)
-      + '%;top:' + (box.top / cw * 100).toFixed(4)
+      + '%;top:' + (box.top / ch * 100).toFixed(4)
       + '%;width:' + (box.width / cw * 100).toFixed(4)
-      + '%;height:' + (box.height / cw * 100).toFixed(4) + '%;">';
+      + '%;height:' + (box.height / ch * 100).toFixed(4) + '%;">';
     html += itemHTMLFn(b);
     html += '</div>';
   }
@@ -1707,11 +1750,59 @@ document.getElementById('cbFileInput').onchange = function () {
 };
 document.getElementById('cbBtnFolder').onclick = function () {
   var kind = App.trayTab === 'ref' ? 'ref' : 'photo';
-  cbApi().pick_folder().then(function (list) {
-    var added = cbAddPhotos(list || [], kind);
-    if (list && list.length) cbToast('Из папки добавлено: ' + added);
-  });
+  var api = cbApi();
+  if (api.pick_folder_paths) {
+    /* пути сразу, миниатюры батчами — окно прогресса, фото появляются по мере загрузки */
+    api.pick_folder_paths().then(function (paths) {
+      if (!paths) return;
+      if (!paths.length) { cbToast('В папке нет изображений'); return; }
+      cbImportBatched(paths, kind);
+    });
+  } else {
+    api.pick_folder().then(function (list) {
+      var added = cbAddPhotos(list || [], kind);
+      if (list && list.length) cbToast('Из папки добавлено: ' + added);
+    });
+  }
 };
+
+/* Окно прогресса */
+function cbBusyShow(text, frac) {
+  document.getElementById('cbBusy').classList.add('cb-open');
+  document.getElementById('cbBusyText').textContent = text || '';
+  document.getElementById('cbBusyBar').style.width =
+    Math.round(Math.max(0, Math.min(1, frac || 0)) * 100) + '%';
+}
+
+function cbBusyHide() {
+  document.getElementById('cbBusy').classList.remove('cb-open');
+}
+
+/* Батч-импорт по путям: прогресс + инкрементальное появление в галерее */
+function cbImportBatched(paths, kind) {
+  var total = paths.length;
+  var B = 20;
+  var idx = 0, added = 0;
+  cbBusyShow('Импорт фото: 0 / ' + total, 0);
+  function next() {
+    if (idx >= total) {
+      cbBusyHide();
+      cbToast('Из папки добавлено: ' + added);
+      return;
+    }
+    cbApi().import_dropped(paths.slice(idx, idx + B)).then(function (list) {
+      added += cbAddPhotos(list || [], kind);
+      idx += B;
+      var done = Math.min(idx, total);
+      cbBusyShow('Импорт фото: ' + done + ' / ' + total, done / total);
+      setTimeout(next, 0);   /* отдать кадр интерфейсу */
+    }).catch(function () {
+      idx += B;
+      setTimeout(next, 0);
+    });
+  }
+  next();
+}
 
 /* Drag-and-drop файлов: в активную вкладку галереи */
 var dragDepth = 0;

@@ -148,6 +148,21 @@ class CardboardAPI:
                        if f.is_file() and f.suffix.lower() in IMG_EXT)
         return self._import_paths(paths)
 
+    def pick_folder_paths(self) -> list:
+        """Диалог выбора папки — только СПИСОК путей, без миниатюр.
+
+        Миниатюры frontend запрашивает батчами (import_dropped) и
+        показывает прогресс: на больших съёмках (сотни кадров) один
+        синхронный вызов замораживал интерфейс без обратной связи.
+        """
+        import webview
+        result = self._window.create_file_dialog(webview.FOLDER_DIALOG)
+        if not result:
+            return []
+        folder = Path(result[0])
+        return sorted(str(f) for f in folder.iterdir()
+                      if f.is_file() and f.suffix.lower() in IMG_EXT)
+
     def import_dropped(self, paths: list) -> list:
         """Импорт файлов, брошенных drag-and-drop (пути передаёт frontend)."""
         return self._import_paths([p for p in paths if p])
