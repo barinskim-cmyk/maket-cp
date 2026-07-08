@@ -294,6 +294,9 @@ body { font-family: var(--font-main); background: var(--panel-2); color: var(--t
 
 .empty-state { color: var(--text-3); font-size: 14px; text-align: center; padding: 40px 0; }
 
+/* Кнопки-действия внутри пустых состояний (ux-empty-state-actions) */
+.es-actions { display: flex; justify-content: center; gap: 8px; margin-top: 14px; }
+
 /* ══════════════════════════════════════════════
    Съёмки: список проектов + пайплайн
    ══════════════════════════════════════════════ */

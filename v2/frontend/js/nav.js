@@ -68,6 +68,51 @@ function showSubpage(name) {
   if (name === 'allcontent' && typeof acOnPageShow === 'function') acOnPageShow();
 }
 
+// ── Empty-states с действиями (задача ux-empty-state-actions) ──
+
+/**
+ * HTML кнопок-действий для пустых состояний «Выберите съёмку».
+ * Убирает тупики: с любой вкладки можно создать съёмку или открыть последнюю.
+ * Для гостя по share-ссылке возвращает пустую строку (создание недоступно).
+ * @param {string} onOpen — имя глобальной функции перерисовки текущего экрана
+ *                          после выбора проекта (напр. 'arOnPageShow'); опционально
+ * @returns {string} HTML-фрагмент или ''
+ */
+function navEmptyActionsHTML(onOpen) {
+  if (window._isShareLink) return '';
+  var html = '<div class="es-actions">';
+  html += '<button class="btn btn-sm" onclick="navEmptyCreateShooting()">Создать съёмку</button>';
+  if (window.App && App.projects && App.projects.length > 0) {
+    html += '<button class="btn btn-sm" onclick="navEmptyOpenLast(\'' + (onOpen || '') + '\')">Открыть последнюю</button>';
+  }
+  html += '</div>';
+  return html;
+}
+
+/** Перейти на «Проекты» и открыть модалку новой съёмки. */
+function navEmptyCreateShooting() {
+  showPage('shootings');
+  if (typeof openNewProjectModal === 'function') openNewProjectModal();
+}
+
+/**
+ * Выбрать последнюю (самую свежую в списке) съёмку, не покидая текущую вкладку.
+ * @param {string} onOpen — имя функции перерисовки экрана после выбора
+ */
+function navEmptyOpenLast(onOpen) {
+  if (!window.App || !App.projects || !App.projects.length) {
+    showPage('shootings');
+    return;
+  }
+  selectProject(App.projects.length - 1);
+  if (onOpen && typeof window[onOpen] === 'function') window[onOpen]();
+  /* Контент: перерисовать карточку и превью после выбора проекта */
+  if (App.currentPage === 'content') {
+    if (typeof pvOnPageShow === 'function') pvOnPageShow();
+    if (typeof cpRenderCard === 'function') cpRenderCard();
+  }
+}
+
 // ── Модалки ──
 
 /* Элемент, имевший фокус до открытия модалки — вернуть фокус при закрытии (a11y) */

@@ -577,7 +577,12 @@ function arOnPageShow() {
   var noProj = document.getElementById('ar-no-project');
   var main = document.getElementById('ar-main');
   if (!proj) {
-    if (noProj) noProj.style.display = '';
+    if (noProj) {
+      noProj.style.display = '';
+      /* Empty-state с действиями: не оставлять тупик (ux-empty-state-actions) */
+      var actions = (typeof navEmptyActionsHTML === 'function') ? navEmptyActionsHTML('arOnPageShow') : '';
+      noProj.innerHTML = 'Выберите проект на вкладке "Проекты"' + actions;
+    }
     if (main) main.style.display = 'none';
     return;
   }

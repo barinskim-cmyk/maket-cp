@@ -136,9 +136,14 @@ function cpToggleShowDeleted() {
 function cpShowEmpty() {
   var view = document.getElementById('cp-view');
   var proj = getActiveProject();
-  view.innerHTML = '<div class="cp-empty">' +
-    (proj ? 'Нет карточек. Нажмите "+ Новая карточка".' : 'Создайте или откройте съёмку') +
-    '</div>';
+  if (proj) {
+    view.innerHTML = '<div class="cp-empty">Нет карточек. Нажмите "+ Новая карточка".</div>';
+    return;
+  }
+  /* Нет проекта: empty-state с действиями, чтобы не оставлять тупик
+     (ux-empty-state-actions). После выбора проекта cpRenderCard перерисует экран. */
+  var actions = (typeof navEmptyActionsHTML === 'function') ? navEmptyActionsHTML('') : '';
+  view.innerHTML = '<div class="cp-empty">Создайте или откройте съёмку' + actions + '</div>';
 }
 
 
