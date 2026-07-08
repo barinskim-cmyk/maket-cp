@@ -2066,7 +2066,37 @@ function cbPop(id, open) {
 }
 
 function cbCloseAllPops() {
-  CB_POPS.forEach(function (id) { document.getElementById(id).classList.remove('cb-open'); });
+  CB_POPS.forEach(function (id) {
+    var el = document.getElementById(id);
+    el.classList.remove('cb-open');
+    if (id === 'cbPickerPop') cbResetPopPos(el);   /* снять fixed-позицию от карточки */
+  });
+}
+
+/* Прижать попап к произвольной кнопке (position:fixed от вьюпорта).
+   Нужно для кнопки «Шаблон» на карточке — она в рабочей области, а сам
+   попап живёт в топбаре, поэтому без этого он всплывал вверху экрана. */
+function cbAnchorPop(pop, anchorEl) {
+  var r = anchorEl.getBoundingClientRect();
+  pop.style.position = 'fixed';
+  pop.style.right = 'auto';
+  pop.style.bottom = 'auto';
+  var vw = window.innerWidth, vh = window.innerHeight;
+  var pw = pop.offsetWidth || 260, ph = pop.offsetHeight || 300;
+  var left = Math.min(Math.max(8, r.right - pw), Math.max(8, vw - pw - 8));
+  var top = r.bottom + 4;
+  if (top + ph > vh - 8) top = Math.max(8, r.top - ph - 4);   /* нет места снизу — вверх */
+  pop.style.left = left + 'px';
+  pop.style.top = top + 'px';
+}
+
+/* Вернуть попап к дефолтной вёрстке топбара. */
+function cbResetPopPos(pop) {
+  pop.style.position = '';
+  pop.style.top = '';
+  pop.style.left = '';
+  pop.style.right = '';
+  pop.style.bottom = '';
 }
 
 [['cbMenuFileBtn', 'cbMenuFile'], ['cbMenuTplBtn', 'cbMenuTpl'], ['cbMenuHelpBtn', 'cbMenuHelp']].forEach(function (pair) {
@@ -3249,7 +3279,7 @@ document.getElementById('cbMenuTplGallery').onclick = cbGalOpen;
 
 var _pickerFor = null;   /* id карточки: попап меняет её шаблон, null — новая карточка */
 
-function cbPickerOpen(forCid) {
+function cbPickerOpen(forCid, anchorEl) {
   _pickerFor = forCid || null;
   var active = App.templates.filter(function (t) { return t.active !== false; });
   if (!active.length) { cbGalOpen(); return; }
@@ -3268,8 +3298,12 @@ function cbPickerOpen(forCid) {
     html += '</button>';
   });
   html += '<div class="cb-pop-sep"></div><button id="cbPickerGal">Настроить шаблоны...</button>';
-  document.getElementById('cbPickerPop').innerHTML = html;
+  var pop = document.getElementById('cbPickerPop');
+  pop.innerHTML = html;
   cbPop('cbPickerPop', true);
+  /* Открыт с карточки — прижать попап к её кнопке «Шаблон», иначе он всплывёт
+     в топбаре (у кнопки «+ Карточка»). Без anchor — дефолт топбара. */
+  if (anchorEl) cbAnchorPop(pop, anchorEl); else cbResetPopPos(pop);
 }
 
 document.getElementById('cbBtnAdd').onclick = function (e) {
@@ -3488,7 +3522,7 @@ document.getElementById('cbCards').addEventListener('click', function (e) {
   var card2 = cbCardById(cardEl.getAttribute('data-cid'));
   var i = App.cards.indexOf(card2);
   var act = btn.getAttribute('data-act');
-  if (act === 'tpl') { e.stopPropagation(); cbPickerOpen(card2.id); return; }
+  if (act === 'tpl') { e.stopPropagation(); cbPickerOpen(card2.id, btn); return; }
   if (act === 'del') {
     if (!confirm('Удалить карточку «' + card2.title + '»? Фото останутся в галерее.')) return;
     App.cards.splice(i, 1);
