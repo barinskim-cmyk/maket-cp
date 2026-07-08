@@ -1200,11 +1200,11 @@ tr:hover td { background: #fafafa; }
 </tr>
 
 <tr data-row="ux-focus-visible">
-  <td><span class="s-todo">TODO</span></td>
+  <td><span class="s-done">DONE</span></td>
   <td>CSS / Accessibility</td>
   <td><strong>:focus-visible стили для клавиатурной навигации</strong></td>
   <td></td>
-  <td>Нет видимого фокуса при Tab-навигации. Добавить глобальный :focus-visible стиль (outline:2px solid #333). Добавить alt на img в превью/слотах.</td>
+  <td>Нет видимого фокуса при Tab-навигации. Добавить глобальный :focus-visible стиль (outline:2px solid #333). Добавить alt на img в превью/слотах. DONE: :focus-visible уже в style.css (A2-блок, 3 правила). Добавлены alt на 5 img в cards.js (слот-фото, mob-card-menu-thumb, mob-select, mob-gallery) — в превью уже были. Верификация: node-харнесс 6/6 (имя файла, фолбэки, XSS-эскейп), node --check обоих модулей OK.</td>
   <td class="files">style.css, previews.js, cards.js</td>
   <td><span class="p-low">P3</span></td>
   <td class="t-cell"><span class="t-none">--</span></td>

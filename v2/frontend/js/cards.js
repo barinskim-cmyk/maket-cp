@@ -672,7 +672,7 @@ function cpSlotHTML(slotIdx, span, hasHero) {
       addedBadge = '<span class="slot-added-by" title="' + esc(slot._addedAt || '') + '">' + esc(slot._addedBy) + '</span>';
     }
     return '<div class="photo-slot filled' + mainCls + '" data-slot="' + slotIdx + '" draggable="true">' +
-      '<img src="' + src + '" loading="lazy"' + rotStyle + ' onerror="this.parentNode.classList.add(\'img-error\')">' +
+      '<img src="' + src + '" alt="' + esc(slot.file || 'Фото в слоте') + '" loading="lazy"' + rotStyle + ' onerror="this.parentNode.classList.add(\'img-error\')">' +
       zoomBtn + carouselArrows + addedBadge +
       '<button class="remove-btn" onclick="cpClearSlotPhoto(' + slotIdx + ',event)">&times;</button></div>';
   }
@@ -2956,7 +2956,7 @@ function _cpMobileCardMenuHTML(proj) {
 
     html += '<button class="mob-card-menu-item" onclick="cpMobileGoToCard(' + i + ')">';
     if (thumbSrc) {
-      html += '<img class="mob-card-menu-thumb" src="' + thumbSrc + '">';
+      html += '<img class="mob-card-menu-thumb" src="' + thumbSrc + '" alt="' + label + '">';
     } else {
       html += '<div class="mob-card-menu-thumb mob-card-menu-thumb-empty"></div>';
     }
@@ -3734,7 +3734,7 @@ function cpMobileRenderSelect() {
     var itemClass = orient === 'h' ? 'mob-select-item-h' : 'mob-select-item-v';
 
     html += '<div class="mob-select-item ' + itemClass + '">';
-    html += '<img src="' + src + '" loading="lazy" onclick="cpMobileSelectFullscreen(' + i + ')">';
+    html += '<img src="' + src + '" alt="' + esc(it.name || 'Фото') + '" loading="lazy" onclick="cpMobileSelectFullscreen(' + i + ')">';
     html += '</div>';
   }
 
@@ -3802,8 +3802,9 @@ function cpMobileRenderOther() {
       orient = (pv.width && pv.height) ? (pv.width > pv.height ? 'h' : 'v') : (pv.orient || 'v');
     }
     var itemClass = orient === 'h' ? 'mob-select-item-h' : 'mob-select-item-v';
+    var itemAlt = esc(item.name || 'Фото');
     var t = '<div class="mob-select-item ' + itemClass + '">';
-    t += '<img src="' + src + '" loading="lazy" onclick="' + onclickFn + '">';
+    t += '<img src="' + src + '" alt="' + itemAlt + '" loading="lazy" onclick="' + onclickFn + '">';
     t += '<button class="mob-oc-remove" onclick="' + removeFn + '">&times;</button>';
     t += '</div>';
     return t;
@@ -4049,7 +4050,7 @@ function cpMobileRenderGallery() {
     var isChecked = (inCard || inOC) ? ' checked' : '';
 
     html += '<div class="mob-gallery-item ' + itemClass + '">';
-    html += '<img src="' + src + '" loading="lazy" onclick="cpMobileGalleryFullscreen(' + i + ')">';
+    html += '<img src="' + src + '" alt="' + esc(pvName || 'Фото') + '" loading="lazy" onclick="cpMobileGalleryFullscreen(' + i + ')">';
     html += '<div class="mob-gallery-check' + isChecked + '" onclick="cpMobileToggleOC(\'' + esc(pvName) + '\',this)">';
     html += isChecked ? '&#10003;' : '';
     html += '</div>';
