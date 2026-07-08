@@ -2600,6 +2600,33 @@ function cbTplById(id) {
   return null;
 }
 
+/* Каноническая подпись раскладки шаблона — для сравнения «это тот же шаблон?».
+   Учитывает всё, что влияет на вид: режим, канвас, герой, пропорции, ряды,
+   слотов-в-ряду и сами слоты (ориентация + ряд + подпись). */
+function cbTplSignature(t) {
+  var slots = (t.slots || []).map(function (s) {
+    return (s.orient || 'v') + '/' + (s.row || 0) + '/' + (s.name || '');
+  }).join(',');
+  return [t.mode || 'manual', t.canvas || 'h', t.hasHero ? 1 : 0,
+    t.hAspect || '', t.vAspect || '', t.rows || '', t.perRow || '', slots].join('|');
+}
+
+/* Найти сохранённый шаблон с точно такой же раскладкой (или null). */
+function cbFindMatchingTpl(t) {
+  var sig = cbTplSignature(t);
+  return App.templates.filter(function (x) { return cbTplSignature(x) === sig; })[0] || null;
+}
+
+/* Уникальное имя шаблона (без коллизий с существующими). */
+function cbUniqueTplName(base) {
+  base = (base && base.trim()) ? base.trim() : 'Шаблон';
+  var ex = function (nm) { return App.templates.some(function (x) { return x.name === nm; }); };
+  if (!ex(base)) return base;
+  var n = 2;
+  while (ex(base + ' ' + n)) n++;
+  return base + ' ' + n;
+}
+
 function cbStoreTemplates() {
   try { localStorage.setItem(TPL_STORE, JSON.stringify(App.templates)); } catch (e) { /* квота */ }
 }
@@ -3098,22 +3125,40 @@ document.getElementById('cbTplSave').onclick = function () {
   cbTeCollectNames();
   var t = TE.cur;
   if (!t.name) t.name = cbTeAutoName(t);   /* пустое имя -> автоимя */
-  if (!t.id && TE.applyTo) {
-    /* редактор открыт из карточки: то же имя -> обновить шаблон, не плодить копии */
-    var byName = App.templates.filter(function (x) {
-      return x.mode !== 'auto' && x.name === t.name;
-    })[0];
-    if (byName) t.id = byName.id;
-  }
+
   if (t.id) {
+    /* Явная правка конкретного шаблона (из галереи «Изменить») —
+       обновляем его на месте, это осознанное редактирование. */
     var existing = cbTplById(t.id);
     if (existing) {
       Object.keys(t).forEach(function (k) { existing[k] = JSON.parse(JSON.stringify(t[k])); });
     }
+  } else if (TE.applyTo) {
+    /* Правка ИЗ карточки: старый шаблон НЕ трогаем (issue Маша 2026-07-08 —
+       раньше находили одноимённый и перезаписывали, из-за чего у шаблона
+       менялась раскладка при старой миниатюре/имени). Теперь:
+       - если ровно такая раскладка уже есть в библиотеке — переиспользуем её;
+       - иначе создаём НОВЫЙ шаблон (имя «… (изменён)»), старый остаётся как был. */
+    var match = cbFindMatchingTpl(t);
+    if (match) {
+      t = TE.cur = JSON.parse(JSON.stringify(match));
+    } else {
+      var linked = App.templates.filter(function (x) {
+        return x.mode !== 'auto' && x.name === t.name;
+      })[0];
+      var suffix = ' (изменён)';
+      var base = t.name;
+      if (linked && base.slice(-suffix.length) !== suffix) base = base + suffix;
+      t.name = cbUniqueTplName(base);
+      t.id = 'tpl' + (App.nextId++);
+      App.templates.push(JSON.parse(JSON.stringify(t)));
+    }
   } else {
+    /* Новый шаблон из редактора (кнопка «Создать шаблон» / галерея). */
     t.id = 'tpl' + (App.nextId++);
     App.templates.push(JSON.parse(JSON.stringify(t)));
   }
+
   cbStoreTemplates();
   cbMarkDirty();
   cbTeClose();
@@ -3253,6 +3298,7 @@ document.getElementById('cbPickerPop').addEventListener('click', function (e) {
   } else {
     cbAddCardFromTpl(btn.getAttribute('data-pick-tpl'));
   }
+  cbPop('cbPickerPop', false);   /* закрыть попап — иначе он перекрывает изменённую карточку */
 });
 
 /* Заменить шаблон карточки: фото остаются, раскладываются по порядку слотов */
