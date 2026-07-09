@@ -1,0 +1,17 @@
+-- Migration 037: fix previews SELECT leak (incident 2026-07-09).
+-- Applied to prod 2026-07-09 via MCP.
+--
+-- Проблема: у public.previews была политика previews_select с USING (true),
+-- дававшая SELECT всех превью ЛЮБОМУ пользователю (в т.ч. любому залогиненному).
+-- В результате новый пользователь (olesyasvlasova@gmail.com) при входе видел
+-- все чужие превью (~11.9k строк из чужих съёмок).
+--
+-- Проверено под ролью authenticated с чужим sub: до фикса previews_visible = 11918,
+-- после — 0. Проекты/карточки/слоты не были затронуты (их политики корректны).
+--
+-- Доступ владельца сохраняется через previews_owner_all (ALL, get_my_project_ids()),
+-- доступ участников проекта — через previews_member_select.
+-- Гостевой доступ по share-ссылке НЕ зависит от этой политики: он идёт через
+-- SECURITY DEFINER функцию get_project_by_token(text), которая проверяет токен и
+-- возвращает previews одного проекта в обход RLS (проверено: TRIVE, 150 превью, role=client).
+DROP POLICY IF EXISTS previews_select ON public.previews;
