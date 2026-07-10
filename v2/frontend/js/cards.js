@@ -3170,9 +3170,11 @@ function cpMobileRenderFeed() {
         html += '</div>';
         html += '</div>';
       } else {
-        /* Пустой слот */
+        /* Пустой слот. Клиент по share-ссылке не может перетащить фото мышью,
+           поэтому даём явную кнопку выбора конкретного фото + авто-подбор двойным тапом. */
         html += '<div class="' + slotClass + ' mob-slot-empty"' + slotStyle + ' data-card="' + ci + '" data-slot="' + si + '">';
-        html += '<div class="mob-slot-empty-text">Нажмите дважды чтобы добавить фото</div>';
+        html += '<button class="mob-slot-pick-btn" onclick="cpMobileOpenSlotPicker(' + ci + ',' + si + ')">Выбрать фото</button>';
+        html += '<div class="mob-slot-empty-text">или двойной тап — авто-подбор</div>';
         html += '</div>';
       }
     }
@@ -3494,7 +3496,8 @@ function cpMobileClearSlot(cardIdx, slotIdx) {
         slotStyle = ' style="aspect-ratio:' + vAspect.replace('/', ' / ') + '"';
       }
       var emptyHtml = '<div class="' + slotClass + ' mob-slot-empty"' + slotStyle + ' data-card="' + cardIdx + '" data-slot="' + slotIdx + '">' +
-        '<div class="mob-slot-empty-text">Нажмите дважды чтобы добавить фото</div>' +
+        '<button class="mob-slot-pick-btn" onclick="cpMobileOpenSlotPicker(' + cardIdx + ',' + slotIdx + ')">Выбрать фото</button>' +
+        '<div class="mob-slot-empty-text">или двойной тап — авто-подбор</div>' +
         '</div>';
       var tmp = document.createElement('div');
       tmp.innerHTML = emptyHtml;
@@ -3978,6 +3981,173 @@ function cpMobileAutoFillSlot(cardIdx, slotIdx) {
   if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
   if (typeof shAutoSave === 'function') shAutoSave();
 
+  cpMobileRender();
+}
+
+/* ── Мобильный выбор конкретного фото в слот ──────────────────────────────
+   Клиент по share-ссылке не может перетащить фото мышью (desktop drag-drop),
+   поэтому пустой слот открывает bottom-sheet с сеткой превью нужной
+   ориентации, где можно выбрать конкретное фото. Дополняет авто-подбор
+   (cpMobileAutoFillSlot) явным выбором. */
+
+/** @type {boolean} Показывать в пикере все ориентации, а не только по слоту */
+var _mobPickerAllOrient = false;
+
+/**
+ * Открыть мобильный пикер выбора фото в слот.
+ * @param {number} cardIdx — индекс карточки
+ * @param {number} slotIdx — индекс слота
+ */
+function cpMobileOpenSlotPicker(cardIdx, slotIdx) {
+  var proj = getActiveProject();
+  if (!proj || !proj.cards || !proj.cards[cardIdx]) return;
+  var card = proj.cards[cardIdx];
+  var slot = card.slots ? card.slots[slotIdx] : null;
+  if (!slot) return;
+
+  cpMobileCloseSlotPicker();
+
+  var wantOrient = slot.orient || 'v';
+  var previews = proj.previews || [];
+
+  /* Файлы, уже занятые в этой карточке — пометим их бейджем. */
+  var used = {};
+  for (var u = 0; u < card.slots.length; u++) {
+    if (card.slots[u] && card.slots[u].file) used[card.slots[u].file] = true;
+  }
+
+  /* Отфильтровать по ориентации (если не выбран режим «все ориентации»). */
+  var list = [];
+  for (var i = 0; i < previews.length; i++) {
+    var pv = previews[i];
+    var o = (pv.width && pv.height) ? (pv.width > pv.height ? 'h' : 'v') : (pv.orient || 'v');
+    if (_mobPickerAllOrient || o === wantOrient) list.push(pv);
+  }
+
+  /* Ограничить размер сетки, чтобы не раздувать DOM на 5000+ превью.
+     Виртуализация галереи — отдельная задача (дизайн-аудит C1). */
+  var LIMIT = 400;
+  var truncated = list.length > LIMIT;
+  if (truncated) list = list.slice(0, LIMIT);
+
+  var overlay = document.createElement('div');
+  overlay.id = 'mob-slot-picker';
+  overlay.className = 'mob-slot-picker-overlay';
+
+  var h = '<div class="mob-slot-picker" role="dialog" aria-modal="true" aria-label="Выбор фото в слот">';
+  h += '<div class="mob-slot-picker-head">';
+  h += '<div class="mob-slot-picker-title">Выберите фото в слот</div>';
+  h += '<button class="mob-slot-picker-close" aria-label="Закрыть" onclick="cpMobileCloseSlotPicker()">&times;</button>';
+  h += '</div>';
+  h += '<div class="mob-slot-picker-sub">';
+  h += '<button class="mob-slot-picker-toggle' + (_mobPickerAllOrient ? '' : ' mob-picker-toggle-active') + '" onclick="cpMobileTogglePickerOrient(' + cardIdx + ',' + slotIdx + ')">';
+  h += (_mobPickerAllOrient ? 'Показаны все ориентации' : 'Только по форме слота') + '</button>';
+  h += '<span class="mob-slot-picker-count">' + list.length + (truncated ? '+' : '') + ' фото</span>';
+  h += '</div>';
+
+  if (list.length === 0) {
+    h += '<div class="mob-slot-picker-empty">Нет подходящих превью в проекте</div>';
+  } else {
+    h += '<div class="mob-slot-picker-grid">';
+    for (var k = 0; k < list.length; k++) {
+      var p = list[k];
+      var nm = p.name || p.stem || '';
+      if (!nm) continue;
+      var thumb = (typeof pvGetThumb === 'function') ? pvGetThumb(p) : (p.thumb || p.preview || '');
+      if (!thumb) continue;
+      var nmJs = esc(nm).replace(/'/g, "\\'");
+      var usedCls = used[nm] ? ' mob-picker-tile-used' : '';
+      h += '<button class="mob-slot-picker-tile' + usedCls + '" onclick="cpMobilePickPhoto(' + cardIdx + ',' + slotIdx + ',\'' + nmJs + '\')">';
+      h += '<img src="' + thumb + '" alt="' + esc(nm) + '" loading="lazy">';
+      if (used[nm]) h += '<span class="mob-picker-used-badge">в карточке</span>';
+      h += '</button>';
+    }
+    h += '</div>';
+  }
+  h += '</div>';
+
+  overlay.innerHTML = h;
+  /* Клик по затемнению вне панели — закрыть. */
+  overlay.addEventListener('click', function (e) {
+    if (e.target === overlay) cpMobileCloseSlotPicker();
+  });
+  document.body.appendChild(overlay);
+}
+
+/**
+ * Переключить фильтр ориентации в пикере и перерисовать его.
+ * @param {number} cardIdx
+ * @param {number} slotIdx
+ */
+function cpMobileTogglePickerOrient(cardIdx, slotIdx) {
+  _mobPickerAllOrient = !_mobPickerAllOrient;
+  cpMobileOpenSlotPicker(cardIdx, slotIdx);
+}
+
+/**
+ * Закрыть мобильный пикер выбора фото.
+ */
+function cpMobileCloseSlotPicker() {
+  var el = document.getElementById('mob-slot-picker');
+  if (el && el.parentNode) el.parentNode.removeChild(el);
+}
+
+/**
+ * Вставить выбранное фото в слот (мобильный пикер).
+ * @param {number} cardIdx — индекс карточки
+ * @param {number} slotIdx — индекс слота
+ * @param {string} pvName — имя файла превью
+ */
+function cpMobilePickPhoto(cardIdx, slotIdx, pvName) {
+  var proj = getActiveProject();
+  if (!proj || !proj.cards || !proj.cards[cardIdx]) return;
+  var card = proj.cards[cardIdx];
+  var slot = card.slots ? card.slots[slotIdx] : null;
+  if (!slot) return;
+
+  /* Найти превью по имени. */
+  var pv = null;
+  if (proj.previews) {
+    for (var i = 0; i < proj.previews.length; i++) {
+      if (proj.previews[i].name === pvName || proj.previews[i].stem === pvName) {
+        pv = proj.previews[i];
+        break;
+      }
+    }
+  }
+  if (!pv) { cpMobileCloseSlotPicker(); return; }
+
+  slot.file = pv.name || pv.stem || '';
+  slot.dataUrl = (typeof pvGetPreview === 'function') ? pvGetPreview(pv) : (pv.preview || pv.thumb || '');
+  slot.thumbUrl = (typeof pvGetThumb === 'function') ? pvGetThumb(pv) : (pv.thumb || '');
+  slot.path = (typeof pvGetPath === 'function') ? pvGetPath(pv) : (pv.path || '');
+
+  if (typeof sbLogAction === 'function') sbLogAction('pick_into_slot', 'card', card.id, card.name, slot.file);
+  if (typeof shCloudSyncExplicit === 'function') shCloudSyncExplicit();
+  if (typeof shAutoSave === 'function') shAutoSave();
+
+  cpMobileCloseSlotPicker();
+
+  /* Хирургический апдейт: перерисовать только блок этой карточки. */
+  if (_mobViewMode === 'cards') {
+    var block = document.querySelector('.mob-card-block[data-card-idx="' + cardIdx + '"]');
+    if (block && block.parentNode) {
+      var feedHtml = '';
+      try { feedHtml = cpMobileRenderFeed(); } catch (e) { feedHtml = ''; }
+      var tmp = document.createElement('div');
+      tmp.innerHTML = feedHtml;
+      var newBlock = tmp.querySelector('.mob-card-block[data-card-idx="' + cardIdx + '"]');
+      if (newBlock) {
+        block.parentNode.replaceChild(newBlock, block);
+        if (typeof cpMobileBindCarousels === 'function') cpMobileBindCarousels();
+        if (typeof cpMobileBindDoubleTap === 'function') cpMobileBindDoubleTap();
+        if (typeof cpMobileBindSlotTap === 'function') cpMobileBindSlotTap();
+        return;
+      }
+    }
+  }
+
+  /* Фолбэк: полный ре-рендер. */
   cpMobileRender();
 }
 
