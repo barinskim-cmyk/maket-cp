@@ -710,6 +710,7 @@ body.cb-file-drag #cbDropOverlay { display: flex; }
       <button id="cbBtnPdf">Экспорт PDF<span class="cb-hotkey">⌘E</span></button>
       <button id="cbBtnPrint">Печать...</button>
       <button id="cbBtnList">Экспорт списка (CSV + TXT)</button>
+      <button id="cbBtnSelected" style="display:none" title="Собрать все кадры из карточек и доп. контента в одну папку SELECTED">Собрать отбор в папку...</button>
       <div class="cb-pop-note"><span id="cbMode"></span></div>
     </div>
   </div>
@@ -3966,11 +3967,67 @@ function cbExportList() {
     });
     if (cont.text) txt += '  Комментарий: ' + cont.text + '\r\n';
   });
+  /* Desktop: WKWebView не умеет blob-загрузку (<a download>) — окно
+     зависало без диалога. Пишем файлы через Python и открываем TXT в
+     системном редакторе: дальше «Сохранить как…» в нужное место. */
+  if (cbDesktop()) {
+    cbApi().export_text_list(name, txt, csv).then(function (res) {
+      cbToast(res ? 'Список открыт в редакторе — сохраните куда нужно' : 'Не удалось выгрузить список');
+    }, function () { cbToast('Не удалось выгрузить список'); });
+    return;
+  }
   cbDownload(name + ' — список.csv', '﻿' + csv, 'text/csv;charset=utf-8');
   cbDownload(name + ' — список.txt', txt);
   cbToast('Список выгружен (CSV + TXT)');
 }
 document.getElementById('cbBtnList').onclick = cbExportList;
+
+/* Собрать отбор в папку SELECTED: все оригиналы фото, которые стоят в
+   карточках и доп. контенте (референсы не входят), копируются в папку
+   SELECTED внутри выбранной пользователем папки. Оригиналы не трогаются. */
+function cbCollectSelectedPaths() {
+  var seen = {}, out = [];
+  function add(pid) {
+    var p = pid ? cbPhotoById(pid) : null;
+    if (!p || (p.kind || 'photo') === 'ref') return;   /* рефы не берём */
+    if (!p.path) return;                                /* только реальные файлы на диске */
+    if (seen[p.path]) return;
+    seen[p.path] = 1;
+    out.push(p.path);
+  }
+  App.cards.forEach(function (card) {
+    if (card.mode === 'auto') (card.pids || []).forEach(add);
+    else (card.slots || []).forEach(function (s) { add(s.pid); });
+  });
+  App.containers.forEach(function (cont) {
+    (cont.photoIds || []).forEach(add);
+  });
+  return out;
+}
+
+function cbExportSelected() {
+  if (!cbDesktop()) {
+    cbToast('Сбор в папку доступен только в desktop-версии');
+    return;
+  }
+  var paths = cbCollectSelectedPaths();
+  if (!paths.length) {
+    cbToast('В карточках и доп. контенте нет фото с файлами на диске');
+    return;
+  }
+  cbToast('Копирую ' + paths.length + ' кадр(ов) в SELECTED...');
+  cbApi().export_selected(JSON.stringify(paths)).then(function (res) {
+    if (!res || !res.ok) {
+      if (res && res.error === 'cancel') return;   /* пользователь отменил выбор папки */
+      cbToast('Не удалось собрать отбор');
+      return;
+    }
+    var msg = 'Скопировано в SELECTED: ' + res.copied;
+    if (res.missing) msg += ' · пропущено (нет файла): ' + res.missing;
+    cbToast(msg);
+  }, function () { cbToast('Не удалось собрать отбор'); });
+}
+document.getElementById('cbBtnSelected').onclick = cbExportSelected;
 
 /* ============================================================
    Сохранение / загрузка проекта
@@ -4171,6 +4228,7 @@ document.getElementById('cbProjInput').onchange = function () {
 
 function cbInitDesktopUi() {
   document.getElementById('cbBtnFolder').style.display = '';
+  document.getElementById('cbBtnSelected').style.display = '';
   document.getElementById('cbMode').textContent = 'desktop';
   /* нативное macOS-меню вместо HTML-меню в топбаре */
   try {
@@ -4186,7 +4244,7 @@ function cbMenuNative(action) {
     'new': 'cbMenuNew', 'open': 'cbBtnOpen', 'save': 'cbBtnSave', 'rename': 'cbMenuRename',
     'pick': 'cbBtnPick', 'pickref': 'cbBtnPickRef', 'folder': 'cbBtnFolder', 'watch': 'cbBtnWatch',
     'locate': 'cbBtnLocate',
-    'pdf': 'cbBtnPdf', 'print': 'cbBtnPrint', 'list': 'cbBtnList',
+    'pdf': 'cbBtnPdf', 'print': 'cbBtnPrint', 'list': 'cbBtnList', 'selected': 'cbBtnSelected',
     'tplnew': 'cbMenuTplNew', 'tplgal': 'cbMenuTplGallery',
     'helpguide': 'cbMenuHelpGuide', 'helpsync': 'cbMenuHelpSync', 'helpprod': 'cbMenuHelpProducts',
     'update': 'cbMenuHelpUpdate', 'telemetry': 'cbMenuHelpTelemetry'

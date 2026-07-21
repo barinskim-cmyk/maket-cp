@@ -334,6 +334,106 @@ class CardboardAPI:
             out += ".pdf"
         return self.write_pdf(spec, out)
 
+    # ---------- отбор в папку / экспорт списка ----------
+
+    @staticmethod
+    def _unique_target(folder: Path, name: str, used: set) -> Path:
+        """Свободное имя в папке: file.jpg -> file (2).jpg при коллизии.
+
+        Файлы отбора могут прийти из разных исходных папок с одинаковыми
+        именами — чтобы не перезаписать один другим, добавляем счётчик.
+        """
+        if name not in used and not (folder / name).exists():
+            return folder / name
+        stem, suffix = Path(name).stem, Path(name).suffix
+        i = 2
+        while True:
+            cand = f"{stem} ({i}){suffix}"
+            if cand not in used and not (folder / cand).exists():
+                return folder / cand
+            i += 1
+
+    def export_selected(self, paths_json: str) -> dict:
+        """Собрать отобранные кадры в папку SELECTED (копированием).
+
+        Frontend передаёт уникальные пути к оригиналам фото, которые
+        стоят в карточках и доп. контенте (референсы не входят).
+        Пользователь выбирает папку, внутри создаётся SELECTED, туда
+        КОПИРУЮТСЯ файлы. Оригиналы остаются на месте.
+        Возвращает {ok, copied, missing, folder} или {ok: False, error}.
+        """
+        import webview
+        import shutil
+        try:
+            paths = json.loads(paths_json)
+        except Exception:
+            paths = []
+        paths = [p for p in paths if p]
+        if not paths:
+            return {"ok": False, "error": "empty", "copied": 0, "missing": 0}
+        result = self._window.create_file_dialog(webview.FOLDER_DIALOG)
+        if not result:
+            return {"ok": False, "error": "cancel", "copied": 0, "missing": 0}
+        dest = Path(result[0]) / "SELECTED"
+        try:
+            dest.mkdir(exist_ok=True)
+        except Exception as exc:
+            return {"ok": False, "error": str(exc), "copied": 0, "missing": 0}
+        copied, missing = 0, 0
+        used: set = set()
+        for p in paths:
+            src = Path(p)
+            if not src.is_file():
+                missing += 1
+                continue
+            target = self._unique_target(dest, src.name, used)
+            try:
+                shutil.copy2(src, target)
+                used.add(target.name)
+                copied += 1
+            except Exception:
+                missing += 1
+        try:   # показать готовую папку
+            if sys.platform == "darwin":
+                subprocess.Popen(["open", str(dest)])
+            elif sys.platform.startswith("win"):
+                os.startfile(str(dest))   # type: ignore[attr-defined]
+            else:
+                subprocess.Popen(["xdg-open", str(dest)])
+        except Exception:
+            pass
+        return {"ok": True, "copied": copied, "missing": missing, "folder": str(dest)}
+
+    def export_text_list(self, name: str, txt: str, csv: str) -> Optional[dict]:
+        """Сохранить список отбора в TXT (+CSV) и открыть TXT в редакторе.
+
+        Blob-загрузка (<a download>) в WKWebView не работает — окно
+        зависало без диалога «куда сохранить». Пишем файлы во временную
+        папку и открываем TXT системным текстовым редактором: дальше
+        «Сохранить как…» в нужное место. Возвращает {txt, csv} или None.
+        """
+        import tempfile
+        safe = "".join(c for c in (name or "Проект")
+                       if c not in '/\\:*?"<>|').strip() or "Проект"
+        try:
+            d = Path(tempfile.mkdtemp(prefix="cardboard_list_"))
+            txt_path = d / f"{safe} — список.txt"
+            csv_path = d / f"{safe} — список.csv"
+            txt_path.write_text(txt or "", encoding="utf-8")
+            csv_path.write_text("﻿" + (csv or ""), encoding="utf-8")
+        except Exception:
+            return None
+        try:   # открыть TXT в системном текстовом редакторе
+            if sys.platform == "darwin":
+                subprocess.Popen(["open", "-t", str(txt_path)])
+            elif sys.platform.startswith("win"):
+                os.startfile(str(txt_path))   # type: ignore[attr-defined]
+            else:
+                subprocess.Popen(["xdg-open", str(txt_path)])
+        except Exception:
+            pass
+        return {"txt": str(txt_path), "csv": str(csv_path)}
+
     # ---------- автообновление с GitHub Releases ----------
 
     UPDATE_REPO = "barinskim-cmyk/content-pulse-cardboard"
@@ -655,6 +755,7 @@ def main() -> None:
                 wm.MenuAction("Экспорт PDF", _js("pdf")),
                 wm.MenuAction("Печать", _js("print")),
                 wm.MenuAction("Экспорт списка (CSV + TXT)", _js("list")),
+                wm.MenuAction("Собрать отбор в папку (SELECTED)", _js("selected")),
             ]),
             wm.Menu("Шаблон", [
                 wm.MenuAction("Создать шаблон", _js("tplnew")),
