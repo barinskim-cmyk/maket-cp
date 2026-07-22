@@ -382,10 +382,10 @@ tr:hover td { background: #fafafa; }
   <td>1.11b</td>
   <td contenteditable="true"><strong>Горизонты = 2x ширина в превью</strong></td>
   <td><span class="who-claude">Claude</span></td>
-  <td><span class="s-todo">TODO</span></td>
+  <td><span class="s-done">DONE</span></td>
   <td>Превью</td>
-  <td>Горизонтальные фото (aspect > 1) занимают 2 колонки в превью-сетке. Определять ориентацию по naturalWidth/naturalHeight загруженного img. CSS: grid-column: span 2 для горизонтов.</td>
-  <td class="files">previews.js, style.css</td>
+  <td>Горизонтальные фото (aspect > 1) занимают 2 колонки в превью-сетке. Определять ориентацию по naturalWidth/naturalHeight загруженного img. CSS: grid-column: span 2 для горизонтов. DONE: механика уже была (класс pv-h, CSS .pv-thumb.pv-h, pvDetectOrient по naturalWidth). Закрыт баг: при нестандартном числе колонок (ползунок 2/4/5/6) горизонт, распознанный ПОСЛЕ async-загрузки img, оставался в 1 колонку — inline-ширина 1 колонки (от pvApplyColumnWidth) не переопределялась CSS-классом. Фикс: helper pvThumbWidthFor(isHoriz) как единый источник формулы; pvDetectOrient проставляет 2-колоночную ширину при pvColumns!==3. Верификация: jsdom-харнесс на реально извлечённых из previews.js функциях, 10/10 (cols=2/3/4, до/после фикса).</td>
+  <td class="files">previews.js</td>
   <td>--</td>
   <td class="t-cell"><span class="t-none">--</span></td>
   <td contenteditable="true" class="my-comment"></td>

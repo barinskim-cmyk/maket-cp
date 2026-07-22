@@ -1977,6 +1977,13 @@ function pvDetectOrient(gallery) {
       var check = function() {
         if (img.naturalWidth > img.naturalHeight) {
           thumb.classList.add('pv-h');
+          /* При нестандартном размере колонок на плитках стоит inline-ширина
+             1 колонки (проставлена pvApplyColumnWidth до загрузки img), и
+             CSS-правило .pv-h её не переопределит. Проставляем 2 колонки вручную.
+             При 3 колонках inline-ширины нет — ширину задаёт CSS-класс .pv-h. */
+          if (pvColumns !== 3) {
+            thumb.style.width = pvThumbWidthFor(true);
+          }
           /* Обновляем данные в store чтобы не пересчитывать */
           var name = thumb.getAttribute('data-pv-name');
           var store = pvGetStore();
@@ -4863,35 +4870,38 @@ function pvSetColumns(cols) {
 }
 
 /**
+ * Ширина одной плитки для текущего количества колонок.
+ * Единый источник формулы: используется и pvApplyColumnWidth (при смене
+ * ползунка), и pvDetectOrient (когда горизонт распознан после async-загрузки
+ * img — inline-ширина 1 колонки должна замениться на 2 колонки).
+ * @param {boolean} isHoriz — горизонт (2 колонки) или вертикаль (1 колонка)
+ * @returns {string} значение для style.width
+ */
+function pvThumbWidthFor(isHoriz) {
+  var gap = 4;
+  var totalGap = (pvColumns - 1) * gap;
+  if (!isHoriz) {
+    return 'calc((100% - ' + totalGap + 'px) / ' + pvColumns + ')';
+  }
+  /* При 2 колонках горизонт = полная ширина, иначе 2 ячейки + 1 gap */
+  if (pvColumns <= 2) return '100%';
+  return 'calc(2 * (100% - ' + totalGap + 'px) / ' + pvColumns + ' + ' + gap + 'px)';
+}
+
+/**
  * Применить ширину колонок ко всем галереям.
  * Формула: width = (100% - (cols-1)*gap) / cols
  * gap = 4px
  */
 function pvApplyColumnWidth() {
-  var gap = 4;
-  var totalGap = (pvColumns - 1) * gap;
-  var thumbWidth = 'calc((100% - ' + totalGap + 'px) / ' + pvColumns + ')';
-
-  /* Горизонт = 2 колонки + 1 gap */
-  var hCols = Math.min(pvColumns, pvColumns); // ограничение: не больше pvColumns
-  var hGap = (hCols - 1) * gap;
-  var hThumbWidth;
-  if (pvColumns <= 2) {
-    /* При 2 колонках горизонт = полная ширина */
-    hThumbWidth = '100%';
-  } else {
-    /* Горизонт = 2 ячейки + 1 gap */
-    hThumbWidth = 'calc(2 * (100% - ' + totalGap + 'px) / ' + pvColumns + ' + ' + gap + 'px)';
-  }
-
   var galleries = document.querySelectorAll('.pv-gallery');
   for (var g = 0; g < galleries.length; g++) {
     var thumbs = galleries[g].querySelectorAll('.pv-thumb');
     for (var t = 0; t < thumbs.length; t++) {
       if (thumbs[t].classList.contains('pv-h')) {
-        thumbs[t].style.width = hThumbWidth;
+        thumbs[t].style.width = pvThumbWidthFor(true);
       } else {
-        thumbs[t].style.width = thumbWidth;
+        thumbs[t].style.width = pvThumbWidthFor(false);
       }
     }
   }
