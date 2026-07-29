@@ -9,7 +9,8 @@
   /* Нейтральные серые без тёплого оттенка, приподнято от чёрного (Маша 03.07) */
   --bg:#191919; --surface:#1e1e1e; --panel:#282828; --panel-2:#232323;
   --line:#333333; --line-soft:#2c2c2c;
-  --text:#f2f2f2; --text-2:#b5b5b5; --text-3:#8f8f8f; --meta:#707070;
+  /* --text-3/--meta приподняты до WCAG AA 4.5:1 на тёмных панелях (было #8f8f8f/#707070 = 2.98-4.56:1; ux-contrast-fix) */
+  --text:#f2f2f2; --text-2:#b5b5b5; --text-3:#9a9a9a; --meta:#909090;
   --invert-bg:#f2f2f2; --invert-fg:#1a1a1a;
   --field-bg:#242424; --field-border:#383838;
   --ok:#7fae7f; --warn:#c9956b; --danger:#c96b6b; --accent:#c9956b;
@@ -35,7 +36,8 @@
   --photo-bg:#ffffff; /* фон для фото — абсолютно белый */
   --bg:#e3e3e3; --surface:#fdfdfd; --panel:#fdfdfd; --panel-2:#f5f5f5;
   --line:#dcdcdc; --line-soft:#e8e8e8;
-  --text:#141414; --text-2:#555555; --text-3:#8a8a8a; --meta:#909090;
+  /* --text-3/--meta затемнены до WCAG AA 4.5:1 на светлых панелях (было #8a8a8a/#909090 = 2.49-3.39:1; ux-contrast-fix) */
+  --text:#141414; --text-2:#555555; --text-3:#6f6f6f; --meta:#707070;
   --invert-bg:#141414; --invert-fg:#fdfdfd;
   --field-bg:#fdfdfd; --field-border:#d0d0d0;
   --ok:#3f7a4f; --warn:#a5701e; --danger:#b5453f; --accent:#a5701e;
