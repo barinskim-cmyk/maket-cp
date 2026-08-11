@@ -1153,6 +1153,50 @@ body { font-family: var(--font-main); background: var(--panel-2); color: var(--t
 /* Ползунок размера миниатюр */
 .pv-slider { width: 60px; height: 4px; cursor: pointer; accent-color: var(--text); }
 
+/* ── Coach-marks: подсказки при первом использовании панели превью ── */
+.pv-coach {
+  position: absolute;
+  left: 14px; right: 14px;
+  max-width: 320px;
+  z-index: 20;
+  background: var(--panel-2);
+  border: 1px solid var(--field-border);
+  border-left: 2px solid var(--accent);
+  border-radius: 0;
+  padding: 12px 14px 14px;
+  box-shadow: 0 6px 22px rgba(0,0,0,0.28);
+}
+.pv-coach-head {
+  font-family: var(--font-mono);
+  font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 8px;
+}
+.pv-coach-list {
+  margin: 0 0 10px; padding-left: 18px;
+  font-size: 12px; line-height: 1.5; color: var(--text-2);
+}
+.pv-coach-list li { margin-bottom: 5px; }
+.pv-coach-list li:last-child { margin-bottom: 0; }
+.pv-coach-btn {
+  border: 1px solid var(--field-border);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 12px; padding: 5px 14px; cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.pv-coach-btn:hover { background: var(--surface); border-color: var(--text-3); }
+/* Мягкая подсветка первой плитки — «сюда можно тянуть фото» */
+.pv-gallery .pv-thumb.pv-coach-target {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  animation: pv-coach-pulse 1.4s ease-in-out 3;
+}
+@keyframes pv-coach-pulse {
+  0%, 100% { outline-color: var(--accent); }
+  50% { outline-color: transparent; }
+}
+
 /* Галерея */
 .pv-gallery {
   display: flex;

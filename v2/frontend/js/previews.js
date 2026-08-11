@@ -1866,6 +1866,83 @@ function pvRenderPanel(galleryId, toolbarId, countId, dropzoneId) {
     };
     requestAnimationFrame(_tryRestore);
   }
+
+  /* Coach-marks: показать подсказки при первом использовании панели
+     превью (только основная панель 'pv', только когда есть фото). */
+  if (panelKey === 'pv' && store.length > 0) pvMaybeShowCoach();
+}
+
+
+/* ══════════════════════════════════════════════
+   Coach-marks — подсказки при первом использовании
+   Показываются один раз (localStorage-флаг), когда в панели превью
+   впервые появляются фото. Три коротких подсказки:
+     1. фото можно перетаскивать в слот карточки;
+     2. клик по фото открывает полноэкранный просмотр;
+     3. звёзды вверху — фильтр по рейтингу.
+   Никаких иконок/эмодзи (требование Маши). Тон: конкретное действие.
+   ══════════════════════════════════════════════ */
+
+/** @type {string} localStorage-ключ «подсказки превью показаны». */
+var PV_COACH_KEY = 'maketcp_coach_pv_v1';
+
+/** @return {boolean} true если пользователь уже видел/закрыл подсказки. */
+function pvCoachDismissed() {
+  try { return localStorage.getItem(PV_COACH_KEY) === '1'; }
+  catch (e) { return false; }
+}
+
+/** Запомнить, что подсказки показаны (больше не показывать). */
+function pvCoachMarkSeen() {
+  try { localStorage.setItem(PV_COACH_KEY, '1'); } catch (e) {}
+}
+
+/**
+ * Показать карточку подсказок, если пользователь ещё её не закрывал.
+ * Идемпотентна: повторный вызов не создаёт дубликат.
+ */
+function pvMaybeShowCoach() {
+  if (pvCoachDismissed()) return;
+  if (document.getElementById('pv-coach')) return;
+
+  var host = document.getElementById('cp-previews');
+  if (!host) return;
+
+  /* Контекст позиционирования для absolute-карточки. */
+  var cs = window.getComputedStyle(host);
+  if (cs.position === 'static') host.style.position = 'relative';
+
+  var gallery = document.getElementById('pv-gallery');
+
+  var card = document.createElement('div');
+  card.className = 'pv-coach';
+  card.id = 'pv-coach';
+  /* Ставим карточку над началом галереи. */
+  card.style.top = (gallery ? gallery.offsetTop + 6 : 120) + 'px';
+
+  var h = '';
+  h += '<div class="pv-coach-head">Быстрый старт</div>';
+  h += '<ol class="pv-coach-list">';
+  h += '<li>Перетащите фото из превью в слот карточки слева.</li>';
+  h += '<li>Клик по фото — просмотр на весь экран, отбор и комментарии.</li>';
+  h += '<li>Звёзды вверху панели — фильтр по рейтингу из Capture One.</li>';
+  h += '</ol>';
+  h += '<button type="button" class="pv-coach-btn" onclick="pvCoachClose()">Понятно</button>';
+  card.innerHTML = h;
+  host.appendChild(card);
+
+  /* Мягкая подсветка первой плитки — «сюда можно тянуть». */
+  var firstThumb = host.querySelector('.pv-gallery .pv-thumb');
+  if (firstThumb) firstThumb.classList.add('pv-coach-target');
+}
+
+/** Закрыть подсказки и запомнить это. */
+function pvCoachClose() {
+  pvCoachMarkSeen();
+  var card = document.getElementById('pv-coach');
+  if (card && card.parentNode) card.parentNode.removeChild(card);
+  var t = document.querySelector('.pv-coach-target');
+  if (t) t.classList.remove('pv-coach-target');
 }
 
 
