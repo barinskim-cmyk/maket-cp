@@ -222,9 +222,13 @@ function sbOnAuthChange(event, session) {
   } else if (event === 'SIGNED_OUT') {
     sbUser = null;
     console.log('supabase.js: Вышли');
-    /* Заблокировать приложение (только в браузере) */
-    if (typeof authLock === 'function' && !(window.pywebview && window.pywebview.api)) {
-      authLock();
+    /* Заблокировать приложение и почистить кэш проектов (только в
+       браузере — на desktop localStorage хранит локальные проекты).
+       Покрывает выход не только по кнопке, но и по истечении сессии /
+       выходу в другой вкладке. */
+    if (!(window.pywebview && window.pywebview.api)) {
+      if (typeof _shClearCloudCache === 'function') _shClearCloudCache();
+      if (typeof authLock === 'function') authLock();
     }
   }
   // Обновляем UI если функция есть

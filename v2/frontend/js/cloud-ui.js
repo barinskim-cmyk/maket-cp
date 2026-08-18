@@ -609,6 +609,16 @@ function authLogout() {
     App.selectedProject = -1;
   }
 
+  /* Security: почистить localStorage-кэш проектов, чтобы следующий
+     пользователь на этом браузере не увидел проекты предыдущего
+     (остаток инцидента previews RLS-leak). Только в браузере — на
+     desktop localStorage хранит локальные проекты как основной store.
+     На desktop эта функция недостижима (кнопка "Выйти" скрыта). */
+  if (typeof _shClearCloudCache === 'function' &&
+      !(window.pywebview && window.pywebview.api)) {
+    _shClearCloudCache();
+  }
+
   /* Остановить авто-пул и realtime */
   if (typeof sbStopAutoPull === 'function') sbStopAutoPull();
 

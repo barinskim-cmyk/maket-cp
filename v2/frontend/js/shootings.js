@@ -3822,6 +3822,60 @@ window.addEventListener('offline', function() {
 /** @type {string} localStorage key prefix для превью проекта */
 var SH_PREVIEWS_KEY_PREFIX = 'maketcp_pv_';
 
+/** @type {string} localStorage key основного кэша проектов (см. SH_AUTOSAVE_KEY). */
+var SH_PROJECTS_CACHE_KEY = 'maketcp_projects';
+
+/* Ключи UI-настроек, которые начинаются с maketcp_pv_, но НЕ являются
+   превью проекта (ширина панели, число колонок). Их нельзя удалять при
+   GC/очистке кэша, иначе сбрасываются пользовательские настройки панели.
+   Баг: старый GC матчил по префиксу и стирал их при каждом автосейве. */
+var SH_PV_RESERVED_KEYS = { 'maketcp_pv_width': true, 'maketcp_pv_cols': true };
+
+/**
+ * Является ли localStorage-ключ ключом превью конкретного проекта
+ * (maketcp_pv_<brand_date>), а не UI-настройкой панели превью.
+ * @param {string} k
+ * @returns {boolean}
+ */
+function _shIsProjectPreviewKey(k) {
+  return k.indexOf(SH_PREVIEWS_KEY_PREFIX) === 0 && !SH_PV_RESERVED_KEYS[k];
+}
+
+/**
+ * Очистить локальный кэш облачных проектов из localStorage.
+ * Вызывается при выходе из аккаунта (браузер), чтобы следующий
+ * пользователь на том же браузере не увидел проекты предыдущего
+ * (остаточная часть инцидента previews RLS-leak, 09.07 — кэш в
+ * localStorage не сбрасывался при logout).
+ *
+ * Удаляет:
+ *   - maketcp_projects (основной кэш списка проектов);
+ *   - maketcp_pv_<...> (превью проектов).
+ * Сохраняет UI-настройки (maketcp_pv_width, maketcp_pv_cols) и прочие ключи.
+ *
+ * ВАЖНО: на desktop (pywebview) localStorage — основное хранилище
+ * локальных проектов, поэтому вызывать только в браузерном режиме.
+ * @returns {number} сколько ключей удалено
+ */
+function _shClearCloudCache() {
+  var removed = 0;
+  try {
+    if (localStorage.getItem(SH_PROJECTS_CACHE_KEY) !== null) {
+      localStorage.removeItem(SH_PROJECTS_CACHE_KEY);
+      removed++;
+    }
+    var lsKeys = Object.keys(localStorage);
+    for (var i = 0; i < lsKeys.length; i++) {
+      var k = lsKeys[i];
+      if (_shIsProjectPreviewKey(k)) {
+        localStorage.removeItem(k);
+        removed++;
+      }
+    }
+  } catch (e) { /* ignore — очистка best-effort */ }
+  return removed;
+}
+
 /**
  * Получить уникальный ключ проекта для хранения превью.
  * @param {Object} proj
@@ -3902,7 +3956,9 @@ function _shDoAutoSave() {
     var lsKeys = Object.keys(localStorage);
     for (var lk = 0; lk < lsKeys.length; lk++) {
       var k = lsKeys[lk];
-      if (k.indexOf(SH_PREVIEWS_KEY_PREFIX) === 0 && !activeKeys[k]) {
+      /* Только ключи превью проекта; UI-настройки (maketcp_pv_width /
+         maketcp_pv_cols) сохраняем — см. _shIsProjectPreviewKey. */
+      if (_shIsProjectPreviewKey(k) && !activeKeys[k]) {
         try {
           localStorage.removeItem(k);
           console.log('localStorage GC: удалён orphan превью-ключ', k);
