@@ -1632,12 +1632,12 @@ tr:hover td { background: #fafafa; }
 </tr>
 
 <tr data-row="feat0702-native-rename">
-  <td><span class="s-todo">TODO</span></td>
+  <td><span class="s-done">DONE</span></td>
   <td>Переименование</td>
   <td><strong>Нативное переименование файлов (rename_in_folder)</strong></td>
-  <td></td>
-  <td>Сейчас заглушка: фотограф скачивает CSV и запускает отдельный maket_rename.exe. Реализовать переименование прямо из desktop-приложения (Python уже есть). Убирает самый неуклюжий шаг workflow.</td>
-  <td class="files">v2/backend/core/api/app_api.py, rename.js</td>
+  <td>99c775a</td>
+  <td>DONE 19.08: фича фактически уже была реализована сквозняком — backend AppAPI.rename_in_folder (native-диалог папки + os.rename + лог) и frontend rnRenameFolder (сбор old→new только по verified-парам, проверка коллизий имён, вызов Python, показ результата), кнопка в тулбаре Артикулов. Описание про CSV+maket_rename.exe устарело. В эту сессию: вынес чистую FS-логику из app_api в infra — FileSystem.apply_rename_mapping (поиск файла, skip-not-found, защита от перезаписи существующего имени, лог с секциями RENAMED/SKIPPED/ERRORS), app_api теперь тонкая обёртка над native-диалогом. Добавил первые в проекте Python-юнит-тесты: tests/test_rename.py, 6/6 (обычный ренейм, skip missing, коллизия без перезаписи, пустые пары, old==new no-op, запись лога). Верификация: python3 tests/test_rename.py -> 6/6 PASS, py_compile обоих модулей OK.</td>
+  <td class="files">v2/backend/core/infra/filesystem.py, v2/backend/core/api/app_api.py, v2/backend/tests/test_rename.py, rename.js</td>
   <td><span class="p-low">P2</span></td>
   <td class="t-cell"><span class="t-none">--</span></td>
   <td contenteditable="true" class="my-comment"></td>
