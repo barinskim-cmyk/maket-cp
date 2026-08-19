@@ -23,6 +23,7 @@ from ..services.version_service import VersionService
 from ..services.shooting_service import ShootingService
 from ..services import permissions_service
 from ..infra.c1_bridge import CaptureOneBridge
+from ..infra.filesystem import FileSystem
 from ..domain.project import Project
 from ..domain.card import CardTemplate
 
@@ -1107,14 +1108,14 @@ class AppAPI:
         """Apply old→new rename mapping to real files inside a user-picked folder.
 
         JS вызывает с {mapping: [{old, new}, ...]} — мы открываем
-        native-диалог «выбор папки», находим каждый `old` на диске и
-        делаем os.rename → `new`. Пишем лог рядом с папкой.
+        native-диалог «выбор папки», а саму работу (поиск файлов на диске,
+        os.rename, лог) делегируем FileSystem.apply_rename_mapping (infra),
+        которая покрыта юнит-тестами (tests/test_rename.py).
 
         Returns:
-            {renamed: int, skipped: [old_names_not_found], log_path: str}
-            или {cancelled: True}, или {error: "..."}.
+            {renamed: int, skipped: [old_names_not_found], errors: [...],
+             log_path: str} или {cancelled: True}, или {error: "..."}.
         """
-        import datetime
         if not self._window:
             return {"error": "Нет окна"}
         mapping = payload.get("mapping") if isinstance(payload, dict) else None
@@ -1133,57 +1134,7 @@ class AppAPI:
         if not folder_p.is_dir():
             return {"error": f"Папка не найдена: {folder}"}
 
-        renamed = 0
-        skipped = []
-        applied_pairs: list[tuple[str, str]] = []
-        errors: list[str] = []
-
-        for pair in mapping:
-            old_name = (pair or {}).get("old")
-            new_name = (pair or {}).get("new")
-            if not old_name or not new_name:
-                continue
-            src = folder_p / old_name
-            if not src.exists():
-                skipped.append(old_name)
-                continue
-            dst = folder_p / new_name
-            if dst.exists() and dst != src:
-                errors.append(f"{old_name}: '{new_name}' уже существует — пропущен")
-                continue
-            try:
-                os.rename(src, dst)
-                renamed += 1
-                applied_pairs.append((old_name, new_name))
-            except Exception as e:
-                errors.append(f"{old_name}: {e}")
-
-        ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        log_path = folder_p / f"rename_log_{ts}.txt"
-        try:
-            with log_path.open("w", encoding="utf-8") as f:
-                f.write(f"Rename log — {ts}\n")
-                f.write(f"Folder: {folder}\n")
-                f.write(f"Total mapping: {len(mapping)}, renamed: {renamed}, "
-                        f"skipped: {len(skipped)}, errors: {len(errors)}\n\n")
-                f.write("=== RENAMED ===\n")
-                for old, new in applied_pairs:
-                    f.write(f"{old}\t->\t{new}\n")
-                if skipped:
-                    f.write("\n=== SKIPPED (not found in folder) ===\n")
-                    for s in skipped:
-                        f.write(f"{s}\n")
-                if errors:
-                    f.write("\n=== ERRORS ===\n")
-                    for e in errors:
-                        f.write(f"{e}\n")
-        except Exception as e:
-            # Лог не критичен — основная работа сделана.
-            errors.append(f"log write failed: {e}")
-
-        return {
-            "renamed": renamed,
-            "skipped": skipped,
-            "errors": errors,
-            "log_path": str(log_path),
-        }
+        result = FileSystem.apply_rename_mapping(folder_p, mapping)
+        # applied — внутренний список пар, наружу в JS не отдаём.
+        result.pop("applied", None)
+        return result
