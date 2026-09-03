@@ -340,7 +340,10 @@ body { font-family: var(--font-main); background: var(--panel-2); color: var(--t
 .project-restore-btn:hover { color: var(--text); border-color: var(--text); }
 .project-shared-tag { font-size: 10px; color: var(--invert-fg); background: var(--invert-bg); padding: 1px 6px; border-radius: 0; font-weight: normal; }
 
-.shootings-layout { display: grid; grid-template-columns: 1.3fr 1fr; gap: 24px; align-items: start; }
+/* Пайплайн-колонка: адаптивная ширина вместо жёсткого 1fr.
+   На узких десктопах (1280px) не сжимает список; на широких (1920px)
+   не «отрывается» огромной колонкой — clamp держит 320–420px. */
+.shootings-layout { display: grid; grid-template-columns: minmax(0, 1.3fr) clamp(320px, 30%, 420px); gap: 24px; align-items: start; }
 .shootings-left { min-width: 0; }
 .shootings-right { min-width: 0; }
 
