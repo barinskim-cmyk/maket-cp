@@ -26,7 +26,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=42">
+<link rel="stylesheet" href="css/style.css?v=43">
 <link rel="stylesheet" href="css/design-system.css?v=2">
 </head>
 <body>
@@ -452,24 +452,21 @@
         <div class="sync-panel">
           <div class="section-title">Rate Setter</div>
 
-          <div class="radio-group">
-            <label><input type="radio" name="rs-mode" value="text" checked onchange="toggleRsMode()"> Список имён</label>
-            <label><input type="radio" name="rs-mode" value="folder" onchange="toggleRsMode()"> Папка с файлами</label>
-          </div>
-
+          <!-- Основной путь: список файлов из проекта (заполняется автоматически) -->
           <div id="rs-text-mode">
             <div class="sync-field">
               <label>Список имён файлов (по одному на строку)</label>
-              <div id="rs-auto-info" style="display:none;font-size:12px;color:#666;margin-bottom:4px"></div>
+              <div id="rs-auto-info" style="display:none;font-size:12px;color:var(--text-3);margin-bottom:4px"></div>
               <textarea id="rs-text" placeholder="IMG_0001&#10;IMG_0002&#10;IMG_0003"></textarea>
               <div style="margin-top:4px;display:flex;gap:8px;flex-wrap:wrap">
                 <button class="btn btn-sm" onclick="rsAutoFillFromProject()">Все файлы</button>
                 <button class="btn btn-sm" onclick="rsFillDeltaFromLatest()" id="rs-delta-btn" style="border-color:#2a7d2a;color:#2a7d2a">Только изменения</button>
-                <button class="btn btn-sm" onclick="rsClearAutoFill()" style="border-color:#999;color:#999">Очистить</button>
+                <button class="btn btn-sm" onclick="rsClearAutoFill()" style="border-color:var(--text-3);color:var(--text-3)">Очистить</button>
               </div>
             </div>
           </div>
 
+          <!-- Режим «Папка» — виден только когда выбран в «Дополнительно» -->
           <div id="rs-folder-mode" style="display:none">
             <div class="sync-field">
               <label>Папка-источник (с превью/выборкой)</label>
@@ -489,18 +486,38 @@
           </div>
 
           <div class="checkbox-row">
-            <input type="checkbox" id="rs-strip-tails">
-            <label for="rs-strip-tails">Убирать суффиксы (_preview, _web, _copy...)</label>
+            <input type="checkbox" id="rs-dry-run">
+            <label for="rs-dry-run">Пробный запуск (проверить без записи .cos)</label>
           </div>
 
-          <div class="sync-field">
-            <label for="rs-custom-strip-suffix">Свой суффикс/префикс (через запятую — стрипается с начала и/или конца)</label>
-            <input type="text" id="rs-custom-strip-suffix" placeholder="например: _v2, 1 , -draft">
+          <div style="margin-top:4px">
+            <button class="btn btn-primary" id="rs-run-btn" onclick="runRateSetter()">Запустить</button>
           </div>
 
-          <div style="display:flex; gap:8px;">
-            <button class="btn btn-primary" id="rs-run-btn" onclick="runRateSetter(false)">Запустить</button>
-            <button class="btn" onclick="runRateSetter(true)">Пробный запуск</button>
+          <!-- Дополнительно: режим ввода, суффиксы -->
+          <div class="rs-adv">
+            <button type="button" class="rs-adv-toggle" id="rs-adv-toggle" aria-expanded="false" onclick="toggleRsAdvanced()">
+              <span class="rs-adv-caret">▸</span> Дополнительно
+            </button>
+            <div id="rs-adv-body" class="rs-adv-body" style="display:none">
+              <div class="sync-field">
+                <label>Режим ввода</label>
+                <div class="radio-group">
+                  <label><input type="radio" name="rs-mode" value="text" checked onchange="toggleRsMode()"> Список имён</label>
+                  <label><input type="radio" name="rs-mode" value="folder" onchange="toggleRsMode()"> Папка с файлами</label>
+                </div>
+              </div>
+
+              <div class="checkbox-row">
+                <input type="checkbox" id="rs-strip-tails">
+                <label for="rs-strip-tails">Убирать суффиксы (_preview, _web, _copy...)</label>
+              </div>
+
+              <div class="sync-field">
+                <label for="rs-custom-strip-suffix">Свой суффикс/префикс (через запятую — стрипается с начала и/или конца)</label>
+                <input type="text" id="rs-custom-strip-suffix" placeholder="например: _v2, 1 , -draft">
+              </div>
+            </div>
           </div>
         </div>
       </div>

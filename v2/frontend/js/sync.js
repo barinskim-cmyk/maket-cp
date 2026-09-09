@@ -12,6 +12,22 @@ function toggleRsMode() {
 }
 
 /**
+ * Развернуть/свернуть панель «Дополнительно» (режим ввода, суффиксы).
+ * Второстепенные настройки скрыты по умолчанию, чтобы основной путь
+ * (список + Запустить) оставался единственным заметным действием.
+ */
+function toggleRsAdvanced() {
+  var body = document.getElementById('rs-adv-body');
+  var toggle = document.getElementById('rs-adv-toggle');
+  if (!body || !toggle) return;
+  var open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : '';
+  toggle.setAttribute('aria-expanded', open ? 'false' : 'true');
+  var caret = toggle.querySelector('.rs-adv-caret');
+  if (caret) caret.textContent = open ? '▸' : '▾'; /* ▸ / ▾ */
+}
+
+/**
  * Выбрать папку через нативный диалог (desktop only).
  * @param {string} inputId — id текстового поля для пути
  */
@@ -145,6 +161,12 @@ function _rsCleanLineToStem(line) {
  * @param {boolean} dryRun — тестовый прогон (без записи .cos)
  */
 function runRateSetter(dryRun) {
+  /* «Пробный запуск» теперь чекбокс, а не отдельная кнопка: если аргумент
+     не передан явно (основная кнопка «Запустить»), читаем состояние тоггла. */
+  if (dryRun === undefined) {
+    var drEl = document.getElementById('rs-dry-run');
+    dryRun = !!(drEl && drEl.checked);
+  }
   var mode = document.querySelector('input[name="rs-mode"]:checked').value;
   var sessionDir = document.getElementById('rs-session-dir').value;
   if (!sessionDir) { alert('Выберите папку сессии Capture One'); return; }

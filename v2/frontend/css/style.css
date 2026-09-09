@@ -2011,6 +2011,17 @@ body { font-family: var(--font-main); background: var(--panel-2); color: var(--t
 .checkbox-row { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
 .checkbox-row label { font-size: 13px; color: var(--text-2); cursor: pointer; }
 
+/* ── Rate Setter: панель «Дополнительно» ── */
+.rs-adv { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 12px; }
+.rs-adv-toggle {
+  background: none; border: none; padding: 0; cursor: pointer;
+  font-family: inherit; font-size: 12px; color: var(--text-3);
+  display: flex; align-items: center; gap: 6px;
+}
+.rs-adv-toggle:hover { color: var(--text-2); }
+.rs-adv-caret { font-size: 10px; line-height: 1; }
+.rs-adv-body { margin-top: 12px; }
+
 /* ── Заглушки ── */
 .placeholder { max-width: 600px; margin: 80px auto; text-align: center; }
 .placeholder h2 { font-size: 20px; margin-bottom: 12px; }
