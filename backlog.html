@@ -1427,12 +1427,24 @@ tr:hover td { background: #fafafa; }
   <td contenteditable="true" class="my-comment"></td>
 </tr>
 
+<tr data-row="feat-preview-name-search">
+  <td><span class="s-done">DONE</span></td>
+  <td>Превью / UX</td>
+  <td><strong>Поиск по имени файла над галереей превью</strong></td>
+  <td></td>
+  <td>Срез задачи design0702-gallery-virtualization (audit C1): найти конкретный кадр в больших сменах (5000+ фото) по имени. Добавлено поле «Поиск по имени» type=search в панели фильтров обеих панелей (pv и oc-pv); новый фильтр PV_NAME_FILTER встроен в существующий пайплайн pvRenderPanel (подстрока, регистронезависимо), комбинируется с фильтрами рейтинга/папки/комментариев; pvSetNameFilter тримит ввод и перерисовывает с дебаунсом 150мс (на 5000+ фото ре-рендер на каждый символ заметен). Поле — отдельный элемент внутри .pv-filter, поэтому pvRenderPanel его не перезатирает: фокус и каретка сохраняются при вводе. Стиль .pv-name-search по токенам дизайн-системы, без иконок. previews.js?v=44->45, style.css?v=43->44. Верификация: jsdom-харнесс tests/unit/preview-name-search.test.js на реальных index.html+previews.js — 15/15 (наличие полей, пустой фильтр, подстрока, регистронезависимость, нет-совпадений + empty-state, комбинация с рейтингом, trim, дебаунс, схлопывание быстрого ввода); node --check previews.js OK.</td>
+  <td class="files">previews.js, index.html, style.css, tests/unit/</td>
+  <td><span class="p-low">P2</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
 <tr data-row="design0702-gallery-virtualization">
   <td><span class="s-todo">TODO</span></td>
   <td>Дизайн / Производительность</td>
-  <td><strong>Виртуализация галереи превью (5000+ фото) + поиск по имени</strong></td>
+  <td><strong>Виртуализация галереи превью (5000+ фото) + группировка по папкам</strong></td>
   <td></td>
-  <td>Дизайн-аудит C1 (HIGH): при >300 превью рендерить только видимое окно (justified-layout уже посчитан), поиск по имени файла над галереей, группировка по папкам со сворачиванием.</td>
+  <td>Дизайн-аудит C1 (HIGH). Остаток после выделения поиска по имени (feat-preview-name-search, DONE): (1) при >300 превью рендерить только видимое окно с рециклингом DOM-узлов — сейчас есть ленивый догруз батчами PV_RENDER_BATCH=60 через pvBindLazyScroll (это уже снимает остроту OOM, но DOM растёт при прокрутке); (2) группировка по папкам со сворачиванием. Обе части — крупная переработка render/scroll-anchor/drag-машинерии в previews.js (6400+ строк), высокий риск сломать существующие экраны — делать с Машей или в отдельной ветке, не в автономной сессии.</td>
   <td class="files">previews.js, style.css</td>
   <td><span class="p-low">P2</span></td>
   <td class="t-cell"><span class="t-none">--</span></td>

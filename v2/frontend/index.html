@@ -26,7 +26,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=43">
+<link rel="stylesheet" href="css/style.css?v=44">
 <link rel="stylesheet" href="css/design-system.css?v=2">
 </head>
 <body>
@@ -293,6 +293,7 @@
           <span class="pv-filter-stars" id="pv-filter-stars" data-panel="pv"></span>
           <button class="pv-filter-reset" id="pv-filter-reset" onclick="pvSetFilter('pv', 0)">Все</button>
           <!-- фильтр комментариев убран из панели превью -->
+          <input type="search" class="pv-name-search" id="pv-name-search" placeholder="Поиск по имени" oninput="pvSetNameFilter('pv', this.value)">
         </div>
         <div class="pv-folder-filter" id="pv-folder-filter" style="display:none">
           <select class="pv-folder-select" id="pv-folder-select" onchange="pvSetFolderFilter('pv', this.value)">
@@ -339,6 +340,7 @@
         <div class="pv-filter" id="oc-pv-filter" style="display:none">
           <span class="pv-filter-stars" id="oc-pv-filter-stars" data-panel="oc-pv"></span>
           <button class="pv-filter-reset" id="oc-pv-filter-reset" onclick="pvSetFilter('oc-pv', 0)">Все</button>
+          <input type="search" class="pv-name-search" id="oc-pv-name-search" placeholder="Поиск по имени" oninput="pvSetNameFilter('oc-pv', this.value)">
         </div>
         <div class="pv-folder-filter" id="oc-pv-folder-filter" style="display:none">
           <select class="pv-folder-select" id="oc-pv-folder-select" onchange="pvSetFolderFilter('oc-pv', this.value)">
@@ -808,7 +810,7 @@
 <script src="js/lib/justified-layout.min.js?v=1"></script>
 <script src="js/layout.js?v=2"></script>
 <script src="js/cards.js?v=11"></script>
-<script src="js/previews.js?v=44"></script>
+<script src="js/previews.js?v=45"></script>
 <script src="js/rename.js?v=2"></script>
 <script src="js/articles.js?v=26"></script>
 <script src="js/sync.js"></script>

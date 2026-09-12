@@ -1352,6 +1352,16 @@ body { font-family: var(--font-main); background: var(--panel-2); color: var(--t
 }
 .pv-folder-select:focus { outline: none; border-color: var(--text-3); }
 
+/* Поиск по имени файла — компактное поле в панели фильтров превью */
+.pv-name-search {
+  flex: 0 1 120px; min-width: 70px; margin-left: 6px;
+  padding: 3px 6px; font-size: 11px;
+  border: 1px solid var(--line); border-radius: 0;
+  background: var(--surface); color: var(--text-2);
+}
+.pv-name-search::placeholder { color: var(--text-3); }
+.pv-name-search:focus { outline: none; border-color: var(--text-3); }
+
 /* ── Версии превью (RAW / ЦК / Ретушь) ── */
 .pv-version-bar {
   margin-bottom: 6px; padding: 4px 2px;

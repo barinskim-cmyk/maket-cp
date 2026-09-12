@@ -33,6 +33,11 @@ var PV_FILTER = { 'pv': 0, 'oc-pv': 0 };
 var PV_FOLDER_FILTER = { 'pv': '', 'oc-pv': '' };
 // Фильтр "с комментариями": true = показывать только с аннотациями
 var PV_COMMENT_FILTER = { 'pv': false, 'oc-pv': false };
+// Поиск по имени файла (подстрока, регистронезависимо): '' = без фильтра.
+// Помогает найти конкретный кадр в больших сменах (5000+ фото). audit C1.
+var PV_NAME_FILTER = { 'pv': '', 'oc-pv': '' };
+// Дебаунс перерисовки при вводе в поле поиска (ключ панели -> id таймера).
+var PV_NAME_FILTER_TIMER = { 'pv': null, 'oc-pv': null };
 
 // ── Версии превью (по этапам пайплайна) ──
 // Этапы, для которых можно загружать отдельные версии превью
@@ -1802,6 +1807,8 @@ function pvRenderPanel(galleryId, toolbarId, countId, dropzoneId) {
     selectionSet = pvGetSelectionSet();
   }
   var commentFilter = PV_COMMENT_FILTER[panelKey] || false;
+  /* Поиск по имени файла: нормализуем к нижнему регистру один раз. */
+  var nameFilter = (PV_NAME_FILTER[panelKey] || '').toLowerCase();
   for (var i = 0; i < allStore.length; i++) {
     var pv = allStore[i];
     if (minRating > 0 && (pv.rating || 0) < minRating) continue;
@@ -1810,6 +1817,8 @@ function pvRenderPanel(galleryId, toolbarId, countId, dropzoneId) {
     if (selectionSet && !selectionSet[pv.name]) continue;
     /* Фильтр: только с комментариями */
     if (commentFilter && rtAnnotCount(pv.name) === 0) continue;
+    /* Поиск по имени: подстрока в имени файла (регистронезависимо) */
+    if (nameFilter && String(pv.name).toLowerCase().indexOf(nameFilter) < 0) continue;
     store.push(pv);
   }
 
@@ -2922,6 +2931,28 @@ function pvRenderFolderSelect(panelKey, folders, current) {
 function pvSetFolderFilter(panelKey, folderName) {
   PV_FOLDER_FILTER[panelKey] = folderName;
   pvRenderAll();
+}
+
+// ── Поиск по имени файла ──
+
+/**
+ * Обновляет фильтр поиска по имени и перерисовывает галерею с дебаунсом.
+ * Поле поиска (input) — отдельный элемент внутри .pv-filter, поэтому
+ * pvRenderPanel не перезатирает его и фокус/каретка сохраняются при вводе.
+ * @param {string} panelKey  'pv' | 'oc-pv'
+ * @param {string} value     подстрока имени файла
+ */
+function pvSetNameFilter(panelKey, value) {
+  PV_NAME_FILTER[panelKey] = (value || '').trim();
+  /* Дебаунс: на больших сменах (5000+ фото) перерисовка на каждый
+     символ заметна, поэтому ждём паузу в вводе. */
+  if (PV_NAME_FILTER_TIMER[panelKey]) {
+    clearTimeout(PV_NAME_FILTER_TIMER[panelKey]);
+  }
+  PV_NAME_FILTER_TIMER[panelKey] = setTimeout(function() {
+    PV_NAME_FILTER_TIMER[panelKey] = null;
+    pvRenderAll();
+  }, 150);
 }
 
 // ── Фильтр по комментариям ──
