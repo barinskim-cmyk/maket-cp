@@ -473,6 +473,9 @@ function cpRenderCard() {
   /* Выбор шаблона из библиотеки — dropdown прямо в карточке */
   html += _cpTemplateSelectHTML();
 
+  /* Категория карточки — необязательный тоггл (task 4.1) */
+  html += _cpCategoryBtnHTML(card);
+
   /* Редактор шаблона и библиотека */
   html += '<button class="btn btn-sm" onclick="cpOpenTemplateEditor()">Редактор</button>';
   html += '<button class="btn btn-sm" onclick="cpOpenTemplateLibrary()">Библиотека</button>';
@@ -1952,6 +1955,157 @@ function _cpTemplateSelectHTML() {
   }
   html += '</select>';
   return html;
+}
+
+// ══════════════════════════════════════════════
+//  Категория карточки (task 4.1)
+// ══════════════════════════════════════════════
+
+/**
+ * Кнопка-тоггл категории в тулбаре карточки.
+ * Категория необязательна (по умолчанию пусто). Список берётся из
+ * proj.categories, категорию можно добавить на лету.
+ * @param {Object} card
+ * @returns {string} HTML кнопки
+ */
+function _cpCategoryBtnHTML(card) {
+  var cur = (card && card.category) ? String(card.category).trim() : '';
+  var label = cur ? cur : 'Категория';
+  var cls = 'btn btn-sm cp-cat-btn' + (cur ? ' cp-cat-set' : '');
+  var title = cur ? 'Категория: ' + cur : 'Задать категорию карточки';
+  return '<button class="' + cls + '" onclick="cpToggleCategoryMenu(event)" title="' + esc(title) + '">'
+    + esc(label) + '</button>';
+}
+
+/**
+ * Открыть/закрыть попап выбора категории рядом с кнопкой.
+ * @param {Event} e
+ */
+function cpToggleCategoryMenu(e) {
+  if (e) e.stopPropagation();
+  var existing = document.querySelector('.cp-cat-menu');
+  if (existing) { cpCloseCategoryMenu(); return; }
+
+  var proj = getActiveProject();
+  if (!proj || !proj.cards) return;
+  var card = proj.cards[App.currentCardIdx];
+  if (!card) return;
+
+  var btn = e && e.currentTarget ? e.currentTarget : document.querySelector('.cp-cat-btn');
+  if (!btn) return;
+
+  var cur = (card.category || '').trim();
+  var cats = (proj.categories && proj.categories.length) ? proj.categories.slice() : [];
+  /* Текущая категория карточки может отсутствовать в списке проекта
+     (например, пришла из импорта артикулов) — показать её тоже. */
+  if (cur && cats.indexOf(cur) === -1) cats.unshift(cur);
+
+  var html = '';
+  /* Пункт "без категории" — очистка */
+  html += '<button class="cp-cat-item cp-cat-none' + (cur ? '' : ' cp-cat-active')
+    + '" onclick="cpSetCategory(\'\')">Без категории</button>';
+  for (var i = 0; i < cats.length; i++) {
+    var name = cats[i];
+    var active = (name === cur) ? ' cp-cat-active' : '';
+    html += '<button class="cp-cat-item' + active + '" onclick="cpSetCategory(\''
+      + _cpEscAttr(name) + '\')">' + esc(name) + '</button>';
+  }
+  /* Добавление на лету */
+  html += '<div class="cp-cat-add">'
+    + '<input type="text" class="cp-cat-input" placeholder="Новая категория"'
+    + ' onkeydown="cpCategoryInputKey(event)">'
+    + '<button class="btn btn-sm" onclick="cpAddCategory()">Добавить</button>'
+    + '</div>';
+
+  var menu = document.createElement('div');
+  menu.className = 'cp-cat-menu';
+  menu.innerHTML = html;
+  /* Клик внутри меню не должен закрывать его через глобальный обработчик */
+  menu.onclick = function(ev) { ev.stopPropagation(); };
+  document.body.appendChild(menu);
+
+  /* Позиционирование под кнопкой */
+  var r = btn.getBoundingClientRect();
+  menu.style.top = (r.bottom + window.scrollY + 4) + 'px';
+  menu.style.left = (r.left + window.scrollX) + 'px';
+
+  /* Закрытие по клику вне и Escape */
+  setTimeout(function() {
+    document.addEventListener('click', cpCloseCategoryMenu);
+    document.addEventListener('keydown', cpCategoryEscHandler);
+  }, 0);
+}
+
+/** Закрыть попап категории. */
+function cpCloseCategoryMenu() {
+  var menu = document.querySelector('.cp-cat-menu');
+  if (menu) menu.remove();
+  document.removeEventListener('click', cpCloseCategoryMenu);
+  document.removeEventListener('keydown', cpCategoryEscHandler);
+}
+
+/** Escape закрывает попап категории. */
+function cpCategoryEscHandler(e) {
+  if (e.key === 'Escape') cpCloseCategoryMenu();
+}
+
+/** Enter в поле новой категории = добавить. */
+function cpCategoryInputKey(e) {
+  if (e.key === 'Enter') { e.preventDefault(); cpAddCategory(); }
+  else if (e.key === 'Escape') { e.preventDefault(); cpCloseCategoryMenu(); }
+}
+
+/**
+ * Установить категорию текущей карточки (пустая строка = очистить).
+ * Снимок в undo-стек, ре-рендер, сохранение.
+ * @param {string} name
+ */
+function cpSetCategory(name) {
+  var proj = getActiveProject();
+  if (!proj || !proj.cards) return;
+  var card = proj.cards[App.currentCardIdx];
+  if (!card) return;
+  var val = (name || '').trim();
+  if ((card.category || '') === val) { cpCloseCategoryMenu(); return; }
+  if (typeof cpSaveHistory === 'function') cpSaveHistory();
+  card.category = val;
+  cpCloseCategoryMenu();
+  cpRenderCard();
+  if (typeof cpRenderList === 'function') cpRenderList();
+  if (typeof shAutoSave === 'function') shAutoSave();
+}
+
+/**
+ * Добавить новую категорию в проект и назначить её карточке.
+ * Дубликаты (без учёта регистра) не создаются.
+ */
+function cpAddCategory() {
+  var proj = getActiveProject();
+  if (!proj || !proj.cards) return;
+  var input = document.querySelector('.cp-cat-input');
+  if (!input) return;
+  var val = (input.value || '').trim();
+  if (!val) { input.focus(); return; }
+  if (!proj.categories) proj.categories = [];
+  /* Не плодить дубли по регистру — переиспользовать существующее написание. */
+  var existing = null;
+  for (var i = 0; i < proj.categories.length; i++) {
+    if (String(proj.categories[i]).toLowerCase() === val.toLowerCase()) {
+      existing = proj.categories[i];
+      break;
+    }
+  }
+  if (!existing) proj.categories.push(val);
+  cpSetCategory(existing || val);
+}
+
+/**
+ * Эскейп строки для использования внутри одинарных кавычек в inline onclick.
+ * @param {string} s
+ * @returns {string}
+ */
+function _cpEscAttr(s) {
+  return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
 }
 
 /**

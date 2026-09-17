@@ -675,6 +675,58 @@ body { font-family: var(--font-main); background: var(--panel-2); color: var(--t
 .cp-card-name:hover { border-bottom-color: var(--field-border); }
 .cp-toolbar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 
+/* Категория карточки (task 4.1) */
+.cp-cat-btn.cp-cat-set { border-color: var(--text); color: var(--text); }
+.cp-cat-menu {
+  position: absolute;
+  z-index: 1000;
+  min-width: 180px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: var(--sp-1);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-l);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cp-cat-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 6px 10px;
+  font-size: var(--fs-s);
+  color: var(--text-2);
+  background: transparent;
+  border: none;
+  border-radius: var(--r-m);
+  cursor: pointer;
+}
+.cp-cat-item:hover { background: var(--panel-2); color: var(--text); }
+.cp-cat-item.cp-cat-active { color: var(--text); border: 1px solid var(--line-soft); }
+.cp-cat-none { color: var(--text-3); }
+.cp-cat-add {
+  display: flex;
+  gap: var(--sp-1);
+  margin-top: var(--sp-1);
+  padding-top: var(--sp-1);
+  border-top: 1px solid var(--line-soft);
+}
+.cp-cat-input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  font-size: var(--fs-s);
+  color: var(--text);
+  background: var(--field-bg);
+  border: 1px solid var(--field-border);
+  border-radius: var(--r-m);
+  outline: none;
+}
+.cp-cat-input:focus { border-color: var(--border-focus); }
+
 /* ══════════════════════════════════════════════
    Layout v3 — JS-sizing (layout.js)
    ══════════════════════════════════════════════
