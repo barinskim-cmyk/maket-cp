@@ -423,10 +423,10 @@ tr:hover td { background: #fafafa; }
   <td>1.14</td>
   <td contenteditable="true"><strong>Подсказки по этапам</strong></td>
   <td><span class="who-claude">Claude</span></td>
-  <td><span class="s-todo">TODO</span></td>
+  <td><span class="s-done">DONE</span></td>
   <td>Пайплайн</td>
-  <td>Описание текущего этапа: что нужно сделать, какие инструменты доступны. Раскрывающийся блок под активным шагом.</td>
-  <td class="files">state.js, shootings.js, style.css</td>
+  <td>Описание текущего этапа: что нужно сделать, какие инструменты доступны. Раскрывающийся блок под активным шагом. [DONE 18.09: поле hint у каждого PIPELINE_STAGES (state.js). В renderPipelineV2 (shootings.js) под активным шагом — сворачиваемый блок «Что делать на этапе» (_shStageHintHTML), тоггл shToggleStageHint переключает DOM без ре-рендера и хранит открытое состояние по этапам в localStorage (maketcp_stagehint_open). Стиль .cp-stage-hint* в design-system.css по токенам, обе темы, каретки ▸/▾ без эмодзи. Независимо от 1.12 (текст статичный). Верификация: tests/unit/stage-hint.test.js — jsdom на реальных state.js+shootings.js (стабы коллабораторов рендера), 21/21: hint у всех этапов без эмодзи, блок только под активным этапом, свёрнут по умолчанию, открыт из localStorage, тоггл DOM+персист. node --check OK, CSS 95/95.]</td>
+  <td class="files">state.js, shootings.js, design-system.css, index.html, tests/unit/</td>
   <td>1.12</td>
   <td class="t-cell"><span class="t-none">--</span></td>
   <td contenteditable="true" class="my-comment"></td>

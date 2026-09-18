@@ -90,6 +90,23 @@
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
+/* ── Подсказка по этапу (задача 1.14) ── */
+.cp-stage-hint { margin-top: 10px; }
+.cp-stage-hint-toggle {
+  background: none; border: none; padding: 0; cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 9px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-3);
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.cp-stage-hint-toggle:hover { color: var(--text-2); }
+.cp-hint-caret { font-size: 9px; line-height: 1; }
+.cp-stage-hint-body {
+  margin-top: 7px; max-width: 460px;
+  font-size: 12px; line-height: 1.5; color: var(--text-2);
+  border-left: 2px solid var(--line); padding-left: 10px;
+}
+
 /* ── Развилка ── */
 .cp-fork { margin-top: 12px; border-left: 1px solid var(--line); }
 .cp-fork.current { border-left-color: var(--accent); }

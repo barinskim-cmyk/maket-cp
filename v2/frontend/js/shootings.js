@@ -921,6 +921,68 @@ function _shV2Forks(proj) {
   return forks;
 }
 
+/* ──────────────────────────────────────────────
+   Подсказки по этапам (задача 1.14)
+   Раскрывающийся блок «Что делать на этапе» под активным шагом.
+   Открытое состояние по каждому этапу хранится в localStorage,
+   чтобы не сбрасываться при ре-рендере пайплайна.
+   ────────────────────────────────────────────── */
+var _SH_STAGEHINT_KEY = 'maketcp_stagehint_open';
+
+function _shStageHintOpenMap() {
+  try {
+    var raw = localStorage.getItem(_SH_STAGEHINT_KEY);
+    var m = raw ? JSON.parse(raw) : {};
+    return (m && typeof m === 'object') ? m : {};
+  } catch (e) { return {}; }
+}
+
+function _shStageHintIsOpen(stageId) {
+  return !!_shStageHintOpenMap()[stageId];
+}
+
+/**
+ * Развернуть/свернуть подсказку этапа. Переключает DOM без полного
+ * ре-рендера пайплайна и запоминает состояние в localStorage.
+ * @param {string} stageId — id этапа из PIPELINE_STAGES
+ * @param {Element} btn — кнопка-тоггл
+ * @returns {boolean} новое состояние (true = открыто)
+ */
+function shToggleStageHint(stageId, btn) {
+  var m = _shStageHintOpenMap();
+  var open = !m[stageId];
+  if (open) m[stageId] = 1; else delete m[stageId];
+  try { localStorage.setItem(_SH_STAGEHINT_KEY, JSON.stringify(m)); } catch (e) {}
+  var wrap = btn && btn.parentNode;
+  if (wrap) {
+    var body = wrap.querySelector('.cp-stage-hint-body');
+    if (body) body.style.display = open ? '' : 'none';
+    var caret = btn.querySelector('.cp-hint-caret');
+    if (caret) caret.textContent = open ? '▾' : '▸'; /* ▾ / ▸ */
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  return open;
+}
+
+/**
+ * Разметка подсказки этапа для активного шага пайплайна.
+ * @param {Object} stageObj — элемент PIPELINE_STAGES (нужен id + hint)
+ * @returns {string} HTML или '' если у этапа нет подсказки
+ */
+function _shStageHintHTML(stageObj) {
+  if (!stageObj || !stageObj.hint) return '';
+  var open = _shStageHintIsOpen(stageObj.id);
+  var caret = open ? '▾' : '▸'; /* ▾ / ▸ */
+  var h = '<div class="cp-stage-hint">';
+  h += '<button type="button" class="cp-stage-hint-toggle" aria-expanded="' +
+    (open ? 'true' : 'false') + '" onclick="shToggleStageHint(\'' + stageObj.id +
+    '\', this)"><span class="cp-hint-caret">' + caret + '</span> Что делать на этапе</button>';
+  h += '<div class="cp-stage-hint-body"' + (open ? '' : ' style="display:none"') + '>' +
+    esc(stageObj.hint) + '</div>';
+  h += '</div>';
+  return h;
+}
+
 function renderPipelineV2() {
   var container = document.getElementById('pipeline-container');
   if (!container) return;
@@ -1184,6 +1246,9 @@ function renderPipelineV2() {
       }
       html += '</div>';
     }
+
+    /* Подсказка «Что делать на этапе» — только под активным шагом (задача 1.14) */
+    if (isActive) html += _shStageHintHTML(s2);
 
     html += '</div></div>'; /* /body /row */
   }
