@@ -1319,6 +1319,18 @@ tr:hover td { background: #fafafa; }
   <td contenteditable="true" class="my-comment"></td>
 </tr>
 
+<tr data-row="sec-fn-search-path">
+  <td><span class="s-done">DONE</span></td>
+  <td>Supabase / Безопасность</td>
+  <td contenteditable="true"><strong>Пин search_path у всех public-функций (анти-эскалация)</strong></td>
+  <td></td>
+  <td>Срез audit0702-share-role-db + Supabase security advisor (lint 0011 function_search_path_mutable). 27 функций в схеме public имели role-mutable search_path; для SECURITY DEFINER это вектор privilege-escalation (функция с правами владельца резолвит неполные имена по search_path ВЫЗЫВАЮЩЕГО, который может подсунуть shadowing-объект). Самая опасная поверхность — anon-вызываемые share-RPC: save_cards_by_token, get_project_by_token, _find_project_by_share_token, oc_add_item_by_token, oc_remove_item_by_token, join_by_token. Миграция 038_fn_search_path_hardening: ALTER FUNCTION ... SET search_path = public, extensions, pg_catalog на все 27 (логика не тронута, только резолвинг имён; идемпотентно; extension-функции http_*/urlencode не трогаются). Верификация через Supabase MCP: advisor security — lint function_search_path_mutable исчез (был 27); get_project_by_token на живом токене EKONIKA до и после = 64 карточки (поведение сохранено); контрольный SELECT — 0 app-функций без search_path. НЕ тронуто (вынесено Маше): (1) github_push*/_stage_* — SECURITY DEFINER и executable для anon/authenticated (+ таблица public._secrets) — потенциально anon может триггерить пуш в GitHub, revoke execute меняет поведение/трогает секреты; (2) ролевая модель share view-vs-edit — продуктовое решение (фронт сейчас шлёт и client, и retoucher через save_cards_by_token).</td>
+  <td class="files">v2/supabase/038_fn_search_path_hardening.sql</td>
+  <td><span class="p-med">P1</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
 <tr data-row="audit0702-monetization-matrix">
   <td><span class="s-done">DONE</span></td>
   <td>Бизнес</td>
