@@ -410,10 +410,10 @@ tr:hover td { background: #fafafa; }
   <td>1.13</td>
   <td contenteditable="true"><strong>Журнал переходов (timestamps)</strong></td>
   <td><span class="who-claude">Claude</span></td>
-  <td><span class="s-todo">TODO</span></td>
+  <td><span class="s-done">DONE</span></td>
   <td>Пайплайн</td>
-  <td>advanceStage() записывает {stage, timestamp, trigger} в proj._stageHistory[]. UI показывает время на каждом завершённом этапе.</td>
-  <td class="files">shootings.js</td>
+  <td>advanceStage() записывает {stage, timestamp, trigger} в proj._stageHistory[]. UI показывает время на каждом завершённом этапе. DONE: механика уже реализована сквозняком. advanceStage при опустошении этапа пишет время ухода в proj._stageHistory[idx] (строка) + proj._stageDates[idx].lastLeave (ISO), а вход на следующий этап — в _stageDates[next].firstEnter. Триггер перехода (manual/client/авто) фиксируется batch-событием proj._stageBatches[] (shRecordBatchMove) и каноническим журналом событий (emitEvent); _stageHistory хранит только timestamp. renderPipelineV2 (и legacy renderPipeline) показывают дату завершённого этапа в .ds-meta. Верификация: tests/unit/stage-history.test.js — jsdom на реальных state.js+shootings.js (картина этапов застаблена, т.к. shPhotosPerStage event-sourced), 19/19 PASS: запись _stageHistory/_stageDates/_stageBatches с trigger, сдвиг proj._stage, нелинейный прыжок через targetIdx, рендер даты в .ds-meta, guard'ы (последний этап / нет проекта).</td>
+  <td class="files">shootings.js, tests/unit/stage-history.test.js</td>
   <td>1.12</td>
   <td class="t-cell"><span class="t-none">--</span></td>
   <td contenteditable="true" class="my-comment"></td>
