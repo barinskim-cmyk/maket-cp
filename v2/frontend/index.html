@@ -492,6 +492,18 @@
             <label for="rs-dry-run">Пробный запуск (проверить без записи .cos)</label>
           </div>
 
+          <div class="checkbox-row">
+            <input type="checkbox" id="rs-kw-enabled" onchange="rsToggleKeywords()">
+            <label for="rs-kw-enabled">Записывать ключевые слова в COS</label>
+          </div>
+          <div id="rs-kw-body" style="display:none;margin:2px 0 6px 20px">
+            <div class="radio-group" style="margin-bottom:4px">
+              <label><input type="radio" name="rs-kw-cat" value="card" checked onchange="rsToggleKeywords()"> Карточки (card)</label>
+              <label><input type="radio" name="rs-kw-cat" value="extra" onchange="rsToggleKeywords()"> Доп. контент (extra)</label>
+            </div>
+            <div id="rs-kw-preview" style="font-size:12px;color:var(--text-3)"></div>
+          </div>
+
           <div style="margin-top:4px">
             <button class="btn btn-primary" id="rs-run-btn" onclick="runRateSetter()">Запустить</button>
           </div>

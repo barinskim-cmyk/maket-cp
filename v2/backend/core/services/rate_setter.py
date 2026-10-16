@@ -104,6 +104,7 @@ class RateSetterService:
         session_root: Path,
         log: Callable[[str], None] | None = None,
         dry_run: bool = False,
+        keywords: list[str] | None = None,
     ) -> dict:
         """Запуск обработки.
 
@@ -112,9 +113,13 @@ class RateSetterService:
             session_root: корневая папка сессии Capture One
             log: callback для вывода строк прогресса
             dry_run: если True — только показать что будет сделано, без записи
+            keywords: ключевые слова для записи в .cos (union с существующими
+                через CosRepository.update_keywords). Пусто/None — рейтинг без
+                ключевых слов (обратная совместимость).
 
         Returns:
-            dict с ключами: updated, unchanged, missing, duplicates, errors
+            dict с ключами: updated, unchanged, missing, duplicates, errors,
+            keyworded (сколько .cos получили новые ключевые слова)
         """
         if log is None:
             log = print
@@ -122,7 +127,11 @@ class RateSetterService:
         repo = CosRepository(session_root)
         cos_index = repo.build_index()
 
-        updated = unchanged = missing = errors = duplicates = 0
+        # Санитизация: убрать пустые/не-строки. Пустой список == без ключевых
+        # слов, т.е. ровно прежнее поведение (только рейтинг).
+        kw = [k.strip() for k in (keywords or []) if isinstance(k, str) and k.strip()]
+
+        updated = unchanged = missing = errors = duplicates = keyworded = 0
 
         for stem in sorted(stems):
             matches = cos_index.get(stem)
@@ -137,12 +146,26 @@ class RateSetterService:
             for cos_path in matches:
                 try:
                     if dry_run:
-                        log(f"DRY  {stem} -> {cos_path.name}")
+                        if kw:
+                            log(f"DRY  {stem} -> {cos_path.name} "
+                                f"(Basic_Rating={self.rating}, keywords: {', '.join(kw)})")
+                        else:
+                            log(f"DRY  {stem} -> {cos_path.name}")
                         updated += 1
                     else:
-                        changed = repo.update_rating(cos_path, self.rating)
-                        if changed:
-                            log(f"OK   {stem} -> {cos_path.name} (Basic_Rating={self.rating})")
+                        rating_changed = repo.update_rating(cos_path, self.rating)
+                        kw_changed = False
+                        if kw:
+                            kw_changed = repo.update_keywords(cos_path, kw)
+                            if kw_changed:
+                                keyworded += 1
+                        if rating_changed or kw_changed:
+                            parts = []
+                            if rating_changed:
+                                parts.append(f"Basic_Rating={self.rating}")
+                            if kw_changed:
+                                parts.append(f"keywords: {', '.join(kw)}")
+                            log(f"OK   {stem} -> {cos_path.name} ({'; '.join(parts)})")
                             updated += 1
                         else:
                             log(f"SKIP {stem} -> {cos_path.name} (уже {self.rating})")
@@ -157,4 +180,5 @@ class RateSetterService:
             "missing": missing,
             "duplicates": duplicates,
             "errors": errors,
+            "keyworded": keyworded,
         }

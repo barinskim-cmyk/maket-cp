@@ -157,6 +157,40 @@ function _rsCleanLineToStem(line) {
 }
 
 /**
+ * Собрать список ключевых слов для записи в COS.
+ * Всегда: "MaketCP" + тип ("card"/"extra") + площадки из proj.channels.
+ * @returns {string[]} дедуплицированный список ключевых слов
+ */
+function rsBuildKeywords() {
+  var out = ['MaketCP'];
+  var catEl = document.querySelector('input[name="rs-kw-cat"]:checked');
+  out.push(catEl ? catEl.value : 'card');
+
+  var proj = (typeof getActiveProject === 'function') ? getActiveProject() : null;
+  if (proj && proj.channels && proj.channels.length) {
+    for (var i = 0; i < proj.channels.length; i++) {
+      var ch = proj.channels[i];
+      /* channels — list[str], но на всякий случай поддержим {name} */
+      var name = (typeof ch === 'string') ? ch : (ch && ch.name);
+      if (name) name = ('' + name).trim();
+      if (name && out.indexOf(name) === -1) out.push(name);
+    }
+  }
+  return out;
+}
+
+/**
+ * Переключить блок ключевых слов и обновить превью.
+ */
+function rsToggleKeywords() {
+  var on = !!(document.getElementById('rs-kw-enabled') || {}).checked;
+  var body = document.getElementById('rs-kw-body');
+  if (body) body.style.display = on ? '' : 'none';
+  var prev = document.getElementById('rs-kw-preview');
+  if (prev) prev.textContent = on ? ('Будут записаны: ' + rsBuildKeywords().join(', ')) : '';
+}
+
+/**
  * Запустить Rate Setter.
  * @param {boolean} dryRun — тестовый прогон (без записи .cos)
  */
@@ -217,6 +251,12 @@ function runRateSetter(dryRun) {
 
   if (dryRun) payload.dry_run = true;
 
+  /* Ключевые слова: только если включён тоггл (иначе прежнее поведение). */
+  var kwEl = document.getElementById('rs-kw-enabled');
+  if (kwEl && kwEl.checked) {
+    payload.keywords = rsBuildKeywords();
+  }
+
   var logEl = document.getElementById('rs-log');
   var resultEl = document.getElementById('rs-result');
   logEl.innerHTML = 'Запуск...';
@@ -273,7 +313,8 @@ window.onRateSetterDone = function(result) {
   el.innerHTML = 'Обновлено: <span>' + (result.updated || 0) + '</span> | ' +
     'Без изменений: <span>' + (result.unchanged || 0) + '</span> | ' +
     'Не найдено: <span>' + (result.missing || 0) + '</span> | ' +
-    'Ошибок: <span>' + (result.errors || 0) + '</span>';
+    'Ошибок: <span>' + (result.errors || 0) + '</span>' +
+    (result.keyworded ? ' | Ключевые слова: <span>' + result.keyworded + '</span>' : '');
 
   /* F-02 (за feature-flag): если Python вернул updated=0 И unchanged=0 —
      явно сообщить пользователю, что ничего не произошло. Без этого

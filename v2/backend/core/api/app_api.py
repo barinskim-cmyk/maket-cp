@@ -158,6 +158,12 @@ class AppAPI:
             custom_strip_raw = payload.get("custom_strip") or []
             custom_strip = [s for s in custom_strip_raw if isinstance(s, str) and s]
 
+            # Ключевые слова (MaketCP + тип card/extra + площадки proj.channels),
+            # формируются во фронте (sync.js:rsBuildKeywords). Пусто — рейтинг
+            # без ключевых слов, прежнее поведение.
+            keywords_raw = payload.get("keywords") or []
+            keywords = [s for s in keywords_raw if isinstance(s, str) and s.strip()]
+
             if mode == "folder":
                 source_dir = Path(payload.get("source_dir", ""))
                 if not source_dir.exists():
@@ -183,7 +189,9 @@ class AppAPI:
             def log(msg: str):
                 self._emit("onRateSetterLog", msg)
 
-            result = self.rate_setter.run(stems=stems, session_root=session_root, log=log)
+            result = self.rate_setter.run(
+                stems=stems, session_root=session_root, log=log, keywords=keywords,
+            )
             self._emit("onRateSetterDone", result)
 
         threading.Thread(target=task, daemon=True).start()
