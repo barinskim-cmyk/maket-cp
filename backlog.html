@@ -1456,14 +1456,26 @@ tr:hover td { background: #fafafa; }
   <td>Дизайн / Производительность</td>
   <td><strong>Виртуализация галереи превью (5000+ фото) + группировка по папкам</strong></td>
   <td></td>
-  <td>Дизайн-аудит C1 (HIGH). Остаток после выделения поиска по имени (feat-preview-name-search, DONE): (1) при >300 превью рендерить только видимое окно с рециклингом DOM-узлов — сейчас есть ленивый догруз батчами PV_RENDER_BATCH=60 через pvBindLazyScroll (это уже снимает остроту OOM, но DOM растёт при прокрутке); (2) группировка по папкам со сворачиванием. Обе части — крупная переработка render/scroll-anchor/drag-машинерии в previews.js (6400+ строк), высокий риск сломать существующие экраны — делать с Машей или в отдельной ветке, не в автономной сессии.</td>
+  <td>Дизайн-аудит C1 (HIGH). Остаток после выделения поиска по имени (feat-preview-name-search, DONE). Часть «группировка по папкам» вынесена в отдельную завершённую подзадачу feat-gallery-folder-grouping (DONE, 6f6d443) — секции с заголовками папок через тоггл. ОСТАЁТСЯ здесь: (1) истинная виртуализация — при >300 превью рендерить только видимое окно с рециклингом/освобождением DOM-узлов (сейчас ленивый догруз батчами PV_RENDER_BATCH=60 через pvBindLazyScroll снимает остроту OOM, но DOM растёт при прокрутке и не освобождается); (2) опционально — сворачивание секций папок. Виртуализация — крупная переработка render/scroll-anchor/drag-машинерии в previews.js (6400+ строк), высокий риск + нужен большой датасет для проверки UX → делать с Машей или в отдельной ветке, не в автономной сессии.</td>
   <td class="files">previews.js, style.css</td>
   <td><span class="p-low">P2</span></td>
   <td class="t-cell"><span class="t-none">--</span></td>
   <td contenteditable="true" class="my-comment"></td>
 </tr>
 
-<tr data-row="feat0702-invalid-token-msg">
+<tr data-row="feat-gallery-folder-grouping">
+   <td><span class="s-done">DONE</span></td>
+   <td>Превью / Производительность</td>
+   <td><strong>Группировка превью по папкам (секции с заголовками)</strong></td>
+   <td>6f6d443</td>
+   <td>Выделено из design0702-gallery-virtualization (часть «+ группировка по папкам»). В панель фильтра папок (pv и oc-pv) добавлен тоггл «Группировать» (по умолчанию ВЫКЛ, состояние в localStorage per-panel). При включении, когда папок &gt;1 и не выбран одиночный фильтр папки, store сортируется по (папка, имя) и перед первым фото каждой папки рендерится заголовок секции «Папка (N)». pvBuildHTML получил параметры группировки; заголовки не дублируются на границах ленивых батчей (pvBindLazyScroll прокидывает g._pvGroup/_pvGroupCounts). Добавлены pvPrimaryFolder() и pvToggleGroupByFolder(). Плоский вид при ВЫКЛ не изменился (обратная совместимость). CSS: .pv-folder-head (во всю ширину ряда), .pv-group-toggle; панель folder-filter -&gt; flex; кэш style.css v45-&gt;v46. Верификация: jsdom-харнесс tests/unit/preview-folder-grouping.test.js на реальных index.html+previews.js — 21/21 PASS; существующий preview-name-search 15/15 PASS; node --check previews.js OK.</td>
+   <td class="files">previews.js, index.html, style.css, tests/unit/preview-folder-grouping.test.js</td>
+   <td><span class="p-low">P2</span></td>
+   <td class="t-cell"><span class="t-none">--</span></td>
+   <td contenteditable="true" class="my-comment"></td>
+ </tr>
+
+ <tr data-row="feat0702-invalid-token-msg">
   <td><span class="s-done">DONE</span></td>
   <td>Share / UX</td>
   <td><strong>Сообщение «Ссылка недействительна» при невалидном токене</strong></td>
