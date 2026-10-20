@@ -1396,12 +1396,30 @@ body { font-family: var(--font-main); background: var(--panel-2); color: var(--t
   margin-bottom: 8px; padding: 4px 2px;
   position: sticky; top: 56px; z-index: 3;
   background: var(--surface);
+  display: flex; align-items: center; gap: 6px;
 }
 .pv-folder-select {
-  width: 100%; padding: 4px 6px;
+  flex: 1 1 auto; padding: 4px 6px;
   font-size: 11px; border: 1px solid var(--line); border-radius: 0;
   background: var(--surface); color: var(--text-2); cursor: pointer;
 }
+/* Тоггл группировки превью по папкам — тот же стиль, что и «С комм.» */
+.pv-group-toggle {
+  flex: 0 0 auto; white-space: nowrap;
+  font-size: 11px; color: var(--text-2); cursor: pointer;
+  border: 1px solid var(--field-border); background: var(--panel-2); padding: 3px 10px;
+  border-radius: 0; transition: all 0.15s; font-weight: normal;
+}
+.pv-group-toggle:hover { color: var(--text); background: var(--panel); border-color: var(--field-border); }
+.pv-group-toggle.active { color: var(--invert-fg); background: var(--invert-bg); border-color: var(--text); font-weight: normal; }
+/* Заголовок секции-папки: занимает весь ряд flex-галереи */
+.pv-folder-head {
+  flex: 0 0 100%; width: 100%;
+  font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.03em;
+  padding: 8px 2px 4px; margin-top: 2px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.pv-folder-head:first-child { margin-top: 0; padding-top: 2px; }
 .pv-folder-select:focus { outline: none; border-color: var(--text-3); }
 
 /* Поиск по имени файла — компактное поле в панели фильтров превью */

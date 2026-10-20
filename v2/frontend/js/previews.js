@@ -38,6 +38,14 @@ var PV_COMMENT_FILTER = { 'pv': false, 'oc-pv': false };
 var PV_NAME_FILTER = { 'pv': '', 'oc-pv': '' };
 // Дебаунс перерисовки при вводе в поле поиска (ключ панели -> id таймера).
 var PV_NAME_FILTER_TIMER = { 'pv': null, 'oc-pv': null };
+// Группировка галереи по папкам: true = секции с заголовками папок вместо
+// плоского списка. По умолчанию выключено (плоский вид не меняется).
+// Срез задачи design0702-gallery-virtualization. Persist в localStorage.
+var PV_GROUP_BY_FOLDER = { 'pv': false, 'oc-pv': false };
+try {
+  PV_GROUP_BY_FOLDER['pv'] = localStorage.getItem('maketcp_pv_group_pv') === '1';
+  PV_GROUP_BY_FOLDER['oc-pv'] = localStorage.getItem('maketcp_pv_group_oc-pv') === '1';
+} catch (e) {}
 
 // ── Версии превью (по этапам пайплайна) ──
 // Этапы, для которых можно загружать отдельные версии превью
@@ -246,6 +254,17 @@ function pvDbLoadPreviews(projKey, callback) {
 }
 
 // ── Хелперы папок ──
+
+/**
+ * Первичная папка превью для группировки. Фото может числиться в нескольких
+ * папках-источниках (folders[]); для секции берём первую, иначе — «Без папки».
+ * @param {Object} pv — объект превью
+ * @returns {string}
+ */
+function pvPrimaryFolder(pv) {
+  if (pv && pv.folders && pv.folders.length) return pv.folders[0];
+  return 'Без папки';
+}
 
 function pvFolderName(folderPath) {
   // "/Users/user/Photos/BrandX_previews" → "BrandX_previews"
@@ -1782,6 +1801,9 @@ function pvRenderPanel(galleryId, toolbarId, countId, dropzoneId) {
     if (folders.length > 1) {
       folderFilterEl.style.display = '';
       pvRenderFolderSelect(panelKey, folders, folderFilter);
+      /* Кнопка-тоггл «Группировать по папкам» (видна только при >1 папке) */
+      var grpBtn = document.getElementById(panelKey + '-group-folders');
+      if (grpBtn) grpBtn.classList.toggle('active', !!PV_GROUP_BY_FOLDER[panelKey]);
     } else {
       folderFilterEl.style.display = 'none';
     }
@@ -1831,8 +1853,27 @@ function pvRenderPanel(galleryId, toolbarId, countId, dropzoneId) {
     return;
   }
 
+  /* Группировка по папкам: при явном тоггле, >1 папке и без выбранного
+     одиночного фильтра папки — сортируем store по (папка, имя) и включаем
+     режим секций-заголовков. Иначе порядок и разметка не меняются. */
+  var groupByFolder = !!PV_GROUP_BY_FOLDER[panelKey] && folders.length > 1 && !folderFilter;
+  var groupCounts = null;
+  if (groupByFolder) {
+    store.sort(function (a, b) {
+      var fa = pvPrimaryFolder(a), fb = pvPrimaryFolder(b);
+      if (fa !== fb) return fa < fb ? -1 : 1;
+      var na = String(a.name).toLowerCase(), nb = String(b.name).toLowerCase();
+      return na < nb ? -1 : (na > nb ? 1 : 0);
+    });
+    groupCounts = {};
+    for (var gi = 0; gi < store.length; gi++) {
+      var gf = pvPrimaryFolder(store[gi]);
+      groupCounts[gf] = (groupCounts[gf] || 0) + 1;
+    }
+  }
+
   var limit = Math.min(store.length, PV_RENDER_BATCH);
-  var html = pvBuildHTML(store, used, 0, limit);
+  var html = pvBuildHTML(store, used, 0, limit, groupByFolder, groupCounts);
 
   /* Маша 2026-06-01 (v2): «центровая привязка» вместо tan scrollTop.
      Сохраняем имя фото которое сейчас в центре viewport + насколько
@@ -1855,6 +1896,8 @@ function pvRenderPanel(galleryId, toolbarId, countId, dropzoneId) {
   gallery._pvRendered = limit;
   gallery._pvStore = store;
   gallery._pvUsed = used;
+  gallery._pvGroup = groupByFolder;
+  gallery._pvGroupCounts = groupCounts;
 
   pvBindDragFromGallery(gallery);
   pvDetectOrient(gallery);
@@ -2169,10 +2212,21 @@ function pvMarkThumbInCard(pvName, inCard) {
 }
 
 
-function pvBuildHTML(store, used, from, to) {
+function pvBuildHTML(store, used, from, to, groupByFolder, groupCounts) {
   var html = '';
   for (var i = from; i < to; i++) {
     var pv = store[i];
+    /* Заголовок секции папки: при группировке — перед первым фото каждой
+       папки. Сравниваем с предыдущим элементом (store[i-1] может быть из
+       прошлого батча lazy-scroll — дубля заголовка не будет). */
+    if (groupByFolder) {
+      var curFolder = pvPrimaryFolder(pv);
+      var prevFolder = (i > 0) ? pvPrimaryFolder(store[i - 1]) : null;
+      if (i === 0 || curFolder !== prevFolder) {
+        var fCount = (groupCounts && groupCounts[curFolder]) || 0;
+        html += '<div class="pv-folder-head" data-folder="' + esc(curFolder) + '">' + esc(curFolder) + ' (' + fCount + ')</div>';
+      }
+    }
     var inCard = used[pv.name] ? true : false;
     var rating = pv.rating || 0;
     /* orient может не быть у старых данных — фолбэк по thumb (img.src) */
@@ -2933,6 +2987,19 @@ function pvSetFolderFilter(panelKey, folderName) {
   pvRenderAll();
 }
 
+/**
+ * Переключает группировку галереи превью по папкам для панели.
+ * Состояние persist в localStorage, по умолчанию выключено.
+ * @param {string} panelKey  'pv' | 'oc-pv'
+ */
+function pvToggleGroupByFolder(panelKey) {
+  PV_GROUP_BY_FOLDER[panelKey] = !PV_GROUP_BY_FOLDER[panelKey];
+  try { localStorage.setItem('maketcp_pv_group_' + panelKey, PV_GROUP_BY_FOLDER[panelKey] ? '1' : '0'); } catch (e) {}
+  var btn = document.getElementById(panelKey + '-group-folders');
+  if (btn) btn.classList.toggle('active', PV_GROUP_BY_FOLDER[panelKey]);
+  pvRenderAll();
+}
+
 // ── Поиск по имени файла ──
 
 /**
@@ -3161,7 +3228,7 @@ function pvBindLazyScroll(scrollEl, gallery) {
 
     if (this.scrollTop + this.clientHeight > this.scrollHeight - 200) {
       var nextLimit = Math.min(total, rendered + PV_RENDER_BATCH);
-      var newHTML = pvBuildHTML(g._pvStore, g._pvUsed, rendered, nextLimit);
+      var newHTML = pvBuildHTML(g._pvStore, g._pvUsed, rendered, nextLimit, g._pvGroup, g._pvGroupCounts);
       var temp = document.createElement('div');
       temp.innerHTML = newHTML;
       while (temp.firstChild) g.appendChild(temp.firstChild);

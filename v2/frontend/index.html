@@ -26,7 +26,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=45">
+<link rel="stylesheet" href="css/style.css?v=46">
 <link rel="stylesheet" href="css/design-system.css?v=3">
 </head>
 <body>
@@ -299,6 +299,7 @@
           <select class="pv-folder-select" id="pv-folder-select" onchange="pvSetFolderFilter('pv', this.value)">
             <option value="">Все папки</option>
           </select>
+          <button class="pv-group-toggle" id="pv-group-folders" onclick="pvToggleGroupByFolder('pv')" title="Группировать превью по папкам">Группировать</button>
         </div>
         <div class="pv-version-bar" id="pv-version-bar" style="display:none">
           <div class="pv-version-switcher" id="pv-version-switcher"></div>
@@ -346,6 +347,7 @@
           <select class="pv-folder-select" id="oc-pv-folder-select" onchange="pvSetFolderFilter('oc-pv', this.value)">
             <option value="">Все папки</option>
           </select>
+          <button class="pv-group-toggle" id="oc-pv-group-folders" onclick="pvToggleGroupByFolder('oc-pv')" title="Группировать превью по папкам">Группировать</button>
         </div>
         <div class="pv-gallery" id="oc-pv-gallery"></div>
       </div>
