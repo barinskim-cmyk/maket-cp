@@ -1431,6 +1431,10 @@ function _sbDoLoadByToken(token) {
 function sbSaveCardsByToken(token, cards, callback) {
   if (!token) { callback('Нет share-токена'); return; }
   if (!sbClient) { callback('Supabase не инициализирован'); return; }
+  /* Роль viewer = только чтение: не пишем на сервер, тихо отдаём успех.
+     Серверный RPC тоже отклонит (миграция 039), это UX-страховка. */
+  var _vp = (typeof getActiveProject === 'function') ? getActiveProject() : null;
+  if (_vp && _vp._role === 'viewer') { callback(null); return; }
 
   /* Собираем JSON для RPC: массив карточек со слотами */
   var cardsJson = [];
@@ -1520,6 +1524,7 @@ function sbOcDeltaAdd(fileName, callback) {
 
   var proj = getActiveProject();
   if (!proj || !proj._cloudId) { _sbOcFallbackFullSync(); callback && callback('no project'); return; }
+  if (proj._role === 'viewer') { callback && callback(null); return; }  /* viewer = read-only (задача audit0702-share-role-db) */
 
   /* Залогиненный пользователь ВСЕГДА использует owner RPC (по project_id).
      Клиентский RPC (по token) — только для анонимных. */
@@ -1559,6 +1564,7 @@ function sbOcDeltaRemove(fileName, callback) {
 
   var proj = getActiveProject();
   if (!proj || !proj._cloudId) { _sbOcFallbackFullSync(); callback && callback('no project'); return; }
+  if (proj._role === 'viewer') { callback && callback(null); return; }  /* viewer = read-only (задача audit0702-share-role-db) */
 
   var isLoggedIn = (typeof sbIsLoggedIn === 'function') && sbIsLoggedIn();
   var useOwnerPath = isLoggedIn;
