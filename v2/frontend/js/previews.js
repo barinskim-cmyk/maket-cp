@@ -3755,6 +3755,7 @@ function ocRenderField() {
     }
     for (var i = 0; i < items.length; i++) {
       var item = items[i];
+      if (!pvOcItemPassesFilter(item)) continue;
       var cSel = _ocSelected['cnt:' + c + ':' + i] ? ' oc-selected' : '';
       var cSrc = (_ocPvMap[item.name] && typeof pvGetPreview === 'function') ? (pvGetPreview(_ocPvMap[item.name]) || item.preview || item.thumb) : (item.preview || item.thumb);
       html += '<div class="oc-item' + cSel + '" data-oc-idx="' + i + '" title="' + esc(item.name) + '" onclick="ocItemClick(\'cnt\',' + c + ',' + i + ',event)">';
@@ -3763,6 +3764,7 @@ function ocRenderField() {
       html += '<button class="pv-remove" aria-label="Убрать фото" onclick="ocRemoveFromContainer(' + c + ',' + i + ',event)">&times;</button>';
       if (item._addedBy) html += '<span class="oc-added-by">' + esc(item._addedBy) + '</span>';
       html += '<span class="pv-name">' + esc(pvShortName(item.name)) + '</span>';
+      html += pvOcTagsHTML('cnt', c, i, item);
       html += '</div>';
     }
     html += '</div>';
@@ -3780,6 +3782,7 @@ function ocRenderField() {
   }
   for (var f = 0; f < freeStore.length; f++) {
     var fItem = freeStore[f];
+    if (!pvOcItemPassesFilter(fItem)) continue;
     var fSel = _ocSelected['free:' + f] ? ' oc-selected' : '';
     var fSrc = (_ocPvMap[fItem.name] && typeof pvGetPreview === 'function') ? (pvGetPreview(_ocPvMap[fItem.name]) || fItem.preview || fItem.thumb) : (fItem.preview || fItem.thumb);
     html += '<div class="oc-item' + fSel + '" data-oc-idx="' + f + '" title="' + esc(fItem.name) + '" onclick="ocItemClick(\'free\',-1,' + f + ',event)">';
@@ -3788,12 +3791,17 @@ function ocRenderField() {
     html += '<button class="pv-remove" aria-label="Убрать фото" onclick="ocRemoveItem(' + f + ',event)">&times;</button>';
     if (fItem._addedBy) html += '<span class="oc-added-by">' + esc(fItem._addedBy) + '</span>';
     html += '<span class="pv-name">' + esc(pvShortName(fItem.name)) + '</span>';
+    html += pvOcTagsHTML('free', -1, f, fItem);
     html += '</div>';
   }
   html += '</div>';
   html += '</div>';
 
   target.innerHTML = html;
+
+  /* Панель фильтра по тегам площадок (задача s1-17) */
+  if (totalPhotos > 0) { pvOcRenderTagFilter(); }
+  else { var _tf = document.getElementById('oc-tag-filter'); if (_tf) _tf.style.display = 'none'; }
 
   /* Привязать drop-зоны */
   ocInitField();
@@ -3802,6 +3810,168 @@ function ocRenderField() {
   if (typeof ocApplyMasonryLayout === 'function') {
     setTimeout(ocApplyMasonryLayout, 0);
   }
+}
+
+/* ══════════ Теги площадок публикации на OC-фото (задача s1-17) ══════════
+   На каждом фото в доп. отборе (панель «Другое») — кликабельные теги
+   площадок (WB, Ozon, Lamoda, сайт, соцсети, баннер). Множественный выбор,
+   фильтрация по тегам. Список берётся из proj.channels (фолбэк — дефолтный
+   набор, т.к. UI-редактора каналов пока нет).
+   ВАЖНО: назначения тегов персистятся ЛОКАЛЬНО (shAutoSave → desktop-файл /
+   localStorage браузера). Облачная схема other_content хранит только имена
+   файлов, поэтому теги НЕ попадают в облако — это отдельный follow-up
+   (нужна колонка в other_content, выходит за рамки фронт-задачи s1-17). */
+
+/** Фолбэк-список каналов, если proj.channels пуст. */
+var PV_DEFAULT_CHANNELS = ['WB', 'Ozon', 'Lamoda', 'сайт', 'соцсети', 'баннер'];
+
+/** @type {Object.<string, boolean>} Активные теги фильтра OC (ключ = тег). */
+var _ocTagFilter = {};
+
+/** Список доступных тегов площадок: из proj.channels, иначе дефолтный. */
+function pvChannelTags() {
+  var proj = (typeof getActiveProject === 'function') ? getActiveProject() : null;
+  var list = [];
+  if (proj && proj.channels && proj.channels.length) {
+    for (var i = 0; i < proj.channels.length; i++) {
+      var c = proj.channels[i];
+      var nm = (typeof c === 'string') ? c : (c && c.name ? c.name : '');
+      if (nm) list.push(nm);
+    }
+  }
+  return list.length ? list : PV_DEFAULT_CHANNELS.slice();
+}
+
+/** Есть ли активный фильтр по тегам. */
+function _ocTagFilterActive() {
+  for (var k in _ocTagFilter) { if (_ocTagFilter[k]) return true; }
+  return false;
+}
+
+/** Проходит ли OC-элемент активный фильтр (OR по выбранным тегам). */
+function pvOcItemPassesFilter(item) {
+  if (!_ocTagFilterActive()) return true;
+  var ch = (item && item.channels) || [];
+  for (var k in _ocTagFilter) {
+    if (_ocTagFilter[k] && ch.indexOf(k) !== -1) return true;
+  }
+  return false;
+}
+
+/** Разрешить OC-элемент по source/cntIdx/itemIdx в модели проекта. */
+function _ocResolveItem(source, cntIdx, itemIdx) {
+  if (typeof getActiveProject !== 'function' || !getActiveProject()) return null;
+  if (source === 'free') {
+    var store = ocGetStore();
+    return store[itemIdx] || null;
+  }
+  var containers = ocGetContainers();
+  var cnt = containers[cntIdx];
+  if (!cnt || !cnt.items) return null;
+  return cnt.items[itemIdx] || null;
+}
+
+/** HTML тегов для OC-элемента: всегда видимые бейджи + hover-пикер. */
+function pvOcTagsHTML(source, cntIdx, itemIdx, item) {
+  var tags = pvChannelTags();
+  var assigned = (item && item.channels) || [];
+  var badges = '';
+  for (var b = 0; b < assigned.length; b++) {
+    badges += '<span class="oc-tag-badge">' + esc(assigned[b]) + '</span>';
+  }
+  var picker = '';
+  for (var t = 0; t < tags.length; t++) {
+    var on = assigned.indexOf(tags[t]) !== -1 ? ' oc-tag-on' : '';
+    picker += '<button type="button" class="oc-tag' + on + '" data-tag="' + esc(tags[t]) +
+      '" onclick="pvOcToggleTag(\'' + source + '\',' + cntIdx + ',' + itemIdx + ',' + t + ',event)">' +
+      esc(tags[t]) + '</button>';
+  }
+  var h = '';
+  if (badges) h += '<span class="oc-tags-badges">' + badges + '</span>';
+  h += '<span class="oc-tags">' + picker + '</span>';
+  return h;
+}
+
+/** Переключить тег площадки на конкретном OC-фото. */
+function pvOcToggleTag(source, cntIdx, itemIdx, tagIdx, e) {
+  if (e) { e.stopPropagation(); e.preventDefault(); }
+  var tags = pvChannelTags();
+  var tag = tags[tagIdx];
+  if (!tag) return;
+  var item = _ocResolveItem(source, cntIdx, itemIdx);
+  if (!item) return;
+  if (!item.channels) item.channels = [];
+  var pos = item.channels.indexOf(tag);
+  if (pos === -1) item.channels.push(tag); else item.channels.splice(pos, 1);
+  if (typeof shAutoSave === 'function') shAutoSave();
+  /* При активном фильтре видимость могла измениться — полный ре-рендер.
+     Иначе обновляем на месте, чтобы пикер не закрывался (множественный выбор). */
+  if (_ocTagFilterActive()) {
+    ocRenderField();
+  } else {
+    _ocUpdateItemTags(source, cntIdx, itemIdx, item);
+  }
+}
+
+/** Обновить состояние тегов одного OC-элемента в DOM без полного ре-рендера. */
+function _ocUpdateItemTags(source, cntIdx, itemIdx, item) {
+  var sel = (source === 'free')
+    ? '#oc-free-field .oc-item[data-oc-idx="' + itemIdx + '"]'
+    : '#oc-cnt-gallery-' + cntIdx + ' .oc-item[data-oc-idx="' + itemIdx + '"]';
+  var el = document.querySelector(sel);
+  if (!el) return;
+  var assigned = item.channels || [];
+  var btns = el.querySelectorAll('.oc-tag');
+  for (var i = 0; i < btns.length; i++) {
+    var tg = btns[i].getAttribute('data-tag');
+    if (assigned.indexOf(tg) !== -1) btns[i].classList.add('oc-tag-on');
+    else btns[i].classList.remove('oc-tag-on');
+  }
+  var badgesHTML = '';
+  for (var b = 0; b < assigned.length; b++) badgesHTML += '<span class="oc-tag-badge">' + esc(assigned[b]) + '</span>';
+  var badgeWrap = el.querySelector('.oc-tags-badges');
+  if (badgeWrap) {
+    badgeWrap.innerHTML = badgesHTML;
+  } else if (badgesHTML) {
+    var span = document.createElement('span');
+    span.className = 'oc-tags-badges';
+    span.innerHTML = badgesHTML;
+    el.insertBefore(span, el.firstChild);
+  }
+}
+
+/** Отрисовать панель фильтра по тегам площадок над галереей OC. */
+function pvOcRenderTagFilter() {
+  var el = document.getElementById('oc-tag-filter');
+  if (!el) return;
+  var tags = pvChannelTags();
+  if (!tags.length) { el.style.display = 'none'; return; }
+  var html = '<span class="oc-tag-filter-label">Площадки:</span>';
+  for (var t = 0; t < tags.length; t++) {
+    var on = _ocTagFilter[tags[t]] ? ' oc-tag-on' : '';
+    html += '<button type="button" class="oc-tag' + on + '" data-tag="' + esc(tags[t]) +
+      '" onclick="pvOcToggleFilter(' + t + ')">' + esc(tags[t]) + '</button>';
+  }
+  if (_ocTagFilterActive()) {
+    html += '<button type="button" class="oc-tag-filter-reset" onclick="pvOcClearFilter()">Сбросить</button>';
+  }
+  el.innerHTML = html;
+  el.style.display = 'flex';
+}
+
+/** Переключить тег в фильтре площадок. */
+function pvOcToggleFilter(tagIdx) {
+  var tags = pvChannelTags();
+  var tag = tags[tagIdx];
+  if (!tag) return;
+  _ocTagFilter[tag] = !_ocTagFilter[tag];
+  ocRenderField();
+}
+
+/** Сбросить фильтр площадок. */
+function pvOcClearFilter() {
+  _ocTagFilter = {};
+  ocRenderField();
 }
 
 /**
