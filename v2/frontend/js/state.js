@@ -297,19 +297,77 @@ loadUserTemplates();
 (function () {
   try {
     var _selVal = App.selectedProject;
-    window._selProjTrace = [];
+    var _selTraceKey = 'maketcp_selproj_trace';
+    var _selTraceCap = 80;
+    /* Восстановить трейс из прошлых сессий (localStorage), чтобы он пережил
+       перезагрузку страницы — иначе улика теряется до того, как Маша нажмёт
+       «Скачать лог». */
+    window._selProjTrace = (function () {
+      try {
+        var raw = window.localStorage && localStorage.getItem(_selTraceKey);
+        var arr = raw ? JSON.parse(raw) : [];
+        return (arr && arr.length) ? arr : [];
+      } catch (e) { return []; }
+    })();
+    function _selProjName(idx) {
+      try {
+        if (idx == null || idx < 0) return null;
+        var p = (App.projects || [])[idx];
+        if (!p) return null;
+        return p.brand || p.name || ('#' + idx);
+      } catch (e) { return null; }
+    }
+    function _selLightboxOpen() {
+      try {
+        var el = document.getElementById('pv-lightbox');
+        return !!(el && el.offsetParent !== null);
+      } catch (e) { return false; }
+    }
+    function _selPersist() {
+      try {
+        if (window.localStorage) {
+          localStorage.setItem(_selTraceKey, JSON.stringify(window._selProjTrace));
+        }
+      } catch (e) { /* quota/недоступно — не критично для работы */ }
+    }
+    /* Ручная очистка улик (из консоли) после того, как фикс подтверждён. */
+    window._selProjTraceClear = function () {
+      window._selProjTrace = [];
+      try { if (window.localStorage) localStorage.removeItem(_selTraceKey); } catch (e) {}
+    };
     Object.defineProperty(App, 'selectedProject', {
       get: function () { return _selVal; },
       set: function (v) {
         if (v !== _selVal) {
+          var page = (App && App.currentPage) || null;
+          var lightbox = _selLightboxOpen();
+          /* Подозрительно: выбор уехал на ДРУГОЙ валидный проект, пока
+             пользователь на экране контента/карточек (там проект не
+             переключают) либо открыт полноэкранный просмотр — это и есть
+             симптом бага «перескакивает проект» (Маша 03.07). */
+          var suspicious = (v >= 0 && _selVal >= 0 && v !== _selVal &&
+                            (page === 'content' || lightbox));
           var rec = {
             ts: new Date().toISOString(),
             from: _selVal, to: v,
-            stack: (new Error().stack || '').split('\n').slice(2, 6).join(' | ')
+            fromName: _selProjName(_selVal), toName: _selProjName(v),
+            page: page,
+            cardIdx: (App && App.currentCardIdx != null) ? App.currentCardIdx : null,
+            lightbox: lightbox,
+            projectsCount: (App && App.projects ? App.projects.length : 0),
+            suspicious: suspicious,
+            stack: (new Error().stack || '').split('\n').slice(2, 12).join(' | ')
           };
           window._selProjTrace.push(rec);
-          if (window._selProjTrace.length > 50) window._selProjTrace.shift();
-          console.warn('[selectedProject]', rec.from, '->', rec.to, rec.stack);
+          while (window._selProjTrace.length > _selTraceCap) window._selProjTrace.shift();
+          _selPersist();
+          if (suspicious) {
+            console.error('[selectedProject] ПОДОЗРИТЕЛЬНЫЙ ПЕРЕХОД',
+              rec.fromName, '->', rec.toName,
+              '(page=' + page + ', lightbox=' + lightbox + ')', rec.stack);
+          } else {
+            console.warn('[selectedProject]', rec.from, '->', rec.to, rec.stack);
+          }
         }
         _selVal = v;
       }

@@ -289,6 +289,18 @@
           viewport: { w: window.innerWidth, h: window.innerHeight },
           online: navigator.onLine,
           app: appSnapshot(),
+          selProjTrace: (function () {
+            /* Трейс смен App.selectedProject (диагностика бага «перескакивает
+               проект», Маша 03.07). Живёт в window._selProjTrace с фолбэком на
+               localStorage, чтобы пережить перезагрузку. */
+            try {
+              if (window._selProjTrace && window._selProjTrace.length) {
+                return window._selProjTrace.slice();
+              }
+              var raw = window.localStorage && localStorage.getItem('maketcp_selproj_trace');
+              return raw ? JSON.parse(raw) : [];
+            } catch (e) { return [{ error: e.message }]; }
+          })(),
           supabase: sb,
           idb: idb,
           localStorageKeys: (function () {
