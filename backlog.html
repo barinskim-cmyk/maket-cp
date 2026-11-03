@@ -1474,6 +1474,17 @@ tr:hover td { background: #fafafa; }
    <td class="t-cell"><span class="t-none">--</span></td>
    <td contenteditable="true" class="my-comment"></td>
  </tr>
+ <tr data-row="test-post-approval-safeguard">
+   <td><span class="s-done">DONE</span></td>
+   <td>Синхронизация / Данные (backup-guard)</td>
+   <td><strong>Регресс-тесты страховки «после согласования отбора»</strong></td>
+   <td></td>
+   <td>Страховочная сетка (текущий фокус Маши: smoke-тесты / backup-guards). Модуль post-approval-safeguard.js — защита согласованного клиентом отбора от случайной перезаписи — не имел регресс-покрытия. Добавлен jsdom-харнесс tests/unit/post-approval-safeguard.test.js на РЕАЛЬНОМ модуле, 45/45 PASS. Кода модуля НЕ менял, только тесты. Покрыто: детекция approved (event-log selectionApproved, _stageHistory['client_approved'], _stageHistory[2], _stage&gt;2, отрицательные случаи); режим «Просто посмотреть» — forward+reverse sync (shCloudSyncExplicit / sbUploadProject / sbPullProject / sbLogAction / sbSyncStage / sbStartAutoPull) становятся no-op (ядро защиты от потери правок); режим «Изменить отбор» — passthrough к оригиналам; неодобренный проект — гейта нет; модалка-гейт открывается при intent=null и откладывает действие, выбор view/edit пишется в sessionStorage; pending-детекция по fallback-фингерпринту; кнопка «Сохранить изменения после отбора» появляется/исчезает по pending; без эмодзи в UI; paResetIntent чистит intent+snapshot. Полный юнит-прогон зелёный (13 файлов).</td>
+   <td class="files">tests/unit/post-approval-safeguard.test.js</td>
+   <td><span class="p-med">P1</span></td>
+   <td class="t-cell"><span class="t-none">--</span></td>
+   <td contenteditable="true" class="my-comment"></td>
+ </tr>
 
  <tr data-row="feat0702-invalid-token-msg">
   <td><span class="s-done">DONE</span></td>
