@@ -776,9 +776,9 @@ tr:hover td { background: #fafafa; }
   <td>3.4</td>
   <td contenteditable="true"><strong>Текстовые комментарии к карточке и фото</strong></td>
   <td><span class="who-claude">Claude</span></td>
-  <td><span class="s-todo">TODO</span></td>
+  <td><span class="s-done">DONE</span></td>
   <td>Ретушь</td>
-  <td>MVP: текстовые комментарии на двух уровнях -- к карточке целиком и к отдельному фото. Автор + timestamp. Видны всем ролям.</td>
+  <td>MVP: текстовые комментарии на двух уровнях -- к карточке целиком и к отдельному фото. Автор + timestamp. Видны всем ролям. DONE: функционал реализован сквозняком и покрыт тестом. Карточка: cpAddComment/cpGetComments/cpRenderComments/cpSaveNewComment/cpDeleteComment (модель card._comments={id,text,author:team|client,created ISO}; рендер даты, счётчика, кнопок, экранирование; мобильный вариант _cpMobileCommentsHTML). Фото: _pvLbGetCardComments привязывает комментарии карточки к фото по файлу слота; _pvLbGetAllComments агрегирует комментарии фото из карточки + контейнера доп.контента + аннотаций с источником, ролью автора (Команда/Клиент) и timestamp; rtRenderCmtList выводит их в тулбар лайтбокса (видно всем ролям). Верификация: tests/unit/card-photo-comments.test.js — jsdom на РЕАЛЬНЫХ index.html+cards.js+previews.js, 42/42 PASS (добавление/рендер/удаление карточного комментария, автор+timestamp, cpSaveNewComment из поля с trim, пустой no-op, агрегация 3 источников для фото, роли Команда/Клиент, безымянная карточка -> "Карточка N", без эмодзи). Регресс: весь юнит-набор зелёный (14 файлов).</td>
   <td class="files">cards.js, style.css, domain</td>
   <td>2.1</td>
   <td class="t-cell"><span class="t-none">--</span></td>
