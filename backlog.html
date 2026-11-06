@@ -1283,12 +1283,24 @@ tr:hover td { background: #fafafa; }
   <td contenteditable="true" class="my-comment"></td>
 </tr>
 
+<tr data-row="feat-retoucher-queue">
+  <td><span class="s-done">DONE</span></td>
+  <td>Роли / Ретушёр</td>
+  <td><strong>Режим ретушёра: очередь на ретушь + видимость правок клиента</strong></td>
+  <td></td>
+  <td>Слайс 1 задачи audit0702-retoucher-mode. Раньше ветка role==='retoucher' в shRenderClientBar показывала пустую заглушку «Команда». Теперь ретушёр по share-ссылке видит реальную панель: (1) очередь на ретушь — заполненные слоты карточек (реальное фото, синтетические плейсхолдеры slot_C_S исключены), сгруппированные по карточкам, со статусом «в работе»/«готово» (готово = у фото есть версия retouch в previews[].versions.retouch; матч по stem'у, регистронезависимо и без учёта расширения — .CR3 превью против .jpg слота), слот-комментарии рядом; (2) сводка «осталось N из M (готово K)» в подзаголовке; (3) блок «Правки клиента» — комментарии карточек author='client' + проектные _clientComments (командные комментарии исключены). Чистая клиентская функция shBuildRetouchQueue + рендер shRetoucherPanelHTML, без обращений к БД и без действий, меняющих данные. Ветки client/owner/viewer не тронуты (additive). CSS .rtch-* по дизайн-токенам, без emoji; .client-action-bar.rtch-mode -> колоночный layout. style.css v47->48, shootings.js v28->29. Верификация: jsdom-харнесс tests/unit/retoucher-queue.test.js на реальных state.js+shootings.js — 31/31 PASS (тоталы очереди, исключение синтетических слотов, ext-agnostic/case-insensitive матч версии, сбор правок клиента + исключение командных, рендер панели/класса/статусов/фидбэка, отсутствие emoji, guard пустого проекта и null, неизменность роли client). Полный юнит-прогон зелёный (15 файлов). ОСТАЁТСЯ в родительской задаче: загрузка результата + photo_versions, продакшн compare-view.</td>
+  <td class="files">v2/frontend/js/shootings.js, v2/frontend/css/style.css, v2/frontend/index.html, tests/unit/retoucher-queue.test.js</td>
+  <td><span class="p-med">P1</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
 <tr data-row="audit0702-retoucher-mode">
   <td><span class="s-todo">TODO</span></td>
   <td>Роли / Ретушёр</td>
   <td><strong>Минимальный режим ретушёра</strong></td>
   <td></td>
-  <td>Роль retoucher сейчас без интерфейса. Минимум: очередь фото на ретуши, загрузка результата, версия в photo_versions, видимость комментариев/аннотаций клиента. Включить compare-view (сейчас за DEBUG-флагом).</td>
+  <td>Роль retoucher сейчас без интерфейса. Минимум: очередь фото на ретуши, загрузка результата, версия в photo_versions, видимость комментариев/аннотаций клиента. Включить compare-view (сейчас за DEBUG-флагом). Первый слайс (очередь на ретушь + видимость правок клиента) вынесен в отдельную завершённую подзадачу feat-retoucher-queue (DONE). ОСТАЁТСЯ: загрузка результата ретушёром + запись в photo_versions, продакшн-интеграция compare-view (сейчас за DEBUG_COMPARE_VIEW) — затрагивает upload-флоу/БД/роли, высокий риск -> делать с Машей или в отдельной ветке, не в автономной сессии.</td>
   <td class="files">shootings.js, compare-view.js, supabase.js</td>
   <td><span class="p-med">P1</span></td>
   <td class="t-cell"><span class="t-none">--</span></td>

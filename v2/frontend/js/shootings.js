@@ -4576,6 +4576,117 @@ var _shPostApprovePopupShown = false;
  * - После согласования: "Запросить доп. кадры" + "Внести изменения в отбор"
  *   Клиент свободно редактирует. Снимок — закладка для отката, не блокировка.
  */
+/**
+ * Построить очередь на ретушь из проекта (чистая функция, без обращений к БД).
+ * Очередь = заполненные слоты карточек (реальное фото, не плейсхолдер).
+ * "Готово" = у фото уже есть версия retouch в previews[].versions.retouch.
+ * Плюс собираем правки клиента (комментарии карточек author='client' и
+ * проектные _clientComments) — видимость обратной связи для ретушёра.
+ * @param {Object} proj
+ * @returns {{total:number,done:number,pending:number,cards:Array,feedback:Array}}
+ */
+function shBuildRetouchQueue(proj) {
+  var res = { total: 0, done: 0, pending: 0, cards: [], feedback: [] };
+  if (!proj || !proj.cards) return res;
+
+  /* stem -> есть ли версия retouch (имя без расширения, регистронезависимо) */
+  var retouchStems = {};
+  if (proj.previews) {
+    for (var p = 0; p < proj.previews.length; p++) {
+      var pv = proj.previews[p];
+      if (!pv || !pv.versions || !pv.versions['retouch']) continue;
+      var st = pv.stem || (pv.name ? String(pv.name).replace(/\.[^.\/\\]+$/, '') : '');
+      if (st) retouchStems[st.toLowerCase()] = true;
+    }
+  }
+
+  var SYN = /^slot_\d+_\d+\.jpe?g$/i; /* синтетические имена пустых слотов */
+  for (var ci = 0; ci < proj.cards.length; ci++) {
+    var card = proj.cards[ci];
+    if (!card) continue;
+    var cardName = card.name || ('Карточка ' + (ci + 1));
+    var items = [];
+    if (card.slots) {
+      for (var si = 0; si < card.slots.length; si++) {
+        var slot = card.slots[si];
+        if (!slot) continue;
+        var file = slot.file || '';
+        var filled = (!!file && !SYN.test(file)) || !!slot.dataUrl;
+        if (!filled) continue;
+        var stem = file ? String(file).replace(/\.[^.\/\\]+$/, '').toLowerCase() : '';
+        var hasRetouch = stem ? !!retouchStems[stem] : false;
+        res.total++;
+        if (hasRetouch) res.done++; else res.pending++;
+        items.push({ slotIdx: si, file: file, comment: (slot.comment || ''), done: hasRetouch });
+      }
+    }
+    if (items.length) res.cards.push({ cardIdx: ci, name: cardName, items: items });
+
+    if (card._comments) {
+      for (var k = 0; k < card._comments.length; k++) {
+        var cm = card._comments[k];
+        if (cm && cm.author === 'client' && cm.text) {
+          res.feedback.push({ card: cardName, text: cm.text, date: cm.created || '' });
+        }
+      }
+    }
+  }
+
+  if (proj._clientComments) {
+    for (var q = 0; q < proj._clientComments.length; q++) {
+      var pc = proj._clientComments[q];
+      if (pc && pc.text) res.feedback.push({ card: '', text: pc.text, date: pc.date || '' });
+    }
+  }
+  return res;
+}
+
+/**
+ * HTML панели ретушёра: сводка очереди, список по карточкам и правки клиента.
+ * Только чтение — никаких действий, меняющих данные (загрузка результата —
+ * отдельная задача). Без emoji, по дизайн-токенам.
+ * @param {Object} proj
+ * @returns {string}
+ */
+function shRetoucherPanelHTML(proj) {
+  var qd = shBuildRetouchQueue(proj);
+  var h = '<div class="rtch-panel">';
+  if (qd.cards.length === 0) {
+    h += '<div class="rtch-empty">Пока нет кадров, помещённых в карточки.</div>';
+  } else {
+    for (var i = 0; i < qd.cards.length; i++) {
+      var c = qd.cards[i];
+      h += '<div class="rtch-card"><div class="rtch-card-name">' + esc(c.name) + '</div><ul class="rtch-list">';
+      for (var j = 0; j < c.items.length; j++) {
+        var it = c.items[j];
+        var cls = it.done ? 'rtch-item done' : 'rtch-item';
+        var state = it.done ? 'готово' : 'в работе';
+        var label = it.file || ('слот ' + (it.slotIdx + 1));
+        h += '<li class="' + cls + '">' +
+               '<span class="rtch-file">' + esc(label) + '</span>' +
+               '<span class="rtch-state">' + state + '</span>' +
+               (it.comment ? '<span class="rtch-cmt">' + esc(it.comment) + '</span>' : '') +
+             '</li>';
+      }
+      h += '</ul></div>';
+    }
+  }
+  if (qd.feedback.length) {
+    h += '<div class="rtch-feedback"><div class="rtch-fb-head">Правки клиента</div><ul class="rtch-fb-list">';
+    for (var f = 0; f < qd.feedback.length; f++) {
+      var fb = qd.feedback[f];
+      h += '<li>' +
+             (fb.card ? '<span class="rtch-fb-card">' + esc(fb.card) + '</span> ' : '') +
+             '<span class="rtch-fb-text">' + esc(fb.text) + '</span>' +
+             (fb.date ? '<span class="rtch-fb-date">' + esc(fb.date) + '</span>' : '') +
+           '</li>';
+    }
+    h += '</ul></div>';
+  }
+  h += '</div>';
+  return h;
+}
+
 function shRenderClientBar() {
   /* Удалить существующую панель если есть */
   var existing = document.getElementById('client-action-bar');
@@ -4613,11 +4724,11 @@ function shRenderClientBar() {
         '</div>';
     }
   } else if (role === 'retoucher') {
-    subtitle = 'Команда';
-    buttonsHtml =
-      '<div class="client-bar-buttons">' +
-        '<span style="color:#888;font-size:12px">Команда</span>' +
-      '</div>';
+    var _rq = shBuildRetouchQueue(proj);
+    subtitle = 'Ретушёр  ·  очередь: осталось ' + _rq.pending + ' из ' + _rq.total +
+               (_rq.done ? '  (готово ' + _rq.done + ')' : '');
+    buttonsHtml = shRetoucherPanelHTML(proj);
+    bar.className += ' rtch-mode';
   } else {
     /* viewer */
     subtitle = 'Режим просмотра';

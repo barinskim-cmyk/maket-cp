@@ -2189,6 +2189,72 @@ body { font-family: var(--font-main); background: var(--panel-2); color: var(--t
 }
 
 /* ══════════════════════════════════════════════
+   Панель ретушёра (очередь на ретушь + правки клиента)
+   Задача «Минимальный режим ретушёра», слайс 1.
+   ══════════════════════════════════════════════ */
+.client-action-bar.rtch-mode {
+  flex-direction: column;
+  align-items: stretch;
+}
+.rtch-panel {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.rtch-empty { color: var(--text-3); font-size: 13px; }
+.rtch-card-name {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 4px;
+}
+.rtch-list { list-style: none; margin: 0; padding: 0; }
+.rtch-item {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 13px;
+  color: var(--text);
+}
+.rtch-item .rtch-file { flex: 0 0 auto; }
+.rtch-item .rtch-state {
+  flex: 0 0 auto;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--warn);
+}
+.rtch-item.done .rtch-state { color: var(--ok); }
+.rtch-item .rtch-cmt {
+  flex: 1 1 auto;
+  color: var(--text-2);
+  font-size: 12px;
+}
+.rtch-feedback {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+.rtch-fb-head {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 6px;
+}
+.rtch-fb-list { list-style: none; margin: 0; padding: 0; }
+.rtch-fb-list li {
+  padding: 4px 0;
+  font-size: 13px;
+  color: var(--text);
+}
+.rtch-fb-card { color: var(--text-3); font-size: 12px; margin-right: 6px; }
+.rtch-fb-date { color: var(--meta); font-size: 11px; margin-left: 8px; }
+
+/* ══════════════════════════════════════════════
    Мобильный режим клиента (< 768px)
    ══════════════════════════════════════════════ */
 
