@@ -1731,7 +1731,7 @@ tr:hover td { background: #fafafa; }
   <td>Метрики</td>
   <td><strong>Метрики использования: DAU, проекты, топ-ошибки</strong></td>
   <td></td>
-  <td>Сейчас не видно кто и как пользуется. Счётчики через action_log + еженедельная сводка (DAU, активные проекты, ошибки из client_errors). Нужно для кейса «до/после» с евангелистами.</td>
+  <td>Сейчас не видно кто и как пользуется. Счётчики через action_log + еженедельная сводка (DAU, активные проекты, ошибки из client_errors). Нужно для кейса «до/после» с евангелистами. <strong>Сделано (слайс, бэкенд-движок сводки):</strong> read-only owner-scoped RPC usage_metrics_summary(p_days) (migration 040) — агрегирует DAU, активные проекты, топ-действия, активность по ролям и топ клиентских ошибок строго по проектам владельца (auth.uid()); анонимный/чужой вызов отдаёт пустую сводку, окно клампится 1..730. SECURITY DEFINER + search_path=public, EXECUTE только authenticated (anon revoked). Фронт-аксессор sbUsageMetrics(days, cb) в supabase.js (?v=31). Верификация: Supabase — вызов функции под реальным владельцем совпал с эталонным SELECT (1820 действий, 7 юзеров, 14 активных проектов, 232 ошибки, 75 сигнатур, 22 дня); анонимный вызов = все нули; структура функции (secdef/stable/search_path/grants) подтверждена. jsdom-тест tests/unit/usage-metrics.test.js 17/17, полный юнит-прогон зелёный (16 файлов). ОСТАЁТСЯ: UI-экран «Метрики» и/или еженедельная доставка сводки (дайджест/письмо — зависит от внешнего провайдера, нужна Маша).</td>
   <td class="files">state.js, supabase.js, v2/supabase/</td>
   <td><span class="p-low">P2</span></td>
   <td class="t-cell"><span class="t-none">--</span></td>

@@ -1844,6 +1844,37 @@ function sbGetActionLog(projectId, opts, callback) {
 }
 
 
+/**
+ * Сводка использования для владельца (DAU, активные проекты, топ-действия,
+ * активность по ролям, топ клиентских ошибок) за последние N дней.
+ *
+ * Обёртка над read-only RPC usage_metrics_summary (migration 040). Данные
+ * агрегируются ТОЛЬКО по проектам текущего владельца (auth.uid()); анонимный
+ * или чужой вызов вернёт пустую сводку — чувствительные данные не утекают.
+ *
+ * Можно вызывать sbUsageMetrics(cb) — тогда окно 30 дней по умолчанию.
+ *
+ * @param {number}   [days]    окно в днях (1..730, клампится на бэкенде; по умолчанию 30)
+ * @param {function} callback  callback(errMsg|null, summaryObj|null)
+ */
+function sbUsageMetrics(days, callback) {
+  if (typeof days === 'function') { callback = days; days = 30; }
+  if (typeof callback !== 'function') callback = function () {};
+  if (!sbClient) { callback('Supabase не подключён', null); return; }
+  if (typeof sbIsLoggedIn === 'function' && !sbIsLoggedIn()) {
+    callback('Сводка доступна только авторизованному владельцу', null);
+    return;
+  }
+  var n = parseInt(days, 10);
+  if (isNaN(n)) n = 30;
+  sbClient.rpc('usage_metrics_summary', { p_days: n }).then(function (res) {
+    if (res.error) callback(res.error.message, null);
+    else callback(null, res.data || null);
+  })['catch'](function (err) {
+    callback(String(err), null);
+  });
+}
+
 // ══════════════════════════════════════════════
 //  Загрузка миниатюр в Storage
 // ══════════════════════════════════════════════
