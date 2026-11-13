@@ -1707,8 +1707,19 @@ tr:hover td { background: #fafafa; }
   <td>Онбординг</td>
   <td><strong>Демо-проект при первой регистрации</strong></td>
   <td></td>
-  <td>Новый пользователь после регистрации видит пустоту. Автоматически создавать демо-проект с карточками и фото — ценность видна в браузере без установки desktop-приложения. Снижает главный friction онбординга.</td>
+  <td>Новый пользователь после регистрации видит пустоту. Автоматически создавать демо-проект с карточками и фото — ценность видна в браузере без установки desktop-приложения. Снижает главный friction онбординга. Слайс 1 (браузерный демо по кнопке в пустом состоянии) вынесён в feat-demo-browser-slice (DONE). ОСТАЁТСЯ: авто-создание при регистрации + облачный сид — нужно решение Маши по онбордингу.</td>
   <td class="files">supabase.js, cloud-ui.js, v2/supabase/</td>
+  <td><span class="p-low">P2</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+<tr data-row="feat-demo-browser-slice">
+  <td><span class="s-done">DONE</span></td>
+  <td>Онбординг</td>
+  <td><strong>Демо-проект: браузерный слайс (кнопка в пустом состоянии)</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td>Слайс 1 feat0702-demo-project. Кнопка «Посмотреть демо-проект» в пустом состоянии списка проектов загружает готовый демо-проект (3 карточки, заполненные слоты, SVG-плейсхолдеры) прямо в браузере. Демо живёт только в браузере (нет _cloudId → облачная синхронизация его не трогает). Новый модуль demo.js, тег «демо» в списке. Верификация: jsdom tests/unit/demo-project.test.js 40/40, полный юнит-прогон зелёный (18 файлов).</td>
+  <td class="files">demo.js, shootings.js, index.html, style.css</td>
   <td><span class="p-low">P2</span></td>
   <td class="t-cell"><span class="t-none">--</span></td>
   <td contenteditable="true" class="my-comment"></td>

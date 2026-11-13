@@ -566,7 +566,12 @@ function renderProjects() {
     var _isLoading = (typeof sbIsConnected === 'function' && sbIsConnected() && !_shCloudLoadDone);
     var emptyMsg = hiddenCount > 0 ? 'Все проекты скрыты' :
                    (_isLoading ? 'Загружаю проекты...' : 'Нет открытых проектов');
-    list.innerHTML = '<div class="empty-state">' + emptyMsg + '</div>';
+    /* feat0702-demo-project: предложить демо-проект в настоящем пустом
+       состоянии (нет проектов, не загрузка, не все скрыты, не share). */
+    var _showDemo = (hiddenCount === 0 && !_isLoading && !window._isShareLink
+                     && typeof shDemoEmptyActionHTML === 'function');
+    var _demoHtml = _showDemo ? shDemoEmptyActionHTML() : '';
+    list.innerHTML = '<div class="empty-state">' + emptyMsg + _demoHtml + '</div>';
     document.getElementById('pipeline-container').innerHTML =
       '<div class="empty-state">' + (_isLoading ? '' : 'Выберите съёмку') + '</div>';
     return;
@@ -601,7 +606,8 @@ function renderProjects() {
     html += '<div class="project-item' + sel + (isDeleted ? ' project-deleted' : '') + '" onclick="selectProject(' + entry.originalIndex + ')">';
     html += '<div class="pi-top">';
     html += '<span class="pi-name">' + esc(shProjectDisplayName(p)) +
-      (p._shared ? ' <span class="project-shared-tag">общий</span>' : '') + '</span>';
+      (p._shared ? ' <span class="project-shared-tag">общий</span>' : '') +
+      (p._demo ? ' <span class="project-demo-tag">демо</span>' : '') + '</span>';
     html += '<span style="display:inline-flex;align-items:center">';
     if (stLbl) {
       html += '<span class="pi-status"><span class="dot' + (stDelivered ? ' ok' : '') + '"></span><span class="lbl">' + esc(stLbl) + '</span></span>';

@@ -339,6 +339,9 @@ body { font-family: var(--font-main); background: var(--panel-2); color: var(--t
 .project-restore-btn { font-size: 11px; padding: 2px 8px; color: var(--text-2); border: 1px solid var(--field-border); background: transparent; cursor: pointer; }
 .project-restore-btn:hover { color: var(--text); border-color: var(--text); }
 .project-shared-tag { font-size: 10px; color: var(--invert-fg); background: var(--invert-bg); padding: 1px 6px; border-radius: 0; font-weight: normal; }
+/* feat0702-demo-project: тег демо-проекта в списке (приглушённый,
+   волосяная рамка -- дизайн-язык «Тёмная плёнка», без заливки). */
+.project-demo-tag { font-size: 10px; color: var(--muted, #767676); background: transparent; border: 1px solid var(--line, #3a3a3a); padding: 0 5px; border-radius: 0; font-weight: normal; letter-spacing: 1px; text-transform: uppercase; }
 
 /* Пайплайн-колонка: адаптивная ширина вместо жёсткого 1fr.
    На узких десктопах (1280px) не сжимает список; на широких (1920px)
