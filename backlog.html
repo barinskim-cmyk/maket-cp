@@ -1683,8 +1683,20 @@ tr:hover td { background: #fafafa; }
   <td>Уведомления</td>
   <td><strong>Уведомления фотографу: аппрув / возврат / комментарий клиента</strong></td>
   <td></td>
-  <td>Сейчас фотограф узнаёт о действиях клиента, только открыв приложение. Email через Supabase edge function (или telegram-бот) на события: selection_approved, cc_returned, comment_added. Главный кандидат на retention.</td>
+  <td>Сейчас фотограф узнаёт о действиях клиента, только открыв приложение. Email через Supabase edge function (или telegram-бот) на события: selection_approved, cc_returned, comment_added. Главный кандидат на retention. Слайс 1 (внутриприложенческая лента «Активность клиентов» для владельца, браузер, бейдж непрочитанного) вынесён в feat-activity-feed-slice (DONE). ОСТАЁТСЯ: email/telegram-доставка — внешний провайдер + решение Маши.</td>
   <td class="files">v2/supabase/functions/, events.js</td>
+  <td><span class="p-med">P1</span></td>
+  <td class="t-cell"><span class="t-none">--</span></td>
+  <td contenteditable="true" class="my-comment"></td>
+</tr>
+
+<tr data-row="feat-activity-feed-slice">
+  <td><span class="s-done">DONE</span></td>
+  <td>Уведомления</td>
+  <td><strong>Лента активности клиента для владельца (вкладка + бейдж)</strong></td>
+  <td><span class="who-claude">Claude</span></td>
+  <td>Слайс 1 feat0702-notifications. Внутриприложенческая вкладка «Активность клиентов»: бейдж непрочитанного на кнопке + лента, где показаны аппрувы отбора (selection_approved), возвраты на доработку (cc_returned) и комментарии клиента (комментарии карточек author=client + проектные _clientComments), собранные из канонического журнала событий proj._events и комментариев. Только чтение: без БД, без внешних сервисов, данные проектов не меняются. Непрочитанное считается против localStorage-метки maketcp_activity_seen; открытие вкладки помечает просмотренным и гасит бейдж. Гостю по share-ссылке вкладка скрыта (owner-only, как «Метрики»). acParseTs детерминирован — принимает только ISO-метки (locale-строки _clientComments.date парсятся движками по-разному и отброшены в 0, чтобы не зажигать бейдж ложно). Новый модуль v2/frontend/js/activity.js (?v=1), правки nav.js (?v=2-&gt;3: showPage-гейт share + хук acOnPageShow + навидимость/бейдж), shootings.js (?v=30-&gt;31: acRefreshBadge в конце renderProjects), index.html (кнопка nav-activity + page-activity + include, css?v=50-&gt;51), style.css (+.ac-*/.nav-badge, дизайн-язык «Тёмная плёнка», без emoji). Верификация: jsdom tests/unit/activity-feed.test.js 48/48 (сбор активности, игнор командных комментов и неклиентских событий, детерминированный acParseTs, unread-счёт seen=0/середина/будущее, empty-state, ac-new только у новых, XSS-экранирование, без emoji) + inline DOM-смоук оркестрации 6/6 (бейдж непрочитанного, рендер ленты в #ac-body, персист seen, гашение бейджа после просмотра, скрытие для share-link); полный юнит-прогон зелёный (19 файлов). ОСТАЁТСЯ в родителе feat0702-notifications: email/telegram-доставка (внешний провайдер — нужна Маша).</td>
+  <td class="files">v2/frontend/js/activity.js, nav.js, shootings.js, index.html, css/style.css, tests/unit/activity-feed.test.js</td>
   <td><span class="p-med">P1</span></td>
   <td class="t-cell"><span class="t-none">--</span></td>
   <td contenteditable="true" class="my-comment"></td>

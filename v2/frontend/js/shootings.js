@@ -626,6 +626,7 @@ function renderProjects() {
 
   try { renderPipeline(); } catch(e) { console.error('renderPipeline error:', e); }
   cpRenderList();
+  if (typeof acRefreshBadge === 'function') { try { acRefreshBadge(); } catch(e) {} }
 }
 
 

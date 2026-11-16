@@ -26,7 +26,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=50">
+<link rel="stylesheet" href="css/style.css?v=51">
 <link rel="stylesheet" href="css/design-system.css?v=3">
 </head>
 <body>
@@ -90,6 +90,7 @@
   <button class="nav-btn" id="nav-articles" onclick="showPage('articles')">Артикулы</button>
   <button class="nav-btn" id="nav-sync" onclick="showPage('sync')">Синхронизация</button>
   <button class="nav-btn" id="nav-metrics" onclick="showPage('metrics')" title="Сводка использования платформы">Метрики</button>
+  <button class="nav-btn" id="nav-activity" onclick="showPage('activity')" title="Действия клиентов по вашим ссылкам">Активность<span id="ac-nav-badge" class="nav-badge" style="display:none"></span></button>
 </div>
 
 <!-- ══════════════ Проекты (внутренний id "shootings" — не трогать) ══════════════ -->
@@ -799,6 +800,17 @@
   <span id="user-status" style="margin-left:auto"></span>
   <button class="btn-logout" onclick="authLogout()" title="Выйти из аккаунта" id="btn-logout" style="display:none">Выйти</button>
 <!-- ══════════════ Метрики (Usage) ══════════════ -->
+<div id="page-activity" class="page">
+  <div class="container">
+    <div class="projects-header">
+      <div class="section-title">Активность клиентов</div>
+    </div>
+    <div id="ac-body" class="ac-body">
+      <div class="ac-empty ds-meta">Загрузка…</div>
+    </div>
+  </div>
+</div>
+
 <div id="page-metrics" class="page">
   <div class="container">
     <div class="projects-header">
@@ -835,8 +847,8 @@
 <script src="js/diag.js"></script>
 <script src="js/state.js?v=3"></script>
 <script src="js/events.js?v=23"></script>
-<script src="js/nav.js?v=2"></script>
-<script src="js/shootings.js?v=30"></script>
+<script src="js/nav.js?v=3"></script>
+<script src="js/shootings.js?v=31"></script>
 <script src="js/lib/justified-layout.min.js?v=1"></script>
 <script src="js/layout.js?v=2"></script>
 <script src="js/cards.js?v=12"></script>
@@ -847,6 +859,7 @@
 <script src="js/supabase.js?v=31"></script>
 <script src="js/metrics.js?v=1"></script>
 <script src="js/demo.js?v=1"></script>
+<script src="js/activity.js?v=1"></script>
 <script src="js/cloud-ui.js?v=3"></script>
 <!-- Post-approval safeguard: блокирует случайный sync после
      «Согласовать отбор». См. docs/agents/dev/post-approval-safeguard.md -->

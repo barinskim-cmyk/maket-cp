@@ -5,7 +5,7 @@
 function showPage(name) {
   /* Permission-hardening: гость по share-ссылке не должен попадать на
      админ-вкладки (Артикулы, Синхронизация). Если попытка — редирект на съёмки. */
-  if (window._isShareLink && (name === 'articles' || name === 'sync' || name === 'metrics')) {
+  if (window._isShareLink && (name === 'articles' || name === 'sync' || name === 'metrics' || name === 'activity')) {
     name = 'shootings';
   }
   App.currentPage = name;
@@ -37,6 +37,10 @@ function showPage(name) {
   if (name === 'metrics') {
     /* Экран использования: загрузить и отрисовать сводку */
     if (typeof mxOnPageShow === 'function') mxOnPageShow();
+  }
+  if (name === 'activity') {
+    /* Лента активности клиента: отрисовать и пометить просмотренным */
+    if (typeof acOnPageShow === 'function') acOnPageShow();
   }
 }
 
@@ -230,6 +234,11 @@ function navUpdateTabVisibility() {
 
   /* Метрики — сводка владельца; гостю по share-ссылке не показываем */
   if (mxBtn) mxBtn.style.display = window._isShareLink ? 'none' : '';
+
+  /* Активность клиентов — owner-only; гостю скрываем, бейдж обновляем */
+  var acBtn = document.getElementById('nav-activity');
+  if (acBtn) acBtn.style.display = window._isShareLink ? 'none' : '';
+  if (typeof acRefreshBadge === 'function') acRefreshBadge();
 
   /* Синхронизация — только desktop (нужен Python для записи COS) */
   if (syncBtn) syncBtn.style.display = isDesktop ? '' : 'none';

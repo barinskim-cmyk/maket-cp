@@ -3816,3 +3816,31 @@ h1, h2, h3, .modal h3, .modal-title { font-family: var(--font-main); font-weight
 .mx-empty-line { padding: 10px 2px; }
 .mx-notice { max-width: 520px; }
 .mx-foot { margin-top: 22px; padding-top: 10px; border-top: 1px solid var(--line); }
+
+/* ══ Активность клиентов (срез feat0702-notifications) ══ */
+.nav-badge {
+  display: inline-block; margin-left: 6px; min-width: 16px; padding: 0 5px;
+  font-size: 10px; line-height: 16px; font-weight: 600; text-align: center;
+  color: var(--bg); background: var(--accent); border-radius: 8px;
+  vertical-align: top; font-variant-numeric: tabular-nums;
+}
+.ac-body { padding: 4px 0 48px; }
+.ac-summary { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--text-3); margin-bottom: 14px; }
+.ac-list { display: flex; flex-direction: column; }
+.ac-item { display: flex; gap: 10px; padding: 12px 2px; border-top: 1px solid var(--border-soft); }
+.ac-item:first-child { border-top: none; }
+.ac-dot { flex: 0 0 auto; width: 7px; height: 7px; margin-top: 6px; border-radius: 50%;
+  background: transparent; border: 1px solid var(--border); }
+.ac-item.ac-new .ac-dot { background: var(--accent); border-color: var(--accent); }
+.ac-item-main { flex: 1 1 auto; min-width: 0; }
+.ac-item-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.ac-label { font-size: 13px; color: var(--text); }
+.ac-item.ac-new .ac-label { font-weight: 600; }
+.ac-proj { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--text-3);
+  text-transform: uppercase; letter-spacing: 0.03em; }
+.ac-text { font-size: 12px; color: var(--text-2); margin-top: 4px; white-space: pre-wrap;
+  word-break: break-word; }
+.ac-meta { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--meta);
+  margin-top: 4px; font-variant-numeric: tabular-nums; }
+.ac-empty { font-size: 13px; line-height: 1.5; max-width: 520px; padding: 24px 0; }
