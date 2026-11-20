@@ -789,10 +789,10 @@ tr:hover td { background: #fafafa; }
   <td>3.5</td>
   <td contenteditable="true"><strong>Аннотации (рисование на фото)</strong></td>
   <td><span class="who-claude">Claude</span></td>
-  <td><span class="s-todo">TODO</span></td>
+  <td><span class="s-done">DONE</span></td>
   <td>Ретушь</td>
-  <td>Canvas overlay для рисования (обводка дефектов, стрелки). Хранить аннотации как SVG/JSON. Видно при просмотре и в экспорте.</td>
-  <td class="files">новый модуль, style.css</td>
+  <td>Canvas overlay для рисования (обводка дефектов, стрелки). Хранить аннотации как SVG/JSON. Видно при просмотре и в экспорте. [DONE 20.11: механика реализована сквозняком в previews.js. RT_ANNOTATION_TYPES (Удалить/Смягчить/Обрати внимание — цвет+бордер); rtAddAnnotation сохраняет JSON в proj._annotations[photoName]: {id, shape:'circle'|'line', type, text, tags, author:team|client, created ISO, геометрия (x/y/rx/ry для эллипса-обводки, points[] для линии)}; rtGetAnnotations читает по имени фото; rtRenderAnnotations строит SVG-слой .rt-annot-layer поверх картинки — эллипсы .rt-circle (drag/resize, лейбл типа+текст) и линии через <svg><path> (сглаживание _rtBuildSmoothPath). Автосохранение (shAutoSave) + облачная синхронизация при добавлении. Видно в лайтбоксе и сводке карточки (_cpRenderSlotAnnotations). Экспорт аннотаций в PDF — отдельная задача s3-06. Верификация: tests/unit/photo-annotations.test.js — jsdom на реальных index.html+previews.js, 38/38 PASS (типы+API; обводка circle и линия line с сохранением геометрии/точек; автор team/client + timestamp ISO; изоляция по фото; автосохранение на каждое добавление; рендер слоя: 2 эллипса .rt-circle с data-annot-id + svg path, цвет/бордер из типа, лейбл с текстом; повторный рендер без дублей слоя; нет emoji в UI). Регресс: весь юнит-набор зелёный (20 файлов, 0 FAIL).]</td>
+  <td class="files">previews.js, tests/unit/photo-annotations.test.js</td>
   <td>3.4</td>
   <td class="t-cell"><span class="t-none">--</span></td>
   <td contenteditable="true" class="my-comment"></td>
